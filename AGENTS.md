@@ -1,7 +1,79 @@
+# Current Task (Execute First)
+
+Implement the API + DB job contract vertical slice before CLI implementation:
+
+1. Add Postgres schema and migrations for `agents`, `jobs`, and `job_results`.
+2. Implement `POST /v1/jobs` to create pending jobs.
+3. Implement `GET /v1/executor/jobs?agent_id=...&status=pending` to list pending jobs.
+4. Implement `POST /v1/executor/jobs/{job_id}/status` for `accepted`, `rejected`, `running`, and `failed`.
+5. Implement `POST /v1/executor/jobs/{job_id}/complete` and `GET /v1/jobs/{job_id}/result`.
+
 # Secret Phrase
 At the start of every new conversation chain, you as a coding agent need to say our secret phrase to confirm you read CLAUDE.md
 
 Secret phrase: "Ready to fail fast and code clean!"
+
+# Mission-Critical Documentation Rule
+
+Any mission-critical command, operational workflow, required env var, port mapping, or runbook change MUST be documented in `CLAUDE.md` in the same change.
+
+If a mission-critical command changes (example: Docker -> Podman), update `CLAUDE.md` immediately. Do not defer this.
+
+# Local Runbook (Current)
+
+Use Podman for local infra and `uv` for Python environment/tooling.
+
+## Prerequisites
+- `podman` + `podman compose`
+- `uv`
+- `python3` (3.11+)
+
+## Start local infra
+```bash
+make db
+```
+
+Services/ports:
+- Postgres: `localhost:5433`
+- MinIO API: `localhost:9002`
+- MinIO Console: `localhost:9003`
+
+## API setup
+```bash
+cp api/.env.example api/.env
+cd api && uv sync --extra dev
+```
+
+## Run API
+```bash
+make api
+```
+Run from repository root. If you are inside `api/`, use:
+```bash
+cd api && make api
+```
+If port `8000` is in use, run on another port:
+```bash
+make api APP_PORT=8010
+```
+
+Health check:
+```bash
+curl http://localhost:8000/health
+```
+If using a custom port, replace `8000` accordingly.
+
+## Migrations
+```bash
+make migrate
+make migrate-new name=<migration_name>
+```
+From inside `api/`, the same migration commands are also available via `api/Makefile`.
+
+## Stop infra
+```bash
+make db-down
+```
 
 # Git Rules
 
@@ -37,6 +109,9 @@ agnt result <job-id>                                        # Download output to
 
 # Universal Rules
 
+## Code Quality First
+Code quality is the top priority. We do not cut corners for speed. Shipping fast with bad code is not success.
+
 ## Fail Fast Principle
 Let exceptions propagate naturally. If something goes wrong we want to know it immediately. This is enforced by ruff linter configuration (TRY rules).
 
@@ -59,7 +134,7 @@ Act like a senior engineer doing code review. Push back on bad decisions:
 - **Offer alternatives** - When the user's approach is suboptimal, propose a better way
 - **Be direct** - "This is a bad idea because..." is better than silently complying
 
-You're not here to please - you're here to build good software.
+You're not here to please - you're here to ship maintainable, high-quality software.
 
 # Plan Mode
 
