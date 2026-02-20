@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     app_port: int = 8000
     database_url: str = "postgresql+asyncpg://agnt:agnt@localhost:5433/agnt"
 
+    @property
+    def database_sync_url(self) -> str:
+        if "+asyncpg" not in self.database_url:
+            raise ValueError("DATABASE_URL must use postgresql+asyncpg for runtime.")
+        return self.database_url.replace("+asyncpg", "+psycopg", 1)
+
 
 @lru_cache
 def get_settings() -> Settings:
