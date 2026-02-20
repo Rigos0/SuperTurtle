@@ -83,6 +83,7 @@ make db-down
 - Valid scopes: `frontend`, `backend`, `landing`, `video`, `copilot`, `infra`, `docs`, `repo`
 - Do NOT include Claude signature (no "Co-Authored-By", no "Generated with Claude Code")
 - See `docs/CONTRIBUTING.md` for full details
+- **Amend when logical:** Before committing, check the last commit. If the new changes belong to the same logical unit of work, amend (`git commit --amend`) instead of creating a separate commit. Avoid multiple commits for what should be one.
 
 ## Pull Requests
 - Do NOT include Claude signature in PR descriptions
