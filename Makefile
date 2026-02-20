@@ -7,11 +7,11 @@ db-down:
 	docker compose down
 
 api:
-	uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+	uvicorn agnt_api.main:app --reload --host 0.0.0.0 --port 8000 --app-dir api
 
 migrate:
-	alembic upgrade head
+	cd api && alembic upgrade head
 
 migrate-new:
 	@test -n "$(name)" || (echo "Usage: make migrate-new name=<migration_name>" && exit 1)
-	alembic revision --autogenerate -m "$(name)"
+	cd api && alembic revision --autogenerate -m "$(name)"
