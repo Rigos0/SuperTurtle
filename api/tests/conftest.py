@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi.testclient import TestClient
 
-from agnt_api.api.deps import get_session
+from agnt_api.api.deps import get_session, get_storage
 from agnt_api.main import create_app
 from agnt_api.models.enums import JobStatus
 
@@ -59,6 +59,22 @@ def make_job(**overrides: Any) -> FakeModel:
     return FakeModel(**defaults)
 
 
+def make_job_result(**overrides: Any) -> FakeModel:
+    defaults: dict[str, Any] = {
+        "job_id": uuid.uuid4(),
+        "files_json": [
+            {
+                "path": "jobs/default/result.txt",
+                "size_bytes": 12,
+                "mime_type": "text/plain",
+            }
+        ],
+        "created_at": _utc_now(),
+    }
+    defaults.update(overrides)
+    return FakeModel(**defaults)
+
+
 class FakeScalarsResult:
     """Mimics the result of session.scalars()."""
 
@@ -75,7 +91,22 @@ def mock_session() -> AsyncMock:
 
 
 @pytest.fixture()
+def mock_storage() -> AsyncMock:
+    storage = AsyncMock()
+    storage.presigned_url = AsyncMock(return_value="https://example.com/download/file")
+    return storage
+
+
+@pytest.fixture()
 def client(mock_session: AsyncMock) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_session] = lambda: mock_session
+    return TestClient(app)
+
+
+@pytest.fixture()
+def client_with_storage(mock_session: AsyncMock, mock_storage: AsyncMock) -> TestClient:
+    app = create_app()
+    app.dependency_overrides[get_session] = lambda: mock_session
+    app.dependency_overrides[get_storage] = lambda: mock_storage
     return TestClient(app)

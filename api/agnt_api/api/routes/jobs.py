@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agnt_api.api.deps import get_session
+from agnt_api.api.deps import get_session, get_storage
 from agnt_api.api.errors import ApiError
 from agnt_api.models import Agent, Job, JobResult, JobStatus
 from agnt_api.schemas.common import ErrorResponse
@@ -18,6 +18,7 @@ from agnt_api.schemas.jobs import (
     JobListResponse,
     JobResultResponse,
 )
+from agnt_api.storage import Storage
 
 router = APIRouter(tags=["jobs"])
 
@@ -124,11 +125,17 @@ async def get_job(
 @router.get(
     "/jobs/{job_id}/result",
     response_model=JobResultResponse,
-    responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+    responses={
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+        502: {"model": ErrorResponse},
+    },
 )
 async def get_job_result(
     job_id: UUID,
     session: AsyncSession = Depends(get_session),
+    storage: Storage = Depends(get_storage),
 ) -> JobResultResponse:
     job = await session.get(Job, job_id)
     if job is None:
@@ -144,4 +151,37 @@ async def get_job_result(
     if result is None:
         raise ApiError(status_code=404, error="job_result_not_found", message="Job result does not exist.")
 
-    return JobResultResponse(job_id=job.id, status=job.status, files=result.files_json)
+    if not isinstance(result.files_json, list):
+        raise ApiError(
+            status_code=500,
+            error="invalid_job_result_manifest",
+            message="Job result contains an invalid file manifest.",
+        )
+
+    files = await _attach_download_urls(result.files_json, storage)
+    return JobResultResponse(job_id=job.id, status=job.status, files=files)
+
+
+async def _attach_download_urls(
+    files: list[dict[str, object]],
+    storage: Storage,
+) -> list[dict[str, object]]:
+    enriched_files: list[dict[str, object]] = []
+    for file_entry in files:
+        path = file_entry.get("path")
+        if not isinstance(path, str) or not path:
+            raise ApiError(
+                status_code=500,
+                error="invalid_job_result_manifest",
+                message="Job result contains an invalid file manifest.",
+            )
+        try:
+            download_url = await storage.presigned_url(path)
+        except Exception as exc:
+            raise ApiError(
+                status_code=502,
+                error="storage_presign_failed",
+                message="Failed to generate download URLs for job result files.",
+            ) from exc
+        enriched_files.append({**file_entry, "download_url": download_url})
+    return enriched_files

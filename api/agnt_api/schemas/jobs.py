@@ -57,6 +57,7 @@ class UpdateJobStatusResponse(BaseModel):
 
 class JobManifestFile(BaseModel):
     path: str
+    download_url: str
     size_bytes: int | None = Field(default=None, ge=0)
     mime_type: str | None = None
 

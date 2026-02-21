@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import uuid
+from unittest.mock import AsyncMock
 
 from agnt_api.models.enums import JobStatus
-from conftest import FakeScalarsResult, make_job
+from conftest import FakeScalarsResult, make_job, make_job_result
 
 
 def test_list_jobs_empty(client, mock_session):
@@ -103,3 +104,115 @@ def test_get_job_not_found(client, mock_session):
 def test_get_job_invalid_uuid(client, mock_session):
     resp = client.get("/v1/jobs/not-a-uuid")
     assert resp.status_code == 422
+
+
+def test_get_job_result_returns_presigned_urls(client_with_storage, mock_session, mock_storage):
+    job = make_job(status=JobStatus.COMPLETED, progress=100)
+    result = make_job_result(
+        job_id=job.id,
+        files_json=[
+            {"path": f"jobs/{job.id}/result.txt", "size_bytes": 5, "mime_type": "text/plain"},
+            {"path": f"jobs/{job.id}/summary.json", "size_bytes": 11, "mime_type": "application/json"},
+        ],
+    )
+    mock_session.get.return_value = job
+    mock_session.scalar.return_value = result
+
+    mock_storage.presigned_url = AsyncMock(
+        side_effect=[
+            "https://example.com/download/result.txt",
+            "https://example.com/download/summary.json",
+        ]
+    )
+
+    resp = client_with_storage.get(f"/v1/jobs/{job.id}/result")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["job_id"] == str(job.id)
+    assert body["status"] == "completed"
+    assert len(body["files"]) == 2
+    assert body["files"][0]["path"] == f"jobs/{job.id}/result.txt"
+    assert body["files"][0]["download_url"] == "https://example.com/download/result.txt"
+    assert body["files"][1]["path"] == f"jobs/{job.id}/summary.json"
+    assert body["files"][1]["download_url"] == "https://example.com/download/summary.json"
+    assert mock_storage.presigned_url.await_count == 2
+    assert mock_storage.presigned_url.await_args_list[0].args[0] == f"jobs/{job.id}/result.txt"
+    assert mock_storage.presigned_url.await_args_list[1].args[0] == f"jobs/{job.id}/summary.json"
+
+
+def test_get_job_result_returns_404_when_job_missing(client_with_storage, mock_session):
+    mock_session.get.return_value = None
+
+    resp = client_with_storage.get(f"/v1/jobs/{uuid.uuid4()}/result")
+
+    assert resp.status_code == 404
+    assert resp.json()["error"] == "job_not_found"
+
+
+def test_get_job_result_returns_409_when_job_not_completed(client_with_storage, mock_session):
+    job = make_job(status=JobStatus.RUNNING, progress=75)
+    mock_session.get.return_value = job
+
+    resp = client_with_storage.get(f"/v1/jobs/{job.id}/result")
+
+    assert resp.status_code == 409
+    assert resp.json()["error"] == "job_not_completed"
+
+
+def test_get_job_result_returns_404_when_result_missing(client_with_storage, mock_session):
+    job = make_job(status=JobStatus.COMPLETED, progress=100)
+    mock_session.get.return_value = job
+    mock_session.scalar.return_value = None
+
+    resp = client_with_storage.get(f"/v1/jobs/{job.id}/result")
+
+    assert resp.status_code == 404
+    assert resp.json()["error"] == "job_result_not_found"
+
+
+def test_get_job_result_returns_502_when_presign_fails(client_with_storage, mock_session, mock_storage):
+    job = make_job(status=JobStatus.COMPLETED, progress=100)
+    result = make_job_result(
+        job_id=job.id,
+        files_json=[{"path": f"jobs/{job.id}/result.txt", "size_bytes": 5, "mime_type": "text/plain"}],
+    )
+    mock_session.get.return_value = job
+    mock_session.scalar.return_value = result
+
+    mock_storage.presigned_url = AsyncMock(side_effect=RuntimeError("storage down"))
+
+    resp = client_with_storage.get(f"/v1/jobs/{job.id}/result")
+
+    assert resp.status_code == 502
+    assert resp.json()["error"] == "storage_presign_failed"
+
+
+def test_get_job_result_returns_500_when_manifest_has_no_path(client_with_storage, mock_session):
+    job = make_job(status=JobStatus.COMPLETED, progress=100)
+    result = make_job_result(
+        job_id=job.id,
+        files_json=[{"size_bytes": 5, "mime_type": "text/plain"}],
+    )
+    mock_session.get.return_value = job
+    mock_session.scalar.return_value = result
+
+    resp = client_with_storage.get(f"/v1/jobs/{job.id}/result")
+
+    assert resp.status_code == 500
+    assert resp.json()["error"] == "invalid_job_result_manifest"
+
+
+def test_get_job_result_returns_500_when_files_json_not_a_list(client_with_storage, mock_session):
+    job = make_job(status=JobStatus.COMPLETED, progress=100)
+    result = make_job_result(
+        job_id=job.id,
+        files_json={"not": "a list"},
+    )
+    mock_session.get.return_value = job
+    mock_session.scalar.return_value = result
+
+    resp = client_with_storage.get(f"/v1/jobs/{job.id}/result")
+
+    assert resp.status_code == 500
+    assert resp.json()["error"] == "invalid_job_result_manifest"
