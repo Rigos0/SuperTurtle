@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-POC complete — all backlog items delivered and end-to-end flow validated. Ready to select next phase of work.
+Marketplace Frontend — iteration 1: scaffold `web/` project (Vite + React + TS + shadcn/ui + Tailwind + API client).
 
 
 # End goal with specs
@@ -91,33 +91,34 @@ All output is JSON only.
 
 # ROADMAP
 
-1. **API** — complete all buyer-facing and executor-facing endpoints with tests
-2. **Object storage** — MinIO locally, S3-compatible in deployment; wire into job results
-3. **CLI** — Go binary implementing all `agnt` commands, JSON output
-4. **Distribution** — npm wrapper complete; pip wrapper package for the Go binary in progress
-5. **Local orchestration** — Podman compose for full-stack local dev (API + Postgres + MinIO)
-6. **Integration** — end-to-end flow: CLI → API → executor → result download
+1. ~~**API** — complete all buyer-facing and executor-facing endpoints with tests~~ ✓
+2. ~~**Object storage** — MinIO locally, S3-compatible in deployment; wire into job results~~ ✓
+3. ~~**CLI** — Go binary implementing all `agnt` commands, JSON output~~ ✓
+4. ~~**Distribution** — npm wrapper complete; pip wrapper package for Go binary~~ ✓
+5. ~~**Local orchestration** — Podman compose for full-stack local dev~~ ✓
+6. ~~**Integration** — end-to-end flow: CLI → API → executor → result download~~ ✓
+7. ~~**Auth** — static API key auth (buyer + executor) via DI~~ ✓
+8. **Marketplace Frontend** — web UI for browsing agents, viewing details, placing orders
 
 
 # BACKLOG
 
-Near-term tasks to chip away at, roughly in order:
+Marketplace Frontend (current phase):
 
-- [x] Add buyer-facing agent endpoints (search, detail)
-- [x] Add buyer-facing job endpoints (list, detail)
-- [x] Object storage setup (MinIO container, S3 client in API)
-- [x] Wire file upload into job completion endpoint
-- [x] Wire file download into job result endpoint
-- [x] Go CLI scaffold (module init, cobra setup, config)
-- [x] CLI HTTP client (`cli/internal/api/`) + `search` and `info` commands
-- [x] CLI `order` command
-- [x] CLI `jobs` and `status` commands
-- [x] CLI `result` command (download files)
-- [x] npm distribution package (JS wrapper for Go binary)
-- [x] pip distribution package (Python wrapper for Go binary)
-- [x] Local orchestration: API Dockerfile + compose + Makefile targets
-- [x] Seed data: sample agents for local dev/testing
-- [x] Fix presigned URLs for host access (`S3_PUBLIC_URL` config rewrite)
-- [x] Integration: end-to-end script, Makefile target, and docs (`scripts/`)
-- [x] Code review polish: S3 URL caching, test coverage, integration script hardening
-- [x] Validate end-to-end flow: run `make integration` against the live stack
+- [ ] Scaffold `web/` — Vite + React + TS + shadcn/ui + Tailwind + API client
+- [ ] Agent Browse page — search, tag filter, agent card grid
+- [ ] Agent Detail page — full info, schemas, pricing, "Order" CTA
+- [ ] Order Flow page — dynamic form from input_schema, job creation
+- [ ] Docker + compose integration — Dockerfile, nginx proxy, compose service
+- [ ] Polish — error handling UI, responsive, README
+
+Future (not this phase):
+
+- [ ] Job tracking pages (my jobs, status, result download)
+- [ ] Landing/marketing page
+- [ ] Per-user auth (login flow, DB-backed API keys)
+- [ ] Admin dashboard
+- [ ] Rate limiting on the API
+- [ ] Deployment configuration (cloud infra, CI/CD)
+- [ ] CLI polish (better error messages, `--help` refinements, version command)
+- [ ] Executor SDK/example (sample executor implementation)

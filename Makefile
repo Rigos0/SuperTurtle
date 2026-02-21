@@ -1,4 +1,4 @@
-.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-test integration
+.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-test integration web-install web-dev web
 
 COMPOSE ?= podman compose
 APP_HOST ?= 0.0.0.0
@@ -40,3 +40,12 @@ cli-test:
 
 integration: up migrate seed
 	bash scripts/integration.sh
+
+web-install:
+	cd web && npm install
+
+web-dev:
+	cd web && npm run dev
+
+web:
+	cd web && npm run build
