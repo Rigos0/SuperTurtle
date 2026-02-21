@@ -484,3 +484,77 @@ func TestGetJobInvalidUUID(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestGetJobResult(t *testing.T) {
+	t.Parallel()
+
+	jobID := "11111111-2222-3333-4444-555555555555"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/v1/jobs/"+jobID+"/result" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"job_id":"11111111-2222-3333-4444-555555555555",
+			"status":"completed",
+			"files":[
+				{
+					"path":"jobs/11111111-2222-3333-4444-555555555555/result.txt",
+					"download_url":"https://example.com/result.txt",
+					"size_bytes":5,
+					"mime_type":"text/plain"
+				}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL, 2*time.Second, "")
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	resp, err := client.GetJobResult(context.Background(), jobID)
+	if err != nil {
+		t.Fatalf("GetJobResult() error = %v", err)
+	}
+	if resp.JobID != jobID {
+		t.Fatalf("unexpected job id: %s", resp.JobID)
+	}
+	if resp.Status != "completed" {
+		t.Fatalf("unexpected status: %s", resp.Status)
+	}
+	if len(resp.Files) != 1 {
+		t.Fatalf("unexpected file count: %d", len(resp.Files))
+	}
+	if resp.Files[0].DownloadURL != "https://example.com/result.txt" {
+		t.Fatalf("unexpected download url: %s", resp.Files[0].DownloadURL)
+	}
+	if resp.Files[0].SizeBytes == nil || *resp.Files[0].SizeBytes != 5 {
+		t.Fatalf("unexpected size: %v", resp.Files[0].SizeBytes)
+	}
+	if resp.Files[0].MimeType == nil || *resp.Files[0].MimeType != "text/plain" {
+		t.Fatalf("unexpected mime type: %v", resp.Files[0].MimeType)
+	}
+}
+
+func TestGetJobResultInvalidUUID(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient("http://localhost:9999", 2*time.Second, "")
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	_, err = client.GetJobResult(context.Background(), "not-a-uuid")
+	if err == nil {
+		t.Fatalf("expected error for invalid UUID")
+	}
+	if err.Error() != "invalid job id: must be a valid UUID" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

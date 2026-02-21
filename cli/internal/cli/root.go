@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -338,29 +341,160 @@ func newStatusCommand() *cobra.Command {
 }
 
 func newResultCommand() *cobra.Command {
-	cmd := newStubCommand("result <job-id>", "Download job result files", cobra.ExactArgs(1), "result")
-	cmd.Flags().String("output", ".", "Output directory for downloaded files")
+	var outputDir string
+
+	cmd := &cobra.Command{
+		Use:   "result <job-id>",
+		Short: "Download job result files",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if strings.TrimSpace(outputDir) == "" {
+				return &CLIError{
+					Code:     "validation_error",
+					Message:  "output must not be empty",
+					ExitCode: 4,
+				}
+			}
+
+			client, err := apiClientFromContext(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			resp, err := client.GetJobResult(cmd.Context(), args[0])
+			if err != nil {
+				return toCLIError(err)
+			}
+
+			if resp.Status != "completed" {
+				return &CLIError{
+					Code:     "job_not_completed",
+					Message:  fmt.Sprintf("job status is %q, must be completed to download results", resp.Status),
+					ExitCode: 1,
+				}
+			}
+
+			downloadClient := &http.Client{
+				Timeout: 10 * time.Minute,
+			}
+
+			files := make([]resultOutputFile, 0, len(resp.Files))
+			for _, file := range resp.Files {
+				destination, err := resultDestinationPath(outputDir, file.Path)
+				if err != nil {
+					return &CLIError{
+						Code:     "invalid_job_result_manifest",
+						Message:  fmt.Sprintf("invalid result file path %q: %v", file.Path, err),
+						ExitCode: 1,
+					}
+				}
+				if err := downloadFile(cmd.Context(), downloadClient, file.DownloadURL, destination); err != nil {
+					return &CLIError{
+						Code:     "download_failed",
+						Message:  fmt.Sprintf("download %q failed: %v", file.Path, err),
+						ExitCode: 1,
+					}
+				}
+				files = append(files, resultOutputFile{
+					Path:      destination,
+					SizeBytes: file.SizeBytes,
+					MimeType:  file.MimeType,
+				})
+			}
+
+			return writeJSON(cmd.OutOrStdout(), resultOutput{
+				JobID:  resp.JobID,
+				Status: resp.Status,
+				Files:  files,
+			})
+		},
+	}
+
+	cmd.Flags().StringVar(&outputDir, "output", ".", "Output directory for downloaded files")
 	return cmd
 }
 
-func newStubCommand(
-	use string,
-	short string,
-	args cobra.PositionalArgs,
-	commandName string,
-) *cobra.Command {
-	return &cobra.Command{
-		Use:   use,
-		Short: short,
-		Args:  args,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return &CLIError{
-				Code:     "not_implemented",
-				Message:  fmt.Sprintf("%s command is not implemented yet", commandName),
-				ExitCode: 1,
-			}
-		},
+type resultOutput struct {
+	JobID  string             `json:"job_id"`
+	Status string             `json:"status"`
+	Files  []resultOutputFile `json:"files"`
+}
+
+type resultOutputFile struct {
+	Path      string  `json:"path"`
+	SizeBytes *int    `json:"size_bytes"`
+	MimeType  *string `json:"mime_type"`
+}
+
+func resultDestinationPath(outputDir string, resultPath string) (string, error) {
+	cleanResultPath := filepath.Clean(resultPath)
+	if cleanResultPath == "." || cleanResultPath == string(filepath.Separator) {
+		return "", errors.New("path must not be empty")
 	}
+	if filepath.IsAbs(cleanResultPath) {
+		return "", errors.New("path must be relative")
+	}
+
+	absOutput, err := filepath.Abs(outputDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve output directory: %w", err)
+	}
+	joined := filepath.Join(absOutput, cleanResultPath)
+	if !strings.HasPrefix(joined, absOutput+string(filepath.Separator)) {
+		return "", errors.New("path must not escape output directory")
+	}
+
+	return filepath.Join(outputDir, cleanResultPath), nil
+}
+
+const maxDownloadBytes = 1 << 30 // 1 GiB
+
+func downloadFile(ctx context.Context, httpClient *http.Client, downloadURL string, destination string) error {
+	if strings.TrimSpace(downloadURL) == "" {
+		return errors.New("download_url must not be empty")
+	}
+
+	parsed, err := url.Parse(downloadURL)
+	if err != nil {
+		return fmt.Errorf("parse download url: %w", err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("unsupported download url scheme %q", parsed.Scheme)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("unexpected status %d", resp.StatusCode)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
+		return fmt.Errorf("create destination directory: %w", err)
+	}
+
+	file, err := os.Create(destination)
+	if err != nil {
+		return fmt.Errorf("create destination file: %w", err)
+	}
+
+	if _, err := io.Copy(file, io.LimitReader(resp.Body, maxDownloadBytes)); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("write destination file: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("close destination file: %w", err)
+	}
+
+	return nil
 }
 
 func exitCode(err error) int {

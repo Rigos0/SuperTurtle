@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Implement CLI `result` command — add API client support for `GET /v1/jobs/{job_id}/result`, implement file download behavior in CLI, and add `httptest`-based tests at both client and CLI levels.
+npm distribution package — JavaScript wrapper that installs the compiled Go binary and exposes `agnt` as a CLI command via `npx` / `npm exec`.
 
 
 # End goal with specs
@@ -112,5 +112,6 @@ Near-term tasks to chip away at, roughly in order:
 - [x] CLI HTTP client (`cli/internal/api/`) + `search` and `info` commands
 - [x] CLI `order` command
 - [x] CLI `jobs` and `status` commands
-- [ ] CLI `result` command (download files) ← current
+- [x] CLI `result` command (download files)
+- [ ] npm distribution package (JS wrapper for Go binary) ← current
 

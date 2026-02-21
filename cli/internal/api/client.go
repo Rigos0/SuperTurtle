@@ -108,6 +108,19 @@ type JobDetailResponse struct {
 	CompletedAt    *time.Time     `json:"completed_at"`
 }
 
+type JobResultResponse struct {
+	JobID  string          `json:"job_id"`
+	Status string          `json:"status"`
+	Files  []JobResultFile `json:"files"`
+}
+
+type JobResultFile struct {
+	Path        string  `json:"path"`
+	DownloadURL string  `json:"download_url"`
+	SizeBytes   *int    `json:"size_bytes"`
+	MimeType    *string `json:"mime_type"`
+}
+
 type createJobRequest struct {
 	AgentID string         `json:"agent_id"`
 	Prompt  string         `json:"prompt"`
@@ -258,6 +271,18 @@ func (c *Client) GetJob(ctx context.Context, jobID string) (JobDetailResponse, e
 	var resp JobDetailResponse
 	if err := c.getJSON(ctx, jobsPath+"/"+jobID, nil, &resp); err != nil {
 		return JobDetailResponse{}, err
+	}
+	return resp, nil
+}
+
+func (c *Client) GetJobResult(ctx context.Context, jobID string) (JobResultResponse, error) {
+	if !uuidPattern.MatchString(jobID) {
+		return JobResultResponse{}, fmt.Errorf("invalid job id: must be a valid UUID")
+	}
+
+	var resp JobResultResponse
+	if err := c.getJSON(ctx, jobsPath+"/"+jobID+"/result", nil, &resp); err != nil {
+		return JobResultResponse{}, err
 	}
 	return resp, nil
 }

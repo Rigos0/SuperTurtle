@@ -3,9 +3,12 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -567,5 +570,366 @@ func TestRunStatusNotFound(t *testing.T) {
 	}
 	if payload["error"] != "job_not_found" {
 		t.Fatalf("unexpected error: %v", payload["error"])
+	}
+}
+
+func TestRunResultCommand(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	jobID := "11111111-2222-3333-4444-555555555555"
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/jobs/" + jobID + "/result":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"job_id":"11111111-2222-3333-4444-555555555555",
+				"status":"completed",
+				"files":[
+					{
+						"path":"jobs/11111111-2222-3333-4444-555555555555/result.txt",
+						"download_url":"` + server.URL + `/downloads/result.txt",
+						"size_bytes":5,
+						"mime_type":"text/plain"
+					},
+					{
+						"path":"jobs/11111111-2222-3333-4444-555555555555/summary.json",
+						"download_url":"` + server.URL + `/downloads/summary.json",
+						"size_bytes":17,
+						"mime_type":"application/json"
+					}
+				]
+			}`))
+		case "/downloads/result.txt":
+			_, _ = w.Write([]byte("hello"))
+		case "/downloads/summary.json":
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	t.Setenv("AGNT_API_BASE_URL", server.URL)
+
+	outputDir := filepath.Join(t.TempDir(), "downloads")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := run(&stdout, &stderr, []string{"result", jobID, "--output", outputDir})
+	if exit != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", exit, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+
+	expectedResultPath := filepath.Join(outputDir, "jobs", jobID, "result.txt")
+	expectedSummaryPath := filepath.Join(outputDir, "jobs", jobID, "summary.json")
+
+	content, err := os.ReadFile(expectedResultPath)
+	if err != nil {
+		t.Fatalf("read downloaded result file: %v", err)
+	}
+	if string(content) != "hello" {
+		t.Fatalf("unexpected file content: %s", string(content))
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("expected json output, got %v", err)
+	}
+	if payload["job_id"] != jobID {
+		t.Fatalf("unexpected job_id: %v", payload["job_id"])
+	}
+	if payload["status"] != "completed" {
+		t.Fatalf("unexpected status: %v", payload["status"])
+	}
+	files, ok := payload["files"].([]any)
+	if !ok || len(files) != 2 {
+		t.Fatalf("unexpected files payload: %#v", payload["files"])
+	}
+	first, ok := files[0].(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected first file payload: %#v", files[0])
+	}
+	if first["path"] != expectedResultPath {
+		t.Fatalf("unexpected first file path: %v", first["path"])
+	}
+	second, ok := files[1].(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected second file payload: %#v", files[1])
+	}
+	if second["path"] != expectedSummaryPath {
+		t.Fatalf("unexpected second file path: %v", second["path"])
+	}
+}
+
+func TestRunResultCommandDownloadFailure(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	jobID := "11111111-2222-3333-4444-555555555555"
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/jobs/" + jobID + "/result":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"job_id":"11111111-2222-3333-4444-555555555555",
+				"status":"completed",
+				"files":[
+					{
+						"path":"jobs/11111111-2222-3333-4444-555555555555/result.txt",
+						"download_url":"` + server.URL + `/downloads/result.txt",
+						"size_bytes":5,
+						"mime_type":"text/plain"
+					}
+				]
+			}`))
+		case "/downloads/result.txt":
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte("storage unavailable"))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	t.Setenv("AGNT_API_BASE_URL", server.URL)
+
+	outputDir := filepath.Join(t.TempDir(), "downloads")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := run(&stdout, &stderr, []string{"result", jobID, "--output", outputDir})
+	if exit != 1 {
+		t.Fatalf("expected exit 1, got %d", exit)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected no stdout output, got %q", stdout.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatalf("expected json error output, got %v", err)
+	}
+	if payload["error"] != "download_failed" {
+		t.Fatalf("unexpected error code: %v", payload["error"])
+	}
+}
+
+func TestResultDestinationPath(t *testing.T) {
+	t.Parallel()
+
+	outputDir := "/tmp/output"
+	tests := []struct {
+		name      string
+		path      string
+		wantOK    bool
+		wantPath  string
+		wantError string
+	}{
+		{
+			name:     "simple file",
+			path:     "result.txt",
+			wantOK:   true,
+			wantPath: filepath.Join(outputDir, "result.txt"),
+		},
+		{
+			name:     "nested path",
+			path:     "jobs/123/result.txt",
+			wantOK:   true,
+			wantPath: filepath.Join(outputDir, "jobs/123/result.txt"),
+		},
+		{
+			name:      "empty path",
+			path:      "",
+			wantError: "path must not be empty",
+		},
+		{
+			name:      "absolute path",
+			path:      "/etc/passwd",
+			wantError: "path must be relative",
+		},
+		{
+			name:      "parent traversal",
+			path:      "../escape",
+			wantError: "path must not escape output directory",
+		},
+		{
+			name:      "deep parent traversal",
+			path:      "foo/../../escape",
+			wantError: "path must not escape output directory",
+		},
+		{
+			name:     "innocuous parent in middle resolves inside",
+			path:     "foo/../bar",
+			wantOK:   true,
+			wantPath: filepath.Join(outputDir, "bar"),
+		},
+		{
+			name:      "dot-dot only",
+			path:      "..",
+			wantError: "path must not escape output directory",
+		},
+		{
+			name:      "just slash",
+			path:      "/",
+			wantError: "path must be relative",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := resultDestinationPath(outputDir, tt.path)
+			if tt.wantOK {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if got != tt.wantPath {
+					t.Fatalf("expected %q, got %q", tt.wantPath, got)
+				}
+			} else {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantError)
+				}
+				if !strings.Contains(err.Error(), tt.wantError) {
+					t.Fatalf("expected error containing %q, got %q", tt.wantError, err.Error())
+				}
+			}
+		})
+	}
+}
+
+func TestRunResultCommandEmptyFiles(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	jobID := "11111111-2222-3333-4444-555555555555"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"job_id":"11111111-2222-3333-4444-555555555555",
+			"status":"completed",
+			"files":[]
+		}`))
+	}))
+	defer server.Close()
+	t.Setenv("AGNT_API_BASE_URL", server.URL)
+
+	outputDir := filepath.Join(t.TempDir(), "downloads")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := run(&stdout, &stderr, []string{"result", jobID, "--output", outputDir})
+	if exit != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", exit, stderr.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("expected json output, got %v", err)
+	}
+	files, ok := payload["files"].([]any)
+	if !ok {
+		t.Fatalf("unexpected files payload: %#v", payload["files"])
+	}
+	if len(files) != 0 {
+		t.Fatalf("expected empty files, got %d", len(files))
+	}
+}
+
+func TestRunResultCommandRejectsNonCompleted(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	jobID := "11111111-2222-3333-4444-555555555555"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"job_id":"11111111-2222-3333-4444-555555555555",
+			"status":"running",
+			"files":[]
+		}`))
+	}))
+	defer server.Close()
+	t.Setenv("AGNT_API_BASE_URL", server.URL)
+
+	outputDir := filepath.Join(t.TempDir(), "downloads")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := run(&stdout, &stderr, []string{"result", jobID, "--output", outputDir})
+	if exit != 1 {
+		t.Fatalf("expected exit 1, got %d", exit)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected no stdout output, got %q", stdout.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatalf("expected json error output, got %v", err)
+	}
+	if payload["error"] != "job_not_completed" {
+		t.Fatalf("unexpected error code: %v", payload["error"])
+	}
+}
+
+func TestRunResultCommandRejectsUnsafeScheme(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	jobID := "11111111-2222-3333-4444-555555555555"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(fmt.Sprintf(`{
+			"job_id":"%s",
+			"status":"completed",
+			"files":[
+				{
+					"path":"result.txt",
+					"download_url":"file:///etc/shadow",
+					"size_bytes":100,
+					"mime_type":"text/plain"
+				}
+			]
+		}`, jobID)))
+	}))
+	defer server.Close()
+	t.Setenv("AGNT_API_BASE_URL", server.URL)
+
+	outputDir := filepath.Join(t.TempDir(), "downloads")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := run(&stdout, &stderr, []string{"result", jobID, "--output", outputDir})
+	if exit != 1 {
+		t.Fatalf("expected exit 1, got %d", exit)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected no stdout output, got %q", stdout.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatalf("expected json error output, got %v", err)
+	}
+	if payload["error"] != "download_failed" {
+		t.Fatalf("unexpected error code: %v", payload["error"])
+	}
+}
+
+func TestRunResultCommandEmptyOutput(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("AGNT_API_BASE_URL", "http://localhost:9999")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := run(&stdout, &stderr, []string{
+		"result",
+		"11111111-2222-3333-4444-555555555555",
+		"--output", "",
+	})
+	if exit != 4 {
+		t.Fatalf("expected exit 4, got %d", exit)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatalf("expected json error output, got %v", err)
+	}
+	if payload["error"] != "validation_error" {
+		t.Fatalf("unexpected error code: %v", payload["error"])
 	}
 }
