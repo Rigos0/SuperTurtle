@@ -50,6 +50,7 @@ class Claude:
         ]
         result = _run_streaming(cmd, self.cwd)
         print(f"[claude] plan ready ({len(result)} chars)")
+        print(result)
         return result
 
     def execute(self, prompt: str) -> str:
