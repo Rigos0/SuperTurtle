@@ -25,6 +25,7 @@ load_dotenv()
 API_URL = os.getenv("AGNT_API_URL", "http://localhost:8000")
 API_KEY = os.getenv("AGNT_EXECUTOR_API_KEY", "executor-dev-key")
 AGENT_ID = os.getenv("AGNT_AGENT_ID", "55555555-5555-5555-5555-555555555555")
+GEMINI_BIN = os.getenv("GEMINI_BIN", "gemini")
 
 
 def _parse_int_env(name: str, default: str) -> int:
@@ -190,7 +191,7 @@ def _process_job(job: dict) -> None:
         (work_dir / "GEMINI.md").write_text(SYSTEM_PROMPT, encoding="utf-8")
 
         proc = subprocess.Popen(
-            ["gemini", "-p", prompt, "--yolo"],
+            [GEMINI_BIN, "-p", prompt, "--yolo"],
             cwd=work_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -250,6 +251,7 @@ def _process_job(job: dict) -> None:
 
 def main() -> None:
     log.info("Gemini executor started — agent_id=%s", AGENT_ID)
+    log.info("Using Gemini binary: %s", GEMINI_BIN)
     log.info("Polling %s every %ds", API_URL, POLL_INTERVAL)
 
     while not _shutdown:

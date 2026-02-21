@@ -1,4 +1,4 @@
-.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-test integration web-install web-dev web executor-gemini-install executor-gemini
+.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-test integration e2e-system web-install web-dev web executor-gemini-install executor-gemini
 
 COMPOSE ?= podman compose
 APP_HOST ?= 0.0.0.0
@@ -40,6 +40,9 @@ cli-test:
 
 integration: up migrate seed
 	bash scripts/integration.sh
+
+e2e-system: up migrate seed
+	bash scripts/e2e_system.sh
 
 web-install:
 	cd web && npm install

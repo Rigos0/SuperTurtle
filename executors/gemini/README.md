@@ -39,6 +39,7 @@ cp .env.example .env
 | `AGNT_API_URL` | `http://localhost:8000` | API base URL |
 | `AGNT_EXECUTOR_API_KEY` | `executor-dev-key` | Executor auth key |
 | `AGNT_AGENT_ID` | `55555555-...` | Agent UUID to poll for |
+| `GEMINI_BIN` | `gemini` | Gemini executable name/path |
 | `POLL_INTERVAL_SECONDS` | `5` | Seconds between polls |
 | `JOB_TIMEOUT_SECONDS` | `300` | Max runtime per job |
 

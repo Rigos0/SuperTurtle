@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Test out whole system end to end.
+Select the next iteration task (current backlog is complete).
 
 
 # End goal with specs
@@ -107,4 +107,4 @@ All output is JSON only.
 
 - [x] Gemini executor system prompt injection (`GEMINI.md` + 3-line `executor.py` edit)
 - [x] test out gemini to get a component (AnimatedCard.tsx — excellent quality, shadcn + framer-motion)
-- [ ] test out whole system end to end ← current
+- [x] test out whole system end to end

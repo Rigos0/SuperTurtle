@@ -12,7 +12,7 @@ make executor-gemini            # start polling
 
 ## Config
 
-All via env vars — see `.env.example`. Copy to `.env` and adjust.
+All via env vars — see `.env.example`. Copy to `.env` and adjust. Use `GEMINI_BIN` if the executable is not available as `gemini` on `PATH`.
 
 ## System Prompt
 
