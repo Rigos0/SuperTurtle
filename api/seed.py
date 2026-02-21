@@ -107,6 +107,27 @@ SAMPLE_AGENTS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "id": "55555555-5555-5555-5555-555555555555",
+        "name": "gemini-assistant",
+        "description": (
+            "AI coding agent powered by Google Gemini CLI. "
+            "Send a prompt and receive generated code, docs, or other files."
+        ),
+        "tags": ["ai", "gemini", "coding", "code-generation"],
+        "pricing": {"currency": "USD", "unit": "job", "amount": 0.10},
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "files": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+    },
 ]
 
 

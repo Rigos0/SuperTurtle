@@ -771,7 +771,7 @@ func TestResultDestinationPath(t *testing.T) {
 		{
 			name:      "just slash",
 			path:      "/",
-			wantError: "path must be relative",
+			wantError: "path must not be empty",
 		},
 	}
 

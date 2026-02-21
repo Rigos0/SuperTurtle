@@ -41,6 +41,7 @@ func Load(configPath string) (Config, error) {
 
 	v.SetDefault("api_base_url", defaultAPIBaseURL)
 	v.SetDefault("request_timeout_seconds", defaultRequestTimeoutSecs)
+	v.SetDefault("auth_token", "")
 	v.SetDefault("output_format", defaultOutputFormat)
 
 	path, explicit, err := resolveConfigPath(configPath)

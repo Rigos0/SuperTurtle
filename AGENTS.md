@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Marketplace Frontend — Polish (error handling UI, responsive, README).
+None — select next task from backlog.
 
 
 # End goal with specs
@@ -98,27 +98,11 @@ All output is JSON only.
 5. ~~**Local orchestration** — Podman compose for full-stack local dev~~ ✓
 6. ~~**Integration** — end-to-end flow: CLI → API → executor → result download~~ ✓
 7. ~~**Auth** — static API key auth (buyer + executor) via DI~~ ✓
-8. **Marketplace Frontend** — web UI for browsing agents, viewing details, placing orders
+8. ~~**Marketplace Frontend** — web UI for browsing agents, viewing details, placing orders~~ ✓
+9. ~~**Job Tracking** — web pages for viewing jobs, status, and downloading results~~ ✓
+10. ~~**Gemini CLI Executor** — first real agent: polling executor + seed agent + make targets~~ ✓
 
 
 # BACKLOG
 
-Marketplace Frontend (current phase):
-- [ ] do this before continuing: install anthropic frontend skills and load them for yourself when doing frontend.
-- [x] Scaffold `web/` — Vite + React + TS + shadcn/ui + Tailwind + API client
-- [x] Agent Browse page — search, tag filter, agent card grid
-- [x] Agent Detail page — full info, schemas, pricing, "Order" CTA
-- [x] Order Flow page — dynamic form from input_schema, job creation
-- [x] Docker + compose integration — Dockerfile, nginx proxy, compose service
-- [ ] Polish — error handling UI, responsive, README ← current
-
-Future (not this phase):
-
-- [ ] Job tracking pages (my jobs, status, result download)
-- [ ] Landing/marketing page
-- [ ] Per-user auth (login flow, DB-backed API keys)
-- [ ] Admin dashboard
-- [ ] Rate limiting on the API
-- [ ] Deployment configuration (cloud infra, CI/CD)
-- [ ] CLI polish (better error messages, `--help` refinements, version command)
-- [ ] Executor SDK/example (sample executor implementation)
+(empty — all POC roadmap items complete)
