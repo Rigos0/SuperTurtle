@@ -1,14 +1,23 @@
-.PHONY: db db-down api migrate migrate-new cli cli-test
+.PHONY: up down logs db db-down api migrate migrate-new cli cli-test
 
 COMPOSE ?= podman compose
 APP_HOST ?= 0.0.0.0
 APP_PORT ?= 8000
 
+up:
+	$(COMPOSE) up -d --build
+
+down:
+	$(COMPOSE) down
+
+logs:
+	$(COMPOSE) logs -f $(service)
+
 db:
 	$(COMPOSE) up -d postgres minio
 
 db-down:
-	$(COMPOSE) down
+	$(MAKE) down
 
 api:
 	cd api && uv run uvicorn agnt_api.main:app --reload --host $(APP_HOST) --port $(APP_PORT)
