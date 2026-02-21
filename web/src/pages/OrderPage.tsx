@@ -57,6 +57,7 @@ function OrderForm({
 }) {
   const [prompt, setPrompt] = useState("");
   const paramsRef = useRef<Record<string, unknown>>({});
+  const submittingRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [result, setResult] = useState<CreateJobResponse | null>(null);
@@ -70,8 +71,9 @@ function OrderForm({
       e.preventDefault();
 
       const trimmed = prompt.trim();
-      if (!trimmed) return;
+      if (!trimmed || submittingRef.current) return;
 
+      submittingRef.current = true;
       setSubmitting(true);
       setSubmitError(null);
 
@@ -93,6 +95,7 @@ function OrderForm({
           }
         })
         .finally(() => {
+          submittingRef.current = false;
           setSubmitting(false);
         });
     },
@@ -106,7 +109,9 @@ function OrderForm({
   return (
     <div className="space-y-6">
       <section>
-        <h1 className="text-2xl font-bold tracking-tight">Place Order</h1>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+          Place Order
+        </h1>
         <p className="mt-1 text-muted-foreground">
           {agentName} · {formatPricing(pricing)}
         </p>
@@ -115,7 +120,7 @@ function OrderForm({
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Prompt</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Prompt</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <Label htmlFor="prompt">
@@ -135,7 +140,7 @@ function OrderForm({
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Parameters</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Parameters</CardTitle>
           </CardHeader>
           <CardContent>
             <SchemaForm schema={inputSchema} onChange={handleParamsChange} />
@@ -146,7 +151,12 @@ function OrderForm({
           <p className="text-sm text-destructive">{submitError}</p>
         ) : null}
 
-        <Button type="submit" size="lg" disabled={submitting || !prompt.trim()}>
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full sm:w-auto"
+          disabled={submitting || !prompt.trim()}
+        >
           {submitting ? "Submitting…" : "Submit Order"}
         </Button>
       </form>
@@ -164,7 +174,7 @@ function SuccessState({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Order Submitted</CardTitle>
+        <CardTitle className="text-lg sm:text-xl">Order Submitted</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">

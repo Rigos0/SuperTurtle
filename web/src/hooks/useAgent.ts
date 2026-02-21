@@ -7,6 +7,7 @@ export function useAgent(agentId: string | undefined) {
   const [agent, setAgent] = useState<AgentDetail | null>(null);
   const [loading, setLoading] = useState(Boolean(agentId));
   const [error, setError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
 
   const fetchAgent = useCallback(() => {
@@ -15,6 +16,7 @@ export function useAgent(agentId: string | undefined) {
     if (!agentId) {
       setAgent(null);
       setError("Invalid agent ID.");
+      setNotFound(false);
       setLoading(false);
       return;
     }
@@ -23,6 +25,7 @@ export function useAgent(agentId: string | undefined) {
     controllerRef.current = controller;
     setLoading(true);
     setError(null);
+    setNotFound(false);
 
     getAgent(agentId, controller.signal)
       .then((data) => {
@@ -31,6 +34,8 @@ export function useAgent(agentId: string | undefined) {
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setAgent(null);
+        const is404 = err instanceof ApiError && err.status === 404;
+        setNotFound(is404);
         setError(normalizeAgentError(err));
       })
       .finally(() => {
@@ -53,7 +58,7 @@ export function useAgent(agentId: string | undefined) {
     fetchAgent();
   }, [fetchAgent]);
 
-  return { agent, loading, error, retry };
+  return { agent, loading, error, notFound, retry };
 }
 
 function normalizeAgentError(err: unknown): string {

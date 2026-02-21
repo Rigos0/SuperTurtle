@@ -9,7 +9,7 @@ import type { AgentDetail } from "@/api/types";
 
 export function AgentDetailPage() {
   const { agentId } = useParams<{ agentId: string }>();
-  const { agent, loading, error, retry } = useAgent(agentId);
+  const { agent, loading, error, notFound, retry } = useAgent(agentId);
 
   if (!agentId) {
     return <InvalidAgentState />;
@@ -24,11 +24,11 @@ export function AgentDetailPage() {
       {loading ? (
         <LoadingState />
       ) : error ? (
-        <ErrorState error={error} onRetry={retry} />
+        <ErrorState error={error} notFound={notFound} onRetry={retry} />
       ) : agent ? (
         <AgentContent agent={agent} />
       ) : (
-        <ErrorState error="Agent data is unavailable." onRetry={retry} />
+        <ErrorState error="Agent data is unavailable." notFound={false} onRetry={retry} />
       )}
     </div>
   );
@@ -38,7 +38,9 @@ function AgentContent({ agent }: { agent: AgentDetail }) {
   return (
     <div className="space-y-6">
       <section className="space-y-3">
-        <h1 className="text-3xl font-bold tracking-tight">{agent.name}</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+          {agent.name}
+        </h1>
         <p className="text-muted-foreground">{agent.description}</p>
         {agent.tags.length > 0 ? (
           <div className="flex flex-wrap gap-2">
@@ -52,10 +54,25 @@ function AgentContent({ agent }: { agent: AgentDetail }) {
       </section>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+        <aside className="order-1 space-y-6 lg:order-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl">Agent Info</CardTitle>
+              <CardTitle className="text-lg sm:text-xl">Pricing</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm font-medium">{formatPricing(agent.pricing)}</p>
+              <JsonBlock value={agent.pricing} />
+              <Button asChild className="w-full">
+                <Link to={`/agents/${agent.agent_id}/order`}>Order Agent</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </aside>
+
+        <div className="order-2 space-y-6 lg:order-1 lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg sm:text-xl">Agent Info</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 text-sm sm:grid-cols-2">
               <MetaRow label="Agent ID" value={agent.agent_id} mono />
@@ -76,21 +93,6 @@ function AgentContent({ agent }: { agent: AgentDetail }) {
             schema={agent.output_schema}
           />
         </div>
-
-        <aside className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl">Pricing</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm font-medium">{formatPricing(agent.pricing)}</p>
-              <JsonBlock value={agent.pricing} />
-              <Button asChild className="w-full">
-                <Link to={`/agents/${agent.agent_id}/order`}>Order Agent</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </aside>
       </div>
     </div>
   );
@@ -125,7 +127,7 @@ function SchemaCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">{title}</CardTitle>
+        <CardTitle className="text-lg sm:text-xl">{title}</CardTitle>
         <p className="text-sm text-muted-foreground">{description}</p>
       </CardHeader>
       <CardContent>
@@ -137,7 +139,7 @@ function SchemaCard({
 
 function JsonBlock({ value }: { value: Record<string, unknown> }) {
   return (
-    <pre className="max-h-96 overflow-auto rounded-lg bg-muted p-3 text-xs leading-relaxed">
+    <pre className="max-h-96 overflow-auto rounded-lg bg-muted p-3 text-[11px] leading-relaxed sm:text-xs">
       {JSON.stringify(value, null, 2)}
     </pre>
   );
@@ -146,7 +148,7 @@ function JsonBlock({ value }: { value: Record<string, unknown> }) {
 function LoadingState() {
   return (
     <div className="grid gap-6 lg:grid-cols-3">
-      <Card className="animate-pulse lg:col-span-2">
+      <Card className="order-2 animate-pulse lg:order-1 lg:col-span-2">
         <CardHeader className="space-y-3">
           <div className="h-8 w-2/3 rounded bg-muted" />
           <div className="h-5 w-full rounded bg-muted" />
@@ -158,7 +160,7 @@ function LoadingState() {
         </CardContent>
       </Card>
 
-      <Card className="animate-pulse">
+      <Card className="order-1 animate-pulse lg:order-2">
         <CardHeader>
           <div className="h-7 w-1/2 rounded bg-muted" />
         </CardHeader>
@@ -174,28 +176,28 @@ function LoadingState() {
 
 function ErrorState({
   error,
+  notFound,
   onRetry,
 }: {
   error: string;
+  notFound: boolean;
   onRetry: () => void;
 }) {
-  const isNotFound = error === "Agent not found.";
-
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-xl">
-          {isNotFound ? "Agent not found" : "Unable to load agent"}
+          {notFound ? "Agent not found" : "Unable to load agent"}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm text-muted-foreground">
         <p>{error}</p>
         <p>
-          {isNotFound
+          {notFound
             ? "The requested agent does not exist or is no longer available."
             : "Check API availability and try again."}
         </p>
-        {!isNotFound ? (
+        {!notFound ? (
           <Button variant="outline" size="sm" onClick={onRetry}>
             Retry
           </Button>

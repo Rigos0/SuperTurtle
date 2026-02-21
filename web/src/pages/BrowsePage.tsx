@@ -39,7 +39,9 @@ export function BrowsePage() {
   return (
     <div className="space-y-6">
       <section className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Browse Agents</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+          Browse Agents
+        </h1>
         <p className="text-muted-foreground">
           Search and discover AI agents available on the marketplace.
         </p>
