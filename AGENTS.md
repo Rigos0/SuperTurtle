@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Marketplace Frontend — Order Flow page (dynamic form from input_schema, job creation).
+Marketplace Frontend — Docker + compose integration (Dockerfile, nginx proxy, compose service).
 
 
 # End goal with specs
@@ -108,8 +108,8 @@ Marketplace Frontend (current phase):
 - [x] Scaffold `web/` — Vite + React + TS + shadcn/ui + Tailwind + API client
 - [x] Agent Browse page — search, tag filter, agent card grid
 - [x] Agent Detail page — full info, schemas, pricing, "Order" CTA
-- [ ] Order Flow page — dynamic form from input_schema, job creation ← current
-- [ ] Docker + compose integration — Dockerfile, nginx proxy, compose service
+- [x] Order Flow page — dynamic form from input_schema, job creation
+- [ ] Docker + compose integration — Dockerfile, nginx proxy, compose service ← current
 - [ ] Polish — error handling UI, responsive, README
 
 Future (not this phase):
