@@ -21,6 +21,10 @@ api/.env
 *.swp
 *.swo
 
+# Node
+node_modules/
+npm/runtime/
+
 # OS
 .DS_Store
 Thumbs.db

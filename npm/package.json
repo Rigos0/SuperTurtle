@@ -1,0 +1,24 @@
+{
+  "name": "agnt",
+  "version": "0.1.0",
+  "description": "npm wrapper for the agnt Go CLI binary",
+  "license": "MIT",
+  "private": true,
+  "type": "commonjs",
+  "bin": {
+    "agnt": "./bin/agnt.js"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "scripts/",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node ./scripts/postinstall.js",
+    "test": "node --test ./test/*.test.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

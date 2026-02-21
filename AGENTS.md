@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-npm distribution package — JavaScript wrapper that installs the compiled Go binary and exposes `agnt` as a CLI command via `npx` / `npm exec`.
+pip distribution package — Python wrapper that installs the compiled Go binary and exposes `agnt` as a CLI command via `pipx` / virtualenv entrypoint.
 
 
 # End goal with specs
@@ -94,7 +94,7 @@ All output is JSON only.
 1. **API** — complete all buyer-facing and executor-facing endpoints with tests
 2. **Object storage** — MinIO locally, S3-compatible in deployment; wire into job results
 3. **CLI** — Go binary implementing all `agnt` commands, JSON output
-4. **Distribution** — npm and pip wrapper packages for the Go binary
+4. **Distribution** — npm wrapper complete; pip wrapper package for the Go binary in progress
 5. **Local orchestration** — Podman compose for full-stack local dev (API + Postgres + MinIO)
 6. **Integration** — end-to-end flow: CLI → API → executor → result download
 
@@ -113,5 +113,5 @@ Near-term tasks to chip away at, roughly in order:
 - [x] CLI `order` command
 - [x] CLI `jobs` and `status` commands
 - [x] CLI `result` command (download files)
-- [ ] npm distribution package (JS wrapper for Go binary) ← current
-
+- [x] npm distribution package (JS wrapper for Go binary)
+- [ ] pip distribution package (Python wrapper for Go binary) ← current
