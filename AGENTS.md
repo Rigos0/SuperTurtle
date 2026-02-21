@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Implement CLI `jobs` and `status` commands — `GET /v1/jobs` and `GET /v1/jobs/{job_id}` with JSON output and `httptest`-based tests.
+Implement CLI `result` command — add API client support for `GET /v1/jobs/{job_id}/result`, implement file download behavior in CLI, and add `httptest`-based tests at both client and CLI levels.
 
 
 # End goal with specs
@@ -111,7 +111,6 @@ Near-term tasks to chip away at, roughly in order:
 - [x] Go CLI scaffold (module init, cobra setup, config)
 - [x] CLI HTTP client (`cli/internal/api/`) + `search` and `info` commands
 - [x] CLI `order` command
-- [ ] CLI `jobs` and `status` commands ← current
-- [ ] CLI `result` command (download files)
-
+- [x] CLI `jobs` and `status` commands
+- [ ] CLI `result` command (download files) ← current
 
