@@ -83,6 +83,7 @@ class JobListItem(BaseModel):
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None
+    duration_seconds: int | None
 
 
 class JobListResponse(BaseModel):
@@ -102,3 +103,4 @@ class JobDetailResponse(BaseModel):
     started_at: datetime | None
     updated_at: datetime
     completed_at: datetime | None
+    duration_seconds: int | None

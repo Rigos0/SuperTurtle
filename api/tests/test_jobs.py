@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
 from agnt_api.models.enums import JobStatus
@@ -35,7 +36,9 @@ def test_list_jobs_empty(client, mock_session):
 
 
 def test_list_jobs_returns_results(client, mock_session):
-    job = make_job()
+    created_at = datetime(2026, 2, 21, 10, 0, tzinfo=timezone.utc)
+    completed_at = datetime(2026, 2, 21, 10, 5, tzinfo=timezone.utc)
+    job = make_job(status=JobStatus.COMPLETED, progress=100, created_at=created_at, completed_at=completed_at)
     mock_session.scalars.return_value = FakeScalarsResult([job])
     mock_session.scalar.return_value = 1
 
@@ -45,7 +48,8 @@ def test_list_jobs_returns_results(client, mock_session):
     body = resp.json()
     assert len(body["jobs"]) == 1
     assert body["jobs"][0]["job_id"] == str(job.id)
-    assert body["jobs"][0]["status"] == "pending"
+    assert body["jobs"][0]["status"] == "completed"
+    assert body["jobs"][0]["duration_seconds"] == 300
     assert body["total"] == 1
 
 
@@ -104,6 +108,25 @@ def test_get_job_found(client, mock_session):
     assert body["status"] == "pending"
     assert body["progress"] == 0
     assert body["decision_reason"] is None
+    assert body["duration_seconds"] is None
+
+
+def test_get_job_duration_seconds_when_completed(client, mock_session):
+    created_at = datetime(2026, 2, 21, 10, 0, tzinfo=timezone.utc)
+    completed_at = datetime(2026, 2, 21, 10, 2, 15, tzinfo=timezone.utc)
+    job = make_job(
+        status=JobStatus.COMPLETED,
+        progress=100,
+        created_at=created_at,
+        completed_at=completed_at,
+    )
+    mock_session.get.return_value = job
+
+    resp = client.get(f"/v1/jobs/{job.id}")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["duration_seconds"] == 135
 
 
 def test_get_job_not_found(client, mock_session):

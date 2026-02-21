@@ -183,6 +183,70 @@ func TestRunInfoInvalidUUID(t *testing.T) {
 	}
 }
 
+func TestRunStatsCommand(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	agentID := "550e8400-e29b-41d4-a716-446655440000"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/agents/"+agentID+"/stats" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"total_jobs":5,
+			"completed_jobs":3,
+			"failed_jobs":1,
+			"avg_duration_seconds":42.5,
+			"success_rate":0.6
+		}`))
+	}))
+	defer server.Close()
+	t.Setenv("AGNT_API_BASE_URL", server.URL)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := run(&stdout, &stderr, []string{"stats", agentID})
+	if exit != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", exit, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("expected json output, got error %v", err)
+	}
+	if payload["total_jobs"] != float64(5) {
+		t.Fatalf("unexpected total_jobs: %v", payload["total_jobs"])
+	}
+	if payload["success_rate"] != 0.6 {
+		t.Fatalf("unexpected success_rate: %v", payload["success_rate"])
+	}
+}
+
+func TestRunStatsInvalidUUID(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("AGNT_API_BASE_URL", "http://localhost:9999")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := run(&stdout, &stderr, []string{"stats", "not-a-uuid"})
+	if exit != 1 {
+		t.Fatalf("expected exit 1, got %d", exit)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatalf("expected json error output, got %v", err)
+	}
+	msg, _ := payload["message"].(string)
+	if msg != "invalid agent id: must be a valid UUID" {
+		t.Fatalf("unexpected message: %s", msg)
+	}
+}
+
 func TestRunSearchInvalidLimit(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("AGNT_API_BASE_URL", "http://localhost:9999")

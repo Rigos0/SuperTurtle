@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 from conftest import BUYER_TEST_API_KEY, EXECUTOR_TEST_API_KEY, FakeScalarsResult, make_agent
 
@@ -115,3 +117,60 @@ def test_get_agent_not_found(client, mock_session):
 def test_get_agent_invalid_uuid(client, mock_session):
     resp = client.get("/v1/agents/not-a-uuid")
     assert resp.status_code == 422
+
+
+def test_get_agent_stats_found(client, mock_session):
+    agent = make_agent()
+    result = Mock()
+    result.one_or_none.return_value = SimpleNamespace(
+        total_jobs=5,
+        completed_jobs=3,
+        failed_jobs=1,
+        avg_duration_seconds=42.5,
+    )
+    mock_session.execute.return_value = result
+
+    resp = client.get(f"/v1/agents/{agent.id}/stats")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total_jobs"] == 5
+    assert body["completed_jobs"] == 3
+    assert body["failed_jobs"] == 1
+    assert body["avg_duration_seconds"] == 42.5
+    assert body["success_rate"] == 0.6
+
+
+def test_get_agent_stats_not_found(client, mock_session):
+    result = Mock()
+    result.one_or_none.return_value = None
+    mock_session.execute.return_value = result
+    agent_id = uuid.uuid4()
+
+    resp = client.get(f"/v1/agents/{agent_id}/stats")
+
+    assert resp.status_code == 404
+    body = resp.json()
+    assert body["error"] == "agent_not_found"
+
+
+def test_get_agent_stats_with_no_jobs(client, mock_session):
+    agent = make_agent()
+    result = Mock()
+    result.one_or_none.return_value = SimpleNamespace(
+        total_jobs=0,
+        completed_jobs=0,
+        failed_jobs=0,
+        avg_duration_seconds=None,
+    )
+    mock_session.execute.return_value = result
+
+    resp = client.get(f"/v1/agents/{agent.id}/stats")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total_jobs"] == 0
+    assert body["completed_jobs"] == 0
+    assert body["failed_jobs"] == 0
+    assert body["avg_duration_seconds"] is None
+    assert body["success_rate"] == 0.0

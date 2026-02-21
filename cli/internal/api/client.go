@@ -19,6 +19,7 @@ var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]
 const (
 	agentsSearchPath = "/v1/agents/search"
 	agentsInfoPath   = "/v1/agents"
+	agentsStatsPath  = "/v1/agents"
 	jobsPath         = "/v1/jobs"
 )
 
@@ -64,6 +65,14 @@ type AgentDetailResponse struct {
 	UpdatedAt    time.Time      `json:"updated_at"`
 }
 
+type AgentStatsResponse struct {
+	TotalJobs          int      `json:"total_jobs"`
+	CompletedJobs      int      `json:"completed_jobs"`
+	FailedJobs         int      `json:"failed_jobs"`
+	AvgDurationSeconds *float64 `json:"avg_duration_seconds"`
+	SuccessRate        float64  `json:"success_rate"`
+}
+
 type CreateJobResponse struct {
 	JobID     string    `json:"job_id"`
 	AgentID   string    `json:"agent_id"`
@@ -84,28 +93,30 @@ type ListJobsResponse struct {
 }
 
 type JobListItem struct {
-	JobID       string     `json:"job_id"`
-	AgentID     string     `json:"agent_id"`
-	Prompt      string     `json:"prompt"`
-	Status      string     `json:"status"`
-	Progress    int        `json:"progress"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	CompletedAt *time.Time `json:"completed_at"`
+	JobID           string     `json:"job_id"`
+	AgentID         string     `json:"agent_id"`
+	Prompt          string     `json:"prompt"`
+	Status          string     `json:"status"`
+	Progress        int        `json:"progress"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	CompletedAt     *time.Time `json:"completed_at"`
+	DurationSeconds *int       `json:"duration_seconds"`
 }
 
 type JobDetailResponse struct {
-	JobID          string         `json:"job_id"`
-	AgentID        string         `json:"agent_id"`
-	Prompt         string         `json:"prompt"`
-	Params         map[string]any `json:"params"`
-	Status         string         `json:"status"`
-	Progress       int            `json:"progress"`
-	DecisionReason *string        `json:"decision_reason"`
-	CreatedAt      time.Time      `json:"created_at"`
-	StartedAt      *time.Time     `json:"started_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
-	CompletedAt    *time.Time     `json:"completed_at"`
+	JobID           string         `json:"job_id"`
+	AgentID         string         `json:"agent_id"`
+	Prompt          string         `json:"prompt"`
+	Params          map[string]any `json:"params"`
+	Status          string         `json:"status"`
+	Progress        int            `json:"progress"`
+	DecisionReason  *string        `json:"decision_reason"`
+	CreatedAt       time.Time      `json:"created_at"`
+	StartedAt       *time.Time     `json:"started_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	CompletedAt     *time.Time     `json:"completed_at"`
+	DurationSeconds *int           `json:"duration_seconds"`
 }
 
 type JobResultResponse struct {
@@ -204,6 +215,19 @@ func (c *Client) GetAgent(ctx context.Context, agentID string) (AgentDetailRespo
 	var resp AgentDetailResponse
 	if err := c.getJSON(ctx, agentsInfoPath+"/"+agentID, nil, &resp); err != nil {
 		return AgentDetailResponse{}, err
+	}
+
+	return resp, nil
+}
+
+func (c *Client) GetAgentStats(ctx context.Context, agentID string) (AgentStatsResponse, error) {
+	if !uuidPattern.MatchString(agentID) {
+		return AgentStatsResponse{}, fmt.Errorf("invalid agent id: must be a valid UUID")
+	}
+
+	var resp AgentStatsResponse
+	if err := c.getJSON(ctx, agentsStatsPath+"/"+agentID+"/stats", nil, &resp); err != nil {
+		return AgentStatsResponse{}, err
 	}
 
 	return resp, nil

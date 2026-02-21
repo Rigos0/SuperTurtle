@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -87,6 +88,7 @@ async def list_jobs(
                 created_at=job.created_at,
                 updated_at=job.updated_at,
                 completed_at=job.completed_at,
+                duration_seconds=_duration_seconds(job.created_at, job.completed_at),
             )
             for job in jobs
         ],
@@ -119,6 +121,7 @@ async def get_job(
         started_at=job.started_at,
         updated_at=job.updated_at,
         completed_at=job.completed_at,
+        duration_seconds=_duration_seconds(job.created_at, job.completed_at),
     )
 
 
@@ -185,3 +188,9 @@ async def _attach_download_urls(
             ) from exc
         enriched_files.append({**file_entry, "download_url": download_url})
     return enriched_files
+
+
+def _duration_seconds(created_at: datetime, completed_at: datetime | None) -> int | None:
+    if completed_at is None:
+        return None
+    return int((completed_at - created_at).total_seconds())

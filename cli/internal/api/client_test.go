@@ -122,6 +122,73 @@ func TestGetAgent(t *testing.T) {
 	}
 }
 
+func TestGetAgentStats(t *testing.T) {
+	t.Parallel()
+
+	agentID := "550e8400-e29b-41d4-a716-446655440000"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/v1/agents/"+agentID+"/stats" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"total_jobs":5,
+			"completed_jobs":3,
+			"failed_jobs":1,
+			"avg_duration_seconds":42.5,
+			"success_rate":0.6
+		}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL, 2*time.Second, "")
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	resp, err := client.GetAgentStats(context.Background(), agentID)
+	if err != nil {
+		t.Fatalf("GetAgentStats() error = %v", err)
+	}
+
+	if resp.TotalJobs != 5 {
+		t.Fatalf("unexpected total_jobs: %d", resp.TotalJobs)
+	}
+	if resp.CompletedJobs != 3 {
+		t.Fatalf("unexpected completed_jobs: %d", resp.CompletedJobs)
+	}
+	if resp.FailedJobs != 1 {
+		t.Fatalf("unexpected failed_jobs: %d", resp.FailedJobs)
+	}
+	if resp.AvgDurationSeconds == nil || *resp.AvgDurationSeconds != 42.5 {
+		t.Fatalf("unexpected avg_duration_seconds: %v", resp.AvgDurationSeconds)
+	}
+	if resp.SuccessRate != 0.6 {
+		t.Fatalf("unexpected success_rate: %v", resp.SuccessRate)
+	}
+}
+
+func TestGetAgentStatsInvalidUUID(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient("http://localhost:9999", 2*time.Second, "")
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	_, err = client.GetAgentStats(context.Background(), "not-a-uuid")
+	if err == nil {
+		t.Fatalf("expected error for invalid UUID")
+	}
+	if err.Error() != "invalid agent id: must be a valid UUID" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestGetAgentInvalidUUID(t *testing.T) {
 	t.Parallel()
 
@@ -355,7 +422,8 @@ func TestListJobs(t *testing.T) {
 					"progress":65,
 					"created_at":"2026-02-21T10:00:00Z",
 					"updated_at":"2026-02-21T10:02:00Z",
-					"completed_at":null
+					"completed_at":null,
+					"duration_seconds":null
 				}
 			],
 			"total":1
@@ -391,6 +459,9 @@ func TestListJobs(t *testing.T) {
 	}
 	if resp.Jobs[0].CompletedAt != nil {
 		t.Fatalf("expected nil completed_at, got %v", resp.Jobs[0].CompletedAt)
+	}
+	if resp.Jobs[0].DurationSeconds != nil {
+		t.Fatalf("expected nil duration_seconds, got %v", resp.Jobs[0].DurationSeconds)
 	}
 }
 
@@ -431,13 +502,14 @@ func TestGetJob(t *testing.T) {
 			"agent_id":"550e8400-e29b-41d4-a716-446655440000",
 			"prompt":"Generate a logo",
 			"params":{"style":"minimal"},
-			"status":"accepted",
-			"progress":10,
+			"status":"completed",
+			"progress":100,
 			"decision_reason":null,
 			"created_at":"2026-02-21T10:00:00Z",
 			"started_at":"2026-02-21T10:01:00Z",
-			"updated_at":"2026-02-21T10:02:00Z",
-			"completed_at":null
+			"updated_at":"2026-02-21T10:03:00Z",
+			"completed_at":"2026-02-21T10:03:00Z",
+			"duration_seconds":180
 		}`))
 	}))
 	defer server.Close()
@@ -454,7 +526,7 @@ func TestGetJob(t *testing.T) {
 	if resp.JobID != jobID {
 		t.Fatalf("unexpected job id: %s", resp.JobID)
 	}
-	if resp.Status != "accepted" {
+	if resp.Status != "completed" {
 		t.Fatalf("unexpected status: %s", resp.Status)
 	}
 	if resp.Params["style"] != "minimal" {
@@ -463,8 +535,11 @@ func TestGetJob(t *testing.T) {
 	if resp.StartedAt == nil || resp.StartedAt.IsZero() {
 		t.Fatalf("expected non-nil started_at")
 	}
-	if resp.CompletedAt != nil {
-		t.Fatalf("expected nil completed_at, got %v", resp.CompletedAt)
+	if resp.CompletedAt == nil || resp.CompletedAt.IsZero() {
+		t.Fatalf("expected non-nil completed_at")
+	}
+	if resp.DurationSeconds == nil || *resp.DurationSeconds != 180 {
+		t.Fatalf("expected duration_seconds=180, got %v", resp.DurationSeconds)
 	}
 }
 

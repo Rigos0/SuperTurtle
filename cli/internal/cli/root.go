@@ -91,6 +91,7 @@ func NewRootCommand(stdout io.Writer, stderr io.Writer) *cobra.Command {
 	rootCmd.AddCommand(newVersionCommand())
 	rootCmd.AddCommand(newSearchCommand())
 	rootCmd.AddCommand(newInfoCommand())
+	rootCmd.AddCommand(newStatsCommand())
 	rootCmd.AddCommand(newOrderCommand())
 	rootCmd.AddCommand(newJobsCommand())
 	rootCmd.AddCommand(newStatusCommand())
@@ -188,6 +189,27 @@ func newInfoCommand() *cobra.Command {
 			}
 
 			resp, err := client.GetAgent(cmd.Context(), args[0])
+			if err != nil {
+				return toCLIError(err)
+			}
+
+			return writeJSON(cmd.OutOrStdout(), resp)
+		},
+	}
+}
+
+func newStatsCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "stats <agent-id>",
+		Short: "Get agent statistics",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := apiClientFromContext(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			resp, err := client.GetAgentStats(cmd.Context(), args[0])
 			if err != nil {
 				return toCLIError(err)
 			}

@@ -31,3 +31,11 @@ class AgentDetailResponse(BaseModel):
     output_schema: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+
+
+class AgentStatsResponse(BaseModel):
+    total_jobs: int
+    completed_jobs: int
+    failed_jobs: int
+    avg_duration_seconds: float | None
+    success_rate: float
