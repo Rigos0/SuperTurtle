@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Test Gemini executor output quality by generating one shadcn-style animated component.
+Test out whole system end to end.
 
 
 # End goal with specs
@@ -106,5 +106,5 @@ All output is JSON only.
 # BACKLOG
 
 - [x] Gemini executor system prompt injection (`GEMINI.md` + 3-line `executor.py` edit)
-- [ ] test out gemini to get a component ← current
-- [ ] test out whole system end to end
+- [x] test out gemini to get a component (AnimatedCard.tsx — excellent quality, shadcn + framer-motion)
+- [ ] test out whole system end to end ← current
