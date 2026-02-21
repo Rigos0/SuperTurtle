@@ -362,3 +362,210 @@ func TestRunOrderInvalidParam(t *testing.T) {
 		t.Fatalf("unexpected message: %v", payload["message"])
 	}
 }
+
+func TestRunJobsCommand(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/v1/jobs" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("status"); got != "running" {
+			t.Fatalf("unexpected status: %s", got)
+		}
+		if got := r.URL.Query().Get("limit"); got != "5" {
+			t.Fatalf("unexpected limit: %s", got)
+		}
+		if got := r.URL.Query().Get("offset"); got != "10" {
+			t.Fatalf("unexpected offset: %s", got)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"jobs":[
+				{
+					"job_id":"11111111-2222-3333-4444-555555555555",
+					"agent_id":"550e8400-e29b-41d4-a716-446655440000",
+					"prompt":"Generate logo",
+					"status":"running",
+					"progress":65,
+					"created_at":"2026-02-21T10:00:00Z",
+					"updated_at":"2026-02-21T10:02:00Z",
+					"completed_at":null
+				}
+			],
+			"total":1
+		}`))
+	}))
+	defer server.Close()
+	t.Setenv("AGNT_API_BASE_URL", server.URL)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := run(&stdout, &stderr, []string{
+		"jobs",
+		"--status", "running",
+		"--limit", "5",
+		"--offset", "10",
+	})
+	if exit != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", exit, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("expected json output, got %v", err)
+	}
+	if payload["total"] != float64(1) {
+		t.Fatalf("unexpected total: %v", payload["total"])
+	}
+	jobs, ok := payload["jobs"].([]any)
+	if !ok || len(jobs) != 1 {
+		t.Fatalf("unexpected jobs payload: %#v", payload["jobs"])
+	}
+	first, ok := jobs[0].(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected job entry: %#v", jobs[0])
+	}
+	if first["job_id"] != "11111111-2222-3333-4444-555555555555" {
+		t.Fatalf("unexpected job_id: %v", first["job_id"])
+	}
+}
+
+func TestRunJobsInvalidStatus(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("AGNT_API_BASE_URL", "http://localhost:9999")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := run(&stdout, &stderr, []string{"jobs", "--status", "queued"})
+	if exit != 4 {
+		t.Fatalf("expected exit 4, got %d", exit)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatalf("expected json error output, got %v", err)
+	}
+	if payload["error"] != "validation_error" {
+		t.Fatalf("unexpected error code: %v", payload["error"])
+	}
+	if payload["message"] != "status must be one of: pending, accepted, rejected, running, completed, failed" {
+		t.Fatalf("unexpected message: %v", payload["message"])
+	}
+}
+
+func TestRunStatusCommand(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	jobID := "11111111-2222-3333-4444-555555555555"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/v1/jobs/"+jobID {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"job_id":"11111111-2222-3333-4444-555555555555",
+			"agent_id":"550e8400-e29b-41d4-a716-446655440000",
+			"prompt":"Generate logo",
+			"params":{"style":"minimal"},
+			"status":"running",
+			"progress":65,
+			"decision_reason":null,
+			"created_at":"2026-02-21T10:00:00Z",
+			"started_at":"2026-02-21T10:01:00Z",
+			"updated_at":"2026-02-21T10:02:00Z",
+			"completed_at":null
+		}`))
+	}))
+	defer server.Close()
+	t.Setenv("AGNT_API_BASE_URL", server.URL)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := run(&stdout, &stderr, []string{"status", jobID})
+	if exit != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", exit, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("expected json output, got %v", err)
+	}
+	if payload["job_id"] != jobID {
+		t.Fatalf("unexpected job_id: %v", payload["job_id"])
+	}
+	if payload["status"] != "running" {
+		t.Fatalf("unexpected status: %v", payload["status"])
+	}
+	if payload["progress"] != float64(65) {
+		t.Fatalf("unexpected progress: %v", payload["progress"])
+	}
+}
+
+func TestRunStatusInvalidUUID(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("AGNT_API_BASE_URL", "http://localhost:9999")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := run(&stdout, &stderr, []string{"status", "not-a-uuid"})
+	if exit != 1 {
+		t.Fatalf("expected exit 1, got %d", exit)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatalf("expected json error output, got %v", err)
+	}
+	if payload["message"] != "invalid job id: must be a valid UUID" {
+		t.Fatalf("unexpected message: %v", payload["message"])
+	}
+}
+
+func TestRunStatusNotFound(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	jobID := "11111111-2222-3333-4444-555555555555"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/jobs/"+jobID {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":"job_not_found","message":"Job does not exist."}`))
+	}))
+	defer server.Close()
+	t.Setenv("AGNT_API_BASE_URL", server.URL)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := run(&stdout, &stderr, []string{"status", jobID})
+	if exit != 3 {
+		t.Fatalf("expected exit 3, got %d", exit)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected no stdout output, got %q", stdout.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatalf("expected json error output, got %v", err)
+	}
+	if payload["error"] != "job_not_found" {
+		t.Fatalf("unexpected error: %v", payload["error"])
+	}
+}

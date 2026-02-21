@@ -319,3 +319,168 @@ func TestCreateJobEmptyPrompt(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestListJobs(t *testing.T) {
+	t.Parallel()
+
+	agentID := "550e8400-e29b-41d4-a716-446655440000"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/v1/jobs" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("agent_id"); got != agentID {
+			t.Fatalf("unexpected agent_id: %s", got)
+		}
+		if got := r.URL.Query().Get("status"); got != "running" {
+			t.Fatalf("unexpected status: %s", got)
+		}
+		if got := r.URL.Query().Get("limit"); got != "5" {
+			t.Fatalf("unexpected limit: %s", got)
+		}
+		if got := r.URL.Query().Get("offset"); got != "10" {
+			t.Fatalf("unexpected offset: %s", got)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"jobs":[
+				{
+					"job_id":"11111111-2222-3333-4444-555555555555",
+					"agent_id":"550e8400-e29b-41d4-a716-446655440000",
+					"prompt":"Generate a logo",
+					"status":"running",
+					"progress":65,
+					"created_at":"2026-02-21T10:00:00Z",
+					"updated_at":"2026-02-21T10:02:00Z",
+					"completed_at":null
+				}
+			],
+			"total":1
+		}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL, 2*time.Second, "")
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	resp, err := client.ListJobs(context.Background(), ListJobsOptions{
+		AgentID: agentID,
+		Status:  "running",
+		Limit:   5,
+		Offset:  10,
+	})
+	if err != nil {
+		t.Fatalf("ListJobs() error = %v", err)
+	}
+	if resp.Total != 1 {
+		t.Fatalf("unexpected total: %d", resp.Total)
+	}
+	if len(resp.Jobs) != 1 {
+		t.Fatalf("unexpected job count: %d", len(resp.Jobs))
+	}
+	if resp.Jobs[0].JobID != "11111111-2222-3333-4444-555555555555" {
+		t.Fatalf("unexpected job id: %s", resp.Jobs[0].JobID)
+	}
+	if resp.Jobs[0].Status != "running" {
+		t.Fatalf("unexpected status: %s", resp.Jobs[0].Status)
+	}
+	if resp.Jobs[0].CompletedAt != nil {
+		t.Fatalf("expected nil completed_at, got %v", resp.Jobs[0].CompletedAt)
+	}
+}
+
+func TestListJobsInvalidAgentUUID(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient("http://localhost:9999", 2*time.Second, "")
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	_, err = client.ListJobs(context.Background(), ListJobsOptions{
+		AgentID: "not-a-uuid",
+	})
+	if err == nil {
+		t.Fatalf("expected error for invalid UUID")
+	}
+	if err.Error() != "invalid agent id: must be a valid UUID" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestGetJob(t *testing.T) {
+	t.Parallel()
+
+	jobID := "11111111-2222-3333-4444-555555555555"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/v1/jobs/"+jobID {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"job_id":"11111111-2222-3333-4444-555555555555",
+			"agent_id":"550e8400-e29b-41d4-a716-446655440000",
+			"prompt":"Generate a logo",
+			"params":{"style":"minimal"},
+			"status":"accepted",
+			"progress":10,
+			"decision_reason":null,
+			"created_at":"2026-02-21T10:00:00Z",
+			"started_at":"2026-02-21T10:01:00Z",
+			"updated_at":"2026-02-21T10:02:00Z",
+			"completed_at":null
+		}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL, 2*time.Second, "")
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	resp, err := client.GetJob(context.Background(), jobID)
+	if err != nil {
+		t.Fatalf("GetJob() error = %v", err)
+	}
+	if resp.JobID != jobID {
+		t.Fatalf("unexpected job id: %s", resp.JobID)
+	}
+	if resp.Status != "accepted" {
+		t.Fatalf("unexpected status: %s", resp.Status)
+	}
+	if resp.Params["style"] != "minimal" {
+		t.Fatalf("unexpected params: %v", resp.Params)
+	}
+	if resp.StartedAt == nil || resp.StartedAt.IsZero() {
+		t.Fatalf("expected non-nil started_at")
+	}
+	if resp.CompletedAt != nil {
+		t.Fatalf("expected nil completed_at, got %v", resp.CompletedAt)
+	}
+}
+
+func TestGetJobInvalidUUID(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient("http://localhost:9999", 2*time.Second, "")
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	_, err = client.GetJob(context.Background(), "not-a-uuid")
+	if err == nil {
+		t.Fatalf("expected error for invalid UUID")
+	}
+	if err.Error() != "invalid job id: must be a valid UUID" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

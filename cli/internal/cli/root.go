@@ -250,12 +250,91 @@ func parseParamFlags(rawParams []string) (map[string]any, error) {
 	return params, nil
 }
 
+func isValidJobStatus(status string) bool {
+	switch status {
+	case "pending", "accepted", "rejected", "running", "completed", "failed":
+		return true
+	default:
+		return false
+	}
+}
+
 func newJobsCommand() *cobra.Command {
-	return newStubCommand("jobs", "List jobs", cobra.NoArgs, "jobs")
+	var status string
+	var limit int
+	var offset int
+
+	cmd := &cobra.Command{
+		Use:   "jobs",
+		Short: "List jobs",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if status != "" && !isValidJobStatus(status) {
+				return &CLIError{
+					Code:     "validation_error",
+					Message:  "status must be one of: pending, accepted, rejected, running, completed, failed",
+					ExitCode: 4,
+				}
+			}
+			if limit < 1 || limit > 100 {
+				return &CLIError{
+					Code:     "validation_error",
+					Message:  "limit must be between 1 and 100",
+					ExitCode: 4,
+				}
+			}
+			if offset < 0 {
+				return &CLIError{
+					Code:     "validation_error",
+					Message:  "offset must be non-negative",
+					ExitCode: 4,
+				}
+			}
+
+			client, err := apiClientFromContext(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			resp, err := client.ListJobs(cmd.Context(), api.ListJobsOptions{
+				Status: status,
+				Limit:  limit,
+				Offset: offset,
+			})
+			if err != nil {
+				return toCLIError(err)
+			}
+
+			return writeJSON(cmd.OutOrStdout(), resp)
+		},
+	}
+
+	cmd.Flags().StringVar(&status, "status", "", "Filter by status")
+	cmd.Flags().IntVar(&limit, "limit", 20, "Results per page (1-100)")
+	cmd.Flags().IntVar(&offset, "offset", 0, "Pagination offset")
+
+	return cmd
 }
 
 func newStatusCommand() *cobra.Command {
-	return newStubCommand("status <job-id>", "Get job status", cobra.ExactArgs(1), "status")
+	return &cobra.Command{
+		Use:   "status <job-id>",
+		Short: "Get job status",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := apiClientFromContext(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			resp, err := client.GetJob(cmd.Context(), args[0])
+			if err != nil {
+				return toCLIError(err)
+			}
+
+			return writeJSON(cmd.OutOrStdout(), resp)
+		},
+	}
 }
 
 func newResultCommand() *cobra.Command {

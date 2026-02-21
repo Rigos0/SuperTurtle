@@ -71,6 +71,43 @@ type CreateJobResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type ListJobsOptions struct {
+	AgentID string
+	Status  string
+	Limit   int
+	Offset  int
+}
+
+type ListJobsResponse struct {
+	Jobs  []JobListItem `json:"jobs"`
+	Total int           `json:"total"`
+}
+
+type JobListItem struct {
+	JobID       string     `json:"job_id"`
+	AgentID     string     `json:"agent_id"`
+	Prompt      string     `json:"prompt"`
+	Status      string     `json:"status"`
+	Progress    int        `json:"progress"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+	CompletedAt *time.Time `json:"completed_at"`
+}
+
+type JobDetailResponse struct {
+	JobID          string         `json:"job_id"`
+	AgentID        string         `json:"agent_id"`
+	Prompt         string         `json:"prompt"`
+	Params         map[string]any `json:"params"`
+	Status         string         `json:"status"`
+	Progress       int            `json:"progress"`
+	DecisionReason *string        `json:"decision_reason"`
+	CreatedAt      time.Time      `json:"created_at"`
+	StartedAt      *time.Time     `json:"started_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+	CompletedAt    *time.Time     `json:"completed_at"`
+}
+
 type createJobRequest struct {
 	AgentID string         `json:"agent_id"`
 	Prompt  string         `json:"prompt"`
@@ -184,6 +221,43 @@ func (c *Client) CreateJob(
 	var resp CreateJobResponse
 	if err := c.postJSON(ctx, jobsPath, nil, req, &resp); err != nil {
 		return CreateJobResponse{}, err
+	}
+	return resp, nil
+}
+
+func (c *Client) ListJobs(ctx context.Context, opts ListJobsOptions) (ListJobsResponse, error) {
+	params := url.Values{}
+	if opts.AgentID != "" {
+		if !uuidPattern.MatchString(opts.AgentID) {
+			return ListJobsResponse{}, fmt.Errorf("invalid agent id: must be a valid UUID")
+		}
+		params.Set("agent_id", opts.AgentID)
+	}
+	if opts.Status != "" {
+		params.Set("status", opts.Status)
+	}
+	if opts.Limit > 0 {
+		params.Set("limit", strconv.Itoa(opts.Limit))
+	}
+	if opts.Offset > 0 {
+		params.Set("offset", strconv.Itoa(opts.Offset))
+	}
+
+	var resp ListJobsResponse
+	if err := c.getJSON(ctx, jobsPath, params, &resp); err != nil {
+		return ListJobsResponse{}, err
+	}
+	return resp, nil
+}
+
+func (c *Client) GetJob(ctx context.Context, jobID string) (JobDetailResponse, error) {
+	if !uuidPattern.MatchString(jobID) {
+		return JobDetailResponse{}, fmt.Errorf("invalid job id: must be a valid UUID")
+	}
+
+	var resp JobDetailResponse
+	if err := c.getJSON(ctx, jobsPath+"/"+jobID, nil, &resp); err != nil {
+		return JobDetailResponse{}, err
 	}
 	return resp, nil
 }
