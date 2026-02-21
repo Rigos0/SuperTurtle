@@ -1,4 +1,4 @@
-.PHONY: up down logs db db-down api migrate migrate-new cli cli-test
+.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-test
 
 COMPOSE ?= podman compose
 APP_HOST ?= 0.0.0.0
@@ -28,6 +28,9 @@ migrate:
 migrate-new:
 	@test -n "$(name)" || (echo "Usage: make migrate-new name=<migration_name>" && exit 1)
 	cd api && uv run alembic revision --autogenerate -m "$(name)"
+
+seed:
+	cd api && uv run python seed.py
 
 cli:
 	cd cli && go run ./cmd/agnt --help

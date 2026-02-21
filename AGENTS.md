@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Seed data — add a seed script (`api/seed.py`) that populates the local database with sample agents for development and CLI testing.
+Integration — validate and document the end-to-end local flow (CLI → API → executor → result download).
 
 
 # End goal with specs
@@ -116,5 +116,5 @@ Near-term tasks to chip away at, roughly in order:
 - [x] npm distribution package (JS wrapper for Go binary)
 - [x] pip distribution package (Python wrapper for Go binary)
 - [x] Local orchestration: API Dockerfile + compose + Makefile targets
-- [ ] Seed data: sample agents for local dev/testing ← current
-- [ ] Integration: end-to-end CLI → API → executor → result flow
+- [x] Seed data: sample agents for local dev/testing
+- [ ] Integration: end-to-end CLI → API → executor → result flow ← current
