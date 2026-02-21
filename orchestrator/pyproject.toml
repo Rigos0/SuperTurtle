@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agnt-orchestrator"
+version = "0.1.0"
+description = "Headless orchestration of coding agents (Claude, Codex)"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6.0",
+    "pytest>=8.3.0",
+]
+
+[project.scripts]
+agnt-handoff = "agnt_orchestrator.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agnt_orchestrator*"]

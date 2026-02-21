@@ -1,0 +1,68 @@
+"""Concrete agent classes for headless CLI orchestration."""
+
+import subprocess
+import sys
+from pathlib import Path
+
+
+def _run_streaming(cmd: list[str], cwd: Path) -> str:
+    """Run a command, stream stdout line-by-line to stderr, return captured stdout.
+
+    Streams to stderr so that the return value (stdout capture) stays clean
+    for programmatic use, while the operator still sees progress in the terminal.
+
+    Raises subprocess.CalledProcessError on non-zero exit.
+    """
+    proc = subprocess.Popen(
+        cmd,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    lines: list[str] = []
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        sys.stderr.write(line)
+        sys.stderr.flush()
+        lines.append(line)
+    proc.wait()
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, cmd)
+    return "".join(lines).strip()
+
+
+class Claude:
+    """Claude Code agent -- planning mode."""
+
+    def __init__(self, cwd: str | Path = ".") -> None:
+        self.cwd = Path(cwd).resolve()
+
+    def plan(self, prompt: str) -> str:
+        """Generate an implementation plan from a prompt. Returns the plan text."""
+        print(f"[claude] planning in {self.cwd} ...")
+        cmd = [
+            "claude",
+            "--permission-mode",
+            "plan",
+            "--dangerously-skip-permissions",
+            "-p",
+            prompt,
+        ]
+        result = _run_streaming(cmd, self.cwd)
+        print(f"[claude] plan ready ({len(result)} chars)")
+        return result
+
+
+class Codex:
+    """Codex agent -- execution mode."""
+
+    def __init__(self, cwd: str | Path = ".") -> None:
+        self.cwd = Path(cwd).resolve()
+
+    def execute(self, prompt: str) -> str:
+        """Execute a prompt with full auto-approval. Returns agent output."""
+        print(f"[codex] executing in {self.cwd} ...")
+        cmd = ["codex", "exec", "--yolo", prompt]
+        result = _run_streaming(cmd, self.cwd)
+        print("[codex] done")
+        return result
