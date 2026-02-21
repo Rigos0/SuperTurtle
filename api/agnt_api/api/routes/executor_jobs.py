@@ -1,26 +1,30 @@
 from __future__ import annotations
 
+import logging
+import re
 from datetime import datetime, timezone
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agnt_api.api.deps import get_session
+from agnt_api.api.deps import get_session, get_storage
 from agnt_api.api.errors import ApiError
 from agnt_api.models import Job, JobResult, JobStatus
 from agnt_api.schemas.common import ErrorResponse
 from agnt_api.schemas.jobs import (
-    CompleteJobRequest,
     CompleteJobResponse,
     ExecutorListJobsResponse,
     ExecutorListJobsResponseItem,
     UpdateJobStatusRequest,
     UpdateJobStatusResponse,
 )
+from agnt_api.storage import Storage
 
 router = APIRouter(prefix="/executor/jobs", tags=["executor-jobs"])
+logger = logging.getLogger(__name__)
 
 ALLOWED_STATUS_UPDATES = {
     JobStatus.ACCEPTED,
@@ -35,6 +39,9 @@ ALLOWED_TRANSITIONS = {
 }
 REASON_STATUSES = {JobStatus.REJECTED, JobStatus.FAILED}
 PROGRESS_STATUSES = {JobStatus.RUNNING}
+
+MAX_FILES_PER_UPLOAD = 20
+MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024  # 50 MiB
 
 
 @router.get("", response_model=ExecutorListJobsResponse)
@@ -146,9 +153,17 @@ async def update_job_status(
 )
 async def complete_job(
     job_id: UUID,
-    payload: CompleteJobRequest,
+    files: list[UploadFile] = File(..., min_length=1),
     session: AsyncSession = Depends(get_session),
+    storage: Storage = Depends(get_storage),
 ) -> CompleteJobResponse:
+    if len(files) > MAX_FILES_PER_UPLOAD:
+        raise ApiError(
+            status_code=422,
+            error="too_many_files",
+            message=f"Upload at most {MAX_FILES_PER_UPLOAD} files per request.",
+        )
+
     job = await session.get(Job, job_id)
     if job is None:
         raise ApiError(status_code=404, error="job_not_found", message="Job does not exist.")
@@ -159,9 +174,45 @@ async def complete_job(
             message="Only running jobs can be completed.",
         )
 
+    uploaded_keys: list[str] = []
+    file_manifest: list[dict[str, str | int | None]] = []
+    try:
+        for index, upload in enumerate(files):
+            file_bytes = await upload.read()
+            if len(file_bytes) > MAX_FILE_SIZE_BYTES:
+                raise ApiError(
+                    status_code=422,
+                    error="file_too_large",
+                    message=f"File '{upload.filename or index}' exceeds {MAX_FILE_SIZE_BYTES} byte limit.",
+                )
+            object_key = _build_result_object_key(job.id, index, upload.filename)
+            content_type = upload.content_type or "application/octet-stream"
+            stored_key = await storage.upload(object_key, file_bytes, content_type)
+            uploaded_keys.append(stored_key)
+            file_manifest.append(
+                {
+                    "path": stored_key,
+                    "size_bytes": len(file_bytes),
+                    "mime_type": content_type,
+                }
+            )
+    except ApiError:
+        await _cleanup_uploaded_files(storage, uploaded_keys)
+        raise
+    except Exception as exc:
+        await _cleanup_uploaded_files(storage, uploaded_keys)
+        raise ApiError(
+            status_code=502,
+            error="storage_upload_failed",
+            message="Failed to upload one or more result files.",
+        ) from exc
+    finally:
+        for upload in files:
+            await upload.close()
+
     result = JobResult(
         job_id=job.id,
-        files_json=[file.model_dump() for file in payload.files],
+        files_json=file_manifest,
     )
     session.add(result)
 
@@ -171,10 +222,45 @@ async def complete_job(
     job.updated_at = now
     job.completed_at = now
 
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await _cleanup_uploaded_files(storage, uploaded_keys)
+        raise ApiError(
+            status_code=409,
+            error="job_already_completed",
+            message="Job has already been completed.",
+        )
+    except Exception:
+        await _cleanup_uploaded_files(storage, uploaded_keys)
+        raise ApiError(
+            status_code=500,
+            error="commit_failed",
+            message="Failed to persist job result.",
+        )
     await session.refresh(job)
 
     return CompleteJobResponse(job_id=job.id, status=job.status, completed_at=job.completed_at)
+
+
+_SAFE_FILENAME_RE = re.compile(r"[^a-zA-Z0-9._-]")
+
+
+def _build_result_object_key(job_id: UUID, file_index: int, filename: str | None) -> str:
+    raw = filename or ""
+    # Strip directory components (both unix and windows style)
+    basename = raw.rsplit("/", 1)[-1].rsplit("\\", 1)[-1].strip()
+    # Replace unsafe characters, collapse runs of dashes
+    safe_name = _SAFE_FILENAME_RE.sub("-", basename).strip("-") or f"file-{file_index}"
+    return f"jobs/{job_id}/{file_index:03d}-{uuid4().hex}-{safe_name}"
+
+
+async def _cleanup_uploaded_files(storage: Storage, object_keys: list[str]) -> None:
+    for object_key in object_keys:
+        try:
+            await storage.delete(object_key)
+        except Exception:
+            logger.exception("Failed to clean up uploaded object: %s", object_key)
 
 
 def _utc_now() -> datetime:

@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Wire file upload into job completion endpoint — Accept multipart file upload on `POST /v1/executor/jobs/{job_id}/complete`, store files in S3, and record metadata in job_results.
+Apply code review fixes to file upload wiring on `POST /v1/executor/jobs/{job_id}/complete`.
 
 
 # End goal with specs

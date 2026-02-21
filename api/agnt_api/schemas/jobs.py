@@ -61,10 +61,6 @@ class JobManifestFile(BaseModel):
     mime_type: str | None = None
 
 
-class CompleteJobRequest(BaseModel):
-    files: list[JobManifestFile] = Field(min_length=1)
-
-
 class CompleteJobResponse(BaseModel):
     job_id: UUID
     status: JobStatus

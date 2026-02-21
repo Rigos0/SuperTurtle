@@ -9,6 +9,7 @@ description = "API service for the agnt marketplace"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115.0",
+  "python-multipart>=0.0.9",
   "uvicorn>=0.30.0",
   "sqlalchemy>=2.0.0",
   "greenlet>=3.0.0",
