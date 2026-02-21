@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Code review polish of integration/storage layer — cached S3 URL parsing, improved test naming/coverage, hardened integration script, added `.tmp/` to gitignore.
+Validate end-to-end flow: run `make integration` against the live stack, fix any issues found.
 
 
 # End goal with specs
@@ -119,5 +119,5 @@ Near-term tasks to chip away at, roughly in order:
 - [x] Seed data: sample agents for local dev/testing
 - [x] Fix presigned URLs for host access (`S3_PUBLIC_URL` config rewrite)
 - [x] Integration: end-to-end script, Makefile target, and docs (`scripts/`)
-- [x] Code review polish: S3 URL caching, test coverage, integration script hardening ← current
-- [ ] Validate end-to-end flow: run `make integration` against the live stack
+- [x] Code review polish: S3 URL caching, test coverage, integration script hardening
+- [x] Validate end-to-end flow: run `make integration` against the live stack ← current

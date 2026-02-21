@@ -32,7 +32,7 @@ bash scripts/integration.sh
 ## Environment Variables
 
 - `API_BASE_URL` (default: `http://localhost:8000`)
-- `SEARCH_QUERY` (default: `sample`)
+- `SEARCH_QUERY` (default: `text`)
 - `PROMPT_TEXT` (default: `Integration flow test`)
 - `OUTPUT_DIR` (default: `.tmp/integration-results` under repo root)
 - `AGNT_BIN` (optional path to prebuilt `agnt` binary)

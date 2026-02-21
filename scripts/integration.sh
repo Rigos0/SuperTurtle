@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 API_BASE_URL="${API_BASE_URL:-http://localhost:8000}"
-SEARCH_QUERY="${SEARCH_QUERY:-sample}"
+SEARCH_QUERY="${SEARCH_QUERY:-text}"
 PROMPT_TEXT="${PROMPT_TEXT:-Integration flow test}"
 OUTPUT_DIR="${OUTPUT_DIR:-${ROOT_DIR}/.tmp/integration-results}"
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/agnt-integration.XXXXXX")"
