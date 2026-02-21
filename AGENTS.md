@@ -11,8 +11,9 @@ Each iteration targets one commit only, this is very important. So after each ex
 
 Tracking and documenting the project: we do not track at all what has been already coded up. Since that can be discovered from the codebase and git history. The codebase shall be kept modular. And each module shall have a minimalistic .md file which includes critical info. Example: how to run the module.
 
-The project always has an end goal, which is stated in the following section. This end goal is towards to which we are moving to. Important: we are never cutting corners to achieve the end goal. We are not under any time pressure. What does that mean in practice? The planning phase always involves selecting the next task to work on. This task should be small, equal to one commit of work. After you select this task, improve the ROADMAP accordingly. 
+The project always has an end goal, which is stated in the following section. This end goal is towards to which we are moving to. Important: we are never cutting corners to achieve the end goal. We are not under any time pressure. What does that mean in practice? The planning phase always involves selecting the next task to work on. This task should be small, equal to one commit of work. After you select this task, improve the ROADMAP accordingly. Code quality is the absolute key. We want test-driven development. We HAVE TO BE SURE everything we ship at the end of the iteration is working and tested. Devote about every 5th iteration to code review + testing the app. Do not ask user for clarification, you are on full auto mode. If you complete the backlog and roadmap, work on testing the application and code quality. 
 
+IMPORTANT: don't do any cloud deployment for now, work only in the agentic directory. 
 
 What to keep always in this CLAUDE.md file:
 
@@ -21,17 +22,18 @@ What to keep always in this CLAUDE.md file:
 - current task
 - roadmap
 
-
+NOTE: /orchestrator contains a loop which runs you - the coding agents. It's not to be built more, it's a different project. 
 
 # Current Task
 
-Ready to plan iteration 15 — candidates: job list filtering/pagination, error/edge-case polish, deployment, web tests.
+Iteration 15 — Executor PRD: design document for pluggable executor architecture.
 
 
 # End goal with specs
 
 ## Summary
-Build a local-first, deploy-ready POC where users run a local `agnt` CLI and communicate with a hosted API that stores jobs and serves results.
+Build a local-first, deploy-ready POC where users run a local `agnt` CLI and communicate with a hosted API that stores jobs and serves results. A growing set of **executors** (AI-powered agents) run locally, poll the API for jobs, and deliver results. The system is designed so adding a new executor is trivial — copy a scaffold, configure, run.
+
 The CLI is distributed primarily via npm and secondarily via pip, both using the same compiled Go binary.
 
 ## Stack
@@ -43,13 +45,14 @@ The CLI is distributed primarily via npm and secondarily via pip, both using the
 - Object storage: MinIO locally, S3-compatible bucket in deployment
 - Local orchestration: Podman + `podman-compose`
 - Migrations: Alembic
+- Web frontend: React + TypeScript + Vite + Tailwind
 
 ## Architecture
 - User runs `agnt` locally.
 - CLI calls hosted API over HTTPS.
 - API persists agents/jobs/results in Postgres.
-- Third-party executors pull pending jobs and report accept/reject/progress/completion.
-- Output files are stored in object storage and downloaded by CLI via API result responses.
+- Executors poll the API for pending jobs, execute work locally, and upload result files.
+- Output files are stored in object storage and downloaded by CLI or viewed in the web UI.
 
 ## API Surface
 
@@ -90,58 +93,50 @@ The CLI is distributed primarily via npm and secondarily via pip, both using the
 
 All output is JSON only.
 
+## Web UI
+- Marketplace: browse agents, search, view details + stats
+- Job tracking: list jobs with status/duration, view details, download results
+- React SPA served via nginx container on port 3000
+
+## Philosophy
+Specialized executors for specialized tasks. Each agent's context focuses on being an expert at one thing — a dedicated code reviewer, a focused test writer, a targeted refactoring agent — and therefore performs better than a generic coding agent would. The marketplace value comes from this specialization.
+
+## Executors
+- Each executor lives in its own directory under `executors/`
+- All executors share the same polling + status-reporting pattern (see Gemini executor)
+- Current constraint: all executors run locally in their own working directory (no cloud)
+- Target executors: Gemini CLI, Claude Code CLI, OpenAI Codex CLI, code review agent
+
 
 # ROADMAP
 
-1. ~~**API** — complete all buyer-facing and executor-facing endpoints with tests~~ ✓
-2. ~~**Object storage** — MinIO locally, S3-compatible in deployment; wire into job results~~ ✓
-3. ~~**CLI** — Go binary implementing all `agnt` commands, JSON output~~ ✓
-4. ~~**Distribution** — npm wrapper complete; pip wrapper package for Go binary~~ ✓
-5. ~~**Local orchestration** — Podman compose for full-stack local dev~~ ✓
-6. ~~**Integration** — end-to-end flow: CLI → API → executor → result download~~ ✓
-7. ~~**Auth** — static API key auth (buyer + executor) via DI~~ ✓
-8. ~~**Marketplace Frontend** — web UI for browsing agents, viewing details, placing orders~~ ✓
-9. ~~**Job Tracking** — web pages for viewing jobs, status, and downloading results~~ ✓
-10. ~~**Gemini CLI Executor** — first real agent: polling executor + seed agent + make targets~~ ✓
-11. ~~**Orchestrator hardening** — restore `agnt-handoff` entrypoint with tests and docs~~ ✓
-12. ~~**Agent stats & job duration** — `duration_seconds` on job responses + `GET /agents/{id}/stats` endpoint + `agnt stats` CLI command~~ ✓
-13. ~~**UI & Frontend for Agent stats** — TS types, API function, hook, formatDuration, stat card grid on AgentDetailPage~~ ✓
-14. ~~**UI Job Duration** — show `duration_seconds` on MyJobsPage and JobDetailPage~~ ✓
+## Completed (iterations 1–14)
+1. API — all endpoints with tests
+2. Object storage — MinIO + S3 wiring
+3. CLI — Go binary, all commands, JSON output
+4. Distribution — npm + pip wrappers
+5. Local orchestration — Podman compose
+6. Integration — end-to-end CLI → API → executor → result
+7. Auth — static API keys (buyer + executor)
+8. Web marketplace — browse agents, details, order placement
+9. Job tracking UI — job list, status, result download
+10. Gemini CLI executor — first real polling executor
+11. Orchestrator hardening — agnt-handoff entrypoint + tests
+12. Agent stats & job duration — API + CLI
+13. Agent stats UI — TypeScript types, hooks, stat cards
+14. Job duration UI — duration on job list & detail pages
 
-# BACKLOG
+## Current
+15. **Executor PRD** — design document for pluggable executor architecture
+16. **Executor scaffold** — shared Python base for polling, status reporting, file upload
+17. **Claude Code executor** — Claude Code CLI subprocess, same pattern as orchestrator
+18. **Codex executor** — OpenAI Codex CLI subprocess
+19. **Code review executor** — input mechanism designed in PRD, review agent
+20. **Integration test & polish** — test all executors end-to-end, rebuild containers
 
-## Iteration 12 — Agent stats & job duration (done — `a2336ee`)
-
-- [x] Add `duration_seconds` field to `JobDetailResponse` and `JobListItem` schemas (`api/agnt_api/schemas/jobs.py`)
-- [x] Wire `duration_seconds` computation into job route handlers (`api/agnt_api/api/routes/jobs.py`)
-- [x] Add `AgentStatsResponse` schema (`api/agnt_api/schemas/agents.py`)
-- [x] Add `GET /agents/{agent_id}/stats` endpoint with SQL aggregation (`api/agnt_api/api/routes/agents.py`)
-- [x] Add API tests for stats endpoint and duration_seconds (`api/tests/test_agents.py`, `api/tests/test_jobs.py`)
-- [x] Add `AgentStatsResponse` struct + `GetAgentStats()` to Go client (`cli/internal/api/client.go`)
-- [x] Add `DurationSeconds` field to Go `JobDetailResponse` and `JobListItem` structs (`cli/internal/api/client.go`)
-- [x] Add `agnt stats <agent-id>` CLI command (`cli/internal/cli/root.go`)
-- [x] Add Go CLI and client tests (`cli/internal/cli/root_test.go`, `cli/internal/api/client_test.go`)
-- [x] Verify end-to-end: `agnt stats 55555555-5555-5555-5555-555555555555`
-
-## Iteration 13 — UI & Frontend for Agent stats (done — `fb550ea`)
-
-- [x] Add `AgentStats` TypeScript interface + `getAgentStats()` API function
-- [x] Create `useAgentStats` hook following existing data-fetching pattern
-- [x] Add `formatDuration()` helper in `lib/jobs.ts`
-- [x] Embed stat card grid (Total Jobs, Success Rate, Failed Jobs, Avg Duration) on `AgentDetailPage` between header and info/schema sections
-- [x] Verify stats render correctly end-to-end
-
-## Iteration 14 — UI Job Duration (done)
-
-- [x] Add `duration_seconds` to frontend `JobListItem` and `JobDetail` API types (`web/src/api/types.ts`)
-- [x] Show job duration on My Jobs rows using shared `formatDuration()` helper (`web/src/pages/MyJobsPage.tsx`)
-- [x] Show job duration on Job Detail metadata grid (`web/src/pages/JobDetailPage.tsx`)
-- [x] Update page module docs for duration display (`web/src/pages/README.md`)
-- [x] Verify frontend compiles after type/UI updates (`web`: `npm run build`)
-
-## Iteration 15 — candidates (not yet planned)
-
-- [ ] **Job list filtering/pagination** — add status filters or pagination to the jobs list
-- [ ] **Error & edge-case polish** — empty states, loading skeletons, 404 handling improvements
-- [ ] **Deployment** — production Docker/nginx setup, environment config
-- [ ] **Web tests** — add frontend unit/integration tests
+## Future
+- Job list filtering/pagination
+- Error & edge-case polish (empty states, loading skeletons, 404 handling)
+- Web frontend tests
+- More executor types based on project needs
+- Workflow integration — leverage executors to improve iterative development

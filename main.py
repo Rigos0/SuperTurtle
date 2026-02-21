@@ -2,7 +2,7 @@
 
 from orchestrator.agnt_orchestrator import Claude, Codex
 
-prompt = "Follow instructions in CLAUDE.md"
+prompt = "Follow instructions in CLAUDE.md. "
 
 GROOMER_INSTRUCTIONS = """
 Update CLAUDE.md to reflect the plan attached below.                                        
@@ -24,10 +24,17 @@ Update CLAUDE.md to reflect the plan attached below.
      - If the plan introduces work not yet in the backlog, add it in the right position.
      - Check off (`[x]`) any items that are already done based on the codebase/git history.
      - Reorder if priorities have shifted based on the plan.
-  5. Do NOT touch the Roadmap, End Goal, or Instructions sections.
+     - If backlog has more than 6 iterations of tasks described, it's time to delete the old items
+  5. Do NOT touch the End Goal, or Instructions sections.
   6. Do NOT create or modify any other files.
 
   The plan: 
+"""
+
+FINISHER_PROMPT = """You are doing the last step of this iteration. The plan has already been implemented.
+Your job is to do a simple evaluation and code review to check whether everything looks right. If major problems found, 
+execute the fixes and prepare CLAUDE.md for the next iteration by providing NOTE in the backlog section behing the item we've just worked on. 
+For more context, this was the plan we were executing: 
 """
 
 claude = Claude()
@@ -39,3 +46,4 @@ while True:
     codex.execute(f"""You are the executor. Implement the following plan.
                 After you are done, 
                 commit the changes in one commit \n\n{plan}""")
+    claude.execute(FINISHER_PROMPT + plan)

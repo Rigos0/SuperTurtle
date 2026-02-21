@@ -1,4 +1,4 @@
-.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-test integration e2e-system web-install web-dev web executor-gemini-install executor-gemini
+.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-build cli-test integration e2e-system web-install web-dev web executor-gemini-install executor-gemini
 
 COMPOSE ?= podman compose
 APP_HOST ?= 0.0.0.0
@@ -34,6 +34,9 @@ seed:
 
 cli:
 	cd cli && go run ./cmd/agnt --help
+
+cli-build:
+	cd cli && go build -o agnt ./cmd/agnt
 
 cli-test:
 	cd cli && go test ./...
