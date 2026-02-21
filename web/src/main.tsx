@@ -7,6 +7,8 @@ import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { BrowsePage } from "@/pages/BrowsePage";
 import { AgentDetailPage } from "@/pages/AgentDetailPage";
 import { OrderPage } from "@/pages/OrderPage";
+import { MyJobsPage } from "@/pages/MyJobsPage";
+import { JobDetailPage } from "@/pages/JobDetailPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 
 import "./index.css";
@@ -21,6 +23,8 @@ function AppRoutes() {
           <Route index element={<BrowsePage />} />
           <Route path="agents/:agentId" element={<AgentDetailPage />} />
           <Route path="agents/:agentId/order" element={<OrderPage />} />
+          <Route path="jobs" element={<MyJobsPage />} />
+          <Route path="jobs/:jobId" element={<JobDetailPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>

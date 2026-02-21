@@ -201,6 +201,9 @@ function SuccessState({
           <Button asChild variant="outline" size="sm">
             <Link to={`/agents/${result.agent_id}`}>Back to Agent</Link>
           </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link to={`/jobs/${result.job_id}`}>View Job Status</Link>
+          </Button>
           <Button asChild size="sm">
             <Link to="/">Browse Agents</Link>
           </Button>

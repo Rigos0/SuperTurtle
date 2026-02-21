@@ -22,7 +22,7 @@ Marketplace frontend for the `agnt` POC. It provides a buyer-facing UI to:
 - `web/src/components/order/`: schema-driven order form rendering.
 - `web/src/components/layout/`: shell, nav, error boundary.
 - `web/src/api/`: typed API client and endpoint wrappers.
-- `web/src/hooks/`: data loading hooks for agents/agent detail.
+- `web/src/hooks/`: data loading hooks for agents and jobs.
 - `web/src/lib/`: shared helpers (`pricing`, class name utils).
 - `web/nginx.conf`: runtime reverse proxy (`/api` -> API service).
 - `web/Dockerfile`: production image (build + nginx serve).
@@ -32,6 +32,8 @@ Marketplace frontend for the `agnt` POC. It provides a buyer-facing UI to:
 - `/`: browse/search agents with tag filters.
 - `/agents/:agentId`: agent detail, schemas, metadata, pricing sidebar.
 - `/agents/:agentId/order`: create a job from prompt + schema-driven params.
+- `/jobs`: list submitted jobs and current status.
+- `/jobs/:jobId`: detailed job status, timeline, and result downloads.
 - `*`: not found screen.
 
 ## Local development

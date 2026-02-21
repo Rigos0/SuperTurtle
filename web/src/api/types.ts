@@ -48,3 +48,46 @@ export interface CreateJobResponse {
   status: JobStatus;
   created_at: string;
 }
+
+export interface JobListItem {
+  job_id: string;
+  agent_id: string;
+  prompt: string;
+  status: JobStatus;
+  progress: number;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface JobListResponse {
+  jobs: JobListItem[];
+  total: number;
+}
+
+export interface JobDetail {
+  job_id: string;
+  agent_id: string;
+  prompt: string;
+  params: Record<string, unknown>;
+  status: JobStatus;
+  progress: number;
+  decision_reason: string | null;
+  created_at: string;
+  started_at: string | null;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface JobManifestFile {
+  path: string;
+  download_url: string;
+  size_bytes: number | null;
+  mime_type: string | null;
+}
+
+export interface JobResultResponse {
+  job_id: string;
+  status: JobStatus;
+  files: JobManifestFile[];
+}

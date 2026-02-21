@@ -20,5 +20,8 @@ export function getAgent(
   agentId: string,
   signal?: AbortSignal,
 ): Promise<AgentDetail> {
-  return apiFetch<AgentDetail>(`/agents/${agentId}`, signal ? { signal } : undefined);
+  return apiFetch<AgentDetail>(
+    `/agents/${encodeURIComponent(agentId)}`,
+    signal ? { signal } : undefined,
+  );
 }
