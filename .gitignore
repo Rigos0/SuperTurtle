@@ -29,5 +29,8 @@ npm/runtime/
 .DS_Store
 Thumbs.db
 
+# Temp / integration artifacts
+.tmp/
+
 # Claude Code
 .claude/

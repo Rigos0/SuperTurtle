@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, AsyncIterator
+from urllib.parse import urlparse, urlunparse
 
 import aioboto3
 from botocore.exceptions import ClientError
@@ -24,6 +25,12 @@ class Storage:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._session = aioboto3.Session()
+
+        # Pre-parse URLs used by _rewrite_presigned_url to avoid
+        # repeated parsing on every presigned-URL call.
+        public_url = (settings.s3_public_url or "").strip()
+        self._parsed_public = urlparse(public_url) if public_url else None
+        self._endpoint_path = urlparse(settings.s3_endpoint_url).path.rstrip("/")
 
     @asynccontextmanager
     async def _client(self) -> AsyncIterator[S3Client]:
@@ -64,7 +71,7 @@ class Storage:
                 Params={"Bucket": self._settings.s3_bucket, "Key": key},
                 ExpiresIn=expires_in,
             )
-        return url
+        return self._rewrite_presigned_url(url)
 
     async def delete(self, key: str) -> None:
         """Delete an object from storage."""
@@ -73,6 +80,37 @@ class Storage:
                 Bucket=self._settings.s3_bucket,
                 Key=key,
             )
+
+    def _rewrite_presigned_url(self, url: str) -> str:
+        parsed_public = self._parsed_public
+        if parsed_public is None or not parsed_public.scheme or not parsed_public.netloc:
+            return url
+
+        parsed_url = urlparse(url)
+
+        path = parsed_url.path or "/"
+        endpoint_path = self._endpoint_path
+        if endpoint_path:
+            if path == endpoint_path:
+                path = "/"
+            elif path.startswith(endpoint_path + "/"):
+                path = path[len(endpoint_path):]
+
+        public_path = parsed_public.path.rstrip("/")
+        if not path.startswith("/"):
+            path = "/" + path
+        rewritten_path = f"{public_path}{path}" if public_path else path
+
+        return urlunparse(
+            (
+                parsed_public.scheme,
+                parsed_public.netloc,
+                rewritten_path,
+                parsed_url.params,
+                parsed_url.query,
+                parsed_url.fragment,
+            )
+        )
 
 
 _storage: Storage | None = None

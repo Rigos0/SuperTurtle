@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Integration — validate and document the end-to-end local flow (CLI → API → executor → result download).
+POC complete — all backlog items delivered. Next: run `make integration` against the live stack to validate the full end-to-end flow.
 
 
 # End goal with specs
@@ -117,4 +117,5 @@ Near-term tasks to chip away at, roughly in order:
 - [x] pip distribution package (Python wrapper for Go binary)
 - [x] Local orchestration: API Dockerfile + compose + Makefile targets
 - [x] Seed data: sample agents for local dev/testing
-- [ ] Integration: end-to-end CLI → API → executor → result flow ← current
+- [x] Fix presigned URLs for host access (`S3_PUBLIC_URL` config rewrite)
+- [x] Integration: end-to-end script, Makefile target, and docs (`scripts/`)

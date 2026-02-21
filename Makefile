@@ -1,4 +1,4 @@
-.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-test
+.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-test integration
 
 COMPOSE ?= podman compose
 APP_HOST ?= 0.0.0.0
@@ -37,3 +37,6 @@ cli:
 
 cli-test:
 	cd cli && go test ./...
+
+integration: up migrate seed
+	bash scripts/integration.sh

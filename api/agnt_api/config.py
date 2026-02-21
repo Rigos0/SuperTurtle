@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://agnt:agnt@localhost:5433/agnt"
 
     s3_endpoint_url: str = "http://localhost:9002"
+    s3_public_url: str | None = None
     s3_access_key: str = "minioadmin"
     s3_secret_key: str = "minioadmin"
     s3_bucket: str = "agnt-results"
