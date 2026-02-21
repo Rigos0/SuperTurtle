@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Select the next iteration task (current backlog is complete).
+Backlog complete — waiting to pick the next iteration task.
 
 
 # End goal with specs
@@ -101,6 +101,7 @@ All output is JSON only.
 8. ~~**Marketplace Frontend** — web UI for browsing agents, viewing details, placing orders~~ ✓
 9. ~~**Job Tracking** — web pages for viewing jobs, status, and downloading results~~ ✓
 10. ~~**Gemini CLI Executor** — first real agent: polling executor + seed agent + make targets~~ ✓
+11. ~~**Orchestrator hardening** — restore `agnt-handoff` entrypoint with tests and docs~~ ✓
 
 
 # BACKLOG
@@ -108,3 +109,4 @@ All output is JSON only.
 - [x] Gemini executor system prompt injection (`GEMINI.md` + 3-line `executor.py` edit)
 - [x] test out gemini to get a component (AnimatedCard.tsx — excellent quality, shadcn + framer-motion)
 - [x] test out whole system end to end
+- [x] restore orchestrator package entrypoint (`agnt_orchestrator.__main__`) + coverage + module README
