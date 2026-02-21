@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
+	"github.com/richardmladek/agentic/cli/internal/api"
 	"github.com/richardmladek/agentic/cli/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -121,11 +123,74 @@ func newVersionCommand() *cobra.Command {
 }
 
 func newSearchCommand() *cobra.Command {
-	return newStubCommand("search <query>", "Search for agents", cobra.ExactArgs(1), "search")
+	var tag string
+	var limit int
+	var offset int
+
+	cmd := &cobra.Command{
+		Use:   "search <query>",
+		Short: "Search for agents",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if limit < 1 || limit > 100 {
+				return &CLIError{
+					Code:     "validation_error",
+					Message:  "limit must be between 1 and 100",
+					ExitCode: 4,
+				}
+			}
+			if offset < 0 {
+				return &CLIError{
+					Code:     "validation_error",
+					Message:  "offset must be non-negative",
+					ExitCode: 4,
+				}
+			}
+
+			client, err := apiClientFromContext(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			resp, err := client.SearchAgents(cmd.Context(), args[0], api.SearchAgentsOptions{
+				Tag:    tag,
+				Limit:  limit,
+				Offset: offset,
+			})
+			if err != nil {
+				return toCLIError(err)
+			}
+
+			return writeJSON(cmd.OutOrStdout(), resp)
+		},
+	}
+
+	cmd.Flags().StringVar(&tag, "tag", "", "Filter by exact tag")
+	cmd.Flags().IntVar(&limit, "limit", 20, "Results per page (1-100)")
+	cmd.Flags().IntVar(&offset, "offset", 0, "Pagination offset")
+
+	return cmd
 }
 
 func newInfoCommand() *cobra.Command {
-	return newStubCommand("info <agent-id>", "Get agent details", cobra.ExactArgs(1), "info")
+	return &cobra.Command{
+		Use:   "info <agent-id>",
+		Short: "Get agent details",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := apiClientFromContext(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			resp, err := client.GetAgent(cmd.Context(), args[0])
+			if err != nil {
+				return toCLIError(err)
+			}
+
+			return writeJSON(cmd.OutOrStdout(), resp)
+		},
+	}
 }
 
 func newOrderCommand() *cobra.Command {
@@ -197,4 +262,62 @@ func writeJSON(w io.Writer, payload any) error {
 	encoder := json.NewEncoder(w)
 	encoder.SetEscapeHTML(false)
 	return encoder.Encode(payload)
+}
+
+func apiClientFromContext(ctx context.Context) (*api.Client, error) {
+	cfg, err := ConfigFromContext(ctx)
+	if err != nil {
+		return nil, &CLIError{
+			Code:     "internal_error",
+			Message:  err.Error(),
+			ExitCode: 1,
+		}
+	}
+
+	client, err := api.NewClient(
+		cfg.APIBaseURL,
+		time.Duration(cfg.RequestTimeoutSeconds)*time.Second,
+		cfg.AuthToken,
+	)
+	if err != nil {
+		return nil, &CLIError{
+			Code:     "config_error",
+			Message:  err.Error(),
+			ExitCode: 4,
+		}
+	}
+
+	return client, nil
+}
+
+func toCLIError(err error) error {
+	var httpErr *api.HTTPError
+	if errors.As(err, &httpErr) {
+		exit := 1
+		switch httpErr.StatusCode {
+		case 400, 422:
+			exit = 4
+		case 401, 403:
+			exit = 2
+		case 404:
+			exit = 3
+		}
+
+		code := httpErr.Code
+		if code == "" {
+			code = "api_error"
+		}
+
+		return &CLIError{
+			Code:     code,
+			Message:  httpErr.Message,
+			ExitCode: exit,
+		}
+	}
+
+	return &CLIError{
+		Code:     "api_error",
+		Message:  err.Error(),
+		ExitCode: 1,
+	}
 }
