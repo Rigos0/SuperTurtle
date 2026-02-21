@@ -7,7 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useJobs } from "@/hooks/useJobs";
-import { formatDateTime, formatJobStatus, statusBadgeVariant } from "@/lib/jobs";
+import {
+  formatDateTime,
+  formatDuration,
+  formatJobStatus,
+  statusBadgeVariant,
+} from "@/lib/jobs";
 
 export function MyJobsPage() {
   const { jobs, total, loading, error, retry } = useJobs();
@@ -83,11 +88,12 @@ function JobRow({ job }: { job: JobListItem }) {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
           <MetaRow label="Agent ID" value={job.agent_id} mono />
           <MetaRow label="Created" value={formatDateTime(job.created_at)} />
           <MetaRow label="Updated" value={formatDateTime(job.updated_at)} />
           <MetaRow label="Completed" value={formatDateTime(job.completed_at)} />
+          <MetaRow label="Duration" value={formatDuration(job.duration_seconds)} />
         </div>
 
         <div className="space-y-1">

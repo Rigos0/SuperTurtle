@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Iteration 13 — UI & Frontend for Agent stats.
+Ready to plan iteration 15 — candidates: job list filtering/pagination, error/edge-case polish, deployment, web tests.
 
 
 # End goal with specs
@@ -105,7 +105,8 @@ All output is JSON only.
 10. ~~**Gemini CLI Executor** — first real agent: polling executor + seed agent + make targets~~ ✓
 11. ~~**Orchestrator hardening** — restore `agnt-handoff` entrypoint with tests and docs~~ ✓
 12. ~~**Agent stats & job duration** — `duration_seconds` on job responses + `GET /agents/{id}/stats` endpoint + `agnt stats` CLI command~~ ✓
-13. **UI & Frontend for Agent stats**
+13. ~~**UI & Frontend for Agent stats** — TS types, API function, hook, formatDuration, stat card grid on AgentDetailPage~~ ✓
+14. ~~**UI Job Duration** — show `duration_seconds` on MyJobsPage and JobDetailPage~~ ✓
 
 # BACKLOG
 
@@ -122,6 +123,25 @@ All output is JSON only.
 - [x] Add Go CLI and client tests (`cli/internal/cli/root_test.go`, `cli/internal/api/client_test.go`)
 - [x] Verify end-to-end: `agnt stats 55555555-5555-5555-5555-555555555555`
 
-## Iteration 13 — UI & Frontend for Agent stats
+## Iteration 13 — UI & Frontend for Agent stats (done — `fb550ea`)
 
-- [ ] TBD — plan not yet created
+- [x] Add `AgentStats` TypeScript interface + `getAgentStats()` API function
+- [x] Create `useAgentStats` hook following existing data-fetching pattern
+- [x] Add `formatDuration()` helper in `lib/jobs.ts`
+- [x] Embed stat card grid (Total Jobs, Success Rate, Failed Jobs, Avg Duration) on `AgentDetailPage` between header and info/schema sections
+- [x] Verify stats render correctly end-to-end
+
+## Iteration 14 — UI Job Duration (done)
+
+- [x] Add `duration_seconds` to frontend `JobListItem` and `JobDetail` API types (`web/src/api/types.ts`)
+- [x] Show job duration on My Jobs rows using shared `formatDuration()` helper (`web/src/pages/MyJobsPage.tsx`)
+- [x] Show job duration on Job Detail metadata grid (`web/src/pages/JobDetailPage.tsx`)
+- [x] Update page module docs for duration display (`web/src/pages/README.md`)
+- [x] Verify frontend compiles after type/UI updates (`web`: `npm run build`)
+
+## Iteration 15 — candidates (not yet planned)
+
+- [ ] **Job list filtering/pagination** — add status filters or pagination to the jobs list
+- [ ] **Error & edge-case polish** — empty states, loading skeletons, 404 handling improvements
+- [ ] **Deployment** — production Docker/nginx setup, environment config
+- [ ] **Web tests** — add frontend unit/integration tests

@@ -66,6 +66,7 @@ export interface JobListItem {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  duration_seconds: number | null;
 }
 
 export interface JobListResponse {
@@ -85,6 +86,7 @@ export interface JobDetail {
   started_at: string | null;
   updated_at: string;
   completed_at: string | null;
+  duration_seconds: number | null;
 }
 
 export interface JobManifestFile {

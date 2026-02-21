@@ -11,6 +11,7 @@ import { useJobResult } from "@/hooks/useJobResult";
 import {
   formatBytes,
   formatDateTime,
+  formatDuration,
   formatJobStatus,
   statusBadgeVariant,
 } from "@/lib/jobs";
@@ -101,6 +102,7 @@ function JobContent({
           <MetaRow label="Started" value={formatDateTime(job.started_at)} />
           <MetaRow label="Updated" value={formatDateTime(job.updated_at)} />
           <MetaRow label="Completed" value={formatDateTime(job.completed_at)} />
+          <MetaRow label="Duration" value={formatDuration(job.duration_seconds)} />
           <MetaRow label="Decision Reason" value={job.decision_reason ?? "-"} />
         </CardContent>
       </Card>
