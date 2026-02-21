@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Marketplace Frontend — Docker + compose integration (Dockerfile, nginx proxy, compose service).
+Marketplace Frontend — Polish (error handling UI, responsive, README).
 
 
 # End goal with specs
@@ -109,7 +109,7 @@ Marketplace Frontend (current phase):
 - [x] Agent Browse page — search, tag filter, agent card grid
 - [x] Agent Detail page — full info, schemas, pricing, "Order" CTA
 - [x] Order Flow page — dynamic form from input_schema, job creation
-- [ ] Docker + compose integration — Dockerfile, nginx proxy, compose service ← current
+- [x] Docker + compose integration — Dockerfile, nginx proxy, compose service
 - [ ] Polish — error handling UI, responsive, README
 
 Future (not this phase):
