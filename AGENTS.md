@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-pip distribution package — Python wrapper that installs the compiled Go binary and exposes `agnt` as a CLI command via `pipx` / virtualenv entrypoint.
+Seed data — add a seed script (`api/seed.py`) that populates the local database with sample agents for development and CLI testing.
 
 
 # End goal with specs
@@ -114,4 +114,7 @@ Near-term tasks to chip away at, roughly in order:
 - [x] CLI `jobs` and `status` commands
 - [x] CLI `result` command (download files)
 - [x] npm distribution package (JS wrapper for Go binary)
-- [ ] pip distribution package (Python wrapper for Go binary) ← current
+- [x] pip distribution package (Python wrapper for Go binary)
+- [x] Local orchestration: API Dockerfile + compose + Makefile targets
+- [ ] Seed data: sample agents for local dev/testing ← current
+- [ ] Integration: end-to-end CLI → API → executor → result flow
