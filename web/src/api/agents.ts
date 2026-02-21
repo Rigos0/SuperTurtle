@@ -4,6 +4,7 @@ import type { AgentSearchResponse, AgentDetail } from "./types";
 export function searchAgents(
   query: string = "",
   tags: string[] = [],
+  signal?: AbortSignal,
 ): Promise<AgentSearchResponse> {
   const params = new URLSearchParams();
   if (query) params.set("q", query);
@@ -11,6 +12,7 @@ export function searchAgents(
   const qs = params.toString();
   return apiFetch<AgentSearchResponse>(
     `/agents/search${qs ? `?${qs}` : ""}`,
+    signal ? { signal } : undefined,
   );
 }
 

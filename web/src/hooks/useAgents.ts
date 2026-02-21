@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { searchAgents } from "@/api/agents";
 import type { AgentSummary } from "@/api/types";
 
@@ -8,35 +8,38 @@ export function useAgents(query: string, tags: string[]) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Serialize tags to avoid re-render loops from new array references
-  const tagsKey = tags.join(",");
+  const tagsKey = JSON.stringify(tags);
 
-  useEffect(() => {
-    let cancelled = false;
+  const fetchAgents = useCallback(() => {
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
 
-    const tagsList = tagsKey ? tagsKey.split(",") : [];
-    searchAgents(query, tagsList)
+    const tagsList: string[] = JSON.parse(tagsKey);
+    searchAgents(query, tagsList, controller.signal)
       .then((res) => {
-        if (!cancelled) {
-          setAgents(res.agents);
-          setTotal(res.total);
-        }
+        setAgents(res.agents);
+        setTotal(res.total);
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load agents");
-        }
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setError(err instanceof Error ? err.message : "Failed to load agents");
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return controller;
   }, [query, tagsKey]);
 
-  return { agents, total, loading, error };
+  useEffect(() => {
+    const controller = fetchAgents();
+    return () => controller.abort();
+  }, [fetchAgents]);
+
+  const retry = useCallback(() => {
+    fetchAgents();
+  }, [fetchAgents]);
+
+  return { agents, total, loading, error, retry };
 }
