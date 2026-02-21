@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Validate end-to-end flow: run `make integration` against the live stack, fix any issues found.
+POC complete — all backlog items delivered and end-to-end flow validated. Ready to select next phase of work.
 
 
 # End goal with specs
@@ -120,4 +120,4 @@ Near-term tasks to chip away at, roughly in order:
 - [x] Fix presigned URLs for host access (`S3_PUBLIC_URL` config rewrite)
 - [x] Integration: end-to-end script, Makefile target, and docs (`scripts/`)
 - [x] Code review polish: S3 URL caching, test coverage, integration script hardening
-- [x] Validate end-to-end flow: run `make integration` against the live stack ← current
+- [x] Validate end-to-end flow: run `make integration` against the live stack
