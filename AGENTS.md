@@ -110,7 +110,7 @@ Marketplace Frontend (current phase):
 - [x] Agent Detail page — full info, schemas, pricing, "Order" CTA
 - [x] Order Flow page — dynamic form from input_schema, job creation
 - [x] Docker + compose integration — Dockerfile, nginx proxy, compose service
-- [ ] Polish — error handling UI, responsive, README
+- [ ] Polish — error handling UI, responsive, README ← current
 
 Future (not this phase):
 
