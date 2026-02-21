@@ -40,6 +40,7 @@ POLL_INTERVAL = _parse_int_env("POLL_INTERVAL_SECONDS", "5")
 JOB_TIMEOUT = _parse_int_env("JOB_TIMEOUT_SECONDS", "300")
 
 WORK_ROOT = Path(__file__).resolve().parent / "work"
+SYSTEM_PROMPT = (Path(__file__).resolve().parent / "GEMINI.md").read_text(encoding="utf-8")
 MAX_UPLOAD_FILES = 20
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB per file
 
@@ -186,6 +187,7 @@ def _process_job(job: dict) -> None:
 
         prompt = _build_prompt(job)
         log.info("Running gemini for job %s", job_id)
+        (work_dir / "GEMINI.md").write_text(SYSTEM_PROMPT, encoding="utf-8")
 
         proc = subprocess.Popen(
             ["gemini", "-p", prompt, "--yolo"],
@@ -209,7 +211,7 @@ def _process_job(job: dict) -> None:
             return
 
         # Collect output -----------------------------------------------
-        files = _collect_files(work_dir)
+        files = [p for p in _collect_files(work_dir) if p.name != "GEMINI.md"]
 
         if not files and stdout.strip():
             response_file = work_dir / "response.txt"

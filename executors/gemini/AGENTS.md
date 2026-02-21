@@ -14,6 +14,10 @@ make executor-gemini            # start polling
 
 All via env vars — see `.env.example`. Copy to `.env` and adjust.
 
+## System Prompt
+
+`executor.py` copies `GEMINI.md` into each job work directory before running Gemini CLI. Update `GEMINI.md` to tune generation behavior.
+
 ## Prerequisites
 
 Gemini CLI must be installed and authenticated. Run `gemini` once interactively to complete OAuth before starting the executor.

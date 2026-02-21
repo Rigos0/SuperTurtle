@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-None — select next task from backlog.
+Test Gemini executor output quality by generating one shadcn-style animated component.
 
 
 # End goal with specs
@@ -105,4 +105,6 @@ All output is JSON only.
 
 # BACKLOG
 
-(empty — all POC roadmap items complete)
+- [x] Gemini executor system prompt injection (`GEMINI.md` + 3-line `executor.py` edit)
+- [ ] test out gemini to get a component ← current
+- [ ] test out whole system end to end

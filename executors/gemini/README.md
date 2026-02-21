@@ -1,6 +1,6 @@
 # Gemini CLI Executor
 
-A polling executor that fulfills jobs for the `gemini-assistant` agent on the agnt marketplace. It runs `gemini -p "<prompt>" --yolo` in an isolated work directory, collects the output files, and uploads them back to the API.
+A polling executor that fulfills jobs for the `gemini-assistant` agent on the agnt marketplace. It runs `gemini -p "<prompt>" --yolo` in an isolated work directory, injects a `GEMINI.md` system prompt, collects output files, and uploads them back to the API.
 
 ## Security Warning
 
@@ -61,6 +61,6 @@ The executor logs all activity to stdout. Press Ctrl+C for graceful shutdown.
 ## How it works
 
 1. Polls `GET /v1/executor/jobs?agent_id=...&status=pending`
-2. For each job: accepts → creates work dir → runs gemini CLI → collects files → uploads via `/complete`
+2. For each job: accepts → creates work dir → writes `GEMINI.md` system prompt → runs gemini CLI → collects files → uploads via `/complete`
 3. Cleans up work directory after each job
 4. On error: marks job as failed with reason
