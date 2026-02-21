@@ -4,12 +4,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAgent } from "@/hooks/useAgent";
+import { useAgentStats } from "@/hooks/useAgentStats";
+import { formatDuration } from "@/lib/jobs";
 import { formatPricing } from "@/lib/pricing";
-import type { AgentDetail } from "@/api/types";
+import type { AgentDetail, AgentStats } from "@/api/types";
 
 export function AgentDetailPage() {
   const { agentId } = useParams<{ agentId: string }>();
   const { agent, loading, error, notFound, retry } = useAgent(agentId);
+  const {
+    stats,
+    loading: statsLoading,
+    error: statsError,
+    retry: retryStats,
+  } = useAgentStats(agentId);
 
   if (!agentId) {
     return <InvalidAgentState />;
@@ -26,7 +34,13 @@ export function AgentDetailPage() {
       ) : error ? (
         <ErrorState error={error} notFound={notFound} onRetry={retry} />
       ) : agent ? (
-        <AgentContent agent={agent} />
+        <AgentContent
+          agent={agent}
+          stats={stats}
+          statsLoading={statsLoading}
+          statsError={statsError}
+          onRetryStats={retryStats}
+        />
       ) : (
         <ErrorState error="Agent data is unavailable." notFound={false} onRetry={retry} />
       )}
@@ -34,7 +48,19 @@ export function AgentDetailPage() {
   );
 }
 
-function AgentContent({ agent }: { agent: AgentDetail }) {
+function AgentContent({
+  agent,
+  stats,
+  statsLoading,
+  statsError,
+  onRetryStats,
+}: {
+  agent: AgentDetail;
+  stats: AgentStats | null;
+  statsLoading: boolean;
+  statsError: string | null;
+  onRetryStats: () => void;
+}) {
   return (
     <div className="space-y-6">
       <section className="space-y-3">
@@ -52,6 +78,13 @@ function AgentContent({ agent }: { agent: AgentDetail }) {
           </div>
         ) : null}
       </section>
+
+      <StatsGrid
+        stats={stats}
+        loading={statsLoading}
+        error={statsError}
+        onRetry={onRetryStats}
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <aside className="order-1 space-y-6 lg:order-2">
@@ -95,6 +128,57 @@ function AgentContent({ agent }: { agent: AgentDetail }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function StatsGrid({
+  stats,
+  loading,
+  error,
+  onRetry,
+}: {
+  stats: AgentStats | null;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+}) {
+  const placeholder = loading ? "..." : "-";
+  const totalJobs = stats ? stats.total_jobs.toLocaleString("en-US") : placeholder;
+  const successRate = stats ? formatSuccessRate(stats.success_rate) : placeholder;
+  const failedJobs = stats ? stats.failed_jobs.toLocaleString("en-US") : placeholder;
+  const avgDuration = stats ? formatDuration(stats.avg_duration_seconds) : placeholder;
+
+  return (
+    <section className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Total Jobs" value={totalJobs} />
+        <StatCard label="Success Rate" value={successRate} />
+        <StatCard label="Failed Jobs" value={failedJobs} />
+        <StatCard label="Avg Duration" value={avgDuration} />
+      </div>
+
+      {error ? (
+        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+          <span>{error}</span>
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            Retry stats
+          </Button>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      </CardHeader>
+      <CardContent>
+        <p className="text-2xl font-semibold tracking-tight">{value}</p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -237,4 +321,12 @@ function formatDate(raw: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function formatSuccessRate(value: number): string {
+  if (!Number.isFinite(value) || value < 0) {
+    return "-";
+  }
+
+  return `${(Math.max(0, Math.min(1, value)) * 100).toFixed(1)}%`;
 }

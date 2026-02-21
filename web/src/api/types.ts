@@ -26,6 +26,14 @@ export interface AgentDetail {
   updated_at: string;
 }
 
+export interface AgentStats {
+  total_jobs: number;
+  completed_jobs: number;
+  failed_jobs: number;
+  avg_duration_seconds: number | null;
+  success_rate: number;
+}
+
 /** Mirrors api/agnt_api/schemas/jobs.py */
 
 export type JobStatus =

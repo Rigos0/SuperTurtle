@@ -1,5 +1,5 @@
 import { apiFetch } from "./client";
-import type { AgentSearchResponse, AgentDetail } from "./types";
+import type { AgentSearchResponse, AgentDetail, AgentStats } from "./types";
 
 export function searchAgents(
   query: string = "",
@@ -22,6 +22,16 @@ export function getAgent(
 ): Promise<AgentDetail> {
   return apiFetch<AgentDetail>(
     `/agents/${encodeURIComponent(agentId)}`,
+    signal ? { signal } : undefined,
+  );
+}
+
+export function getAgentStats(
+  agentId: string,
+  signal?: AbortSignal,
+): Promise<AgentStats> {
+  return apiFetch<AgentStats>(
+    `/agents/${encodeURIComponent(agentId)}/stats`,
     signal ? { signal } : undefined,
   );
 }
