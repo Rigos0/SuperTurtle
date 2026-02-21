@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -205,5 +206,116 @@ func TestGetAgentError(t *testing.T) {
 	}
 	if httpErr.Message != "Agent does not exist." {
 		t.Fatalf("unexpected message: %s", httpErr.Message)
+	}
+}
+
+func TestCreateJob(t *testing.T) {
+	t.Parallel()
+
+	agentID := "550e8400-e29b-41d4-a716-446655440000"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/v1/jobs" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Content-Type"); got != "application/json" {
+			t.Fatalf("unexpected content type: %s", got)
+		}
+
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode payload: %v", err)
+		}
+		if payload["agent_id"] != agentID {
+			t.Fatalf("unexpected agent_id: %v", payload["agent_id"])
+		}
+		if payload["prompt"] != "Generate a logo" {
+			t.Fatalf("unexpected prompt: %v", payload["prompt"])
+		}
+		params, ok := payload["params"].(map[string]any)
+		if !ok {
+			t.Fatalf("unexpected params payload: %#v", payload["params"])
+		}
+		if params["style"] != "minimal" {
+			t.Fatalf("unexpected style param: %v", params["style"])
+		}
+		if params["count"] != float64(2) {
+			t.Fatalf("unexpected count param: %v", params["count"])
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"job_id":"11111111-2222-3333-4444-555555555555",
+			"agent_id":"550e8400-e29b-41d4-a716-446655440000",
+			"status":"pending",
+			"created_at":"2026-02-21T10:00:00Z"
+		}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL, 2*time.Second, "")
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	resp, err := client.CreateJob(
+		context.Background(),
+		agentID,
+		"Generate a logo",
+		map[string]any{
+			"style": "minimal",
+			"count": 2,
+		},
+	)
+	if err != nil {
+		t.Fatalf("CreateJob() error = %v", err)
+	}
+	if resp.JobID != "11111111-2222-3333-4444-555555555555" {
+		t.Fatalf("unexpected job id: %s", resp.JobID)
+	}
+	if resp.AgentID != agentID {
+		t.Fatalf("unexpected agent id: %s", resp.AgentID)
+	}
+	if resp.Status != "pending" {
+		t.Fatalf("unexpected status: %s", resp.Status)
+	}
+	if resp.CreatedAt.IsZero() {
+		t.Fatalf("expected non-zero created_at")
+	}
+}
+
+func TestCreateJobInvalidUUID(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient("http://localhost:9999", 2*time.Second, "")
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	_, err = client.CreateJob(context.Background(), "not-a-uuid", "hello", nil)
+	if err == nil {
+		t.Fatalf("expected error for invalid UUID")
+	}
+	if err.Error() != "invalid agent id: must be a valid UUID" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCreateJobEmptyPrompt(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient("http://localhost:9999", 2*time.Second, "")
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	_, err = client.CreateJob(context.Background(), "550e8400-e29b-41d4-a716-446655440000", "   ", nil)
+	if err == nil {
+		t.Fatalf("expected error for empty prompt")
+	}
+	if err.Error() != "prompt must not be empty" {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

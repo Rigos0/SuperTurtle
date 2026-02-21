@@ -6,6 +6,7 @@ Thin HTTP client used by the Go CLI to call the hosted `agnt` API.
 
 - `GET /v1/agents/search`
 - `GET /v1/agents/{agent_id}`
+- `POST /v1/jobs`
 
 ## Notes
 

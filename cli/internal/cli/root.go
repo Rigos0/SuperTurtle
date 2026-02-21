@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/richardmladek/agentic/cli/internal/api"
@@ -194,10 +195,59 @@ func newInfoCommand() *cobra.Command {
 }
 
 func newOrderCommand() *cobra.Command {
-	cmd := newStubCommand("order <agent-id>", "Create a job", cobra.ExactArgs(1), "order")
-	cmd.Flags().String("prompt", "", "Prompt text for the job")
-	cmd.Flags().StringArray("param", nil, "Agent-specific parameter in key=value format")
+	var prompt string
+	var rawParams []string
+
+	cmd := &cobra.Command{
+		Use:   "order <agent-id>",
+		Short: "Create a job",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if strings.TrimSpace(prompt) == "" {
+				return &CLIError{
+					Code:     "validation_error",
+					Message:  "prompt must not be empty",
+					ExitCode: 4,
+				}
+			}
+
+			params, err := parseParamFlags(rawParams)
+			if err != nil {
+				return &CLIError{
+					Code:     "validation_error",
+					Message:  err.Error(),
+					ExitCode: 4,
+				}
+			}
+
+			client, err := apiClientFromContext(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			resp, err := client.CreateJob(cmd.Context(), args[0], prompt, params)
+			if err != nil {
+				return toCLIError(err)
+			}
+
+			return writeJSON(cmd.OutOrStdout(), resp)
+		},
+	}
+	cmd.Flags().StringVar(&prompt, "prompt", "", "Prompt text for the job")
+	cmd.Flags().StringArrayVar(&rawParams, "param", nil, "Agent-specific parameter in key=value format")
 	return cmd
+}
+
+func parseParamFlags(rawParams []string) (map[string]any, error) {
+	params := make(map[string]any, len(rawParams))
+	for _, raw := range rawParams {
+		key, value, ok := strings.Cut(raw, "=")
+		if !ok || strings.TrimSpace(key) == "" {
+			return nil, fmt.Errorf("invalid --param value %q: expected key=value", raw)
+		}
+		params[key] = value
+	}
+	return params, nil
 }
 
 func newJobsCommand() *cobra.Command {

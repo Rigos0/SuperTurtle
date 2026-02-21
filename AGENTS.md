@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-CLI `search` and `info` commands.
+Implement CLI `jobs` and `status` commands — `GET /v1/jobs` and `GET /v1/jobs/{job_id}` with JSON output and `httptest`-based tests.
 
 
 # End goal with specs
@@ -109,9 +109,9 @@ Near-term tasks to chip away at, roughly in order:
 - [x] Wire file upload into job completion endpoint
 - [x] Wire file download into job result endpoint
 - [x] Go CLI scaffold (module init, cobra setup, config)
-- [ ] CLI `search` and `info` commands ← current
-- [ ] CLI `order` command
-- [ ] CLI `jobs` and `status` commands
+- [x] CLI HTTP client (`cli/internal/api/`) + `search` and `info` commands
+- [x] CLI `order` command
+- [ ] CLI `jobs` and `status` commands ← current
 - [ ] CLI `result` command (download files)
 
 

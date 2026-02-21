@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,6 +19,7 @@ var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]
 const (
 	agentsSearchPath = "/v1/agents/search"
 	agentsInfoPath   = "/v1/agents"
+	jobsPath         = "/v1/jobs"
 )
 
 type HTTPDoer interface {
@@ -51,15 +53,28 @@ type AgentSummary struct {
 }
 
 type AgentDetailResponse struct {
-	AgentID     string         `json:"agent_id"`
-	Name        string         `json:"name"`
-	Description string         `json:"description"`
-	Tags        []string       `json:"tags"`
-	Pricing     map[string]any `json:"pricing"`
+	AgentID      string         `json:"agent_id"`
+	Name         string         `json:"name"`
+	Description  string         `json:"description"`
+	Tags         []string       `json:"tags"`
+	Pricing      map[string]any `json:"pricing"`
 	InputSchema  map[string]any `json:"input_schema"`
 	OutputSchema map[string]any `json:"output_schema"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+}
+
+type CreateJobResponse struct {
+	JobID     string    `json:"job_id"`
+	AgentID   string    `json:"agent_id"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type createJobRequest struct {
+	AgentID string         `json:"agent_id"`
+	Prompt  string         `json:"prompt"`
+	Params  map[string]any `json:"params"`
 }
 
 type HTTPError struct {
@@ -144,16 +159,78 @@ func (c *Client) GetAgent(ctx context.Context, agentID string) (AgentDetailRespo
 	return resp, nil
 }
 
+func (c *Client) CreateJob(
+	ctx context.Context,
+	agentID string,
+	prompt string,
+	params map[string]any,
+) (CreateJobResponse, error) {
+	if !uuidPattern.MatchString(agentID) {
+		return CreateJobResponse{}, fmt.Errorf("invalid agent id: must be a valid UUID")
+	}
+	if strings.TrimSpace(prompt) == "" {
+		return CreateJobResponse{}, fmt.Errorf("prompt must not be empty")
+	}
+	if params == nil {
+		params = map[string]any{}
+	}
+
+	req := createJobRequest{
+		AgentID: agentID,
+		Prompt:  prompt,
+		Params:  params,
+	}
+
+	var resp CreateJobResponse
+	if err := c.postJSON(ctx, jobsPath, nil, req, &resp); err != nil {
+		return CreateJobResponse{}, err
+	}
+	return resp, nil
+}
+
 func (c *Client) getJSON(ctx context.Context, endpointPath string, query url.Values, dst any) error {
+	return c.doJSONRequest(ctx, http.MethodGet, endpointPath, query, nil, dst)
+}
+
+func (c *Client) postJSON(
+	ctx context.Context,
+	endpointPath string,
+	query url.Values,
+	payload any,
+	dst any,
+) error {
+	return c.doJSONRequest(ctx, http.MethodPost, endpointPath, query, payload, dst)
+}
+
+func (c *Client) doJSONRequest(
+	ctx context.Context,
+	method string,
+	endpointPath string,
+	query url.Values,
+	payload any,
+	dst any,
+) error {
 	endpoint := *c.baseURL
 	endpoint.Path = strings.TrimRight(c.baseURL.Path, "/") + "/" + strings.TrimLeft(endpointPath, "/")
 	if query != nil {
 		endpoint.RawQuery = query.Encode()
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	var body io.Reader
+	if payload != nil {
+		bodyBytes, err := json.Marshal(payload)
+		if err != nil {
+			return fmt.Errorf("encode request: %w", err)
+		}
+		body = bytes.NewReader(bodyBytes)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, endpoint.String(), body)
 	if err != nil {
 		return fmt.Errorf("build request: %w", err)
+	}
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
 	}
 	if c.authToken != "" {
 		req.Header.Set("Authorization", "Bearer "+c.authToken)
