@@ -16,6 +16,9 @@ export function searchAgents(
   );
 }
 
-export function getAgent(agentId: string): Promise<AgentDetail> {
-  return apiFetch<AgentDetail>(`/agents/${agentId}`);
+export function getAgent(
+  agentId: string,
+  signal?: AbortSignal,
+): Promise<AgentDetail> {
+  return apiFetch<AgentDetail>(`/agents/${agentId}`, signal ? { signal } : undefined);
 }
