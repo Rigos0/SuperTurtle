@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Backlog complete — waiting to pick the next iteration task.
+Iteration 13 — UI & Frontend for Agent stats.
 
 
 # End goal with specs
@@ -56,6 +56,7 @@ The CLI is distributed primarily via npm and secondarily via pip, both using the
 ### Buyer-facing endpoints
 - `GET /v1/agents/search`
 - `GET /v1/agents/{agent_id}`
+- `GET /v1/agents/{agent_id}/stats`
 - `POST /v1/jobs`
 - `GET /v1/jobs`
 - `GET /v1/jobs/{job_id}`
@@ -81,6 +82,7 @@ The CLI is distributed primarily via npm and secondarily via pip, both using the
 ## CLI Scope (POC)
 - `agnt search <query>`
 - `agnt info <agent-id>`
+- `agnt stats <agent-id>`
 - `agnt order <agent-id> --prompt <text> [--param key=value]`
 - `agnt jobs`
 - `agnt status <job-id>`
@@ -102,11 +104,24 @@ All output is JSON only.
 9. ~~**Job Tracking** — web pages for viewing jobs, status, and downloading results~~ ✓
 10. ~~**Gemini CLI Executor** — first real agent: polling executor + seed agent + make targets~~ ✓
 11. ~~**Orchestrator hardening** — restore `agnt-handoff` entrypoint with tests and docs~~ ✓
-
+12. ~~**Agent stats & job duration** — `duration_seconds` on job responses + `GET /agents/{id}/stats` endpoint + `agnt stats` CLI command~~ ✓
+13. **UI & Frontend for Agent stats**
 
 # BACKLOG
 
-- [x] Gemini executor system prompt injection (`GEMINI.md` + 3-line `executor.py` edit)
-- [x] test out gemini to get a component (AnimatedCard.tsx — excellent quality, shadcn + framer-motion)
-- [x] test out whole system end to end
-- [x] restore orchestrator package entrypoint (`agnt_orchestrator.__main__`) + coverage + module README
+## Iteration 12 — Agent stats & job duration (done — `a2336ee`)
+
+- [x] Add `duration_seconds` field to `JobDetailResponse` and `JobListItem` schemas (`api/agnt_api/schemas/jobs.py`)
+- [x] Wire `duration_seconds` computation into job route handlers (`api/agnt_api/api/routes/jobs.py`)
+- [x] Add `AgentStatsResponse` schema (`api/agnt_api/schemas/agents.py`)
+- [x] Add `GET /agents/{agent_id}/stats` endpoint with SQL aggregation (`api/agnt_api/api/routes/agents.py`)
+- [x] Add API tests for stats endpoint and duration_seconds (`api/tests/test_agents.py`, `api/tests/test_jobs.py`)
+- [x] Add `AgentStatsResponse` struct + `GetAgentStats()` to Go client (`cli/internal/api/client.go`)
+- [x] Add `DurationSeconds` field to Go `JobDetailResponse` and `JobListItem` structs (`cli/internal/api/client.go`)
+- [x] Add `agnt stats <agent-id>` CLI command (`cli/internal/cli/root.go`)
+- [x] Add Go CLI and client tests (`cli/internal/cli/root_test.go`, `cli/internal/api/client_test.go`)
+- [x] Verify end-to-end: `agnt stats 55555555-5555-5555-5555-555555555555`
+
+## Iteration 13 — UI & Frontend for Agent stats
+
+- [ ] TBD — plan not yet created
