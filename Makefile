@@ -1,4 +1,4 @@
-.PHONY: db db-down api migrate migrate-new
+.PHONY: db db-down api migrate migrate-new cli cli-test
 
 COMPOSE ?= podman compose
 APP_HOST ?= 0.0.0.0
@@ -19,3 +19,9 @@ migrate:
 migrate-new:
 	@test -n "$(name)" || (echo "Usage: make migrate-new name=<migration_name>" && exit 1)
 	cd api && uv run alembic revision --autogenerate -m "$(name)"
+
+cli:
+	cd cli && go run ./cmd/agnt --help
+
+cli-test:
+	cd cli && go test ./...

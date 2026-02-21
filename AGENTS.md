@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Wire file download into job result endpoint.
+CLI `search` and `info` commands.
 
 
 # End goal with specs
@@ -107,12 +107,11 @@ Near-term tasks to chip away at, roughly in order:
 - [x] Add buyer-facing job endpoints (list, detail)
 - [x] Object storage setup (MinIO container, S3 client in API)
 - [x] Wire file upload into job completion endpoint
-- [ ] Wire file download into job result endpoint ← current
-- [ ] Go CLI scaffold (module init, cobra setup, config)
-- [ ] CLI `search` and `info` commands
+- [x] Wire file download into job result endpoint
+- [x] Go CLI scaffold (module init, cobra setup, config)
+- [ ] CLI `search` and `info` commands ← current
 - [ ] CLI `order` command
 - [ ] CLI `jobs` and `status` commands
 - [ ] CLI `result` command (download files)
-
 
 
