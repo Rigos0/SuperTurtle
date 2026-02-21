@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Apply code review fixes to file upload wiring on `POST /v1/executor/jobs/{job_id}/complete`.
+Wire file download into job result endpoint.
 
 
 # End goal with specs
@@ -106,14 +106,13 @@ Near-term tasks to chip away at, roughly in order:
 - [x] Add buyer-facing agent endpoints (search, detail)
 - [x] Add buyer-facing job endpoints (list, detail)
 - [x] Object storage setup (MinIO container, S3 client in API)
-- [ ] Wire file upload into job completion endpoint ← current
-- [ ] Wire file download into job result endpoint
+- [x] Wire file upload into job completion endpoint
+- [ ] Wire file download into job result endpoint ← current
 - [ ] Go CLI scaffold (module init, cobra setup, config)
 - [ ] CLI `search` and `info` commands
 - [ ] CLI `order` command
 - [ ] CLI `jobs` and `status` commands
 - [ ] CLI `result` command (download files)
-
 
 
 
