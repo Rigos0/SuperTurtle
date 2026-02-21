@@ -23,7 +23,9 @@ What to keep always in this CLAUDE.md file:
 
 
 
-# Current Task 
+# Current Task
+
+Complete Buyer-Facing API Endpoints — Add the 4 missing buyer-facing endpoints (GET /v1/agents/search, GET /v1/agents/{agent_id}, GET /v1/jobs, GET /v1/jobs/{job_id}). Create agent schemas and routes, add job list/detail schemas and routes, register agents router, and add tests.
 
 
 # End goal with specs
@@ -89,8 +91,28 @@ All output is JSON only.
 
 # ROADMAP
 
+1. **API** — complete all buyer-facing and executor-facing endpoints with tests
+2. **Object storage** — MinIO locally, S3-compatible in deployment; wire into job results
+3. **CLI** — Go binary implementing all `agnt` commands, JSON output
+4. **Distribution** — npm and pip wrapper packages for the Go binary
+5. **Local orchestration** — Podman compose for full-stack local dev (API + Postgres + MinIO)
+6. **Integration** — end-to-end flow: CLI → API → executor → result download
 
 
+# BACKLOG
+
+Near-term tasks to chip away at, roughly in order:
+
+- [ ] Add buyer-facing agent endpoints (search, detail) ← current
+- [ ] Add buyer-facing job endpoints (list, detail)
+- [ ] Object storage setup (MinIO container, S3 client in API)
+- [ ] Wire file upload into job completion endpoint
+- [ ] Wire file download into job result endpoint
+- [ ] Go CLI scaffold (module init, cobra setup, config)
+- [ ] CLI `search` and `info` commands
+- [ ] CLI `order` command
+- [ ] CLI `jobs` and `status` commands
+- [ ] CLI `result` command (download files)
 
 
 

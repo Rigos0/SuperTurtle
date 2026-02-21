@@ -52,6 +52,19 @@ class Claude:
         print(f"[claude] plan ready ({len(result)} chars)")
         return result
 
+    def execute(self, prompt: str) -> str:
+        """Generate an implementation plan from a prompt. Returns the plan text."""
+        print(f"[claude] executing in {self.cwd} ...")
+        cmd = [
+            "claude",
+            "--dangerously-skip-permissions",
+            "-p",
+            prompt,
+        ]
+        result = _run_streaming(cmd, self.cwd)
+        print(f"[claude] executed ready ({len(result)} chars)")
+        return result
+
 
 class Codex:
     """Codex agent -- execution mode."""
