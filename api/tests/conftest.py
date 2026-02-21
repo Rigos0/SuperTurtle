@@ -8,9 +8,13 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi.testclient import TestClient
 
-from agnt_api.api.deps import get_session, get_storage
+from agnt_api.api.deps import get_app_settings, get_session, get_storage
+from agnt_api.config import Settings
 from agnt_api.main import create_app
 from agnt_api.models.enums import JobStatus
+
+BUYER_TEST_API_KEY = "buyer-test-key"
+EXECUTOR_TEST_API_KEY = "executor-test-key"
 
 
 def _utc_now() -> datetime:
@@ -98,15 +102,51 @@ def mock_storage() -> AsyncMock:
 
 
 @pytest.fixture()
-def client(mock_session: AsyncMock) -> TestClient:
-    app = create_app()
-    app.dependency_overrides[get_session] = lambda: mock_session
-    return TestClient(app)
+def test_settings() -> Settings:
+    return Settings(
+        buyer_api_key=BUYER_TEST_API_KEY,
+        executor_api_key=EXECUTOR_TEST_API_KEY,
+    )
 
 
 @pytest.fixture()
-def client_with_storage(mock_session: AsyncMock, mock_storage: AsyncMock) -> TestClient:
+def client(mock_session: AsyncMock, test_settings: Settings) -> TestClient:
+    app = create_app()
+    app.dependency_overrides[get_session] = lambda: mock_session
+    app.dependency_overrides[get_app_settings] = lambda: test_settings
+    test_client = TestClient(app)
+    test_client.headers.update({"X-API-Key": BUYER_TEST_API_KEY})
+    return test_client
+
+
+@pytest.fixture()
+def client_with_storage(
+    mock_session: AsyncMock,
+    mock_storage: AsyncMock,
+    test_settings: Settings,
+) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_session] = lambda: mock_session
     app.dependency_overrides[get_storage] = lambda: mock_storage
+    app.dependency_overrides[get_app_settings] = lambda: test_settings
+    test_client = TestClient(app)
+    test_client.headers.update({"X-API-Key": BUYER_TEST_API_KEY})
+    return test_client
+
+
+@pytest.fixture()
+def executor_client(mock_session: AsyncMock, test_settings: Settings) -> TestClient:
+    app = create_app()
+    app.dependency_overrides[get_session] = lambda: mock_session
+    app.dependency_overrides[get_app_settings] = lambda: test_settings
+    test_client = TestClient(app)
+    test_client.headers.update({"X-API-Key": EXECUTOR_TEST_API_KEY})
+    return test_client
+
+
+@pytest.fixture()
+def unauthenticated_client(mock_session: AsyncMock, test_settings: Settings) -> TestClient:
+    app = create_app()
+    app.dependency_overrides[get_session] = lambda: mock_session
+    app.dependency_overrides[get_app_settings] = lambda: test_settings
     return TestClient(app)

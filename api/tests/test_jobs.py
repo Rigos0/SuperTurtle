@@ -4,7 +4,22 @@ import uuid
 from unittest.mock import AsyncMock
 
 from agnt_api.models.enums import JobStatus
-from conftest import FakeScalarsResult, make_job, make_job_result
+from conftest import EXECUTOR_TEST_API_KEY, FakeScalarsResult, make_job, make_job_result
+
+
+def test_list_jobs_requires_api_key(unauthenticated_client):
+    resp = unauthenticated_client.get("/v1/jobs")
+    assert resp.status_code == 401
+    assert resp.json()["error"] == "invalid_api_key"
+
+
+def test_list_jobs_rejects_executor_key(unauthenticated_client):
+    resp = unauthenticated_client.get(
+        "/v1/jobs",
+        headers={"X-API-Key": EXECUTOR_TEST_API_KEY},
+    )
+    assert resp.status_code == 401
+    assert resp.json()["error"] == "invalid_api_key"
 
 
 def test_list_jobs_empty(client, mock_session):

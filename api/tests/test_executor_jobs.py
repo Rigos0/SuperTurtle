@@ -13,10 +13,25 @@ from agnt_api.api.routes.executor_jobs import (
     _build_result_object_key,
 )
 from agnt_api.models.enums import JobStatus
-from conftest import make_job
+from conftest import EXECUTOR_TEST_API_KEY, FakeScalarsResult, make_job
 
 
-def test_complete_job_uploads_files_and_marks_completed(client, mock_session):
+def test_executor_list_jobs_requires_api_key(unauthenticated_client):
+    resp = unauthenticated_client.get(f"/v1/executor/jobs?agent_id={uuid.uuid4()}")
+    assert resp.status_code == 401
+    assert resp.json()["error"] == "invalid_api_key"
+
+
+def test_executor_list_jobs_accepts_bearer_api_key(unauthenticated_client, mock_session):
+    mock_session.scalars.return_value = FakeScalarsResult([])
+    resp = unauthenticated_client.get(
+        f"/v1/executor/jobs?agent_id={uuid.uuid4()}",
+        headers={"Authorization": f"Bearer {EXECUTOR_TEST_API_KEY}"},
+    )
+    assert resp.status_code == 200
+
+
+def test_complete_job_uploads_files_and_marks_completed(executor_client, mock_session):
     job = make_job(status=JobStatus.RUNNING, progress=35)
     mock_session.get.return_value = job
     mock_session.add = MagicMock()
@@ -24,10 +39,10 @@ def test_complete_job_uploads_files_and_marks_completed(client, mock_session):
     mock_storage = AsyncMock()
     mock_storage.upload = AsyncMock(side_effect=lambda key, _data, _content_type: key)
     mock_storage.delete = AsyncMock()
-    client.app.dependency_overrides[get_storage] = lambda: mock_storage
+    executor_client.app.dependency_overrides[get_storage] = lambda: mock_storage
 
     try:
-        resp = client.post(
+        resp = executor_client.post(
             f"/v1/executor/jobs/{job.id}/complete",
             files=[
                 ("files", ("result.txt", b"hello", "text/plain")),
@@ -35,7 +50,7 @@ def test_complete_job_uploads_files_and_marks_completed(client, mock_session):
             ],
         )
     finally:
-        client.app.dependency_overrides.pop(get_storage, None)
+        executor_client.app.dependency_overrides.pop(get_storage, None)
 
     assert resp.status_code == 200
     body = resp.json()
@@ -68,44 +83,44 @@ def test_complete_job_uploads_files_and_marks_completed(client, mock_session):
     assert mock_storage.delete.await_count == 0
 
 
-def test_complete_job_returns_404_when_job_missing(client, mock_session):
+def test_complete_job_returns_404_when_job_missing(executor_client, mock_session):
     mock_session.get.return_value = None
     mock_storage = AsyncMock()
-    client.app.dependency_overrides[get_storage] = lambda: mock_storage
+    executor_client.app.dependency_overrides[get_storage] = lambda: mock_storage
 
     try:
-        resp = client.post(
+        resp = executor_client.post(
             "/v1/executor/jobs/7be6a3db-83be-4d3a-a64b-e8e6efc84f9f/complete",
             files=[("files", ("result.txt", b"hello", "text/plain"))],
         )
     finally:
-        client.app.dependency_overrides.pop(get_storage, None)
+        executor_client.app.dependency_overrides.pop(get_storage, None)
 
     assert resp.status_code == 404
     assert resp.json()["error"] == "job_not_found"
     assert mock_storage.upload.await_count == 0
 
 
-def test_complete_job_returns_409_when_not_running(client, mock_session):
+def test_complete_job_returns_409_when_not_running(executor_client, mock_session):
     job = make_job(status=JobStatus.ACCEPTED, progress=0)
     mock_session.get.return_value = job
     mock_storage = AsyncMock()
-    client.app.dependency_overrides[get_storage] = lambda: mock_storage
+    executor_client.app.dependency_overrides[get_storage] = lambda: mock_storage
 
     try:
-        resp = client.post(
+        resp = executor_client.post(
             f"/v1/executor/jobs/{job.id}/complete",
             files=[("files", ("result.txt", b"hello", "text/plain"))],
         )
     finally:
-        client.app.dependency_overrides.pop(get_storage, None)
+        executor_client.app.dependency_overrides.pop(get_storage, None)
 
     assert resp.status_code == 409
     assert resp.json()["error"] == "job_not_running"
     assert mock_storage.upload.await_count == 0
 
 
-def test_complete_job_cleans_up_on_upload_failure(client, mock_session):
+def test_complete_job_cleans_up_on_upload_failure(executor_client, mock_session):
     job = make_job(status=JobStatus.RUNNING, progress=50)
     mock_session.get.return_value = job
 
@@ -120,10 +135,10 @@ def test_complete_job_cleans_up_on_upload_failure(client, mock_session):
     mock_storage = AsyncMock()
     mock_storage.upload = AsyncMock(side_effect=upload_side_effect)
     mock_storage.delete = AsyncMock()
-    client.app.dependency_overrides[get_storage] = lambda: mock_storage
+    executor_client.app.dependency_overrides[get_storage] = lambda: mock_storage
 
     try:
-        resp = client.post(
+        resp = executor_client.post(
             f"/v1/executor/jobs/{job.id}/complete",
             files=[
                 ("files", ("a.txt", b"a", "text/plain")),
@@ -131,7 +146,7 @@ def test_complete_job_cleans_up_on_upload_failure(client, mock_session):
             ],
         )
     finally:
-        client.app.dependency_overrides.pop(get_storage, None)
+        executor_client.app.dependency_overrides.pop(get_storage, None)
 
     assert resp.status_code == 502
     body = resp.json()
@@ -141,7 +156,7 @@ def test_complete_job_cleans_up_on_upload_failure(client, mock_session):
     assert mock_session.commit.await_count == 0
 
 
-def test_complete_job_cleans_up_on_commit_failure(client, mock_session):
+def test_complete_job_cleans_up_on_commit_failure(executor_client, mock_session):
     job = make_job(status=JobStatus.RUNNING, progress=50)
     mock_session.get.return_value = job
     mock_session.add = MagicMock()
@@ -150,22 +165,22 @@ def test_complete_job_cleans_up_on_commit_failure(client, mock_session):
     mock_storage = AsyncMock()
     mock_storage.upload = AsyncMock(side_effect=lambda key, _data, _ct: key)
     mock_storage.delete = AsyncMock()
-    client.app.dependency_overrides[get_storage] = lambda: mock_storage
+    executor_client.app.dependency_overrides[get_storage] = lambda: mock_storage
 
     try:
-        resp = client.post(
+        resp = executor_client.post(
             f"/v1/executor/jobs/{job.id}/complete",
             files=[("files", ("a.txt", b"data", "text/plain"))],
         )
     finally:
-        client.app.dependency_overrides.pop(get_storage, None)
+        executor_client.app.dependency_overrides.pop(get_storage, None)
 
     assert resp.status_code == 500
     assert resp.json()["error"] == "commit_failed"
     assert mock_storage.delete.await_count == 1
 
 
-def test_complete_job_returns_409_on_duplicate_completion(client, mock_session):
+def test_complete_job_returns_409_on_duplicate_completion(executor_client, mock_session):
     job = make_job(status=JobStatus.RUNNING, progress=80)
     mock_session.get.return_value = job
     mock_session.add = MagicMock()
@@ -174,81 +189,81 @@ def test_complete_job_returns_409_on_duplicate_completion(client, mock_session):
     mock_storage = AsyncMock()
     mock_storage.upload = AsyncMock(side_effect=lambda key, _data, _ct: key)
     mock_storage.delete = AsyncMock()
-    client.app.dependency_overrides[get_storage] = lambda: mock_storage
+    executor_client.app.dependency_overrides[get_storage] = lambda: mock_storage
 
     try:
-        resp = client.post(
+        resp = executor_client.post(
             f"/v1/executor/jobs/{job.id}/complete",
             files=[("files", ("a.txt", b"data", "text/plain"))],
         )
     finally:
-        client.app.dependency_overrides.pop(get_storage, None)
+        executor_client.app.dependency_overrides.pop(get_storage, None)
 
     assert resp.status_code == 409
     assert resp.json()["error"] == "job_already_completed"
     assert mock_storage.delete.await_count == 1
 
 
-def test_complete_job_rejects_too_many_files(client, mock_session):
+def test_complete_job_rejects_too_many_files(executor_client, mock_session):
     job = make_job(status=JobStatus.RUNNING, progress=10)
     mock_session.get.return_value = job
 
     mock_storage = AsyncMock()
-    client.app.dependency_overrides[get_storage] = lambda: mock_storage
+    executor_client.app.dependency_overrides[get_storage] = lambda: mock_storage
 
     file_count = MAX_FILES_PER_UPLOAD + 1
     file_list = [("files", (f"f{i}.txt", b"x", "text/plain")) for i in range(file_count)]
 
     try:
-        resp = client.post(f"/v1/executor/jobs/{job.id}/complete", files=file_list)
+        resp = executor_client.post(f"/v1/executor/jobs/{job.id}/complete", files=file_list)
     finally:
-        client.app.dependency_overrides.pop(get_storage, None)
+        executor_client.app.dependency_overrides.pop(get_storage, None)
 
     assert resp.status_code == 422
     assert resp.json()["error"] == "too_many_files"
     assert mock_storage.upload.await_count == 0
 
 
-def test_complete_job_rejects_oversized_file(client, mock_session):
+def test_complete_job_rejects_oversized_file(executor_client, mock_session):
     job = make_job(status=JobStatus.RUNNING, progress=10)
     mock_session.get.return_value = job
 
     mock_storage = AsyncMock()
     mock_storage.upload = AsyncMock(side_effect=lambda key, _data, _ct: key)
     mock_storage.delete = AsyncMock()
-    client.app.dependency_overrides[get_storage] = lambda: mock_storage
+    executor_client.app.dependency_overrides[get_storage] = lambda: mock_storage
 
     big_data = b"x" * (MAX_FILE_SIZE_BYTES + 1)
 
     try:
-        resp = client.post(
+        resp = executor_client.post(
             f"/v1/executor/jobs/{job.id}/complete",
             files=[("files", ("huge.bin", big_data, "application/octet-stream"))],
         )
     finally:
-        client.app.dependency_overrides.pop(get_storage, None)
+        executor_client.app.dependency_overrides.pop(get_storage, None)
 
     assert resp.status_code == 422
     assert resp.json()["error"] == "file_too_large"
     assert mock_storage.upload.await_count == 0
 
 
-def test_complete_job_sanitises_traversal_filename(client, mock_session):
+def test_complete_job_sanitises_traversal_filename(executor_client, mock_session):
     job = make_job(status=JobStatus.RUNNING, progress=10)
     mock_session.get.return_value = job
     mock_session.add = MagicMock()
 
     mock_storage = AsyncMock()
     mock_storage.upload = AsyncMock(side_effect=lambda key, _data, _ct: key)
-    client.app.dependency_overrides[get_storage] = lambda: mock_storage
+    executor_client.app.dependency_overrides[get_storage] = lambda: mock_storage
 
     try:
-        resp = client.post(
+        resp = executor_client.post(
             f"/v1/executor/jobs/{job.id}/complete",
             files=[("files", ("../../etc/passwd", b"bad", "text/plain"))],
         )
     finally:
-        client.app.dependency_overrides.pop(get_storage, None)
+        executor_client.app.dependency_overrides.pop(get_storage, None)
 
     assert resp.status_code == 200
     uploaded_key = mock_storage.upload.await_args.args[0]

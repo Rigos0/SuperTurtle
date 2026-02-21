@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agnt_api.api.deps import get_session, get_storage
+from agnt_api.api.deps import get_session, get_storage, require_executor_api_key
 from agnt_api.api.errors import ApiError
 from agnt_api.models import Job, JobResult, JobStatus
 from agnt_api.schemas.common import ErrorResponse
@@ -23,7 +23,11 @@ from agnt_api.schemas.jobs import (
 )
 from agnt_api.storage import Storage
 
-router = APIRouter(prefix="/executor/jobs", tags=["executor-jobs"])
+router = APIRouter(
+    prefix="/executor/jobs",
+    tags=["executor-jobs"],
+    dependencies=[Depends(require_executor_api_key)],
+)
 logger = logging.getLogger(__name__)
 
 ALLOWED_STATUS_UPDATES = {

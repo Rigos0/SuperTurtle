@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 API_BASE_URL="${API_BASE_URL:-http://localhost:8000}"
+BUYER_API_KEY="${BUYER_API_KEY:-buyer-dev-key}"
+EXECUTOR_API_KEY="${EXECUTOR_API_KEY:-executor-dev-key}"
 SEARCH_QUERY="${SEARCH_QUERY:-text}"
 PROMPT_TEXT="${PROMPT_TEXT:-Integration flow test}"
 OUTPUT_DIR="${OUTPUT_DIR:-${ROOT_DIR}/.tmp/integration-results}"
@@ -25,15 +27,16 @@ api_url() {
 }
 
 run_cli() {
+  local auth_token="${AGNT_AUTH_TOKEN:-$BUYER_API_KEY}"
   if [[ -n "${AGNT_BIN:-}" ]]; then
-    AGNT_API_BASE_URL="$API_BASE_URL" "$AGNT_BIN" "$@"
+    AGNT_API_BASE_URL="$API_BASE_URL" AGNT_AUTH_TOKEN="$auth_token" "$AGNT_BIN" "$@"
     return
   fi
 
   require_cmd go
   (
     cd "$ROOT_DIR/cli"
-    AGNT_API_BASE_URL="$API_BASE_URL" go run ./cmd/agnt "$@"
+    AGNT_API_BASE_URL="$API_BASE_URL" AGNT_AUTH_TOKEN="$auth_token" go run ./cmd/agnt "$@"
   )
 }
 
@@ -86,7 +89,7 @@ if [[ -z "$job_id" ]]; then
 fi
 
 echo "[integration] checking pending executor queue"
-pending_json="$(curl -fsS "$(api_url "/v1/executor/jobs?agent_id=${agent_id}&status=pending")")"
+pending_json="$(curl -fsS "$(api_url "/v1/executor/jobs?agent_id=${agent_id}&status=pending")" -H "X-API-Key: ${EXECUTOR_API_KEY}")"
 pending_has_job="$(printf '%s' "$pending_json" | JOB_ID="$job_id" python3 -c 'import json,os,sys; data=json.load(sys.stdin); jobs=data.get("jobs") or []; print(any(job.get("job_id")==os.environ["JOB_ID"] for job in jobs), end="")')"
 if [[ "$pending_has_job" != "True" ]]; then
   echo "error: pending queue does not contain job ${job_id}" >&2
@@ -94,7 +97,7 @@ if [[ "$pending_has_job" != "True" ]]; then
 fi
 
 echo "[integration] executor accepts job"
-accept_json="$(curl -fsS -X POST "$(api_url "/v1/executor/jobs/${job_id}/status")" -H 'Content-Type: application/json' -d '{"status":"accepted"}')"
+accept_json="$(curl -fsS -X POST "$(api_url "/v1/executor/jobs/${job_id}/status")" -H "X-API-Key: ${EXECUTOR_API_KEY}" -H 'Content-Type: application/json' -d '{"status":"accepted"}')"
 accept_status="$(extract_json_field "$accept_json" 'data.get("status")')"
 if [[ "$accept_status" != "accepted" ]]; then
   echo "error: expected accepted status, got ${accept_status}" >&2
@@ -102,7 +105,7 @@ if [[ "$accept_status" != "accepted" ]]; then
 fi
 
 echo "[integration] executor starts running job"
-running_json="$(curl -fsS -X POST "$(api_url "/v1/executor/jobs/${job_id}/status")" -H 'Content-Type: application/json' -d '{"status":"running","progress":42}')"
+running_json="$(curl -fsS -X POST "$(api_url "/v1/executor/jobs/${job_id}/status")" -H "X-API-Key: ${EXECUTOR_API_KEY}" -H 'Content-Type: application/json' -d '{"status":"running","progress":42}')"
 running_status="$(extract_json_field "$running_json" 'data.get("status")')"
 if [[ "$running_status" != "running" ]]; then
   echo "error: expected running status, got ${running_status}" >&2
@@ -113,7 +116,7 @@ printf 'integration-success\n' >"$TMP_DIR/result.txt"
 printf '{"source":"integration","ok":true}\n' >"$TMP_DIR/summary.json"
 
 echo "[integration] executor completes job with uploaded files"
-complete_json="$(curl -fsS -X POST "$(api_url "/v1/executor/jobs/${job_id}/complete")" -F "files=@${TMP_DIR}/result.txt;type=text/plain" -F "files=@${TMP_DIR}/summary.json;type=application/json")"
+complete_json="$(curl -fsS -X POST "$(api_url "/v1/executor/jobs/${job_id}/complete")" -H "X-API-Key: ${EXECUTOR_API_KEY}" -F "files=@${TMP_DIR}/result.txt;type=text/plain" -F "files=@${TMP_DIR}/summary.json;type=application/json")"
 complete_status="$(extract_json_field "$complete_json" 'data.get("status")')"
 if [[ "$complete_status" != "completed" ]]; then
   echo "error: expected completed status after /complete, got ${complete_status}" >&2

@@ -17,6 +17,8 @@ services:
       S3_SECRET_KEY: minioadmin
       S3_BUCKET: agnt-results
       S3_REGION: us-east-1
+      BUYER_API_KEY: buyer-dev-key
+      EXECUTOR_API_KEY: executor-dev-key
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s

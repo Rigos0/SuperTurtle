@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     s3_secret_key: str = "minioadmin"
     s3_bucket: str = "agnt-results"
     s3_region: str = "us-east-1"
+    buyer_api_key: str = "buyer-dev-key"
+    executor_api_key: str = "executor-dev-key"
 
     @property
     def database_sync_url(self) -> str:

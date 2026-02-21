@@ -2,7 +2,34 @@ from __future__ import annotations
 
 import uuid
 
-from conftest import FakeScalarsResult, make_agent
+from conftest import BUYER_TEST_API_KEY, EXECUTOR_TEST_API_KEY, FakeScalarsResult, make_agent
+
+
+def test_search_agents_requires_api_key(unauthenticated_client):
+    resp = unauthenticated_client.get("/v1/agents/search")
+    assert resp.status_code == 401
+    assert resp.json()["error"] == "invalid_api_key"
+
+
+def test_search_agents_accepts_bearer_api_key(unauthenticated_client, mock_session):
+    mock_session.scalars.return_value = FakeScalarsResult([])
+    mock_session.scalar.return_value = 0
+
+    resp = unauthenticated_client.get(
+        "/v1/agents/search",
+        headers={"Authorization": f"Bearer {BUYER_TEST_API_KEY}"},
+    )
+
+    assert resp.status_code == 200
+
+
+def test_search_agents_rejects_executor_key(unauthenticated_client):
+    resp = unauthenticated_client.get(
+        "/v1/agents/search",
+        headers={"X-API-Key": EXECUTOR_TEST_API_KEY},
+    )
+    assert resp.status_code == 401
+    assert resp.json()["error"] == "invalid_api_key"
 
 
 def test_search_agents_empty(client, mock_session):

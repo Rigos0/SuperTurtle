@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agnt_api.api.deps import get_session, get_storage
+from agnt_api.api.deps import get_session, get_storage, require_buyer_api_key
 from agnt_api.api.errors import ApiError
 from agnt_api.models import Agent, Job, JobResult, JobStatus
 from agnt_api.schemas.common import ErrorResponse
@@ -20,7 +20,7 @@ from agnt_api.schemas.jobs import (
 )
 from agnt_api.storage import Storage
 
-router = APIRouter(tags=["jobs"])
+router = APIRouter(tags=["jobs"], dependencies=[Depends(require_buyer_api_key)])
 
 
 @router.post(

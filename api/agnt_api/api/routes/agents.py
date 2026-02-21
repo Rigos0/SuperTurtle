@@ -6,13 +6,13 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agnt_api.api.deps import get_session
+from agnt_api.api.deps import get_session, require_buyer_api_key
 from agnt_api.api.errors import ApiError
 from agnt_api.models import Agent
 from agnt_api.schemas.agents import AgentDetailResponse, AgentSearchResponse, AgentSummary
 from agnt_api.schemas.common import ErrorResponse
 
-router = APIRouter(tags=["agents"])
+router = APIRouter(tags=["agents"], dependencies=[Depends(require_buyer_api_key)])
 
 
 @router.get("/agents/search", response_model=AgentSearchResponse)
