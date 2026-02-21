@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     app_port: int = 8000
     database_url: str = "postgresql+asyncpg://agnt:agnt@localhost:5433/agnt"
 
+    s3_endpoint_url: str = "http://localhost:9002"
+    s3_access_key: str = "minioadmin"
+    s3_secret_key: str = "minioadmin"
+    s3_bucket: str = "agnt-results"
+    s3_region: str = "us-east-1"
+
     @property
     def database_sync_url(self) -> str:
         if "+asyncpg" not in self.database_url:

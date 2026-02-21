@@ -33,8 +33,9 @@ Update CLAUDE.md to reflect the plan attached below.
 claude = Claude()
 codex = Codex()
 
-plan = claude.plan(prompt)
-claude.execute(GROOMER_INSTRUCTIONS + plan)
-codex.execute(f"""You are the executor. Implement the following plan.
-               After you are done, 
-               commit the changes in one commit \n\n{plan}""")
+while True:
+    plan = claude.plan(prompt)
+    claude.execute(GROOMER_INSTRUCTIONS + plan)
+    codex.execute(f"""You are the executor. Implement the following plan.
+                After you are done, 
+                commit the changes in one commit \n\n{plan}""")

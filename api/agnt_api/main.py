@@ -1,3 +1,7 @@
+import logging
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.requests import Request
@@ -6,11 +10,22 @@ from fastapi.responses import JSONResponse
 from agnt_api.api.errors import ApiError
 from agnt_api.api.router import api_router
 from agnt_api.config import get_settings
+from agnt_api.storage import get_storage
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    storage = get_storage()
+    await storage.ensure_bucket()
+    logger.info("Storage bucket ready")
+    yield
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title=settings.app_name)
+    app = FastAPI(title=settings.app_name, lifespan=lifespan)
     app.include_router(api_router)
 
     @app.exception_handler(ApiError)

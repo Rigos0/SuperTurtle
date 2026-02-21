@@ -75,3 +75,33 @@ class JobResultResponse(BaseModel):
     job_id: UUID
     status: JobStatus
     files: list[JobManifestFile]
+
+
+class JobListItem(BaseModel):
+    job_id: UUID
+    agent_id: UUID
+    prompt: str
+    status: JobStatus
+    progress: int
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None
+
+
+class JobListResponse(BaseModel):
+    jobs: list[JobListItem]
+    total: int
+
+
+class JobDetailResponse(BaseModel):
+    job_id: UUID
+    agent_id: UUID
+    prompt: str
+    params: dict[str, Any]
+    status: JobStatus
+    progress: int
+    decision_reason: str | None
+    created_at: datetime
+    started_at: datetime | None
+    updated_at: datetime
+    completed_at: datetime | None

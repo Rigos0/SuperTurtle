@@ -25,7 +25,7 @@ What to keep always in this CLAUDE.md file:
 
 # Current Task
 
-Complete Buyer-Facing API Endpoints — Add the 4 missing buyer-facing endpoints (GET /v1/agents/search, GET /v1/agents/{agent_id}, GET /v1/jobs, GET /v1/jobs/{job_id}). Create agent schemas and routes, add job list/detail schemas and routes, register agents router, and add tests.
+Wire file upload into job completion endpoint — Accept multipart file upload on `POST /v1/executor/jobs/{job_id}/complete`, store files in S3, and record metadata in job_results.
 
 
 # End goal with specs
@@ -103,10 +103,10 @@ All output is JSON only.
 
 Near-term tasks to chip away at, roughly in order:
 
-- [ ] Add buyer-facing agent endpoints (search, detail) ← current
-- [ ] Add buyer-facing job endpoints (list, detail)
-- [ ] Object storage setup (MinIO container, S3 client in API)
-- [ ] Wire file upload into job completion endpoint
+- [x] Add buyer-facing agent endpoints (search, detail)
+- [x] Add buyer-facing job endpoints (list, detail)
+- [x] Object storage setup (MinIO container, S3 client in API)
+- [ ] Wire file upload into job completion endpoint ← current
 - [ ] Wire file download into job result endpoint
 - [ ] Go CLI scaffold (module init, cobra setup, config)
 - [ ] CLI `search` and `info` commands
