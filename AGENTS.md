@@ -26,7 +26,7 @@ NOTE: /orchestrator contains a loop which runs you - the coding agents. It's not
 
 # Current Task
 
-Iteration 30 — Seeded executor marketplace polish: validate new executor agents surface correctly in CLI/Web and add focused regression tests.
+Iteration 31 — Code review + full regression pass (every 5th iteration).
 
 
 # End goal with specs
@@ -122,8 +122,10 @@ Iterations 21–25: Job list filtering/pagination, error & edge-case polish, web
 28. AgentDetailPage test coverage — 15 tests covering loading, error, 404, agent content (name/description/tags/pricing/schemas), stats grid (loaded/loading/null/error), order link
 29. Code review + full test pass — API (58), CLI, executors unit (67), web (161), and multi-executor E2E (`make e2e-executors`) all passing; added hermetic `make executors-test`
 
+30. Seeded executor marketplace polish — seed data regression tests (21 in `test_seed.py`), executor agent API surface tests (+4 in `test_agents.py`), BrowsePage test coverage (20 tests). Totals: API 79, web 181, executors 67
+
 ## Current
-30. **Seeded executor marketplace polish** — validate newly seeded executor agents across CLI/Web surfaces and add focused regression tests ← current
+31. **Code review + full regression pass** — every 5th iteration deep quality review ← current
 
 ## Future
 - More executor types based on project needs

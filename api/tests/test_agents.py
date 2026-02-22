@@ -174,3 +174,103 @@ def test_get_agent_stats_with_no_jobs(client, mock_session):
     assert body["failed_jobs"] == 0
     assert body["avg_duration_seconds"] is None
     assert body["success_rate"] == 0.0
+
+
+# ------------------------------------------------------------------ #
+#  Executor agent marketplace surface regression                      #
+# ------------------------------------------------------------------ #
+
+
+def _make_executor_agent(name: str, agent_id: str, tags: list[str]):
+    """Create a mock agent matching seeded executor shape."""
+    return make_agent(
+        id=uuid.UUID(agent_id),
+        name=name,
+        tags=tags,
+        pricing={"currency": "USD", "unit": "job", "amount": 0.10},
+        input_schema={"type": "object", "properties": {}, "required": []},
+        output_schema={"type": "object", "properties": {"files": {"type": "array", "items": {"type": "string"}}}},
+    )
+
+
+def test_search_returns_executor_agents(client, mock_session):
+    """Executor agents surface when searching by name substring."""
+    agents = [
+        _make_executor_agent("gemini-assistant", "55555555-5555-5555-5555-555555555555", ["ai", "gemini", "coding"]),
+        _make_executor_agent("claude-assistant", "66666666-6666-6666-6666-666666666666", ["ai", "claude", "coding"]),
+        _make_executor_agent("codex-assistant", "77777777-7777-7777-7777-777777777777", ["ai", "codex", "coding"]),
+    ]
+    mock_session.scalars.return_value = FakeScalarsResult(agents)
+    mock_session.scalar.return_value = 3
+
+    resp = client.get("/v1/agents/search", params={"q": "assistant"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 3
+    names = {a["name"] for a in body["agents"]}
+    assert names == {"gemini-assistant", "claude-assistant", "codex-assistant"}
+
+
+def test_search_by_ai_tag_returns_executor_agents(client, mock_session):
+    """Filtering by 'ai' tag returns all executor agents."""
+    agents = [
+        _make_executor_agent("gemini-assistant", "55555555-5555-5555-5555-555555555555", ["ai", "gemini", "coding"]),
+        _make_executor_agent("claude-assistant", "66666666-6666-6666-6666-666666666666", ["ai", "claude", "coding"]),
+        _make_executor_agent("codex-assistant", "77777777-7777-7777-7777-777777777777", ["ai", "codex", "coding"]),
+        _make_executor_agent("code-review-specialist", "88888888-8888-8888-8888-888888888888", ["ai", "claude", "code-review"]),
+    ]
+    mock_session.scalars.return_value = FakeScalarsResult(agents)
+    mock_session.scalar.return_value = 4
+
+    resp = client.get("/v1/agents/search", params={"tag": "ai"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 4
+
+
+def test_get_executor_agent_detail(client, mock_session):
+    """Executor agent detail returns all expected fields including schemas."""
+    agent = _make_executor_agent(
+        "claude-assistant",
+        "66666666-6666-6666-6666-666666666666",
+        ["ai", "claude", "coding", "code-generation"],
+    )
+    mock_session.get.return_value = agent
+
+    resp = client.get(f"/v1/agents/{agent.id}")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["name"] == "claude-assistant"
+    assert body["tags"] == ["ai", "claude", "coding", "code-generation"]
+    assert body["pricing"] == {"currency": "USD", "unit": "job", "amount": 0.10}
+    assert "files" in body["output_schema"]["properties"]
+
+
+def test_get_executor_agent_stats_with_completed_jobs(client, mock_session):
+    """Executor agent stats compute correctly with real job data."""
+    agent = _make_executor_agent(
+        "gemini-assistant",
+        "55555555-5555-5555-5555-555555555555",
+        ["ai", "gemini", "coding"],
+    )
+    result = Mock()
+    result.one_or_none.return_value = SimpleNamespace(
+        total_jobs=20,
+        completed_jobs=18,
+        failed_jobs=2,
+        avg_duration_seconds=95.3,
+    )
+    mock_session.execute.return_value = result
+
+    resp = client.get(f"/v1/agents/{agent.id}/stats")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total_jobs"] == 20
+    assert body["completed_jobs"] == 18
+    assert body["failed_jobs"] == 2
+    assert body["avg_duration_seconds"] == 95.3
+    assert body["success_rate"] == 0.9
