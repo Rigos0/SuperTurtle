@@ -2,8 +2,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { listJobs } from "@/api/jobs";
 import type { JobListItem } from "@/api/types";
+import type { JobStatus } from "@/api/types";
 
-export function useJobs() {
+export interface UseJobsOptions {
+  status?: JobStatus;
+  limit?: number;
+  offset?: number;
+}
+
+export function useJobs(options: UseJobsOptions = {}) {
+  const { status, limit = 20, offset = 0 } = options;
   const [jobs, setJobs] = useState<JobListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -18,7 +26,7 @@ export function useJobs() {
     setLoading(true);
     setError(null);
 
-    listJobs({ limit: 100, signal: controller.signal })
+    listJobs({ status, limit, offset, signal: controller.signal })
       .then((res) => {
         setJobs(res.jobs);
         setTotal(res.total);
@@ -35,7 +43,7 @@ export function useJobs() {
           setLoading(false);
         }
       });
-  }, []);
+  }, [status, limit, offset]);
 
   useEffect(() => {
     fetchJobs();

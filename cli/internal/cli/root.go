@@ -285,6 +285,7 @@ func isValidJobStatus(status string) bool {
 }
 
 func newJobsCommand() *cobra.Command {
+	var agentID string
 	var status string
 	var limit int
 	var offset int
@@ -322,9 +323,10 @@ func newJobsCommand() *cobra.Command {
 			}
 
 			resp, err := client.ListJobs(cmd.Context(), api.ListJobsOptions{
-				Status: status,
-				Limit:  limit,
-				Offset: offset,
+				AgentID: agentID,
+				Status:  status,
+				Limit:   limit,
+				Offset:  offset,
 			})
 			if err != nil {
 				return toCLIError(err)
@@ -334,6 +336,7 @@ func newJobsCommand() *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringVar(&agentID, "agent-id", "", "Filter by agent ID")
 	cmd.Flags().StringVar(&status, "status", "", "Filter by status")
 	cmd.Flags().IntVar(&limit, "limit", 20, "Results per page (1-100)")
 	cmd.Flags().IntVar(&offset, "offset", 0, "Pagination offset")

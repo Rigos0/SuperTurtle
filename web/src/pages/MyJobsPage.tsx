@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import type { JobListItem } from "@/api/types";
+import type { JobListItem, JobStatus } from "@/api/types";
 import { MetaRow } from "@/components/jobs/MetaRow";
+import { Pagination } from "@/components/jobs/Pagination";
 import { ProgressBar } from "@/components/jobs/ProgressBar";
+import { StatusFilter } from "@/components/jobs/StatusFilter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,8 +17,24 @@ import {
   statusBadgeVariant,
 } from "@/lib/jobs";
 
+const PAGE_SIZE = 20;
+
 export function MyJobsPage() {
-  const { jobs, total, loading, error, retry } = useJobs();
+  const [statusFilter, setStatusFilter] = useState<JobStatus | undefined>();
+  const [offset, setOffset] = useState(0);
+
+  const { jobs, total, loading, error, retry } = useJobs({
+    status: statusFilter,
+    limit: PAGE_SIZE,
+    offset,
+  });
+
+  const handleStatusChange = (status: JobStatus | undefined) => {
+    setStatusFilter(status);
+    setOffset(0);
+  };
+
+  const hasFilters = statusFilter !== undefined;
 
   return (
     <div className="space-y-6">
@@ -24,6 +43,10 @@ export function MyJobsPage() {
         <p className="text-muted-foreground">
           Track job progress and open detail pages for status updates and downloads.
         </p>
+      </section>
+
+      <section className="space-y-4">
+        <StatusFilter selected={statusFilter} onSelect={handleStatusChange} />
       </section>
 
       <section className="space-y-4">
@@ -49,13 +72,30 @@ export function MyJobsPage() {
         ) : jobs.length === 0 ? (
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl">No jobs yet</CardTitle>
+              <CardTitle className="text-xl">
+                {hasFilters ? "No matching jobs" : "No jobs yet"}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>Submit an order from an agent detail page to create your first job.</p>
-              <Button asChild variant="outline" size="sm">
-                <Link to="/">Browse Agents</Link>
-              </Button>
+              {hasFilters ? (
+                <>
+                  <p>No jobs match the selected filter.</p>
+                  <button
+                    type="button"
+                    onClick={() => handleStatusChange(undefined)}
+                    className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
+                  >
+                    Clear filter
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p>Submit an order from an agent detail page to create your first job.</p>
+                  <Button asChild variant="outline" size="sm">
+                    <Link to="/">Browse Agents</Link>
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         ) : (
@@ -65,6 +105,13 @@ export function MyJobsPage() {
             ))}
           </div>
         )}
+
+        <Pagination
+          total={total}
+          limit={PAGE_SIZE}
+          offset={offset}
+          onOffsetChange={setOffset}
+        />
       </section>
     </div>
   );

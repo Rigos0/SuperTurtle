@@ -505,6 +505,46 @@ func TestRunJobsCommand(t *testing.T) {
 	}
 }
 
+func TestRunJobsWithAgentID(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	agentID := "550e8400-e29b-41d4-a716-446655440000"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/v1/jobs" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("agent_id"); got != agentID {
+			t.Fatalf("unexpected agent_id: %s", got)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"jobs":[],"total":0}`))
+	}))
+	defer server.Close()
+	t.Setenv("AGNT_API_BASE_URL", server.URL)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := run(&stdout, &stderr, []string{
+		"jobs",
+		"--agent-id", agentID,
+	})
+	if exit != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", exit, stderr.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("expected json output, got error %v", err)
+	}
+	if payload["total"] != float64(0) {
+		t.Fatalf("unexpected total: %v", payload["total"])
+	}
+}
+
 func TestRunJobsInvalidStatus(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("AGNT_API_BASE_URL", "http://localhost:9999")

@@ -26,7 +26,7 @@ NOTE: /orchestrator contains a loop which runs you - the coding agents. It's not
 
 # Current Task
 
-Iteration 20 — Integration test & polish: test all executors end-to-end, rebuild containers.
+Iteration 22 — Error & edge-case polish (empty states, loading skeletons, 404 handling).
 
 
 # End goal with specs
@@ -87,7 +87,7 @@ The CLI is distributed primarily via npm and secondarily via pip, both using the
 - `agnt info <agent-id>`
 - `agnt stats <agent-id>`
 - `agnt order <agent-id> --prompt <text> [--param key=value]`
-- `agnt jobs`
+- `agnt jobs [--agent-id <id>] [--status <s>] [--limit N] [--offset N]`
 - `agnt status <job-id>`
 - `agnt result <job-id>`
 
@@ -110,33 +110,23 @@ Specialized executors for specialized tasks. Each agent's context focuses on bei
 
 # ROADMAP
 
-## Completed (iterations 1–19)
-1. API — all endpoints with tests
-2. Object storage — MinIO + S3 wiring
-3. CLI — Go binary, all commands, JSON output
-4. Distribution — npm + pip wrappers
-5. Local orchestration — Podman compose
-6. Integration — end-to-end CLI → API → executor → result
-7. Auth — static API keys (buyer + executor)
-8. Web marketplace — browse agents, details, order placement
-9. Job tracking UI — job list, status, result download
-10. Gemini CLI executor — first real polling executor
-11. Orchestrator hardening — agnt-handoff entrypoint + tests
-12. Agent stats & job duration — API + CLI
-13. Agent stats UI — TypeScript types, hooks, stat cards
-14. Job duration UI — duration on job list & detail pages
+## Completed
+Iterations 1–14: API, object storage, CLI, npm/pip distribution, Podman compose, end-to-end integration, auth, web marketplace, job tracking UI, Gemini executor, orchestrator hardening, agent stats & job duration (API + CLI + UI).
+
 15. Executor PRD — design document for pluggable executor architecture
 16. Executor scaffold — BaseExecutor, ApiClient, files.py, 15 unit tests, Gemini migration
 17. Claude Code executor — --append-system-prompt, --max-turns, 14 unit tests, Makefile targets
 18. Codex executor — `codex exec --yolo`, CODEX.md prompt copy, 13 unit tests, Makefile targets
 19. Code review executor — inline-input mode, input file filtering, 24 unit tests, Makefile targets
+20. Integration test & polish — all executors E2E script with deterministic CLI stubs, new seeded executor agents, container rebuild target
 
 ## Current
-20. **Integration test & polish** — test all executors end-to-end, rebuild containers ← current
+22. **Error & edge-case polish** — empty states, loading skeletons, 404 handling ← current
+
+## Completed (recent)
+21. Job list filtering/pagination — CLI `--agent-id` flag, useJobs hook refactor, StatusFilter + Pagination components, MyJobsPage wired up
 
 ## Future
-- Job list filtering/pagination
-- Error & edge-case polish (empty states, loading skeletons, 404 handling)
 - Web frontend tests
 - More executor types based on project needs
 - Workflow integration — leverage executors to improve iterative development with offloading specialized tasks to executors (/orchestrator)

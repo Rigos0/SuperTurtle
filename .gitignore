@@ -31,7 +31,7 @@ Thumbs.db
 
 # Temp / integration artifacts
 .tmp/
-jobs/
+/jobs/
 
 # Build artifacts
 cli/agnt
