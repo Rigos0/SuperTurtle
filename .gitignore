@@ -31,6 +31,10 @@ Thumbs.db
 
 # Temp / integration artifacts
 .tmp/
+jobs/
+
+# Build artifacts
+cli/agnt
 
 # Claude Code
 .claude/

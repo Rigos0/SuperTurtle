@@ -1,4 +1,4 @@
-.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-build cli-test integration e2e-system web-install web-dev web executor-gemini-install executor-gemini executor-claude-install executor-claude executor-codex-install executor-codex
+.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-build cli-test integration e2e-system web-install web-dev web executor-gemini-install executor-gemini executor-claude-install executor-claude executor-codex-install executor-codex executor-code-review-install executor-code-review
 
 COMPOSE ?= podman compose
 APP_HOST ?= 0.0.0.0
@@ -73,3 +73,9 @@ executor-codex-install:
 
 executor-codex:
 	cd executors/codex && .venv/bin/python3 executor.py
+
+executor-code-review-install:
+	cd executors/code_review && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+
+executor-code-review:
+	cd executors/code_review && .venv/bin/python3 executor.py

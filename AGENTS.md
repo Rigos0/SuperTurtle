@@ -26,7 +26,7 @@ NOTE: /orchestrator contains a loop which runs you - the coding agents. It's not
 
 # Current Task
 
-Iteration 19 — Code review executor: implement inline-input review agent from EXECUTOR_PRD.
+Iteration 20 — Integration test & polish: test all executors end-to-end, rebuild containers.
 
 
 # End goal with specs
@@ -110,7 +110,7 @@ Specialized executors for specialized tasks. Each agent's context focuses on bei
 
 # ROADMAP
 
-## Completed (iterations 1–18)
+## Completed (iterations 1–19)
 1. API — all endpoints with tests
 2. Object storage — MinIO + S3 wiring
 3. CLI — Go binary, all commands, JSON output
@@ -129,10 +129,10 @@ Specialized executors for specialized tasks. Each agent's context focuses on bei
 16. Executor scaffold — BaseExecutor, ApiClient, files.py, 15 unit tests, Gemini migration
 17. Claude Code executor — --append-system-prompt, --max-turns, 14 unit tests, Makefile targets
 18. Codex executor — `codex exec --yolo`, CODEX.md prompt copy, 13 unit tests, Makefile targets
+19. Code review executor — inline-input mode, input file filtering, 24 unit tests, Makefile targets
 
 ## Current
-19. **Code review executor** — input mechanism designed in PRD, review agent ← current
-20. **Integration test & polish** — test all executors end-to-end, rebuild containers
+20. **Integration test & polish** — test all executors end-to-end, rebuild containers ← current
 
 ## Future
 - Job list filtering/pagination
