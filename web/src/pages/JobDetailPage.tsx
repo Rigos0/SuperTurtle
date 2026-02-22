@@ -24,6 +24,7 @@ export function JobDetailPage() {
     result,
     loading: resultLoading,
     error: resultError,
+    notFound: resultNotFound,
     retry: retryResult,
   } = useJobResult(jobId, isCompleted);
 
@@ -46,6 +47,7 @@ export function JobDetailPage() {
           job={job}
           resultLoading={resultLoading}
           resultError={resultError}
+          resultNotFound={resultNotFound}
           onRetryResult={retryResult}
           files={result?.files ?? []}
         />
@@ -60,12 +62,14 @@ function JobContent({
   job,
   resultLoading,
   resultError,
+  resultNotFound,
   onRetryResult,
   files,
 }: {
   job: JobDetail;
   resultLoading: boolean;
   resultError: string | null;
+  resultNotFound: boolean;
   onRetryResult: () => void;
   files: JobManifestFile[];
 }) {
@@ -131,6 +135,7 @@ function JobContent({
         status={job.status}
         loading={resultLoading}
         error={resultError}
+        notFound={resultNotFound}
         onRetry={onRetryResult}
         files={files}
       />
@@ -142,12 +147,14 @@ function ResultCard({
   status,
   loading,
   error,
+  notFound,
   onRetry,
   files,
 }: {
   status: JobDetail["status"];
   loading: boolean;
   error: string | null;
+  notFound: boolean;
   onRetry: () => void;
   files: JobManifestFile[];
 }) {
@@ -162,7 +169,16 @@ function ResultCard({
             Downloads will be available once this job reaches the completed status.
           </p>
         ) : loading ? (
-          <p className="text-muted-foreground">Loading result files...</p>
+          <LoadingFiles />
+        ) : error && notFound ? (
+          <div className="space-y-3">
+            <p className="text-muted-foreground">
+              Result files are not available yet. This can happen briefly after completion.
+            </p>
+            <Button variant="outline" size="sm" onClick={onRetry}>
+              Refresh
+            </Button>
+          </div>
         ) : error ? (
           <div className="space-y-3">
             <p className="text-muted-foreground">{error}</p>
@@ -200,6 +216,20 @@ function ResultCard({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function LoadingFiles() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 2 }).map((_, index) => (
+        <div key={index} className="animate-pulse space-y-2 rounded-lg border p-3">
+          <div className="h-4 w-40 rounded bg-muted" />
+          <div className="h-3 w-full rounded bg-muted" />
+          <div className="h-3 w-1/3 rounded bg-muted" />
+        </div>
+      ))}
+    </div>
   );
 }
 

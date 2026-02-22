@@ -17,10 +17,12 @@ export function Pagination({
     return null;
   }
 
-  const currentPage = Math.floor(offset / limit) + 1;
   const totalPages = Math.ceil(total / limit);
-  const hasPrev = offset > 0;
-  const hasNext = offset + limit < total;
+  const maxOffset = Math.max(0, (totalPages - 1) * limit);
+  const normalizedOffset = Math.min(Math.max(0, offset), maxOffset);
+  const currentPage = Math.floor(normalizedOffset / limit) + 1;
+  const hasPrev = normalizedOffset > 0;
+  const hasNext = normalizedOffset + limit < total;
 
   return (
     <div className="flex items-center justify-between text-sm">
@@ -32,7 +34,7 @@ export function Pagination({
           variant="outline"
           size="sm"
           disabled={!hasPrev}
-          onClick={() => onOffsetChange(Math.max(0, offset - limit))}
+          onClick={() => onOffsetChange(Math.max(0, normalizedOffset - limit))}
         >
           Previous
         </Button>
@@ -40,7 +42,7 @@ export function Pagination({
           variant="outline"
           size="sm"
           disabled={!hasNext}
-          onClick={() => onOffsetChange(offset + limit)}
+          onClick={() => onOffsetChange(normalizedOffset + limit)}
         >
           Next
         </Button>

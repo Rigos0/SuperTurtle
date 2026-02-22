@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getJobResult } from "@/api/jobs";
+import { ApiError } from "@/api/client";
 import type { JobResultResponse } from "@/api/types";
 
 export function useJobResult(jobId: string | undefined, enabled: boolean) {
   const [result, setResult] = useState<JobResultResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
 
   const fetchResult = useCallback(() => {
@@ -15,6 +17,7 @@ export function useJobResult(jobId: string | undefined, enabled: boolean) {
     if (!jobId || !enabled) {
       setResult(null);
       setError(null);
+      setNotFound(false);
       setLoading(false);
       return;
     }
@@ -23,6 +26,7 @@ export function useJobResult(jobId: string | undefined, enabled: boolean) {
     controllerRef.current = controller;
     setLoading(true);
     setError(null);
+    setNotFound(false);
 
     getJobResult(jobId, controller.signal)
       .then((data) => {
@@ -31,6 +35,7 @@ export function useJobResult(jobId: string | undefined, enabled: boolean) {
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setResult(null);
+        setNotFound(err instanceof ApiError && err.status === 404);
         setError(err instanceof Error ? err.message : "Failed to load job results.");
       })
       .finally(() => {
@@ -55,5 +60,5 @@ export function useJobResult(jobId: string | undefined, enabled: boolean) {
     fetchResult();
   }, [fetchResult]);
 
-  return { result, loading, error, retry };
+  return { result, loading, error, notFound, retry };
 }

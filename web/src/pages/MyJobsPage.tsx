@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import type { JobListItem, JobStatus } from "@/api/types";
@@ -35,6 +35,17 @@ export function MyJobsPage() {
   };
 
   const hasFilters = statusFilter !== undefined;
+  const hasOutOfRangeOffset = !loading && total > 0 && jobs.length === 0 && offset > 0;
+
+  useEffect(() => {
+    if (loading || total === 0 || offset === 0) {
+      return;
+    }
+    const maxOffset = Math.floor((total - 1) / PAGE_SIZE) * PAGE_SIZE;
+    if (offset > maxOffset) {
+      setOffset(maxOffset);
+    }
+  }, [loading, total, offset]);
 
   return (
     <div className="space-y-6">
@@ -67,6 +78,15 @@ export function MyJobsPage() {
               <Button variant="outline" size="sm" onClick={retry}>
                 Retry
               </Button>
+            </CardContent>
+          </Card>
+        ) : hasOutOfRangeOffset ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">Refreshing jobs</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <p>Adjusted to the nearest available page after recent job updates.</p>
             </CardContent>
           </Card>
         ) : jobs.length === 0 ? (
@@ -169,7 +189,8 @@ function LoadingList() {
             <div className="h-4 w-5/6 rounded bg-muted" />
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <div className="h-12 rounded bg-muted" />
               <div className="h-12 rounded bg-muted" />
               <div className="h-12 rounded bg-muted" />
               <div className="h-12 rounded bg-muted" />

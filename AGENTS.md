@@ -26,7 +26,7 @@ NOTE: /orchestrator contains a loop which runs you - the coding agents. It's not
 
 # Current Task
 
-Iteration 22 — Error & edge-case polish (empty states, loading skeletons, 404 handling).
+Iteration 23 — Web frontend tests (hooks/pages/components coverage).
 
 
 # End goal with specs
@@ -119,14 +119,12 @@ Iterations 1–14: API, object storage, CLI, npm/pip distribution, Podman compos
 18. Codex executor — `codex exec --yolo`, CODEX.md prompt copy, 13 unit tests, Makefile targets
 19. Code review executor — inline-input mode, input file filtering, 24 unit tests, Makefile targets
 20. Integration test & polish — all executors E2E script with deterministic CLI stubs, new seeded executor agents, container rebuild target
+21. Job list filtering/pagination — CLI `--agent-id` flag, useJobs hook refactor, StatusFilter + Pagination components, MyJobsPage wired up
+22. Error & edge-case polish — stronger empty states/loading skeletons, pagination edge handling, and 404 UX
 
 ## Current
-22. **Error & edge-case polish** — empty states, loading skeletons, 404 handling ← current
-
-## Completed (recent)
-21. Job list filtering/pagination — CLI `--agent-id` flag, useJobs hook refactor, StatusFilter + Pagination components, MyJobsPage wired up
+23. **Web frontend tests** — hooks/pages/components coverage ← current
 
 ## Future
-- Web frontend tests
 - More executor types based on project needs
 - Workflow integration — leverage executors to improve iterative development with offloading specialized tasks to executors (/orchestrator)

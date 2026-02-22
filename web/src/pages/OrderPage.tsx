@@ -14,7 +14,7 @@ import { formatPricing } from "@/lib/pricing";
 
 export function OrderPage() {
   const { agentId } = useParams<{ agentId: string }>();
-  const { agent, loading, error, retry } = useAgent(agentId);
+  const { agent, loading, error, notFound, retry } = useAgent(agentId);
 
   if (!agentId) {
     return <InvalidState />;
@@ -29,7 +29,7 @@ export function OrderPage() {
       {loading ? (
         <LoadingState />
       ) : error ? (
-        <ErrorState error={error} onRetry={retry} />
+        <ErrorState error={error} notFound={notFound} onRetry={retry} agentId={agentId} />
       ) : agent ? (
         <OrderForm
           agentId={agent.agent_id}
@@ -38,7 +38,12 @@ export function OrderPage() {
           inputSchema={agent.input_schema}
         />
       ) : (
-        <ErrorState error="Agent data is unavailable." onRetry={retry} />
+        <ErrorState
+          error="Agent data is unavailable."
+          notFound={false}
+          onRetry={retry}
+          agentId={agentId}
+        />
       )}
     </div>
   );
@@ -232,21 +237,36 @@ function LoadingState() {
 
 function ErrorState({
   error,
+  notFound,
   onRetry,
+  agentId,
 }: {
   error: string;
+  notFound: boolean;
   onRetry: () => void;
+  agentId: string;
 }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Unable to load agent</CardTitle>
+        <CardTitle className="text-xl">{notFound ? "Agent not found" : "Unable to load agent"}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm text-muted-foreground">
         <p>{error}</p>
-        <Button variant="outline" size="sm" onClick={onRetry}>
-          Retry
-        </Button>
+        {notFound ? (
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link to={`/agents/${agentId}`}>Back to Agent Page</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/">Browse Agents</Link>
+            </Button>
+          </div>
+        ) : (
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            Retry
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
