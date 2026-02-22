@@ -1,8 +1,14 @@
 """Entry point: run from repo root so both agents see the full project."""
 
+import subprocess
+from pathlib import Path
+
 from orchestrator.agnt_orchestrator import Claude, Codex
 
 prompt = "Follow instructions in CLAUDE.md. "
+
+RULES_SCRIPT = Path(__file__).resolve().parent / "orchestrator" / "claude-md-guard" / "create-rules-prompt.sh"
+CLAUDE_MD_RULES = subprocess.check_output(["bash", str(RULES_SCRIPT)], text=True)
 
 GROOMER_INSTRUCTIONS = """
 Update CLAUDE.md to reflect the plan attached below.                                        

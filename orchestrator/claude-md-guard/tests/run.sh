@@ -211,6 +211,21 @@ assert_contains "missing marker after edit" "current.*marker" "$OUT"
 rm -rf "$TMP_DIR"
 
 # ============================================================
+#  rules.sh tests
+# ============================================================
+echo ""
+echo "=== rules.sh ==="
+
+# 20. rules.sh output reflects config values
+echo "[20] rules.sh generates rules from config"
+OUT=$("$GUARD_DIR/create-rules-prompt.sh" 2>&1)
+assert_contains "mentions allowed headings" "# Current task" "$OUT"
+assert_contains "mentions backlog minimum" "at least 5 items" "$OUT"
+assert_contains "mentions max lines" "Maximum 500 lines" "$OUT"
+assert_contains "mentions current marker" "current" "$OUT"
+assert_contains "mentions sections needing items" "# Roadmap (Upcoming)" "$OUT"
+
+# ============================================================
 #  Summary
 # ============================================================
 echo ""
