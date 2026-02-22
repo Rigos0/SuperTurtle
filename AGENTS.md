@@ -26,7 +26,7 @@ NOTE: /orchestrator contains a loop which runs you - the coding agents. It's not
 
 # Current Task
 
-Iteration 28 — Marketplace page tests (add MarketplacePage.test.tsx or AgentDetailPage.test.tsx).
+Iteration 29 — Code review + full test pass (every 5th iteration).
 
 
 # End goal with specs
@@ -122,9 +122,10 @@ Iterations 15–20: Executor PRD, BaseExecutor scaffold + Gemini migration, Clau
 25. Web UI job details polish — expanded metadata grid, prompt/params display, result file cards with download links. **NOTE:** JobDetailPage.test.tsx was not added; carry to next iteration
 
 ## Current
-28. **Marketplace page tests** — add MarketplacePage.test.tsx or AgentDetailPage.test.tsx ← current
+29. **Code review + full test pass** — review code quality, run all test suites (api/cli/executors/web), fix issues ← current
 
 ## Completed (recent)
+28. AgentDetailPage test coverage — 15 tests covering loading, error, 404, agent content (name/description/tags/pricing/schemas), stats grid (loaded/loading/null/error), order link
 27. MyJobsPage test coverage — 16 tests covering loading, error, empty (no filter/with filter), job list, status filter, pagination
 26. JobDetailPage test coverage — 18 tests covering loading, error, 404, job content, result downloads, URL sanitization
 
