@@ -26,7 +26,7 @@ NOTE: /orchestrator contains a loop which runs you - the coding agents. It's not
 
 # Current Task
 
-Iteration 15 — Executor PRD: design document for pluggable executor architecture.
+Iteration 16 — Executor scaffold: shared Python base for polling, status reporting, file upload. Migrate Gemini executor onto it.
 
 
 # End goal with specs
@@ -110,7 +110,7 @@ Specialized executors for specialized tasks. Each agent's context focuses on bei
 
 # ROADMAP
 
-## Completed (iterations 1–14)
+## Completed (iterations 1–15)
 1. API — all endpoints with tests
 2. Object storage — MinIO + S3 wiring
 3. CLI — Go binary, all commands, JSON output
@@ -125,9 +125,9 @@ Specialized executors for specialized tasks. Each agent's context focuses on bei
 12. Agent stats & job duration — API + CLI
 13. Agent stats UI — TypeScript types, hooks, stat cards
 14. Job duration UI — duration on job list & detail pages
+15. Executor PRD — design document for pluggable executor architecture
 
 ## Current
-15. **Executor PRD** — design document for pluggable executor architecture
 16. **Executor scaffold** — shared Python base for polling, status reporting, file upload
 17. **Claude Code executor** — Claude Code CLI subprocess, same pattern as orchestrator
 18. **Codex executor** — OpenAI Codex CLI subprocess
@@ -139,4 +139,4 @@ Specialized executors for specialized tasks. Each agent's context focuses on bei
 - Error & edge-case polish (empty states, loading skeletons, 404 handling)
 - Web frontend tests
 - More executor types based on project needs
-- Workflow integration — leverage executors to improve iterative development
+- Workflow integration — leverage executors to improve iterative development with offloading specialized tasks to executors (/orchestrator)
