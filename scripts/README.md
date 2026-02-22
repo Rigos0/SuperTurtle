@@ -36,6 +36,22 @@ Or run directly:
 bash scripts/e2e_system.sh
 ```
 
+## Run Multi-Executor E2E (Deterministic CLI Stubs)
+
+This script validates all local executors in one pass (`gemini`, `claude`, `codex`, `code-review`) using stub binaries for deterministic output.
+
+Run it via Make:
+
+```bash
+make e2e-executors
+```
+
+Or run directly:
+
+```bash
+bash scripts/e2e_executors.sh
+```
+
 ## Prerequisites for Direct Script Use
 
 - API, Postgres, and MinIO are running (for local compose: `make up`)

@@ -1,4 +1,4 @@
-.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-build cli-test integration e2e-system e2e-executors containers-rebuild web-install web-dev web web-test executor-gemini-install executor-gemini executor-claude-install executor-claude executor-codex-install executor-codex executor-code-review-install executor-code-review
+.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-build cli-test executors-test integration e2e-system e2e-executors containers-rebuild web-install web-dev web web-test executor-gemini-install executor-gemini executor-claude-install executor-claude executor-codex-install executor-codex executor-code-review-install executor-code-review
 
 COMPOSE ?= podman compose
 APP_HOST ?= 0.0.0.0
@@ -40,6 +40,13 @@ cli-build:
 
 cli-test:
 	cd cli && go test ./...
+
+executors-test:
+	@if [ ! -x executors/.venv/bin/python3 ]; then \
+		cd executors && python3 -m venv .venv; \
+	fi
+	executors/.venv/bin/pip install --quiet -r executors/requirements.txt
+	executors/.venv/bin/python3 -m unittest discover -s executors/tests
 
 integration: up migrate seed
 	bash scripts/integration.sh

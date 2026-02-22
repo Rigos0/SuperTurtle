@@ -1,10 +1,16 @@
 # Executor Tests
 
-Unit tests for the shared executor scaffold.
+Unit and integration tests for executor scaffolding.
 
 ## Run
-From repository root:
+From repository root, run unit tests:
 
 ```bash
-executors/gemini/.venv/bin/python3 -m unittest discover -s executors/tests
+make executors-test
+```
+
+Run end-to-end executor integration (API + CLI + all executors):
+
+```bash
+make e2e-executors
 ```

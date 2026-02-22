@@ -128,6 +128,72 @@ SAMPLE_AGENTS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "id": "66666666-6666-6666-6666-666666666666",
+        "name": "claude-assistant",
+        "description": (
+            "AI coding agent powered by Claude Code CLI. "
+            "Send a prompt and receive generated code, docs, or other files."
+        ),
+        "tags": ["ai", "claude", "coding", "code-generation"],
+        "pricing": {"currency": "USD", "unit": "job", "amount": 0.10},
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "files": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+    },
+    {
+        "id": "77777777-7777-7777-7777-777777777777",
+        "name": "codex-assistant",
+        "description": (
+            "AI coding agent powered by OpenAI Codex CLI. "
+            "Send a prompt and receive generated code, docs, or other files."
+        ),
+        "tags": ["ai", "codex", "coding", "code-generation"],
+        "pricing": {"currency": "USD", "unit": "job", "amount": 0.10},
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "files": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+    },
+    {
+        "id": "88888888-8888-8888-8888-888888888888",
+        "name": "code-review-specialist",
+        "description": (
+            "Specialized code-review executor. "
+            "Send inline code and receive structured findings."
+        ),
+        "tags": ["ai", "claude", "code-review", "quality"],
+        "pricing": {"currency": "USD", "unit": "job", "amount": 0.08},
+        "input_schema": {
+            "type": "object",
+            "required": ["code"],
+            "properties": {
+                "code": {"type": "string"},
+                "language": {"type": "string"},
+            },
+        },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "files": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+    },
 ]
 
 

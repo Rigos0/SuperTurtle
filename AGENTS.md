@@ -26,7 +26,7 @@ NOTE: /orchestrator contains a loop which runs you - the coding agents. It's not
 
 # Current Task
 
-Iteration 29 — Code review + full test pass (every 5th iteration).
+Iteration 30 — Seeded executor marketplace polish: validate new executor agents surface correctly in CLI/Web and add focused regression tests.
 
 
 # End goal with specs
@@ -115,19 +115,15 @@ Iterations 1–14: API, object storage, CLI, npm/pip distribution, Podman compos
 
 Iterations 15–20: Executor PRD, BaseExecutor scaffold + Gemini migration, Claude Code executor, Codex executor, code review executor, E2E integration test with deterministic CLI stubs.
 
-21. Job list filtering/pagination — CLI `--agent-id` flag, useJobs hook refactor, StatusFilter + Pagination components, MyJobsPage wired up
-22. Error & edge-case polish — stronger empty states/loading skeletons, pagination edge handling, and 404 UX
-23. Web frontend tests — vitest + testing-library, 112 tests across 17 files (lib, api, hooks, components, pages)
-24. Code review + app-wide testing — fixed web test warning noise (`act` wrapping + router future flags); full suite pass across api/cli/executors/npm/pip/web; integration and multi-executor E2E flows passed
-25. Web UI job details polish — expanded metadata grid, prompt/params display, result file cards with download links. **NOTE:** JobDetailPage.test.tsx was not added; carry to next iteration
+Iterations 21–25: Job list filtering/pagination, error & edge-case polish, web frontend test suite (vitest + testing-library), code review + app-wide testing, web UI job details polish.
+
+26. JobDetailPage test coverage — 18 tests covering loading, error, 404, job content, result downloads, URL sanitization
+27. MyJobsPage test coverage — 16 tests covering loading, error, empty (no filter/with filter), job list, status filter, pagination
+28. AgentDetailPage test coverage — 15 tests covering loading, error, 404, agent content (name/description/tags/pricing/schemas), stats grid (loaded/loading/null/error), order link
+29. Code review + full test pass — API (58), CLI, executors unit (67), web (161), and multi-executor E2E (`make e2e-executors`) all passing; added hermetic `make executors-test`
 
 ## Current
-29. **Code review + full test pass** — review code quality, run all test suites (api/cli/executors/web), fix issues ← current
-
-## Completed (recent)
-28. AgentDetailPage test coverage — 15 tests covering loading, error, 404, agent content (name/description/tags/pricing/schemas), stats grid (loaded/loading/null/error), order link
-27. MyJobsPage test coverage — 16 tests covering loading, error, empty (no filter/with filter), job list, status filter, pagination
-26. JobDetailPage test coverage — 18 tests covering loading, error, 404, job content, result downloads, URL sanitization
+30. **Seeded executor marketplace polish** — validate newly seeded executor agents across CLI/Web surfaces and add focused regression tests ← current
 
 ## Future
 - More executor types based on project needs
