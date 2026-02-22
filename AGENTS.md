@@ -26,7 +26,7 @@ NOTE: /orchestrator contains a loop which runs you - the coding agents. It's not
 
 # Current Task
 
-Iteration 16 — Executor scaffold: shared Python base for polling, status reporting, file upload. Migrate Gemini executor onto it.
+Iteration 18 — Codex executor: OpenAI Codex CLI subprocess built on the shared BaseExecutor scaffold.
 
 
 # End goal with specs
@@ -110,7 +110,7 @@ Specialized executors for specialized tasks. Each agent's context focuses on bei
 
 # ROADMAP
 
-## Completed (iterations 1–15)
+## Completed (iterations 1–17)
 1. API — all endpoints with tests
 2. Object storage — MinIO + S3 wiring
 3. CLI — Go binary, all commands, JSON output
@@ -126,11 +126,11 @@ Specialized executors for specialized tasks. Each agent's context focuses on bei
 13. Agent stats UI — TypeScript types, hooks, stat cards
 14. Job duration UI — duration on job list & detail pages
 15. Executor PRD — design document for pluggable executor architecture
+16. Executor scaffold — BaseExecutor, ApiClient, files.py, 15 unit tests, Gemini migration
+17. Claude Code executor — --append-system-prompt, --max-turns, 14 unit tests, Makefile targets
 
 ## Current
-16. **Executor scaffold** — shared Python base for polling, status reporting, file upload
-17. **Claude Code executor** — Claude Code CLI subprocess, same pattern as orchestrator
-18. **Codex executor** — OpenAI Codex CLI subprocess
+18. **Codex executor** — OpenAI Codex CLI subprocess ← current
 19. **Code review executor** — input mechanism designed in PRD, review agent
 20. **Integration test & polish** — test all executors end-to-end, rebuild containers
 

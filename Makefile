@@ -1,4 +1,4 @@
-.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-build cli-test integration e2e-system web-install web-dev web executor-gemini-install executor-gemini
+.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-build cli-test integration e2e-system web-install web-dev web executor-gemini-install executor-gemini executor-claude-install executor-claude
 
 COMPOSE ?= podman compose
 APP_HOST ?= 0.0.0.0
@@ -61,3 +61,9 @@ executor-gemini-install:
 
 executor-gemini:
 	cd executors/gemini && .venv/bin/python3 executor.py
+
+executor-claude-install:
+	cd executors/claude && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+
+executor-claude:
+	cd executors/claude && .venv/bin/python3 executor.py
