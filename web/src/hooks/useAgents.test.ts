@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { useAgents } from "./useAgents";
 
 vi.mock("@/api/agents", () => ({
@@ -73,7 +73,9 @@ describe("useAgents", () => {
     expect(result.current.error).toBe("Fail");
 
     mockSearchAgents.mockResolvedValueOnce({ agents: [], total: 0 });
-    result.current.retry();
+    act(() => {
+      result.current.retry();
+    });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBeNull();

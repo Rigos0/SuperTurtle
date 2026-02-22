@@ -5,7 +5,7 @@ import type { AgentSummary } from "@/api/types";
 
 function renderWithRouter(agent: AgentSummary) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AgentCard agent={agent} />
     </MemoryRouter>,
   );

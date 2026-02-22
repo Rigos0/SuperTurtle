@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { useJobResult } from "./useJobResult";
 import { ApiError } from "@/api/client";
 
@@ -70,7 +70,9 @@ describe("useJobResult", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     mockGetJobResult.mockResolvedValueOnce(mockResult);
-    result.current.retry();
+    act(() => {
+      result.current.retry();
+    });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.result).toEqual(mockResult);

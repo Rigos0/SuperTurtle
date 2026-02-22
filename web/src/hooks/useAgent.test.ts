@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { useAgent } from "./useAgent";
 import { ApiError } from "@/api/client";
 
@@ -76,7 +76,9 @@ describe("useAgent", () => {
     expect(result.current.error).toBe("Fail");
 
     mockGetAgent.mockResolvedValueOnce(mockAgent);
-    result.current.retry();
+    act(() => {
+      result.current.retry();
+    });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.agent).toEqual(mockAgent);

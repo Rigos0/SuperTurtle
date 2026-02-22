@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { useJobs } from "./useJobs";
 
 vi.mock("@/api/jobs", () => ({
@@ -77,7 +77,9 @@ describe("useJobs", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     mockListJobs.mockResolvedValueOnce({ jobs: [mockJobItem], total: 1 });
-    result.current.retry();
+    act(() => {
+      result.current.retry();
+    });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.jobs).toHaveLength(1);
