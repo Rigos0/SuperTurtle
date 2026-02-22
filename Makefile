@@ -1,4 +1,4 @@
-.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-build cli-test executors-test integration e2e-system e2e-executors containers-rebuild web-install web-dev web web-test executor-gemini-install executor-gemini executor-claude-install executor-claude executor-codex-install executor-codex executor-code-review-install executor-code-review
+.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-build cli-test executors-test integration e2e-system e2e-executors containers-rebuild web-install web-dev web web-test guard-test executor-gemini-install executor-gemini executor-claude-install executor-claude executor-codex-install executor-codex executor-code-review-install executor-code-review
 
 COMPOSE ?= podman compose
 APP_HOST ?= 0.0.0.0
@@ -71,6 +71,9 @@ web:
 
 web-test:
 	cd web && npm test
+
+guard-test:
+	bash orchestrator/claude-md-guard/tests/run.sh
 
 executor-gemini-install:
 	cd executors/gemini && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
