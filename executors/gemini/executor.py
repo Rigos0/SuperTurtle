@@ -1,276 +1,64 @@
-"""Gemini CLI Executor — polls the agnt API for pending jobs and runs them via `gemini`."""
+"""Gemini CLI executor built on top of the shared base scaffold."""
 
 from __future__ import annotations
 
-import json
-import logging
-import mimetypes
 import os
-import shutil
-import signal
 import subprocess
 import sys
-import time
 from pathlib import Path
 
-import requests
-from dotenv import load_dotenv
+EXECUTORS_ROOT = Path(__file__).resolve().parents[1]
+if str(EXECUTORS_ROOT) not in sys.path:
+    sys.path.insert(0, str(EXECUTORS_ROOT))
 
-load_dotenv()
-
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
-
-API_URL = os.getenv("AGNT_API_URL", "http://localhost:8000")
-API_KEY = os.getenv("AGNT_EXECUTOR_API_KEY", "executor-dev-key")
-AGENT_ID = os.getenv("AGNT_AGENT_ID", "55555555-5555-5555-5555-555555555555")
-GEMINI_BIN = os.getenv("GEMINI_BIN", "gemini")
+from base import BaseExecutor, run_cli
 
 
-def _parse_int_env(name: str, default: str) -> int:
-    raw = os.getenv(name, default)
-    try:
-        return int(raw)
-    except ValueError:
-        print(f"Error: {name}={raw!r} is not a valid integer", file=sys.stderr)
-        sys.exit(1)
+class GeminiExecutor(BaseExecutor):
+    """Executor that runs Gemini CLI in an isolated work directory."""
 
+    name = "gemini"
 
-POLL_INTERVAL = _parse_int_env("POLL_INTERVAL_SECONDS", "5")
-JOB_TIMEOUT = _parse_int_env("JOB_TIMEOUT_SECONDS", "300")
+    def __init__(self) -> None:
+        super().__init__()
+        self.gemini_bin = os.getenv("GEMINI_BIN", "gemini")
+        self.system_prompt_path = Path(__file__).resolve().parent / "GEMINI.md"
+        self._last_stdout = ""
 
-WORK_ROOT = Path(__file__).resolve().parent / "work"
-SYSTEM_PROMPT = (Path(__file__).resolve().parent / "GEMINI.md").read_text(encoding="utf-8")
-MAX_UPLOAD_FILES = 20
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB per file
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-)
-log = logging.getLogger("gemini-executor")
-
-# ---------------------------------------------------------------------------
-# Graceful shutdown
-# ---------------------------------------------------------------------------
-
-_shutdown = False
-
-
-def _handle_signal(signum: int, _frame: object) -> None:
-    global _shutdown  # noqa: PLW0603
-    log.info("Received signal %s — shutting down after current job", signum)
-    _shutdown = True
-
-
-signal.signal(signal.SIGINT, _handle_signal)
-signal.signal(signal.SIGTERM, _handle_signal)
-
-# ---------------------------------------------------------------------------
-# API helpers
-# ---------------------------------------------------------------------------
-
-
-def _headers() -> dict[str, str]:
-    return {"X-API-Key": API_KEY}
-
-
-def _poll_jobs() -> list[dict]:
-    url = f"{API_URL}/v1/executor/jobs"
-    resp = requests.get(
-        url,
-        params={"agent_id": AGENT_ID, "status": "pending"},
-        headers=_headers(),
-        timeout=10,
-    )
-    resp.raise_for_status()
-    return resp.json().get("jobs", [])
-
-
-def _update_status(
-    job_id: str,
-    status: str,
-    *,
-    progress: int | None = None,
-    reason: str | None = None,
-) -> requests.Response:
-    url = f"{API_URL}/v1/executor/jobs/{job_id}/status"
-    body: dict = {"status": status}
-    if progress is not None:
-        body["progress"] = progress
-    if reason is not None:
-        body["reason"] = reason
-    resp = requests.post(url, json=body, headers=_headers(), timeout=10)
-    resp.raise_for_status()
-    return resp
-
-
-def _upload_files(job_id: str, file_paths: list[Path], work_dir: Path) -> None:
-    url = f"{API_URL}/v1/executor/jobs/{job_id}/complete"
-    if len(file_paths) > MAX_UPLOAD_FILES:
-        log.warning(
-            "Job %s produced %d files — uploading first %d only",
-            job_id,
-            len(file_paths),
-            MAX_UPLOAD_FILES,
-        )
-    files_payload = []
-    for p in file_paths[:MAX_UPLOAD_FILES]:
-        size = p.stat().st_size
-        if size > MAX_FILE_SIZE:
-            log.warning("Skipping %s — %d bytes exceeds %d limit", p.name, size, MAX_FILE_SIZE)
-            continue
-        mime = mimetypes.guess_type(str(p))[0] or "application/octet-stream"
-        name = str(p.relative_to(work_dir))
-        files_payload.append(("files", (name, p.read_bytes(), mime)))
-    if not files_payload:
-        raise RuntimeError("All output files exceeded size limit")
-    resp = requests.post(url, files=files_payload, headers=_headers(), timeout=60)
-    resp.raise_for_status()
-
-
-# ---------------------------------------------------------------------------
-# Job processing
-# ---------------------------------------------------------------------------
-
-
-def _build_prompt(job: dict) -> str:
-    prompt = job.get("prompt", "")
-    params = job.get("params")
-    if params and isinstance(params, dict):
-        parts = []
-        for k, v in params.items():
-            parts.append(f"{k}={v if isinstance(v, str) else json.dumps(v)}")
-        prompt = f"{prompt}\n{' '.join(parts)}"
-    return prompt
-
-
-def _collect_files(work_dir: Path) -> list[Path]:
-    resolved_root = work_dir.resolve()
-    files: list[Path] = []
-    for root, dirs, filenames in os.walk(work_dir):
-        dirs[:] = [d for d in dirs if not d.startswith(".")]
-        for name in filenames:
-            if name.startswith("."):
-                continue
-            p = Path(root) / name
-            if p.is_symlink():
-                log.warning("Skipping symlink: %s", p)
-                continue
-            if not p.resolve().is_relative_to(resolved_root):
-                log.warning("Skipping file outside work dir: %s", p)
-                continue
-            files.append(p)
-    return files
-
-
-def _process_job(job: dict) -> None:
-    job_id = job["job_id"]
-    log.info("Processing job %s", job_id)
-
-    # Accept — bail if another executor already grabbed this job -------
-    try:
-        _update_status(job_id, "accepted")
-    except requests.HTTPError as exc:
-        if exc.response is not None and exc.response.status_code == 409:
-            log.info("Job %s already claimed by another executor", job_id)
-            return
-        raise
-
-    work_dir = WORK_ROOT / job_id
-    work_dir.mkdir(parents=True, exist_ok=True)
-
-    try:
-        # Running ------------------------------------------------------
-        _update_status(job_id, "running", progress=10)
-
-        prompt = _build_prompt(job)
-        log.info("Running gemini for job %s", job_id)
-        (work_dir / "GEMINI.md").write_text(SYSTEM_PROMPT, encoding="utf-8")
-
-        proc = subprocess.Popen(
-            [GEMINI_BIN, "-p", prompt, "--yolo"],
-            cwd=work_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+    def execute(self, job: dict, work_dir: Path) -> None:
+        job_id = str(job["job_id"])
+        prompt = self.build_prompt(job)
+        self.log.info("Running gemini for job %s", job_id)
 
         try:
-            stdout, stderr = proc.communicate(timeout=JOB_TIMEOUT)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.communicate()
-            _update_status(job_id, "failed", reason="Job timed out")
-            return
+            result = run_cli(
+                [self.gemini_bin, "-p", prompt, "--yolo"],
+                cwd=work_dir,
+                timeout=self.job_timeout,
+            )
+        except subprocess.CalledProcessError as exc:
+            reason = (exc.stderr or "").strip()
+            if not reason:
+                reason = f"gemini exited with code {exc.returncode}"
+            raise RuntimeError(reason[:500]) from exc
 
-        if proc.returncode != 0:
-            reason = stderr.strip() or f"gemini exited with code {proc.returncode}"
-            _update_status(job_id, "failed", reason=reason[:500])
-            return
+        self._last_stdout = result.stdout or ""
 
-        # Collect output -----------------------------------------------
-        files = [p for p in _collect_files(work_dir) if p.name != "GEMINI.md"]
-
-        if not files and stdout.strip():
+    def collect_files(self, work_dir: Path) -> list[Path]:
+        files = super().collect_files(work_dir)
+        if files:
+            return files
+        if self._last_stdout.strip():
             response_file = work_dir / "response.txt"
-            response_file.write_text(stdout)
-            files = [response_file]
-
-        if not files:
-            _update_status(job_id, "failed", reason="No output produced")
-            return
-
-        # Upload -------------------------------------------------------
-        _upload_files(job_id, files, work_dir)
-        log.info("Job %s completed — uploaded %d file(s)", job_id, len(files))
-
-    except requests.RequestException as exc:
-        log.error("API error for job %s: %s", job_id, exc)
-        try:
-            _update_status(job_id, "failed", reason=str(exc)[:500])
-        except Exception:
-            pass
-    except Exception as exc:
-        log.error("Unexpected error for job %s: %s", job_id, exc)
-        try:
-            _update_status(job_id, "failed", reason=str(exc)[:500])
-        except Exception:
-            pass
-    finally:
-        if work_dir.exists():
-            shutil.rmtree(work_dir, ignore_errors=True)
-
-
-# ---------------------------------------------------------------------------
-# Main loop
-# ---------------------------------------------------------------------------
+            response_file.write_text(self._last_stdout, encoding="utf-8")
+            return [response_file]
+        return files
 
 
 def main() -> None:
-    log.info("Gemini executor started — agent_id=%s", AGENT_ID)
-    log.info("Using Gemini binary: %s", GEMINI_BIN)
-    log.info("Polling %s every %ds", API_URL, POLL_INTERVAL)
-
-    while not _shutdown:
-        try:
-            jobs = _poll_jobs()
-            if not jobs:
-                log.debug("No pending jobs")
-            for job in jobs:
-                if _shutdown:
-                    break
-                _process_job(job)
-        except requests.RequestException as exc:
-            log.warning("API unreachable: %s — retrying in %ds", exc, POLL_INTERVAL)
-        except Exception:
-            log.exception("Unexpected error in poll loop")
-
-        time.sleep(POLL_INTERVAL)
-
-    log.info("Executor stopped")
+    executor = GeminiExecutor()
+    executor.log.info("Using Gemini binary: %s", executor.gemini_bin)
+    executor.run()
 
 
 if __name__ == "__main__":

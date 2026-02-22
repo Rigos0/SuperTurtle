@@ -308,7 +308,7 @@ class CodeReviewExecutor(BaseExecutor):
     def collect_files(self, work_dir):
         # Only upload the review output, not the input code
         files = super().collect_files(work_dir)
-        return [f for f in files if f.name != f.name.startswith("input")]
+        return [f for f in files if not f.name.startswith("input")]
 ```
 
 **Env**: `CLAUDE_BIN` (default: `claude`)
