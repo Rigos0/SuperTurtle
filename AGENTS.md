@@ -26,7 +26,7 @@ NOTE: /orchestrator contains a loop which runs you - the coding agents. It's not
 
 # Current Task
 
-Iteration 23 — Web frontend tests (hooks/pages/components coverage).
+Iteration 27 — MyJobsPage test coverage (add MyJobsPage.test.tsx).
 
 
 # End goal with specs
@@ -113,17 +113,19 @@ Specialized executors for specialized tasks. Each agent's context focuses on bei
 ## Completed
 Iterations 1–14: API, object storage, CLI, npm/pip distribution, Podman compose, end-to-end integration, auth, web marketplace, job tracking UI, Gemini executor, orchestrator hardening, agent stats & job duration (API + CLI + UI).
 
-15. Executor PRD — design document for pluggable executor architecture
-16. Executor scaffold — BaseExecutor, ApiClient, files.py, 15 unit tests, Gemini migration
-17. Claude Code executor — --append-system-prompt, --max-turns, 14 unit tests, Makefile targets
-18. Codex executor — `codex exec --yolo`, CODEX.md prompt copy, 13 unit tests, Makefile targets
-19. Code review executor — inline-input mode, input file filtering, 24 unit tests, Makefile targets
-20. Integration test & polish — all executors E2E script with deterministic CLI stubs, new seeded executor agents, container rebuild target
+Iterations 15–20: Executor PRD, BaseExecutor scaffold + Gemini migration, Claude Code executor, Codex executor, code review executor, E2E integration test with deterministic CLI stubs.
+
 21. Job list filtering/pagination — CLI `--agent-id` flag, useJobs hook refactor, StatusFilter + Pagination components, MyJobsPage wired up
 22. Error & edge-case polish — stronger empty states/loading skeletons, pagination edge handling, and 404 UX
+23. Web frontend tests — vitest + testing-library, 112 tests across 17 files (lib, api, hooks, components, pages)
+24. Code review + app-wide testing — fixed web test warning noise (`act` wrapping + router future flags); full suite pass across api/cli/executors/npm/pip/web; integration and multi-executor E2E flows passed
+25. Web UI job details polish — expanded metadata grid, prompt/params display, result file cards with download links. **NOTE:** JobDetailPage.test.tsx was not added; carry to next iteration
 
 ## Current
-23. **Web frontend tests** — hooks/pages/components coverage ← current
+27. **MyJobsPage test coverage** — add MyJobsPage.test.tsx covering loading/error/empty/filtered/paginated states ← current
+
+## Completed (recent)
+26. JobDetailPage test coverage — 18 tests covering loading, error, 404, job content, result downloads, URL sanitization
 
 ## Future
 - More executor types based on project needs
