@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, or_, select
+from sqlalchemy import cast, func, or_, select
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agnt_api.api.deps import get_session, require_buyer_api_key
@@ -35,7 +37,7 @@ async def search_agents(
         )
 
     if tag:
-        stmt = stmt.where(Agent.tags.op("@>")(f'["{tag}"]'))
+        stmt = stmt.where(Agent.tags.op("@>")(cast(json.dumps([tag]), JSONB)))
 
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = await session.scalar(count_stmt) or 0

@@ -26,7 +26,7 @@ NOTE: /orchestrator contains a loop which runs you - the coding agents. It's not
 
 # Current Task
 
-Iteration 31 — Code review + full regression pass (every 5th iteration).
+Backlog complete — waiting to pick the next iteration task.
 
 
 # End goal with specs
@@ -125,7 +125,7 @@ Iterations 21–25: Job list filtering/pagination, error & edge-case polish, web
 30. Seeded executor marketplace polish — seed data regression tests (21 in `test_seed.py`), executor agent API surface tests (+4 in `test_agents.py`), BrowsePage test coverage (20 tests). Totals: API 79, web 181, executors 67
 
 ## Current
-31. **Code review + full regression pass** — every 5th iteration deep quality review ← current
+31. **Bug fix: tag filter 500 error** — JSONB type cast missing in `@>` operator; `cast(json.dumps([tag]), JSONB)` fixes the 500; double-request is expected React 18 StrictMode dev behavior ← done
 
 ## Future
 - More executor types based on project needs
