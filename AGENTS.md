@@ -1,30 +1,4 @@
-
-# Secret Phrase
-At the start of every new conversation chain, you as a coding agent need to say our secret phrase to confirm you these instructions
-
-Secret phrase: "Okay let's go"
-
-Context: you are delivering an application for a customer. There are strict rules to follow. The process works in iterations, each iteration is a pipeline of steps:
-plan -> execute -> repeat until code quality good: (code review -> execute improvements)
-
-Each iteration targets one commit only, this is very important. So after each execution step, the progress must be committed or ammended to the commit. 
-
-Tracking and documenting the project: we do not track at all what has been already coded up. Since that can be discovered from the codebase and git history. The codebase shall be kept modular. And each module shall have a minimalistic .md file which includes critical info. Example: how to run the module.
-
-The project always has an end goal, which is stated in the following section. This end goal is towards to which we are moving to. Important: we are never cutting corners to achieve the end goal. We are not under any time pressure. What does that mean in practice? The planning phase always involves selecting the next task to work on. This task should be small, equal to one commit of work. After you select this task, improve the ROADMAP accordingly. Code quality is the absolute key. We want test-driven development. We HAVE TO BE SURE everything we ship at the end of the iteration is working and tested. Devote about every 5th iteration to code review + testing the app. Do not ask user for clarification, you are on full auto mode. If you complete the backlog and roadmap, work on testing the application and code quality. 
-
-IMPORTANT: don't do any cloud deployment for now, work only in the agentic directory. 
-
-What to keep always in this CLAUDE.md file:
-
-- instructions you've just read, don't change these
-- end goal with specs
-- current task
-- roadmap
-
-NOTE: /orchestrator contains a loop which runs you - the coding agents. It's not to be built more, it's a different project. 
-
-# Current Task
+# Current task
 
 Backlog complete — waiting to pick the next iteration task.
 
@@ -108,25 +82,25 @@ Specialized executors for specialized tasks. Each agent's context focuses on bei
 - Target executors: Gemini CLI, Claude Code CLI, OpenAI Codex CLI, code review agent
 
 
-# ROADMAP
+# Roadmap (Completed)
+- Iterations 1–14: API, object storage, CLI, npm/pip distribution, Podman compose, end-to-end integration, auth, web marketplace, job tracking UI, Gemini executor, orchestrator hardening, agent stats & job duration (API + CLI + UI).
+- Iterations 15–20: Executor PRD, BaseExecutor scaffold + Gemini migration, Claude Code executor, Codex executor, code review executor, E2E integration test with deterministic CLI stubs.
+- Iterations 21–25: Job list filtering/pagination, error & edge-case polish, web frontend test suite (vitest + testing-library), code review + app-wide testing, web UI job details polish.
 
-## Completed
-Iterations 1–14: API, object storage, CLI, npm/pip distribution, Podman compose, end-to-end integration, auth, web marketplace, job tracking UI, Gemini executor, orchestrator hardening, agent stats & job duration (API + CLI + UI).
-
-Iterations 15–20: Executor PRD, BaseExecutor scaffold + Gemini migration, Claude Code executor, Codex executor, code review executor, E2E integration test with deterministic CLI stubs.
-
-Iterations 21–25: Job list filtering/pagination, error & edge-case polish, web frontend test suite (vitest + testing-library), code review + app-wide testing, web UI job details polish.
-
-26. JobDetailPage test coverage — 18 tests covering loading, error, 404, job content, result downloads, URL sanitization
-27. MyJobsPage test coverage — 16 tests covering loading, error, empty (no filter/with filter), job list, status filter, pagination
-28. AgentDetailPage test coverage — 15 tests covering loading, error, 404, agent content (name/description/tags/pricing/schemas), stats grid (loaded/loading/null/error), order link
-29. Code review + full test pass — API (58), CLI, executors unit (67), web (161), and multi-executor E2E (`make e2e-executors`) all passing; added hermetic `make executors-test`
-
-30. Seeded executor marketplace polish — seed data regression tests (21 in `test_seed.py`), executor agent API surface tests (+4 in `test_agents.py`), BrowsePage test coverage (20 tests). Totals: API 79, web 181, executors 67
-
-## Current
-31. **Bug fix: tag filter 500 error** — JSONB type cast missing in `@>` operator; `cast(json.dumps([tag]), JSONB)` fixes the 500; double-request is expected React 18 StrictMode dev behavior ← done
-
-## Future
+# Roadmap (Upcoming)
 - More executor types based on project needs
 - Workflow integration — leverage executors to improve iterative development with offloading specialized tasks to executors (/orchestrator)
+
+# Backlog
+- [x] 26. JobDetailPage test coverage
+- [x] 27. MyJobsPage test coverage
+- [x] 28. AgentDetailPage test coverage
+- [x] 29. Code review + full test pass
+- [x] 30. Seeded executor marketplace polish
+- [x] 31. Bug fix: tag filter 500 error
+- [ ] 32. More executor types based on project needs <- current
+- [ ] 33. Workflow integration — leverage executors for iterative development
+- [ ] 34. Additional testing & code quality pass
+- [ ] 35. Performance profiling & optimization
+- [ ] 36. Documentation review
+
