@@ -1,4 +1,4 @@
-.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-build cli-test executors-test integration e2e-system e2e-executors containers-rebuild web-install web-dev web web-test guard-test executor-gemini-install executor-gemini executor-claude-install executor-claude executor-codex-install executor-codex executor-code-review-install executor-code-review
+.PHONY: up down logs db db-down api migrate migrate-new seed cli cli-build cli-test executors-test integration e2e-system e2e-executors containers-rebuild web-install web-dev web web-test guard-test executor-gemini-install executor-gemini executor-claude-install executor-claude executor-codex-install executor-codex executor-code-review-install executor-code-review orchestrator orchestrator-stop orchestrator-status orchestrator-logs
 
 COMPOSE ?= podman compose
 APP_HOST ?= 0.0.0.0
@@ -98,3 +98,15 @@ executor-code-review-install:
 
 executor-code-review:
 	cd executors/code_review && .venv/bin/python3 executor.py
+
+orchestrator:
+	./orchestrator-ctl start
+
+orchestrator-stop:
+	./orchestrator-ctl stop
+
+orchestrator-status:
+	./orchestrator-ctl status
+
+orchestrator-logs:
+	./orchestrator-ctl logs
