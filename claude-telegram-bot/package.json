@@ -1,0 +1,25 @@
+{
+  "name": "claude-telegram-bot-ts",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch run src/index.ts",
+    "typecheck": "bun run --bun tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.76",
+    "@grammyjs/runner": "^2.0.3",
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "grammy": "^1.38.4",
+    "openai": "^6.15.0",
+    "zod": "^4.2.1"
+  }
+}
