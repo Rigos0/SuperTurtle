@@ -13,7 +13,6 @@ venv/
 .env.*
 !.env.example
 .env.local
-api/.env
 
 # IDE
 .vscode/
@@ -23,7 +22,6 @@ api/.env
 
 # Node
 node_modules/
-npm/runtime/
 
 # OS
 .DS_Store
@@ -31,10 +29,6 @@ Thumbs.db
 
 # Temp / integration artifacts
 .tmp/
-/jobs/
-
-# Build artifacts
-cli/agnt
 
 # Claude Code
 .claude/
