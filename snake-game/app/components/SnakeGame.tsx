@@ -13,7 +13,8 @@ type Point = {
 const GRID_SIZE = 20;
 const CELL_SIZE = 24;
 const BOARD_SIZE = GRID_SIZE * CELL_SIZE;
-const STEP_MS = 115;
+const STEP_MS_BASE = 115;
+const STEP_MS_MIN = 55;
 const FOOD_PER_LEVEL = 5;
 const HIGH_SCORE_KEY = "snake-high-score";
 
@@ -34,6 +35,10 @@ const DIRECTION_VECTORS: Record<Direction, Point> = {
   left: { x: -1, y: 0 },
   right: { x: 1, y: 0 },
 };
+
+function getStepMs(level: number): number {
+  return Math.max(STEP_MS_MIN, STEP_MS_BASE - (level - 1) * 6);
+}
 
 function isOppositeDirection(a: Direction, b: Direction): boolean {
   return (
@@ -287,6 +292,7 @@ export default function SnakeGame() {
         const nextLevel = levelRef.current + 1;
         setLevel(nextLevel);
         levelRef.current = nextLevel;
+        accumulatorRef.current = 0;
 
         setFoodEatenThisLevel(0);
         foodEatenThisLevelRef.current = 0;
@@ -476,9 +482,13 @@ export default function SnakeGame() {
 
       if (gameStateRef.current === "playing") {
         accumulatorRef.current += delta;
-        while (accumulatorRef.current >= STEP_MS) {
+        while (true) {
+          const stepMs = getStepMs(levelRef.current);
+          if (accumulatorRef.current < stepMs) {
+            break;
+          }
           stepGame();
-          accumulatorRef.current -= STEP_MS;
+          accumulatorRef.current -= stepMs;
         }
       }
 
