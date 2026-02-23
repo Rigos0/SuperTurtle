@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 bun run start      # Run the bot
+bun run start:live # Run with caffeinate (prevents sleep on AC power)
 bun run dev        # Run with auto-reload (--watch)
 bun run typecheck  # Run TypeScript type checking
 bun install        # Install dependencies

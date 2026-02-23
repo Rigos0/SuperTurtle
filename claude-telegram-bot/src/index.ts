@@ -129,7 +129,13 @@ if (existsSync(RESTART_FILE)) {
 }
 
 // Start with concurrent runner (commands work immediately)
-const runner = run(bot);
+// Retry forever on getUpdates failures (e.g. network drop during sleep)
+const runner = run(bot, {
+  runner: {
+    maxRetryTime: Infinity,
+    retryInterval: "exponential",
+  },
+});
 
 // Graceful shutdown
 const stopRunner = () => {
