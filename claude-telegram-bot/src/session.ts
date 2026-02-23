@@ -7,8 +7,10 @@
 
 import {
   query,
+  unstable_v2_createSession,
   type Options,
   type SDKMessage,
+  type ModelInfo,
 } from "@anthropic-ai/claude-agent-sdk";
 import { readFileSync } from "fs";
 import type { Context } from "grammy";
@@ -74,6 +76,61 @@ function getTextFromMessage(msg: SDKMessage): string | null {
 // Maximum number of sessions to keep in history
 const MAX_SESSIONS = 5;
 
+// Model configuration
+export type EffortLevel = "low" | "medium" | "high";
+
+export const EFFORT_DISPLAY: Record<EffortLevel, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High (default)",
+};
+
+const PREFS_FILE = "/tmp/claude-telegram-prefs.json";
+
+interface UserPrefs {
+  model: string;
+  effort: EffortLevel;
+}
+
+function loadPrefs(): Partial<UserPrefs> {
+  try {
+    const text = readFileSync(PREFS_FILE, "utf-8");
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
+function savePrefs(prefs: UserPrefs): void {
+  try {
+    Bun.write(PREFS_FILE, JSON.stringify(prefs, null, 2));
+  } catch (error) {
+    console.warn("Failed to save preferences:", error);
+  }
+}
+
+// Cached model list fetched dynamically from Claude Code
+let cachedModels: ModelInfo[] | null = null;
+
+export async function getAvailableModels(): Promise<ModelInfo[]> {
+  if (cachedModels) return cachedModels;
+
+  try {
+    const tempSession = unstable_v2_createSession({ model: "claude-sonnet-4-6" });
+    cachedModels = await tempSession.supportedModels();
+    await tempSession.close();
+    return cachedModels;
+  } catch (error) {
+    console.error("Failed to fetch models:", error);
+    // Fallback if dynamic fetch fails
+    return [
+      { value: "claude-opus-4-6", displayName: "Opus 4.6", description: "Most capable for complex work" },
+      { value: "claude-sonnet-4-6", displayName: "Sonnet 4.6", description: "Best for everyday tasks" },
+      { value: "claude-haiku-4-5-20251001", displayName: "Haiku 4.5", description: "Fastest for quick answers" },
+    ];
+  }
+}
+
 class ClaudeSession {
   sessionId: string | null = null;
   lastActivity: Date | null = null;
@@ -85,6 +142,31 @@ class ClaudeSession {
   lastUsage: TokenUsage | null = null;
   lastMessage: string | null = null;
   conversationTitle: string | null = null;
+
+  // Model settings (loaded from disk)
+  private _model: string;
+  private _effort: EffortLevel;
+
+  get model(): string { return this._model; }
+  set model(value: string) {
+    this._model = value;
+    savePrefs({ model: this._model, effort: this._effort });
+  }
+
+  get effort(): EffortLevel { return this._effort; }
+  set effort(value: EffortLevel) {
+    this._effort = value;
+    savePrefs({ model: this._model, effort: this._effort });
+  }
+
+  constructor() {
+    const prefs = loadPrefs();
+    this._model = prefs.model || "claude-sonnet-4-6";
+    this._effort = prefs.effort || "high";
+    if (prefs.model || prefs.effort) {
+      console.log(`Loaded preferences: model=${this._model}, effort=${this._effort}`);
+    }
+  }
 
   private abortController: AbortController | null = null;
   private isQueryRunning = false;
@@ -207,7 +289,7 @@ class ClaudeSession {
 
     // Build SDK V1 options - supports all features
     const options: Options = {
-      model: "claude-sonnet-4-5",
+      model: this.model,
       cwd: WORKING_DIR,
       settingSources: ["user", "project"],
       permissionMode: "bypassPermissions",
@@ -217,6 +299,7 @@ class ClaudeSession {
       maxThinkingTokens: thinkingTokens,
       additionalDirectories: ALLOWED_PATHS,
       resume: this.sessionId || undefined,
+      ...(this.effort !== "high" && { extraArgs: { effort: this.effort } }),
     };
 
     // Add Claude Code executable path if set (required for standalone builds)

@@ -6,7 +6,7 @@
 
 import type { Context } from "grammy";
 import { unlinkSync } from "fs";
-import { session } from "../session";
+import { session, getAvailableModels, EFFORT_DISPLAY, type EffortLevel } from "../session";
 import { ALLOWED_USERS } from "../config";
 import { isAuthorized } from "../security";
 import { auditLog, startTypingIndicator } from "../utils";
@@ -32,7 +32,43 @@ export async function handleCallback(ctx: Context): Promise<void> {
     return;
   }
 
-  // 2. Handle resume callbacks: resume:{session_id}
+  // 2. Handle model selection: model:{model_id}
+  if (callbackData.startsWith("model:")) {
+    const modelId = callbackData.replace("model:", "");
+    const models = await getAvailableModels();
+    const model = models.find((m) => m.value === modelId);
+    if (model) {
+      session.model = modelId;
+      // Reset effort to high if switching to Haiku (no effort support)
+      if (modelId.includes("haiku")) {
+        session.effort = "high";
+      }
+      const effortStr = modelId.includes("haiku") ? "" : ` | ${EFFORT_DISPLAY[session.effort]} effort`;
+      await ctx.editMessageText(`<b>Model:</b> ${model.displayName}${effortStr}`, { parse_mode: "HTML" });
+      await ctx.answerCallbackQuery({ text: `Switched to ${model.displayName}` });
+    } else {
+      await ctx.answerCallbackQuery({ text: "Unknown model" });
+    }
+    return;
+  }
+
+  // 3. Handle effort selection: effort:{level}
+  if (callbackData.startsWith("effort:")) {
+    const effort = callbackData.replace("effort:", "") as EffortLevel;
+    if (effort in EFFORT_DISPLAY) {
+      session.effort = effort;
+      const models = await getAvailableModels();
+      const model = models.find((m) => m.value === session.model);
+      const modelName = model?.displayName || session.model;
+      await ctx.editMessageText(`<b>Model:</b> ${modelName} | ${EFFORT_DISPLAY[effort]} effort`, { parse_mode: "HTML" });
+      await ctx.answerCallbackQuery({ text: `Effort set to ${EFFORT_DISPLAY[effort]}` });
+    } else {
+      await ctx.answerCallbackQuery({ text: "Unknown effort level" });
+    }
+    return;
+  }
+
+  // 4. Handle resume callbacks: resume:{session_id}
   if (callbackData.startsWith("resume:")) {
     await handleResumeCallback(ctx, callbackData);
     return;

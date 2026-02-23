@@ -5,7 +5,7 @@
  */
 
 import type { Context } from "grammy";
-import { session } from "../session";
+import { session, getAvailableModels, EFFORT_DISPLAY, type EffortLevel } from "../session";
 import { WORKING_DIR, ALLOWED_USERS, RESTART_FILE } from "../config";
 import { isAuthorized } from "../security";
 
@@ -220,6 +220,54 @@ export async function handleResume(ctx: Context): Promise<void> {
       inline_keyboard: buttons,
     },
   });
+}
+
+/**
+ * /model - Show current model and let user switch model/effort.
+ */
+export async function handleModel(ctx: Context): Promise<void> {
+  const userId = ctx.from?.id;
+
+  if (!isAuthorized(userId, ALLOWED_USERS)) {
+    await ctx.reply("Unauthorized.");
+    return;
+  }
+
+  const models = await getAvailableModels();
+  const currentModel = models.find((m) => m.value === session.model);
+  const currentEffort = EFFORT_DISPLAY[session.effort];
+
+  // Model buttons — one per row
+  const modelButtons = models.map((m) => [{
+    text: `${m.value === session.model ? "✔ " : ""}${m.displayName}`,
+    callback_data: `model:${m.value}`,
+  }]);
+
+  // Effort buttons — Haiku doesn't support effort
+  const isHaiku = session.model.includes("haiku");
+  const effortButtons = isHaiku
+    ? []
+    : [(Object.entries(EFFORT_DISPLAY) as [EffortLevel, string][]).map(
+        ([level, label]) => ({
+          text: `${level === session.effort ? "✔ " : ""}${label}`,
+          callback_data: `effort:${level}`,
+        })
+      )];
+
+  const modelName = currentModel?.displayName || session.model;
+  const modelDesc = currentModel?.description ? ` — ${currentModel.description}` : "";
+
+  await ctx.reply(
+    `<b>Model:</b> ${modelName}${modelDesc}\n` +
+      `<b>Effort:</b> ${currentEffort}\n\n` +
+      `Select model or effort level:`,
+    {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [...modelButtons, ...effortButtons],
+      },
+    }
+  );
 }
 
 /**
