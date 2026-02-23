@@ -1,5 +1,22 @@
 # Scripts Module
 
+## Meta Agent Entrypoint
+
+Start the shared meta-agent session from repo root with:
+
+```bash
+./claude-meta
+```
+
+This command appends shared instructions from `meta/META_SHARED.md` and then
+launches interactive Claude. Do not start it from subdirectories.
+
+Optional override:
+
+```bash
+META_PROMPT_FILE=meta/META_SHARED.md ./claude-meta --model sonnet
+```
+
 ## Run Integration Flow
 
 The integration script verifies the full lifecycle:
