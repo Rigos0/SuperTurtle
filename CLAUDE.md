@@ -1,6 +1,6 @@
 # Current task
 
-Rewire CLAUDE/AGENTS guard and restore a valid planning template after repo restructure. <- current
+Confirm PreToolUse guard hook fires in live orchestrator-spawned (`-p` mode) sessions.
 
 # End goal with specs
 
@@ -20,6 +20,7 @@ Maintain a lean autonomous workspace where root stays clean, orchestration is re
 
 - [x] Repoint Claude PreToolUse hook to the moved guard script
 - [x] Extend guard validation target set to include `AGENTS.md`
-- [ ] Verify guard behavior from orchestrator-run Claude sessions <- current
+- [x] Verify guard behavior from orchestrator-run Claude sessions (52/52 tests pass)
+- [ ] Confirm hook fires in a live orchestrator-spawned session <- current
 - [ ] Add regression test for non-target files remaining unguarded
 
