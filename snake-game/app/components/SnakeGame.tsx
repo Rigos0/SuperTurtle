@@ -14,6 +14,7 @@ const GRID_SIZE = 20;
 const CELL_SIZE = 24;
 const BOARD_SIZE = GRID_SIZE * CELL_SIZE;
 const STEP_MS = 115;
+const FOOD_PER_LEVEL = 5;
 const HIGH_SCORE_KEY = "snake-high-score";
 
 const KEY_TO_DIRECTION: Record<string, Direction> = {
@@ -101,14 +102,9 @@ function drawRoundedRect(
 export default function SnakeGame() {
   const [gameState, setGameState] = useState<GameState>("start");
   const [score, setScore] = useState(0);
-  const [highScore, setHighScore] = useState(() => {
-    if (typeof window === "undefined") {
-      return 0;
-    }
-    const stored = window.localStorage.getItem(HIGH_SCORE_KEY);
-    const parsed = Number.parseInt(stored ?? "", 10);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-  });
+  const [highScore, setHighScore] = useState(0);
+  const [level, setLevel] = useState(1);
+  const [foodEatenThisLevel, setFoodEatenThisLevel] = useState(0);
   const [snake, setSnake] = useState<Point[]>(() => createInitialSnake());
   const [food, setFood] = useState<Point>(() => pickNextFood(createInitialSnake()));
   const [direction, setDirection] = useState<Direction>("right");
@@ -118,6 +114,8 @@ export default function SnakeGame() {
   const gameStateRef = useRef<GameState>(gameState);
   const scoreRef = useRef(score);
   const highScoreRef = useRef(highScore);
+  const levelRef = useRef(level);
+  const foodEatenThisLevelRef = useRef(foodEatenThisLevel);
   const snakeRef = useRef<Point[]>(snake);
   const foodRef = useRef<Point>(food);
   const directionRef = useRef<Direction>(direction);
@@ -138,6 +136,23 @@ export default function SnakeGame() {
   useEffect(() => {
     highScoreRef.current = highScore;
   }, [highScore]);
+
+  useEffect(() => {
+    levelRef.current = level;
+  }, [level]);
+
+  useEffect(() => {
+    foodEatenThisLevelRef.current = foodEatenThisLevel;
+  }, [foodEatenThisLevel]);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(HIGH_SCORE_KEY);
+    const parsed = Number.parseInt(stored ?? "", 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      setHighScore(parsed);
+      highScoreRef.current = parsed;
+    }
+  }, []);
 
   useEffect(() => {
     snakeRef.current = snake;
@@ -179,6 +194,12 @@ export default function SnakeGame() {
 
     setScore(0);
     scoreRef.current = 0;
+
+    setLevel(1);
+    levelRef.current = 1;
+
+    setFoodEatenThisLevel(0);
+    foodEatenThisLevelRef.current = 0;
 
     setGameState("playing");
     gameStateRef.current = "playing";
@@ -228,7 +249,10 @@ export default function SnakeGame() {
       nextHead.y >= GRID_SIZE;
 
     const hitsSelf = currentSnake.some(
-      (segment) => segment.x === nextHead.x && segment.y === nextHead.y,
+      (segment, i) =>
+        i < currentSnake.length - 1 &&
+        segment.x === nextHead.x &&
+        segment.y === nextHead.y,
     );
 
     if (hitsWall || hitsSelf) {
@@ -257,6 +281,19 @@ export default function SnakeGame() {
       const nextScore = scoreRef.current + 1;
       setScore(nextScore);
       scoreRef.current = nextScore;
+
+      const nextFoodEatenThisLevel = foodEatenThisLevelRef.current + 1;
+      if (nextFoodEatenThisLevel === FOOD_PER_LEVEL) {
+        const nextLevel = levelRef.current + 1;
+        setLevel(nextLevel);
+        levelRef.current = nextLevel;
+
+        setFoodEatenThisLevel(0);
+        foodEatenThisLevelRef.current = 0;
+      } else {
+        setFoodEatenThisLevel(nextFoodEatenThisLevel);
+        foodEatenThisLevelRef.current = nextFoodEatenThisLevel;
+      }
 
       if (nextScore > highScoreRef.current) {
         setHighScore(nextScore);
@@ -385,8 +422,13 @@ export default function SnakeGame() {
 
         ctx.fillStyle = "#04d9ff";
         ctx.shadowColor = "#04d9ff";
+        ctx.font = "600 14px monospace";
+        ctx.fillText(`Level: ${levelRef.current}`, BOARD_SIZE / 2, BOARD_SIZE / 2 + 38);
+
+        ctx.fillStyle = "#04d9ff";
+        ctx.shadowColor = "#04d9ff";
         ctx.font = "600 13px monospace";
-        ctx.fillText("Press any key to restart", BOARD_SIZE / 2, BOARD_SIZE / 2 + 52);
+        ctx.fillText("Press any key to restart", BOARD_SIZE / 2, BOARD_SIZE / 2 + 64);
       }
     }
   }, []);
@@ -429,7 +471,7 @@ export default function SnakeGame() {
         lastFrameRef.current = timestamp;
       }
 
-      const delta = timestamp - lastFrameRef.current;
+      const delta = Math.min(timestamp - lastFrameRef.current, 500);
       lastFrameRef.current = timestamp;
 
       if (gameStateRef.current === "playing") {
@@ -459,6 +501,7 @@ export default function SnakeGame() {
           SNAKE
         </h1>
         <div className="flex items-center gap-4 text-xs uppercase tracking-[0.18em] sm:text-sm">
+          <p className="text-[#04d9ff]">Level: {level}</p>
           <p className="text-[#39ff14]">Score: {score}</p>
           <p className="text-[#ff6ec7]">High: {highScore}</p>
         </div>
