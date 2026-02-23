@@ -76,7 +76,7 @@ for key in list(env):
     if key.startswith('CLAUDECODE'):
         del env[key]
 
-log_fd = open(log_file, 'a')
+log_fd = open(log_file, 'w')
 proc = subprocess.Popen(
     [python, '-u', '-m', 'super_turtle.orchestrator'],
     cwd=cwd,
