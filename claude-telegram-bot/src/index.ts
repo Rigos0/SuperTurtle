@@ -14,6 +14,7 @@ import {
   handleStop,
   handleStatus,
   handleUsage,
+  handleContext,
   handleModel,
   handleResume,
   handleRestart,
@@ -58,6 +59,7 @@ bot.command("new", handleNew);
 bot.command("stop", handleStop);
 bot.command("status", handleStatus);
 bot.command("usage", handleUsage);
+bot.command("context", handleContext);
 bot.command("model", handleModel);
 bot.command("resume", handleResume);
 bot.command("restart", handleRestart);
