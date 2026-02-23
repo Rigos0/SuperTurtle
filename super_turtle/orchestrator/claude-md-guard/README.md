@@ -1,22 +1,22 @@
 # claude-md-guard
 
-Validates CLAUDE.md structure against configurable rules. Two scripts, one config.
+Validates CLAUDE.md / AGENTS.md structure against configurable rules. Two scripts, one config.
 
 ## Usage
 
 ```bash
 # Print section stats and warnings
-claude-md-guard/stats.sh CLAUDE.md
+super_turtle/orchestrator/claude-md-guard/stats.sh CLAUDE.md
 
 # Validate (silent on success, exit 2 on failure)
-echo '{"tool_name":"Write","tool_input":{"file_path":"CLAUDE.md","content":"..."}}' | claude-md-guard/validate.sh
+echo '{"tool_name":"Write","tool_input":{"file_path":"AGENTS.md","content":"..."}}' | super_turtle/orchestrator/claude-md-guard/validate.sh
 ```
 
 ## Files
 
 - `config.sh` — all rules and thresholds (single source of truth)
 - `stats.sh` — human-readable section analysis with warnings
-- `validate.sh` — Claude Code PreToolUse hook, blocks invalid writes
+- `validate.sh` — Claude Code PreToolUse hook, blocks invalid writes to `CLAUDE.md` and `AGENTS.md`
 
 ## Config variables
 
@@ -41,7 +41,7 @@ In `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/claude-md-guard/validate.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/super_turtle/orchestrator/claude-md-guard/validate.sh",
             "timeout": 10
           }
         ]

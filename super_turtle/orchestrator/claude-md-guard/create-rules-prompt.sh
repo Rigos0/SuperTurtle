@@ -19,7 +19,7 @@ while IFS= read -r s; do
 done <<< "$SECTIONS_REQUIRING_ITEMS"
 
 cat <<EOF
-CLAUDE.md must follow this structure. Any write that violates these rules will be rejected.
+CLAUDE.md and AGENTS.md must follow this structure. Any write that violates these rules will be rejected.
 
 Allowed top-level headings (# level), in order:
 ${HEADING_LIST}

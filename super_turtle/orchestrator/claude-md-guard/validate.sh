@@ -1,5 +1,5 @@
 #!/bin/bash
-# claude-md-guard: PreToolUse hook that blocks invalid writes to CLAUDE.md.
+# claude-md-guard: PreToolUse hook that blocks invalid writes to CLAUDE.md / AGENTS.md.
 # Reads JSON from stdin. Exit 0 = allow, exit 2 + stderr = block.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -9,8 +9,10 @@ INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name')
 
-# Only guard CLAUDE.md
-if [[ "$FILE_PATH" != *"CLAUDE.md" ]]; then
+TARGET_FILE="$(basename "$FILE_PATH")"
+
+# Only guard CLAUDE.md and AGENTS.md
+if [[ "$TARGET_FILE" != "CLAUDE.md" && "$TARGET_FILE" != "AGENTS.md" ]]; then
   exit 0
 fi
 
@@ -87,7 +89,7 @@ fi
 # --- Result ---
 if [ ${#ERRORS[@]} -gt 0 ]; then
   {
-    echo "CLAUDE.md validation failed:"
+    echo "${TARGET_FILE} validation failed:"
     for e in "${ERRORS[@]}"; do
       echo "  - $e"
     done

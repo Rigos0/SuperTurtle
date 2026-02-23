@@ -30,5 +30,6 @@ Thumbs.db
 # Temp / integration artifacts
 .tmp/
 
-# Claude Code
-.claude/
+# Claude Code (local-only)
+.claude/settings.local.json
+.claude/.DS_Store

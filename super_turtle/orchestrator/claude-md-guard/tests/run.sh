@@ -137,49 +137,55 @@ JSON=$(write_json "/tmp/CLAUDE.md" "$FIXTURES/valid.md")
 RC=0; OUT=$(echo "$JSON" | "$GUARD_DIR/validate.sh" 2>&1) || RC=$?
 assert_exit "exit 0" 0 "$RC"
 
-# 11. Non-CLAUDE.md file -> exit 0 (skipped)
-echo "[11] Non-CLAUDE.md file skipped"
+# 11. Valid AGENTS.md Write -> exit 0
+echo "[11] Valid AGENTS.md Write exits 0"
+JSON=$(write_json "/tmp/AGENTS.md" "$FIXTURES/valid.md")
+RC=0; OUT=$(echo "$JSON" | "$GUARD_DIR/validate.sh" 2>&1) || RC=$?
+assert_exit "exit 0 for AGENTS.md" 0 "$RC"
+
+# 12. Non-target file -> exit 0 (skipped)
+echo "[12] Non-target file skipped"
 JSON=$(jq -n '{tool_name: "Write", tool_input: {file_path: "/tmp/README.md", content: "hello"}}')
 RC=0; OUT=$(echo "$JSON" | "$GUARD_DIR/validate.sh" 2>&1) || RC=$?
-assert_exit "exit 0 for non-CLAUDE.md" 0 "$RC"
+assert_exit "exit 0 for non-target file" 0 "$RC"
 
-# 12. Unknown heading in Write -> exit 2
-echo "[12] Unknown heading blocks Write"
+# 13. Unknown heading in Write -> exit 2
+echo "[13] Unknown heading blocks Write"
 JSON=$(write_json "/tmp/CLAUDE.md" "$FIXTURES/unknown-heading.md")
 RC=0; OUT=$(echo "$JSON" | "$GUARD_DIR/validate.sh" 2>&1) || RC=$?
 assert_exit "exit 2" 2 "$RC"
 assert_contains "unknown heading error" "Unknown heading" "$OUT"
 
-# 13. Over MAX_LINES in Write -> exit 2
-echo "[13] Too-long file blocks Write"
+# 14. Over MAX_LINES in Write -> exit 2
+echo "[14] Too-long file blocks Write"
 JSON=$(write_json "/tmp/CLAUDE.md" "$FIXTURES/too-long.md")
 RC=0; OUT=$(echo "$JSON" | "$GUARD_DIR/validate.sh" 2>&1) || RC=$?
 assert_exit "exit 2" 2 "$RC"
 assert_contains "max lines error" "maximum 500" "$OUT"
 
-# 14. Few backlog items in Write -> exit 2
-echo "[14] Few backlog items blocks Write"
+# 15. Few backlog items in Write -> exit 2
+echo "[15] Few backlog items blocks Write"
 JSON=$(write_json "/tmp/CLAUDE.md" "$FIXTURES/few-backlog.md")
 RC=0; OUT=$(echo "$JSON" | "$GUARD_DIR/validate.sh" 2>&1) || RC=$?
 assert_exit "exit 2" 2 "$RC"
 assert_contains "min backlog error" "minimum 5" "$OUT"
 
-# 15. Missing marker in Write -> exit 2
-echo "[15] Missing current marker blocks Write"
+# 16. Missing marker in Write -> exit 2
+echo "[16] Missing current marker blocks Write"
 JSON=$(write_json "/tmp/CLAUDE.md" "$FIXTURES/missing-current.md")
 RC=0; OUT=$(echo "$JSON" | "$GUARD_DIR/validate.sh" 2>&1) || RC=$?
 assert_exit "exit 2" 2 "$RC"
 assert_contains "missing marker error" "current.*marker" "$OUT"
 
-# 16. Empty required section in Write -> exit 2
-echo "[16] Empty required section blocks Write"
+# 17. Empty required section in Write -> exit 2
+echo "[17] Empty required section blocks Write"
 JSON=$(write_json "/tmp/CLAUDE.md" "$FIXTURES/empty-items.md")
 RC=0; OUT=$(echo "$JSON" | "$GUARD_DIR/validate.sh" 2>&1) || RC=$?
 assert_exit "exit 2" 2 "$RC"
 assert_contains "0 items error" "has 0 items" "$OUT"
 
-# 17. Multiple errors -> exit 2, all errors present
-echo "[17] Multiple errors all reported"
+# 18. Multiple errors -> exit 2, all errors present
+echo "[18] Multiple errors all reported"
 JSON=$(write_json "/tmp/CLAUDE.md" "$FIXTURES/multiple-errors.md")
 RC=0; OUT=$(echo "$JSON" | "$GUARD_DIR/validate.sh" 2>&1) || RC=$?
 assert_exit "exit 2" 2 "$RC"
@@ -188,8 +194,8 @@ assert_contains "0 items" "has 0 items" "$OUT"
 assert_contains "few backlog" "minimum 5" "$OUT"
 assert_contains "missing marker" "current.*marker" "$OUT"
 
-# 18. Edit that preserves rules -> exit 0
-echo "[18] Safe Edit exits 0"
+# 19. Edit that preserves rules -> exit 0
+echo "[19] Safe Edit exits 0"
 TMP_DIR=$(mktemp -d)
 TMP_CLAUDE="$TMP_DIR/CLAUDE.md"
 cp "$FIXTURES/valid.md" "$TMP_CLAUDE"
@@ -198,8 +204,8 @@ RC=0; OUT=$(echo "$JSON" | "$GUARD_DIR/validate.sh" 2>&1) || RC=$?
 assert_exit "exit 0 for safe edit" 0 "$RC"
 rm -rf "$TMP_DIR"
 
-# 19. Edit that breaks rules -> exit 2
-echo "[19] Breaking Edit exits 2"
+# 20. Edit that breaks rules -> exit 2
+echo "[20] Breaking Edit exits 2"
 TMP_DIR=$(mktemp -d)
 TMP_CLAUDE="$TMP_DIR/CLAUDE.md"
 cp "$FIXTURES/valid.md" "$TMP_CLAUDE"
@@ -216,8 +222,8 @@ rm -rf "$TMP_DIR"
 echo ""
 echo "=== rules.sh ==="
 
-# 20. rules.sh output reflects config values
-echo "[20] rules.sh generates rules from config"
+# 21. rules.sh output reflects config values
+echo "[21] rules.sh generates rules from config"
 OUT=$("$GUARD_DIR/create-rules-prompt.sh" 2>&1)
 assert_contains "mentions allowed headings" "# Current task" "$OUT"
 assert_contains "mentions backlog minimum" "at least 5 items" "$OUT"
