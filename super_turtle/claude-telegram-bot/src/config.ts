@@ -102,36 +102,19 @@ export const ALLOWED_PATHS: string[] = allowedPathsStr
       .filter(Boolean)
   : defaultAllowedPaths;
 
-// Build safety prompt dynamically from ALLOWED_PATHS
-function buildSafetyPrompt(allowedPaths: string[]): string {
-  const pathsList = allowedPaths
-    .map((p) => `   - ${p} (and subdirectories)`)
-    .join("\n");
+// Load META_SHARED.md as system prompt so the bot acts as the meta agent
+import { readFileSync } from "fs";
 
-  return `
-CRITICAL SAFETY RULES FOR TELEGRAM BOT:
-
-1. NEVER delete, remove, or overwrite files without EXPLICIT confirmation from the user.
-   - If user asks to delete something, respond: "Are you sure you want to delete [file]? Reply 'yes delete it' to confirm."
-   - Only proceed with deletion if user replies with explicit confirmation like "yes delete it", "confirm delete"
-   - This applies to: rm, trash, unlink, shred, or any file deletion
-
-2. You can ONLY access files in these directories:
-${pathsList}
-   - REFUSE any file operations outside these paths
-
-3. NEVER run dangerous commands like:
-   - rm -rf (recursive force delete)
-   - Any command that affects files outside allowed directories
-   - Commands that could damage the system
-
-4. For any destructive or irreversible action, ALWAYS ask for confirmation first.
-
-You are running via Telegram, so the user cannot easily undo mistakes. Be extra careful!
-`;
+let META_PROMPT = "";
+try {
+  const metaPath = resolve(WORKING_DIR, "super_turtle/meta/META_SHARED.md");
+  META_PROMPT = readFileSync(metaPath, "utf-8").trim();
+  console.log(`Loaded meta prompt from ${metaPath}`);
+} catch {
+  console.warn("Failed to load META_SHARED.md - running without meta prompt");
 }
 
-export const SAFETY_PROMPT = buildSafetyPrompt(ALLOWED_PATHS);
+export { META_PROMPT };
 
 // Dangerous command patterns to block
 export const BLOCKED_PATTERNS = [

@@ -15,7 +15,7 @@ import type { Context } from "grammy";
 import {
   ALLOWED_PATHS,
   MCP_SERVERS,
-  SAFETY_PROMPT,
+  META_PROMPT,
   SESSION_FILE,
   STREAMING_THROTTLE_MS,
   TEMP_PATHS,
@@ -287,7 +287,7 @@ class ClaudeSession {
       settingSources: ["user", "project"],
       permissionMode: "bypassPermissions",
       allowDangerouslySkipPermissions: true,
-      systemPrompt: SAFETY_PROMPT,
+      systemPrompt: META_PROMPT || undefined,
       mcpServers: MCP_SERVERS,
       maxThinkingTokens: thinkingTokens,
       additionalDirectories: ALLOWED_PATHS,

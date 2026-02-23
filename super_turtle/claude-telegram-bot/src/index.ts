@@ -109,6 +109,9 @@ console.log("Starting bot...");
 const botInfo = await bot.api.getMe();
 console.log(`Bot started: @${botInfo.username}`);
 
+// Drop any messages that arrived while the bot was offline
+await bot.api.deleteWebhook({ drop_pending_updates: true });
+
 // Check for pending restart message to update
 if (existsSync(RESTART_FILE)) {
   try {
