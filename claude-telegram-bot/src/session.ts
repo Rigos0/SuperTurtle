@@ -7,10 +7,8 @@
 
 import {
   query,
-  unstable_v2_createSession,
   type Options,
   type SDKMessage,
-  type ModelInfo,
 } from "@anthropic-ai/claude-agent-sdk";
 import { readFileSync } from "fs";
 import type { Context } from "grammy";
@@ -109,26 +107,21 @@ function savePrefs(prefs: UserPrefs): void {
   }
 }
 
-// Cached model list fetched dynamically from Claude Code
-let cachedModels: ModelInfo[] | null = null;
+// Available models — update when new models are released
+export interface ModelInfo {
+  value: string;
+  displayName: string;
+  description: string;
+}
 
-export async function getAvailableModels(): Promise<ModelInfo[]> {
-  if (cachedModels) return cachedModels;
+const AVAILABLE_MODELS: ModelInfo[] = [
+  { value: "claude-opus-4-6", displayName: "Opus 4.6", description: "Most capable for complex work" },
+  { value: "claude-sonnet-4-6", displayName: "Sonnet 4.6", description: "Best for everyday tasks" },
+  { value: "claude-haiku-4-5-20251001", displayName: "Haiku 4.5", description: "Fastest for quick answers" },
+];
 
-  try {
-    const tempSession = unstable_v2_createSession({ model: "claude-sonnet-4-6" });
-    cachedModels = await tempSession.supportedModels();
-    await tempSession.close();
-    return cachedModels;
-  } catch (error) {
-    console.error("Failed to fetch models:", error);
-    // Fallback if dynamic fetch fails
-    return [
-      { value: "claude-opus-4-6", displayName: "Opus 4.6", description: "Most capable for complex work" },
-      { value: "claude-sonnet-4-6", displayName: "Sonnet 4.6", description: "Best for everyday tasks" },
-      { value: "claude-haiku-4-5-20251001", displayName: "Haiku 4.5", description: "Fastest for quick answers" },
-    ];
-  }
+export function getAvailableModels(): ModelInfo[] {
+  return AVAILABLE_MODELS;
 }
 
 class ClaudeSession {

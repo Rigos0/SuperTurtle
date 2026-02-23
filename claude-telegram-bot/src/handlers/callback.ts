@@ -35,7 +35,7 @@ export async function handleCallback(ctx: Context): Promise<void> {
   // 2. Handle model selection: model:{model_id}
   if (callbackData.startsWith("model:")) {
     const modelId = callbackData.replace("model:", "");
-    const models = await getAvailableModels();
+    const models = getAvailableModels();
     const model = models.find((m) => m.value === modelId);
     if (model) {
       session.model = modelId;
@@ -57,7 +57,7 @@ export async function handleCallback(ctx: Context): Promise<void> {
     const effort = callbackData.replace("effort:", "") as EffortLevel;
     if (effort in EFFORT_DISPLAY) {
       session.effort = effort;
-      const models = await getAvailableModels();
+      const models = getAvailableModels();
       const model = models.find((m) => m.value === session.model);
       const modelName = model?.displayName || session.model;
       await ctx.editMessageText(`<b>Model:</b> ${modelName} | ${EFFORT_DISPLAY[effort]} effort`, { parse_mode: "HTML" });

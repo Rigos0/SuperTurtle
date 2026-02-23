@@ -30,9 +30,11 @@ export async function handleStart(ctx: Context): Promise<void> {
       `Working directory: <code>${workDir}</code>\n\n` +
       `<b>Commands:</b>\n` +
       `/new - Start fresh session\n` +
+      `/model - Switch model/effort\n` +
+      `/usage - Subscription usage\n` +
       `/stop - Stop current query\n` +
       `/status - Show detailed status\n` +
-      `/resume - Resume last session\n` +
+      `/resume - Pick from recent sessions\n` +
       `/retry - Retry last message\n` +
       `/restart - Restart the bot\n\n` +
       `<b>Tips:</b>\n` +
@@ -44,7 +46,7 @@ export async function handleStart(ctx: Context): Promise<void> {
 }
 
 /**
- * /new - Start a fresh session.
+ * /new - Start a fresh session with model info and usage.
  */
 export async function handleNew(ctx: Context): Promise<void> {
   const userId = ctx.from?.id;
@@ -66,7 +68,36 @@ export async function handleNew(ctx: Context): Promise<void> {
   // Clear session
   await session.kill();
 
-  await ctx.reply("🆕 Session cleared. Next message starts fresh.");
+  // Get model info
+  const models = getAvailableModels();
+  const currentModel = models.find((m) => m.value === session.model);
+  const modelName = currentModel?.displayName || session.model;
+  const effortStr = session.model.includes("haiku") ? "" : ` | ${EFFORT_DISPLAY[session.effort]} effort`;
+
+  // Build message
+  const lines: string[] = [
+    `<b>New session</b>\n`,
+    `<b>Model:</b> ${modelName}${effortStr}`,
+    `<b>Dir:</b> <code>${WORKING_DIR}</code>\n`,
+  ];
+
+  // Fetch usage (non-blocking — show what we can)
+  const usageLines = await getUsageLines();
+  if (usageLines.length > 0) {
+    lines.push(...usageLines, "");
+  }
+
+  lines.push(
+    `<b>Commands:</b>`,
+    `/model - Switch model/effort`,
+    `/usage - Subscription usage`,
+    `/stop - Stop current query`,
+    `/status - Detailed status`,
+    `/resume - Pick from recent sessions`,
+    `/restart - Restart bot`,
+  );
+
+  await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
 }
 
 /**
@@ -233,7 +264,7 @@ export async function handleModel(ctx: Context): Promise<void> {
     return;
   }
 
-  const models = await getAvailableModels();
+  const models = getAvailableModels();
   const currentModel = models.find((m) => m.value === session.model);
   const currentEffort = EFFORT_DISPLAY[session.effort];
 
@@ -271,18 +302,10 @@ export async function handleModel(ctx: Context): Promise<void> {
 }
 
 /**
- * /usage - Show Claude subscription usage (rate limits).
+ * Fetch and format usage info as HTML lines. Returns empty array on failure.
  */
-export async function handleUsage(ctx: Context): Promise<void> {
-  const userId = ctx.from?.id;
-
-  if (!isAuthorized(userId, ALLOWED_USERS)) {
-    await ctx.reply("Unauthorized.");
-    return;
-  }
-
+async function getUsageLines(): Promise<string[]> {
   try {
-    // Get OAuth token from macOS Keychain
     const proc = Bun.spawnSync([
       "security",
       "find-generic-password",
@@ -294,86 +317,78 @@ export async function handleUsage(ctx: Context): Promise<void> {
     ]);
     const creds = JSON.parse(proc.stdout.toString());
     const token = creds.claudeAiOauth?.accessToken;
+    if (!token) return [];
 
-    if (!token) {
-      await ctx.reply("Could not read OAuth token from Keychain.");
-      return;
-    }
-
-    // Fetch usage from Anthropic API
     const res = await fetch("https://api.anthropic.com/api/oauth/usage", {
       headers: {
         Authorization: `Bearer ${token}`,
         "anthropic-beta": "oauth-2025-04-20",
       },
     });
-
-    if (!res.ok) {
-      await ctx.reply(`Usage API returned ${res.status}`);
-      return;
-    }
+    if (!res.ok) return [];
 
     const data = (await res.json()) as Record<
       string,
       { utilization: number; resets_at: string } | null
     >;
 
-    // Build progress bar
     const bar = (pct: number): string => {
       const filled = Math.round(pct / 5);
       const empty = 20 - filled;
       return "\u2588".repeat(filled) + "\u2591".repeat(empty);
     };
 
-    // Format reset time
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const resetStr = (iso: string): string => {
       const d = new Date(iso);
-      const now = new Date();
-      const diffMs = d.getTime() - now.getTime();
-      const diffH = Math.floor(diffMs / 3600000);
-      const diffM = Math.floor((diffMs % 3600000) / 60000);
-
       const timeStr = d.toLocaleTimeString("en-US", {
         hour: "numeric",
-        minute: "2-digit",
-        timeZoneName: "short",
-      });
-
-      if (diffH < 24) {
-        return `Resets ${timeStr} (${diffH}h ${diffM}m)`;
-      }
-      const dateStr = d.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
-      return `Resets ${dateStr} at ${timeStr}`;
+        minute: d.getMinutes() ? "2-digit" : undefined,
+        timeZone: tz,
+      }).toLowerCase();
+      return `Resets ${timeStr} (${tz})`;
     };
 
-    const lines: string[] = ["<b>Usage</b>\n"];
-
+    const lines: string[] = [];
     const sections: [string, string][] = [
-      ["five_hour", "Current session"],
-      ["seven_day", "Current week (all models)"],
-      ["seven_day_sonnet", "Current week (Sonnet only)"],
-      ["seven_day_opus", "Current week (Opus only)"],
+      ["five_hour", "Session"],
+      ["seven_day", "Week (all)"],
+      ["seven_day_sonnet", "Week (Sonnet)"],
+      ["seven_day_opus", "Week (Opus)"],
     ];
 
     for (const [key, label] of sections) {
       const entry = data[key];
       if (!entry) continue;
       const pct = Math.round(entry.utilization);
-      lines.push(
-        `<b>${label}</b>`,
-        `<code>${bar(pct)}</code>  ${pct}% used`,
-        `${resetStr(entry.resets_at)}`,
-        ""
-      );
+      const reset = resetStr(entry.resets_at);
+      lines.push(`<code>${bar(pct)}</code> ${pct}% ${label}\n${reset}`);
     }
 
-    await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
-  } catch (error) {
-    await ctx.reply(`Failed to fetch usage: ${error}`);
+    return lines;
+  } catch {
+    return [];
   }
+}
+
+/**
+ * /usage - Show Claude subscription usage (rate limits).
+ */
+export async function handleUsage(ctx: Context): Promise<void> {
+  const userId = ctx.from?.id;
+
+  if (!isAuthorized(userId, ALLOWED_USERS)) {
+    await ctx.reply("Unauthorized.");
+    return;
+  }
+
+  const usageLines = await getUsageLines();
+  if (usageLines.length === 0) {
+    await ctx.reply("Failed to fetch usage.");
+    return;
+  }
+
+  await ctx.reply(`<b>Usage</b>\n\n${usageLines.join("\n")}`, { parse_mode: "HTML" });
 }
 
 /**
