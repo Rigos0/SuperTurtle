@@ -1,6 +1,6 @@
 # Current task
 
-Playtest and feel-tuning pass (edge cases, mobile considerations, speed curves, obstacle fairness) <- current
+All core features implemented and polished. Snake game is production-ready.
 
 # End goal with specs
 
@@ -46,4 +46,4 @@ A playable Snake game built with Next.js and React — with level progression. R
 - [x] Add level-up transition — "levelup" game state, timed overlay with neon flash, board/snake reset, input blocking, accumulator guard
 - [x] Add loop mechanic (after level 10, restart at level 1 with score intact; track lap count)
 - [x] Visual escalation per level (grid color shifts, glow intensity, background hue rotation)
-- [ ] Playtest and feel-tuning pass (edge cases, mobile considerations, speed curves, obstacle fairness) <- current
+- [x] Playtest and feel-tuning pass (edge cases, mobile considerations, speed curves, obstacle fairness)
