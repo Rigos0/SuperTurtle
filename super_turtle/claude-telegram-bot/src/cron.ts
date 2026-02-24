@@ -33,13 +33,14 @@ export function loadJobs(): CronJob[] {
   try {
     if (existsSync(CRON_JOBS_FILE)) {
       const content = readFileSync(CRON_JOBS_FILE, "utf-8");
+      // Only update cache on successful parse — don't wipe jobs on corrupt file
       jobsCache = JSON.parse(content);
     } else {
       jobsCache = [];
     }
   } catch (error) {
-    console.error("Failed to load cron jobs:", error);
-    jobsCache = [];
+    console.error("Failed to load cron jobs (keeping existing cache):", error);
+    // Leave jobsCache as-is so in-memory jobs survive a transient read/parse error
   }
 
   return jobsCache;
@@ -49,11 +50,8 @@ export function loadJobs(): CronJob[] {
  * Save jobs to the persistent store.
  */
 export function saveJobs(): void {
-  try {
-    writeFileSync(CRON_JOBS_FILE, JSON.stringify(jobsCache, null, 2));
-  } catch (error) {
-    console.error("Failed to save cron jobs:", error);
-  }
+  // Intentionally throws — callers must handle so job mutations aren't silently lost
+  writeFileSync(CRON_JOBS_FILE, JSON.stringify(jobsCache, null, 2));
 }
 
 /**
@@ -147,7 +145,8 @@ export function advanceRecurringJob(id: string): boolean {
     return false;
   }
 
-  job.fire_at = job.fire_at + job.interval_ms;
+  // Snap to the next interval after now to avoid pile-up if bot was down
+  job.fire_at = Math.max(Date.now(), job.fire_at) + job.interval_ms;
   saveJobs();
 
   return true;

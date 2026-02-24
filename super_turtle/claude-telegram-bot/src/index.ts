@@ -31,7 +31,6 @@ import {
 } from "./handlers";
 import { session } from "./session";
 import { getDueJobs, advanceRecurringJob, removeJob } from "./cron";
-import { StreamingState, createStatusCallback } from "./handlers/streaming";
 
 // Create bot instance
 export const bot = new Bot(TELEGRAM_TOKEN);
@@ -110,33 +109,11 @@ bot.catch((err) => {
 // ============== Cron Timer Loop ==============
 
 /**
- * Build a minimal Grammy Context-like object from bot.api + chat_id.
- * Just enough surface area for startTypingIndicator and createStatusCallback.
- */
-function makeCronContext(chatId: number) {
-  return {
-    chat: { id: chatId },
-    reply: async (text: string, opts?: Record<string, unknown>) => {
-      return bot.api.sendMessage(chatId, text, opts as Parameters<typeof bot.api.sendMessage>[2]);
-    },
-    replyWithChatAction: async (action: string) => {
-      await bot.api.sendChatAction(chatId, action as Parameters<typeof bot.api.sendChatAction>[1]);
-    },
-    replyWithSticker: async (sticker: unknown) => {
-      // @ts-expect-error minimal shim
-      return bot.api.sendSticker(chatId, sticker);
-    },
-    api: bot.api,
-  } as unknown as import("grammy").Context;
-}
-
-/**
  * Timer loop that checks for due cron jobs every 10 seconds.
- * For each due job:
- * 1. Sends a typing indicator (like normal messages)
- * 2. Injects the prompt through session.sendMessageStreaming
- * 3. Uses the real StreamingState/createStatusCallback for proper output
- * 4. Updates/removes the job from store
+ * When a job fires, it routes the prompt through handleText — the exact same
+ * path as a real user message, with no notification prefix. The job is
+ * removed/advanced BEFORE execution so a crash never causes retries. Failures
+ * are logged and dropped silently (no retry, no error message to user).
  */
 const startCronTimer = () => {
   setInterval(async () => {
@@ -152,70 +129,49 @@ const startCronTimer = () => {
       }
 
       for (const job of dueJobs) {
-        // Build a fake ctx for this chat
-        const ctx = makeCronContext(job.chat_id);
+        // Re-check session before each job — the previous job may have started it
+        if (session.isRunning) {
+          break;
+        }
 
-        // Start typing indicator (same loop as normal messages)
-        let typingRunning = true;
-        const typingLoop = async () => {
-          while (typingRunning) {
-            try {
-              await bot.api.sendChatAction(job.chat_id, "typing");
-            } catch (e) {
-              console.debug("Cron typing indicator failed:", e);
-            }
-            await Bun.sleep(4000);
-          }
-        };
-        typingLoop();
+        // Remove/advance the job BEFORE executing so a crash doesn't cause retries
+        if (job.type === "recurring") {
+          advanceRecurringJob(job.id);
+        } else {
+          removeJob(job.id);
+        }
 
         try {
-          // Send indicator message
-          const promptPreview = job.prompt.slice(0, 80);
-          await bot.api.sendMessage(
-            job.chat_id,
-            `🔔 Scheduled: ${promptPreview}${job.prompt.length > 80 ? "..." : ""}`
-          );
-
-          // Use the real streaming callback (HTML formatting, throttled edits, etc.)
-          const state = new StreamingState();
-          const statusCallback = createStatusCallback(ctx, state);
-
-          // Mark processing so concurrent cron ticks don't overlap
-          const stopProcessing = session.startProcessing();
-
-          try {
-            // Inject the prompt through session.sendMessageStreaming
-            await session.sendMessageStreaming(
-              job.prompt,
-              "cron",
-              0,
-              statusCallback,
-              job.chat_id,
-              ctx
-            );
-          } finally {
-            stopProcessing();
+          // Bail if no allowed users are configured — can't authenticate
+          if (ALLOWED_USERS.length === 0) {
+            console.error(`Cron job ${job.id} skipped: ALLOWED_USERS is empty`);
+            continue;
           }
+          const userId = ALLOWED_USERS[0];
 
-          // Update or remove the job
-          if (job.type === "recurring") {
-            advanceRecurringJob(job.id);
-          } else {
-            removeJob(job.id);
-          }
+          // Append instruction so the agent opens its reply with a scheduled notice
+          const injectedPrompt = `${job.prompt}\n\n(This is a scheduled message. Start your response with "🔔 Scheduled:" on its own line before anything else.)`;
+
+          // Route through handleText — same path as a real user message
+          await handleText({
+            from: { id: userId, username: "cron", is_bot: false, first_name: "Cron" },
+            chat: { id: job.chat_id, type: "private" },
+            message: { text: injectedPrompt, message_id: 0, date: Math.floor(Date.now() / 1000), chat: { id: job.chat_id, type: "private" } },
+            reply: async (text: string, opts?: unknown) => {
+              return bot.api.sendMessage(job.chat_id, text, opts as Parameters<typeof bot.api.sendMessage>[2]);
+            },
+            replyWithChatAction: async (action: string) => {
+              await bot.api.sendChatAction(job.chat_id, action as Parameters<typeof bot.api.sendChatAction>[1]);
+            },
+            replyWithSticker: async (sticker: unknown) => {
+              // @ts-expect-error minimal shim for sticker sending
+              return bot.api.sendSticker(job.chat_id, sticker);
+            },
+            api: bot.api,
+          } as unknown as import("grammy").Context);
         } catch (error) {
-          console.error(`Failed to execute cron job ${job.id}:`, error);
-          try {
-            await bot.api.sendMessage(
-              job.chat_id,
-              `❌ Scheduled job failed: ${String(error).slice(0, 100)}`
-            );
-          } catch {
-            // Ignore error sending failure notification
-          }
-        } finally {
-          typingRunning = false;
+          // No retries — let it fail gracefully
+          console.error(`Cron job ${job.id} failed (no retry):`, error);
         }
       }
     } catch (error) {
