@@ -282,7 +282,7 @@ def run_yolo_codex_loop(state_dir: Path, name: str) -> None:
     _state_file, state_ref = _resolve_state_ref(state_dir, name)
     prompt = YOLO_PROMPT.format(state_file=state_ref)
 
-    print(f"[subturtle:{name}] starting yolo loop (codex)")
+    print(f"[subturtle:{name}] starting yolo-codex loop (codex)")
     print(f"[subturtle:{name}] state file: {state_ref}")
 
     codex = Codex()

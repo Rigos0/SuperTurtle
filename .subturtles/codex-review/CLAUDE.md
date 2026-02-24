@@ -1,6 +1,6 @@
 # Current task
 
-Run a final consistency check across all three files <- current
+All subturtle type-system review items are complete <- current
 
 # End goal with specs
 
@@ -31,4 +31,4 @@ Acceptance criteria:
 - [x] Review `super_turtle/subturtle/ctl` for bash issues — quoting, argv flow, ensure_workspace error path, do_list/do_status column alignment
 - [x] Review `super_turtle/meta/META_SHARED.md` for stale/contradictory docs
 - [x] Fix any issues found, commit each fix separately (command path consistency + session ID guidance fixed)
-- [ ] Run a final consistency check across all three files <- current
+- [x] Run a final consistency check across all three files
