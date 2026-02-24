@@ -1,6 +1,6 @@
 # Current task
 
-Update `ctl status` and `ctl list` to show tunnel URL if `.tunnel-url` exists in workspace.
+Update META_SHARED.md: on cron check-ins, check for `.tunnel-url` in the SubTurtle workspace. If found and not yet sent to user, send the link. Document that SubTurtles doing frontend work should have "start tunnel" as their first backlog item.
 
 # End goal with specs
 
@@ -49,6 +49,6 @@ Add preview tunnel support to the SubTurtle infrastructure. When a SubTurtle wor
 - [x] Install cloudflared via Homebrew, verify `cloudflared tunnel --url http://localhost:3000` works (spin up a temp python http server to test, capture the URL from stderr)
 - [x] Create `super_turtle/subturtle/start-tunnel.sh` helper script — takes project dir + optional port, starts dev server + tunnel, writes URL to .tunnel-url in the SubTurtle workspace (passed as arg or auto-detected from cwd)
 - [x] Verify cleanup: start a tunnel via the helper, then kill the parent process — confirm tunnel + dev server die too. If not, add PID tracking + trap cleanup to the helper.
-- [ ] Update `ctl status` and `ctl list` to show tunnel URL if `.tunnel-url` exists in workspace <- current
-- [ ] Update META_SHARED.md: on cron check-ins, check for `.tunnel-url` in the SubTurtle workspace. If found and not yet sent to user, send the link. Document that SubTurtles doing frontend work should have "start tunnel" as their first backlog item.
+- [x] Update `ctl status` and `ctl list` to show tunnel URL if `.tunnel-url` exists in workspace
+- [ ] Update META_SHARED.md: on cron check-ins, check for `.tunnel-url` in the SubTurtle workspace. If found and not yet sent to user, send the link. Document that SubTurtles doing frontend work should have "start tunnel" as their first backlog item. <- current
 - [ ] End-to-end test with snake-game/: write a mini CLAUDE.md that starts a tunnel, verify URL works in browser, stop and verify cleanup

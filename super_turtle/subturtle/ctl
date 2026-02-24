@@ -48,6 +48,7 @@ workspace_dir() {
 pid_file()  { echo "$(workspace_dir "$1")/subturtle.pid"; }
 log_file()  { echo "$(workspace_dir "$1")/subturtle.log"; }
 meta_file() { echo "$(workspace_dir "$1")/subturtle.meta"; }
+tunnel_url_file() { echo "$(workspace_dir "$1")/.tunnel-url"; }
 
 # --- Duration helpers ---
 
@@ -368,6 +369,15 @@ do_status() {
 
     echo "[subturtle:${name}] running as ${type_info} (PID ${pid})${time_info}"
     ps -o pid,ppid,pgid,sess,state,etime,command -p "$pid" 2>/dev/null || true
+
+    # Show tunnel URL if it exists
+    local tunnel_file
+    tunnel_file="$(tunnel_url_file "$name")"
+    if [[ -f "$tunnel_file" ]]; then
+      local tunnel_url
+      tunnel_url="$(cat "$tunnel_file")"
+      echo "[subturtle:${name}] tunnel URL: ${tunnel_url}"
+    fi
   else
     echo "[subturtle:${name}] not running"
     rm -f "$(pid_file "$name")" "$(meta_file "$name")"
@@ -446,6 +456,15 @@ do_list() {
       printf "  %-15s %-8s %-12s %-14s %-14s %s\n" "$name" "$status_str" "$type_str" "$pid_str" "$time_str" "$task"
     else
       printf "  %-15s %-8s %-12s %-14s %-14s %s\n" "$name" "$status_str" "" "$pid_str" "" "$task"
+    fi
+
+    # Show tunnel URL if it exists
+    local tunnel_file
+    tunnel_file="$(tunnel_url_file "$name")"
+    if [[ -f "$tunnel_file" ]]; then
+      local tunnel_url
+      tunnel_url="$(cat "$tunnel_file")"
+      printf "  %-15s → %s\n" "" "$tunnel_url"
     fi
   done
 
