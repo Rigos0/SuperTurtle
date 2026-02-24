@@ -17,7 +17,12 @@ usage() {
   echo "Usage: ./super_turtle/subturtle/ctl <command> [name] [options]"
   echo ""
   echo "Commands:"
-  echo "  start  [name] [--timeout DURATION]   Spawn a SubTurtle (default timeout: ${DEFAULT_TIMEOUT})"
+  echo "  start  [name] [--type TYPE] [--timeout DURATION]"
+  echo "         Spawn a SubTurtle (default timeout: ${DEFAULT_TIMEOUT})"
+  echo "         Types: slow (default), yolo, yolo-codex"
+  echo "           slow       — Plan -> Groom -> Execute -> Review (4 calls/iter)"
+  echo "           yolo       — Single Claude call per iteration (Ralph loop)"
+  echo "           yolo-codex — Single Codex call per iteration (Ralph loop)"
   echo "  stop   [name]                        Stop a SubTurtle gracefully"
   echo "  status [name]                        Check if running + time remaining"
   echo "  logs   [name]                        Tail a SubTurtle's log"
@@ -25,6 +30,9 @@ usage() {
   echo ""
   echo "Timeout durations: 30m, 1h, 2h, 4h, etc. Default: ${DEFAULT_TIMEOUT}"
   echo "SubTurtles auto-terminate when their timeout expires."
+  echo ""
+  echo "IMPORTANT: CLAUDE.md must exist in the workspace before starting."
+  echo "The meta agent writes it — ctl does NOT auto-seed from root."
   echo ""
   echo "Each SubTurtle gets its own workspace at .subturtles/<name>/ with"
   echo "its own CLAUDE.md, AGENTS.md symlink, PID file, and log file."
@@ -97,6 +105,7 @@ read_meta() {
     SPAWNED_AT="$(grep -m1 '^SPAWNED_AT=' "$mf" 2>/dev/null | cut -d= -f2)" || true
     TIMEOUT_SECONDS="$(grep -m1 '^TIMEOUT_SECONDS=' "$mf" 2>/dev/null | cut -d= -f2)" || true
     WATCHDOG_PID="$(grep -m1 '^WATCHDOG_PID=' "$mf" 2>/dev/null | cut -d= -f2)" || true
+    LOOP_TYPE="$(grep -m1 '^LOOP_TYPE=' "$mf" 2>/dev/null | cut -d= -f2)" || true
     return 0
   fi
   return 1
@@ -142,39 +151,11 @@ ensure_workspace() {
 
   mkdir -p "$ws"
 
-  # Create CLAUDE.md if it doesn't exist yet — seed from root if available
+  # CLAUDE.md must be pre-written by the meta agent before spawning
   if [[ ! -f "$ws/CLAUDE.md" ]]; then
-    if [[ -f "$PROJECT_DIR/CLAUDE.md" ]]; then
-      cp "$PROJECT_DIR/CLAUDE.md" "$ws/CLAUDE.md"
-      echo "[subturtle:${name}] seeded CLAUDE.md from project root"
-    else
-      cat > "$ws/CLAUDE.md" <<'SEED'
-# Current task
-
-(no task set)
-
-# End goal with specs
-
-(not defined yet)
-
-# Roadmap (Completed)
-
-- (none yet)
-
-# Roadmap (Upcoming)
-
-- (none yet)
-
-# Backlog
-
-- [ ] Define end goal and first tasks <- current
-- [ ] (placeholder 2)
-- [ ] (placeholder 3)
-- [ ] (placeholder 4)
-- [ ] (placeholder 5)
-SEED
-      echo "[subturtle:${name}] created empty CLAUDE.md"
-    fi
+    echo "[subturtle:${name}] ERROR: CLAUDE.md not found in workspace (${ws}/CLAUDE.md)" >&2
+    echo "[subturtle:${name}] The meta agent must write CLAUDE.md before starting a SubTurtle." >&2
+    exit 1
   fi
 
   # Create AGENTS.md symlink if missing
@@ -203,15 +184,23 @@ read_pid() {
 do_start() {
   local name="${1:-default}"
   local timeout_str="${DEFAULT_TIMEOUT}"
+  local loop_type="slow"
 
-  # Parse --timeout flag from remaining args
+  # Parse --timeout and --type flags from remaining args
   shift || true
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --timeout) timeout_str="${2:?missing timeout value}"; shift 2 ;;
+      --type)    loop_type="${2:?missing type value}"; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
+
+  # Validate loop type
+  case "$loop_type" in
+    slow|yolo|yolo-codex) ;;
+    *) echo "ERROR: unknown SubTurtle type '${loop_type}' (must be: slow, yolo, yolo-codex)" >&2; exit 1 ;;
+  esac
 
   local timeout_secs
   timeout_secs="$(parse_duration "$timeout_str")" || exit 1
@@ -231,7 +220,7 @@ do_start() {
 
   rm -f "$pf" "$mf"
 
-  echo "[subturtle:${name}] spawning (timeout: ${timeout_str})..."
+  echo "[subturtle:${name}] spawning (type: ${loop_type}, timeout: ${timeout_str})..."
   echo "[subturtle:${name}] workspace: ${ws}"
   echo "[subturtle:${name}] log: ${lf}"
 
@@ -248,6 +237,7 @@ python     = sys.argv[3]
 cwd        = sys.argv[4]
 state_dir  = sys.argv[5]
 name       = sys.argv[6]
+loop_type  = sys.argv[7]
 
 env = os.environ.copy()
 # Strip Claude Code session vars so child can spawn its own claude processes
@@ -257,7 +247,7 @@ for key in list(env):
 
 log_fd = open(log_file, 'w')
 proc = subprocess.Popen(
-    [python, '-u', '-m', 'super_turtle.subturtle', '--state-dir', state_dir, '--name', name],
+    [python, '-u', '-m', 'super_turtle.subturtle', '--state-dir', state_dir, '--name', name, '--type', loop_type],
     cwd=cwd,
     stdin=subprocess.DEVNULL,
     stdout=log_fd,
@@ -270,8 +260,8 @@ log_fd.close()
 with open(pid_file, 'w') as f:
     f.write(str(proc.pid))
 
-print(f'[subturtle:{name}] spawned (PID {proc.pid})')
-" "$pf" "$lf" "$PYTHON" "$PROJECT_DIR" "$ws" "$name"
+print(f'[subturtle:{name}] spawned as {loop_type} (PID {proc.pid})')
+" "$pf" "$lf" "$PYTHON" "$PROJECT_DIR" "$ws" "$name" "$loop_type"
 
   # Read back the PID we just wrote
   local turtle_pid
@@ -287,6 +277,7 @@ print(f'[subturtle:{name}] spawned (PID {proc.pid})')
   cat > "$mf" <<METAEOF
 SPAWNED_AT=${spawned_at}
 TIMEOUT_SECONDS=${timeout_secs}
+LOOP_TYPE=${loop_type}
 METAEOF
 
   # Spawn watchdog: sleeps for timeout, then kills the sub-turtle.
@@ -361,18 +352,21 @@ do_status() {
 
     remaining_secs="$(time_remaining "$name")"
 
+    # Read meta for type info (always attempt)
+    LOOP_TYPE=""
+    read_meta "$name" || true
+    local type_info="${LOOP_TYPE:-slow}"
+
     # Build the status line
     local time_info=""
-    if [[ -n "$remaining_secs" ]]; then
-      SPAWNED_AT="" TIMEOUT_SECONDS=""
-      read_meta "$name" || true
+    if [[ -n "$remaining_secs" && -n "$SPAWNED_AT" ]]; then
       local now elapsed
       now="$(date +%s)"
       elapsed=$(( now - SPAWNED_AT ))
       time_info=" — $(format_duration "$elapsed") elapsed, $(format_time_remaining "$remaining_secs")"
     fi
 
-    echo "[subturtle:${name}] running (PID ${pid})${time_info}"
+    echo "[subturtle:${name}] running as ${type_info} (PID ${pid})${time_info}"
     ps -o pid,ppid,pgid,sess,state,etime,command -p "$pid" 2>/dev/null || true
   else
     echo "[subturtle:${name}] not running"
@@ -408,6 +402,7 @@ do_list() {
     local status_str="stopped"
     local pid_str=""
     local time_str=""
+    local type_str=""
     local pf="${ws}subturtle.pid"
     if [[ -f "$pf" ]]; then
       local pid
@@ -416,24 +411,41 @@ do_list() {
         status_str="running"
         pid_str=" (PID ${pid})"
 
-        # Show time remaining from meta
+        # Show time remaining and loop type from meta
         local remaining_secs
         remaining_secs="$(time_remaining "$name")"
         time_str="$(format_time_remaining "$remaining_secs")"
+
+        LOOP_TYPE=""
+        read_meta "$name" || true
+        type_str="${LOOP_TYPE:-slow}"
       fi
     fi
 
     # Read current task from this SubTurtle's CLAUDE.md
     local task="(no task)"
     if [[ -f "${ws}CLAUDE.md" ]]; then
-      task="$(sed -n '/^# Current task/,/^# /{/^# /!p;}' "${ws}CLAUDE.md" | grep -v '^$' | head -1 | sed 's/ *<- current$//')"
+      task="$(
+        awk '
+          /^# Current task$/ { in_current=1; next }
+          in_current && /^# / { exit }
+          in_current {
+            line = $0
+            sub(/[[:space:]]*<- current[[:space:]]*$/, "", line)
+            if (line ~ /[^[:space:]]/) {
+              print line
+              exit
+            }
+          }
+        ' "${ws}CLAUDE.md"
+      )"
       [[ -z "$task" ]] && task="(no task)"
     fi
 
     if [[ -n "$time_str" ]]; then
-      printf "  %-15s %-8s%-14s %-14s %s\n" "$name" "$status_str" "$pid_str" "$time_str" "$task"
+      printf "  %-15s %-8s %-12s %-14s %-14s %s\n" "$name" "$status_str" "$type_str" "$pid_str" "$time_str" "$task"
     else
-      printf "  %-15s %-8s%-14s %-14s %s\n" "$name" "$status_str" "$pid_str" "" "$task"
+      printf "  %-15s %-8s %-12s %-14s %-14s %s\n" "$name" "$status_str" "" "$pid_str" "" "$task"
     fi
   done
 
@@ -452,9 +464,12 @@ shift
 
 case "$CMD" in
   start)
-    # First positional arg is name, rest are flags (e.g. --timeout 2h)
-    NAME="${1:-default}"
-    if [[ $# -gt 0 ]]; then shift; fi
+    # Optional first positional arg is name. If first arg is a flag, use default.
+    NAME="default"
+    if [[ $# -gt 0 && "$1" != --* ]]; then
+      NAME="$1"
+      shift
+    fi
     do_start "$NAME" "$@"
     ;;
   stop)   do_stop "${1:-default}" ;;

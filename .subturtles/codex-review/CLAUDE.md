@@ -1,6 +1,6 @@
 # Current task
 
-Review `super_turtle/subturtle/ctl` for bash issues and patch any bugs found <- current
+Review `super_turtle/meta/META_SHARED.md` for stale or contradictory docs <- current
 
 # End goal with specs
 
@@ -28,7 +28,7 @@ Acceptance criteria:
 # Backlog
 
 - [x] Review `super_turtle/subturtle/__main__.py` for bugs — check prompt formatting, error handling, function signatures, retry logic
-- [ ] Review `super_turtle/subturtle/ctl` for bash issues — quoting, argv flow, ensure_workspace error path, do_list/do_status column alignment <- current
-- [ ] Review `super_turtle/meta/META_SHARED.md` for stale/contradictory docs
+- [x] Review `super_turtle/subturtle/ctl` for bash issues — quoting, argv flow, ensure_workspace error path, do_list/do_status column alignment
+- [ ] Review `super_turtle/meta/META_SHARED.md` for stale/contradictory docs <- current
 - [ ] Fix any issues found, commit each fix separately
 - [ ] Run a final consistency check across all three files
