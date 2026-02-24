@@ -1,0 +1,41 @@
+@import "tailwindcss";
+@config "../tailwind.config.ts";
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(4, 217, 255, 0.12), transparent 45%),
+    radial-gradient(circle at 85% 0%, rgba(255, 110, 199, 0.08), transparent 40%),
+    #02040a;
+  color: #f4f8ff;
+  font-family: var(--font-press-start), "Courier New", monospace;
+}
+
+.neon-pulse {
+  animation: neonPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes neonPulse {
+  0%,
+  100% {
+    text-shadow:
+      0 0 8px rgba(4, 217, 255, 0.7),
+      0 0 18px rgba(4, 217, 255, 0.5),
+      0 0 32px rgba(4, 217, 255, 0.35);
+  }
+  50% {
+    text-shadow:
+      0 0 12px rgba(4, 217, 255, 1),
+      0 0 24px rgba(4, 217, 255, 0.7),
+      0 0 42px rgba(4, 217, 255, 0.45);
+  }
+}
