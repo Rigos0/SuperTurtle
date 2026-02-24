@@ -1,16 +1,24 @@
-"""SubTurtle: autonomous coding loop that plans, grooms, executes, and reviews.
+"""SubTurtle: autonomous coding loop with multiple loop types.
 
 Each SubTurtle gets its own workspace directory with a CLAUDE.md state file.
 The loop runs from the repo root (full codebase access) but reads/writes
 its own state file for task tracking.
 
+Loop types:
+  slow       — Plan -> Groom -> Execute -> Review (4 agent calls/iteration)
+  yolo       — Single Claude call per iteration (Ralph loop style)
+  yolo-codex — Single Codex call per iteration (Ralph loop style)
+
 Usage:
   python -m super_turtle.subturtle --state-dir .subturtles/default --name default
+  python -m super_turtle.subturtle --state-dir .subturtles/fast --name fast --type yolo
 """
 
 import argparse
+import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from .subturtle_loop import Claude, Codex
@@ -20,6 +28,8 @@ STATS_SCRIPT = Path(__file__).resolve().parent / "claude-md-guard" / "stats.sh"
 # ---------------------------------------------------------------------------
 # Prompt templates — {state_file} is replaced with the SubTurtle's CLAUDE.md path
 # ---------------------------------------------------------------------------
+
+# --- Slow loop prompts (plan/groom/execute/review) ---
 
 PLANNER_PROMPT = """\
 Read {state_file}. Understand the current task, end goal, and backlog.
@@ -97,6 +107,45 @@ You are the reviewer. The plan below has been implemented. Your job:
 {{plan}}
 """
 
+# --- Yolo loop prompt (single call, Ralph style) ---
+
+YOLO_PROMPT = """\
+You are an autonomous coding agent. You work alone — there is no human in the loop.
+
+## Your task file
+
+Read `{state_file}` now. It contains:
+- **Current task** — what you should work on RIGHT NOW.
+- **End goal with specs** — the overall objective and acceptance criteria.
+- **Backlog** — ordered checklist of work items. The one marked `<- current` is yours.
+
+## Your job
+
+Do ONE commit's worth of focused work on the current task. Follow this sequence:
+
+1. **Understand** — Read `{state_file}`. Read any code files relevant to the current task. Understand what exists and what needs to change.
+
+2. **Implement** — Make the changes. Write clean, working code that follows existing patterns in the codebase. Keep the scope tight — one logical change, not a sprawling refactor.
+
+3. **Verify** — If there are tests, run them. If there is a build step, run it. If you broke something, fix it before moving on.
+
+4. **Update state** — Edit `{state_file}`:
+   - If the current backlog item is DONE, check it off (`[x]`) and move `<- current` to the next unchecked item.
+   - If it is NOT done but you made progress, leave it as `<- current` and optionally add a note.
+   - Update **Current task** to reflect what `<- current` now points to.
+   - Do NOT touch End Goal, Roadmap (Completed), or Roadmap (Upcoming) sections.
+
+5. **Commit** — Stage ALL changed files (code + `{state_file}`) and commit with a clear message describing what you implemented. Do NOT commit unrelated files.
+
+## Rules
+
+- You MUST read `{state_file}` before doing anything else.
+- You MUST commit before you finish. No uncommitted work.
+- You MUST update `{state_file}` to reflect progress. The next iteration of this loop will read it.
+- Do NOT ask questions. Make reasonable decisions and move forward.
+- Do NOT over-scope. One commit, one focused change. Stop after committing.
+"""
+
 
 def build_prompts(state_file: str) -> dict[str, str]:
     """Build prompt templates with the state file path baked in.
@@ -113,15 +162,19 @@ def build_prompts(state_file: str) -> dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
-# Loop
+# State file helper
 # ---------------------------------------------------------------------------
 
-def run_loop(state_dir: Path, name: str) -> None:
-    """Run the SubTurtle loop forever, using state_dir/CLAUDE.md as the state file."""
+def _resolve_state_ref(state_dir: Path, name: str) -> tuple[Path, str]:
+    """Return (state_file_path, state_ref_string) or exit on error."""
     state_file = state_dir / "CLAUDE.md"
 
     if not state_file.exists():
-        print(f"[subturtle:{name}] ERROR: state file not found: {state_file}", file=sys.stderr)
+        print(
+            f"[subturtle:{name}] ERROR: state file not found: {state_file}\n"
+            f"[subturtle:{name}] The meta agent must write CLAUDE.md before starting a SubTurtle.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # Use a relative path if state_dir is under the project root, otherwise absolute
@@ -131,25 +184,140 @@ def run_loop(state_dir: Path, name: str) -> None:
     except ValueError:
         state_ref = str(state_file)
 
+    return state_file, state_ref
+
+
+# ---------------------------------------------------------------------------
+# Loop implementations
+# ---------------------------------------------------------------------------
+
+RETRY_DELAY = 10  # seconds to wait after an agent crash before retrying
+
+
+def _require_cli(name: str, cli_name: str) -> None:
+    """Exit with a clear error when a required CLI is missing from PATH."""
+    if shutil.which(cli_name) is not None:
+        return
+
+    print(
+        f"[subturtle:{name}] ERROR: '{cli_name}' not found on PATH",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
+def _log_retry(name: str, error: subprocess.CalledProcessError | OSError) -> None:
+    """Log a transient failure and sleep before retrying."""
+    if isinstance(error, subprocess.CalledProcessError):
+        detail = f"exit {error.returncode}"
+    else:
+        detail = f"{type(error).__name__}: {error}"
+
+    print(
+        f"[subturtle:{name}] agent failed ({detail}), retrying in {RETRY_DELAY}s...",
+        file=sys.stderr,
+    )
+    time.sleep(RETRY_DELAY)
+
+
+def run_slow_loop(state_dir: Path, name: str) -> None:
+    """Slow loop: Plan -> Groom -> Execute -> Review. 4 agent calls per iteration."""
+    _require_cli(name, "claude")
+    _require_cli(name, "codex")
+
+    state_file, state_ref = _resolve_state_ref(state_dir, name)
     prompts = build_prompts(state_ref)
 
-    print(f"[subturtle:{name}] starting loop")
+    print(f"[subturtle:{name}] starting slow loop")
     print(f"[subturtle:{name}] state file: {state_ref}")
 
     claude = Claude()
     codex = Codex()
+    iteration = 0
 
     while True:
-        plan = claude.plan(prompts["planner"])
+        iteration += 1
+        print(f"[subturtle:{name}] === slow iteration {iteration} ===")
+        try:
+            plan = claude.plan(prompts["planner"])
 
-        stats = subprocess.check_output(
-            ["bash", str(STATS_SCRIPT), str(state_file)], text=True
+            stats = subprocess.check_output(
+                ["bash", str(STATS_SCRIPT), str(state_file)], text=True
+            )
+            claude.execute(prompts["groomer"].format(stats=stats, plan=plan))
+
+            codex.execute(prompts["executor"].format(plan=plan))
+
+            claude.execute(prompts["reviewer"].format(plan=plan))
+        except (subprocess.CalledProcessError, OSError) as e:
+            _log_retry(name, e)
+
+
+def run_yolo_loop(state_dir: Path, name: str) -> None:
+    """Yolo loop: single Claude call per iteration. Ralph loop style."""
+    _require_cli(name, "claude")
+
+    _state_file, state_ref = _resolve_state_ref(state_dir, name)
+    prompt = YOLO_PROMPT.format(state_file=state_ref)
+
+    print(f"[subturtle:{name}] starting yolo loop (claude)")
+    print(f"[subturtle:{name}] state file: {state_ref}")
+
+    claude = Claude()
+    iteration = 0
+
+    while True:
+        iteration += 1
+        print(f"[subturtle:{name}] === yolo iteration {iteration} ===")
+        try:
+            claude.execute(prompt)
+        except (subprocess.CalledProcessError, OSError) as e:
+            _log_retry(name, e)
+
+
+def run_yolo_codex_loop(state_dir: Path, name: str) -> None:
+    """Yolo-codex loop: single Codex call per iteration. Ralph loop style."""
+    _require_cli(name, "codex")
+
+    _state_file, state_ref = _resolve_state_ref(state_dir, name)
+    prompt = YOLO_PROMPT.format(state_file=state_ref)
+
+    print(f"[subturtle:{name}] starting yolo loop (codex)")
+    print(f"[subturtle:{name}] state file: {state_ref}")
+
+    codex = Codex()
+    iteration = 0
+
+    while True:
+        iteration += 1
+        print(f"[subturtle:{name}] === yolo-codex iteration {iteration} ===")
+        try:
+            codex.execute(prompt)
+        except (subprocess.CalledProcessError, OSError) as e:
+            _log_retry(name, e)
+
+
+# ---------------------------------------------------------------------------
+# Dispatch
+# ---------------------------------------------------------------------------
+
+LOOP_TYPES = {
+    "slow": run_slow_loop,
+    "yolo": run_yolo_loop,
+    "yolo-codex": run_yolo_codex_loop,
+}
+
+
+def run_loop(state_dir: Path, name: str, loop_type: str = "slow") -> None:
+    """Dispatch to the appropriate loop function."""
+    fn = LOOP_TYPES.get(loop_type)
+    if fn is None:
+        print(
+            f"[subturtle:{name}] ERROR: unknown loop type '{loop_type}'",
+            file=sys.stderr,
         )
-        claude.execute(prompts["groomer"].format(stats=stats, plan=plan))
-
-        codex.execute(prompts["executor"].format(plan=plan))
-
-        claude.execute(prompts["reviewer"].format(plan=plan))
+        sys.exit(1)
+    fn(state_dir, name)
 
 
 def main() -> None:
@@ -164,9 +332,15 @@ def main() -> None:
         default="default",
         help="Human-readable name for this SubTurtle (used in log prefixes)",
     )
+    parser.add_argument(
+        "--type",
+        default="slow",
+        choices=list(LOOP_TYPES.keys()),
+        help="Loop type: slow (plan/groom/execute/review), yolo (single Claude call), yolo-codex (single Codex call)",
+    )
     args = parser.parse_args()
 
-    run_loop(state_dir=Path(args.state_dir).resolve(), name=args.name)
+    run_loop(state_dir=Path(args.state_dir).resolve(), name=args.name, loop_type=args.type)
 
 
 if __name__ == "__main__":
