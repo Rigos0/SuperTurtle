@@ -40,6 +40,216 @@ function getStepMs(level: number): number {
   return Math.max(STEP_MS_MIN, STEP_MS_BASE - (level - 1) * 6);
 }
 
+const LEVEL_OBSTACLES: Point[][] = [
+  [],
+  [
+    { x: 8, y: 6 },
+    { x: 9, y: 6 },
+    { x: 10, y: 6 },
+    { x: 11, y: 6 },
+  ],
+  [
+    { x: 13, y: 8 },
+    { x: 13, y: 9 },
+    { x: 13, y: 10 },
+    { x: 13, y: 11 },
+  ],
+  [
+    { x: 4, y: 4 },
+    { x: 4, y: 5 },
+    { x: 4, y: 6 },
+    { x: 4, y: 7 },
+    { x: 5, y: 7 },
+    { x: 6, y: 7 },
+    { x: 7, y: 7 },
+  ],
+  [
+    { x: 12, y: 12 },
+    { x: 13, y: 12 },
+    { x: 14, y: 12 },
+    { x: 15, y: 12 },
+    { x: 15, y: 13 },
+    { x: 15, y: 14 },
+    { x: 15, y: 15 },
+  ],
+  [
+    { x: 6, y: 4 },
+    { x: 7, y: 4 },
+    { x: 8, y: 4 },
+    { x: 9, y: 4 },
+    { x: 10, y: 15 },
+    { x: 11, y: 15 },
+    { x: 12, y: 15 },
+    { x: 13, y: 15 },
+  ],
+  [
+    { x: 6, y: 5 },
+    { x: 6, y: 6 },
+    { x: 6, y: 7 },
+    { x: 6, y: 8 },
+    { x: 6, y: 9 },
+    { x: 6, y: 10 },
+    { x: 6, y: 11 },
+    { x: 6, y: 12 },
+    { x: 6, y: 13 },
+    { x: 6, y: 14 },
+    { x: 13, y: 5 },
+    { x: 13, y: 6 },
+    { x: 13, y: 7 },
+    { x: 13, y: 8 },
+    { x: 13, y: 9 },
+    { x: 13, y: 10 },
+    { x: 13, y: 11 },
+    { x: 13, y: 12 },
+    { x: 13, y: 13 },
+    { x: 13, y: 14 },
+  ],
+  [
+    { x: 3, y: 8 },
+    { x: 4, y: 8 },
+    { x: 5, y: 8 },
+    { x: 6, y: 8 },
+    { x: 7, y: 8 },
+    { x: 8, y: 8 },
+    { x: 9, y: 8 },
+    { x: 10, y: 8 },
+    { x: 11, y: 8 },
+    { x: 12, y: 8 },
+    { x: 13, y: 8 },
+    { x: 14, y: 8 },
+    { x: 15, y: 8 },
+    { x: 16, y: 8 },
+    { x: 10, y: 11 },
+    { x: 10, y: 12 },
+    { x: 10, y: 13 },
+    { x: 10, y: 14 },
+    { x: 10, y: 15 },
+    { x: 10, y: 16 },
+  ],
+  [
+    { x: 3, y: 3 },
+    { x: 4, y: 3 },
+    { x: 5, y: 3 },
+    { x: 6, y: 3 },
+    { x: 7, y: 3 },
+    { x: 8, y: 3 },
+    { x: 9, y: 3 },
+    { x: 10, y: 3 },
+    { x: 11, y: 3 },
+    { x: 12, y: 3 },
+    { x: 13, y: 3 },
+    { x: 14, y: 3 },
+    { x: 15, y: 3 },
+    { x: 16, y: 3 },
+    { x: 3, y: 16 },
+    { x: 4, y: 16 },
+    { x: 5, y: 16 },
+    { x: 6, y: 16 },
+    { x: 7, y: 16 },
+    { x: 8, y: 16 },
+    { x: 9, y: 16 },
+    { x: 10, y: 16 },
+    { x: 11, y: 16 },
+    { x: 12, y: 16 },
+    { x: 13, y: 16 },
+    { x: 14, y: 16 },
+    { x: 15, y: 16 },
+    { x: 16, y: 16 },
+    { x: 3, y: 4 },
+    { x: 3, y: 5 },
+    { x: 3, y: 6 },
+    { x: 3, y: 7 },
+    { x: 3, y: 8 },
+    { x: 3, y: 9 },
+    { x: 3, y: 10 },
+    { x: 3, y: 11 },
+    { x: 3, y: 12 },
+    { x: 3, y: 13 },
+    { x: 3, y: 14 },
+    { x: 3, y: 15 },
+    { x: 16, y: 4 },
+    { x: 16, y: 5 },
+    { x: 16, y: 6 },
+    { x: 16, y: 7 },
+    { x: 16, y: 8 },
+    { x: 16, y: 9 },
+    { x: 16, y: 10 },
+    { x: 16, y: 11 },
+    { x: 16, y: 12 },
+    { x: 16, y: 13 },
+    { x: 16, y: 14 },
+    { x: 16, y: 15 },
+  ],
+  [
+    { x: 5, y: 2 },
+    { x: 5, y: 3 },
+    { x: 5, y: 4 },
+    { x: 5, y: 5 },
+    { x: 5, y: 6 },
+    { x: 5, y: 7 },
+    { x: 5, y: 8 },
+    { x: 5, y: 9 },
+    { x: 5, y: 10 },
+    { x: 5, y: 11 },
+    { x: 5, y: 12 },
+    { x: 5, y: 13 },
+    { x: 5, y: 14 },
+    { x: 5, y: 15 },
+    { x: 5, y: 16 },
+    { x: 5, y: 17 },
+    { x: 10, y: 2 },
+    { x: 10, y: 3 },
+    { x: 10, y: 4 },
+    { x: 10, y: 5 },
+    { x: 10, y: 6 },
+    { x: 10, y: 7 },
+    { x: 10, y: 8 },
+    { x: 10, y: 12 },
+    { x: 10, y: 13 },
+    { x: 10, y: 14 },
+    { x: 10, y: 15 },
+    { x: 10, y: 16 },
+    { x: 10, y: 17 },
+    { x: 15, y: 2 },
+    { x: 15, y: 3 },
+    { x: 15, y: 4 },
+    { x: 15, y: 5 },
+    { x: 15, y: 6 },
+    { x: 15, y: 7 },
+    { x: 15, y: 8 },
+    { x: 15, y: 9 },
+    { x: 15, y: 10 },
+    { x: 15, y: 11 },
+    { x: 15, y: 12 },
+    { x: 15, y: 13 },
+    { x: 15, y: 14 },
+    { x: 15, y: 15 },
+    { x: 15, y: 16 },
+    { x: 15, y: 17 },
+    { x: 6, y: 6 },
+    { x: 7, y: 6 },
+    { x: 8, y: 6 },
+    { x: 9, y: 6 },
+    { x: 11, y: 6 },
+    { x: 12, y: 6 },
+    { x: 13, y: 6 },
+    { x: 14, y: 6 },
+    { x: 6, y: 13 },
+    { x: 7, y: 13 },
+    { x: 8, y: 13 },
+    { x: 9, y: 13 },
+    { x: 11, y: 13 },
+    { x: 12, y: 13 },
+    { x: 13, y: 13 },
+    { x: 14, y: 13 },
+  ],
+];
+
+function getObstaclesForLevel(level: number): Set<string> {
+  const levelLayout = LEVEL_OBSTACLES[(level - 1) % LEVEL_OBSTACLES.length] ?? [];
+  return new Set(levelLayout.map((point) => `${point.x},${point.y}`));
+}
+
 function isOppositeDirection(a: Direction, b: Direction): boolean {
   return (
     (a === "up" && b === "down") ||
@@ -62,13 +272,14 @@ function randomInt(max: number): number {
   return Math.floor(Math.random() * max);
 }
 
-function pickNextFood(snake: Point[]): Point {
+function pickNextFood(snake: Point[], obstacles: Set<string>): Point {
   const occupied = new Set(snake.map((segment) => `${segment.x},${segment.y}`));
   const freeCells: Point[] = [];
 
   for (let y = 0; y < GRID_SIZE; y += 1) {
     for (let x = 0; x < GRID_SIZE; x += 1) {
-      if (!occupied.has(`${x},${y}`)) {
+      const key = `${x},${y}`;
+      if (!occupied.has(key) && !obstacles.has(key)) {
         freeCells.push({ x, y });
       }
     }
@@ -111,7 +322,12 @@ export default function SnakeGame() {
   const [level, setLevel] = useState(1);
   const [foodEatenThisLevel, setFoodEatenThisLevel] = useState(0);
   const [snake, setSnake] = useState<Point[]>(() => createInitialSnake());
-  const [food, setFood] = useState<Point>(() => pickNextFood(createInitialSnake()));
+  const [obstacles, setObstacles] = useState<Set<string>>(() =>
+    getObstaclesForLevel(1),
+  );
+  const [food, setFood] = useState<Point>(() =>
+    pickNextFood(createInitialSnake(), getObstaclesForLevel(1)),
+  );
   const [direction, setDirection] = useState<Direction>("right");
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -122,6 +338,7 @@ export default function SnakeGame() {
   const levelRef = useRef(level);
   const foodEatenThisLevelRef = useRef(foodEatenThisLevel);
   const snakeRef = useRef<Point[]>(snake);
+  const obstaclesRef = useRef<Set<string>>(obstacles);
   const foodRef = useRef<Point>(food);
   const directionRef = useRef<Direction>(direction);
 
@@ -164,6 +381,10 @@ export default function SnakeGame() {
   }, [snake]);
 
   useEffect(() => {
+    obstaclesRef.current = obstacles;
+  }, [obstacles]);
+
+  useEffect(() => {
     foodRef.current = food;
   }, [food]);
 
@@ -177,12 +398,13 @@ export default function SnakeGame() {
 
   const resetGame = useCallback((startDirection?: Direction) => {
     const freshSnake = createInitialSnake();
+    const freshObstacles = getObstaclesForLevel(1);
     const allowedDirection =
       startDirection && !isOppositeDirection("right", startDirection)
         ? startDirection
         : "right";
 
-    const freshFood = pickNextFood(freshSnake);
+    const freshFood = pickNextFood(freshSnake, freshObstacles);
 
     queuedDirectionRef.current = null;
     accumulatorRef.current = 0;
@@ -202,6 +424,9 @@ export default function SnakeGame() {
 
     setLevel(1);
     levelRef.current = 1;
+
+    setObstacles(freshObstacles);
+    obstaclesRef.current = freshObstacles;
 
     setFoodEatenThisLevel(0);
     foodEatenThisLevelRef.current = 0;
@@ -241,6 +466,7 @@ export default function SnakeGame() {
 
     const velocity = DIRECTION_VECTORS[nextDirection];
     const currentSnake = snakeRef.current;
+    const currentObstacles = obstaclesRef.current;
     const currentHead = currentSnake[0];
     const nextHead = {
       x: currentHead.x + velocity.x,
@@ -259,8 +485,9 @@ export default function SnakeGame() {
         segment.x === nextHead.x &&
         segment.y === nextHead.y,
     );
+    const hitsObstacle = currentObstacles.has(`${nextHead.x},${nextHead.y}`);
 
-    if (hitsWall || hitsSelf) {
+    if (hitsWall || hitsSelf || hitsObstacle) {
       setGameState("gameover");
       gameStateRef.current = "gameover";
 
@@ -277,38 +504,56 @@ export default function SnakeGame() {
     const nextSnake = [nextHead, ...currentSnake];
     if (!ateFood) {
       nextSnake.pop();
+      setSnake(nextSnake);
+      snakeRef.current = nextSnake;
+      return;
     }
 
-    setSnake(nextSnake);
-    snakeRef.current = nextSnake;
+    const nextScore = scoreRef.current + 1;
+    setScore(nextScore);
+    scoreRef.current = nextScore;
 
-    if (ateFood) {
-      const nextScore = scoreRef.current + 1;
-      setScore(nextScore);
-      scoreRef.current = nextScore;
+    const nextFoodEatenThisLevel = foodEatenThisLevelRef.current + 1;
+    if (nextFoodEatenThisLevel === FOOD_PER_LEVEL) {
+      const nextLevel = levelRef.current + 1;
+      const nextObstacles = getObstaclesForLevel(nextLevel);
+      const freshSnake = createInitialSnake();
+      const freshFood = pickNextFood(freshSnake, nextObstacles);
 
-      const nextFoodEatenThisLevel = foodEatenThisLevelRef.current + 1;
-      if (nextFoodEatenThisLevel === FOOD_PER_LEVEL) {
-        const nextLevel = levelRef.current + 1;
-        setLevel(nextLevel);
-        levelRef.current = nextLevel;
-        accumulatorRef.current = 0;
+      setLevel(nextLevel);
+      levelRef.current = nextLevel;
+      accumulatorRef.current = 0;
 
-        setFoodEatenThisLevel(0);
-        foodEatenThisLevelRef.current = 0;
-      } else {
-        setFoodEatenThisLevel(nextFoodEatenThisLevel);
-        foodEatenThisLevelRef.current = nextFoodEatenThisLevel;
-      }
+      setObstacles(nextObstacles);
+      obstaclesRef.current = nextObstacles;
 
-      if (nextScore > highScoreRef.current) {
-        setHighScore(nextScore);
-        highScoreRef.current = nextScore;
-      }
+      queuedDirectionRef.current = null;
+      setDirection("right");
+      directionRef.current = "right";
 
-      const nextFood = pickNextFood(nextSnake);
+      setSnake(freshSnake);
+      snakeRef.current = freshSnake;
+
+      setFood(freshFood);
+      foodRef.current = freshFood;
+
+      setFoodEatenThisLevel(0);
+      foodEatenThisLevelRef.current = 0;
+    } else {
+      setFoodEatenThisLevel(nextFoodEatenThisLevel);
+      foodEatenThisLevelRef.current = nextFoodEatenThisLevel;
+
+      setSnake(nextSnake);
+      snakeRef.current = nextSnake;
+
+      const nextFood = pickNextFood(nextSnake, currentObstacles);
       setFood(nextFood);
       foodRef.current = nextFood;
+    }
+
+    if (nextScore > highScoreRef.current) {
+      setHighScore(nextScore);
+      highScoreRef.current = nextScore;
     }
   }, []);
 
@@ -345,6 +590,30 @@ export default function SnakeGame() {
       ctx.lineTo(BOARD_SIZE, p);
       ctx.stroke();
     }
+
+    ctx.save();
+    ctx.fillStyle = "#04d9ff";
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "#04d9ff";
+    for (const obstacle of obstaclesRef.current) {
+      const [xText, yText] = obstacle.split(",");
+      const obstacleX = Number.parseInt(xText, 10);
+      const obstacleY = Number.parseInt(yText, 10);
+
+      if (Number.isNaN(obstacleX) || Number.isNaN(obstacleY)) {
+        continue;
+      }
+
+      drawRoundedRect(
+        ctx,
+        obstacleX * CELL_SIZE + 1,
+        obstacleY * CELL_SIZE + 1,
+        CELL_SIZE - 2,
+        CELL_SIZE - 2,
+        5,
+      );
+    }
+    ctx.restore();
 
     const currentFood = foodRef.current;
     const foodCenterX = currentFood.x * CELL_SIZE + CELL_SIZE / 2;
