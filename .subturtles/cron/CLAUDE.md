@@ -18,13 +18,13 @@ Persistent JSON file at `super_turtle/claude-telegram-bot/cron-jobs.json`
 ### 2. Timer loop (in `src/index.ts`) — DONE
 10s interval, checks due jobs, injects via `session.sendMessageStreaming()`
 
-### 3. `/cron` Telegram command — CURRENT
-- Add `handleCron` to `src/handlers/commands.ts`
-- Register in `src/index.ts`: `bot.command("cron", handleCron)`
-- Export from `src/handlers/index.ts`
-- Reads job store via `getJobs()` from `src/cron.ts`, formats nicely
-- Inline keyboard with cancel buttons: `callback_data: "cron_cancel:<job_id>"`
-- Handle cancel callback in `src/handlers/callback.ts` — look for `cron_cancel:` prefix, call `removeJob(id)`
+### 3. `/cron` Telegram command — DONE
+- Add `handleCron` to `src/handlers/commands.ts` ✓
+- Register in `src/index.ts`: `bot.command("cron", handleCron)` ✓
+- Export from `src/handlers/index.ts` ✓
+- Reads job store via `getJobs()` from `src/cron.ts`, formats nicely ✓
+- Inline keyboard with cancel buttons: `callback_data: "cron_cancel:<job_id>"` ✓
+- Handle cancel callback in `src/handlers/callback.ts` — look for `cron_cancel:` prefix, call `removeJob(id)` ✓
 
 ## Key files to modify
 
