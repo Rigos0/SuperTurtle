@@ -1,6 +1,6 @@
 # Current task
 
-Add loop mechanic (after level 10, restart at level 1 with score intact; track lap count) <- current
+Playtest and feel-tuning pass (edge cases, mobile considerations, speed curves, obstacle fairness) <- current
 
 # End goal with specs
 
@@ -44,6 +44,6 @@ A playable Snake game built with Next.js and React — with level progression. R
 - [x] Add obstacle wall system — LEVEL_OBSTACLES data, getObstaclesForLevel helper, obstacle state/ref, collision check, food-spawn avoidance, neon cyan rendering (placeholder layouts for now)
 - [x] Replace LEVEL_OBSTACLES with 10 hand-crafted layouts (L1 empty → L10 full maze), validate spawn safety & reachability
 - [x] Add level-up transition — "levelup" game state, timed overlay with neon flash, board/snake reset, input blocking, accumulator guard
-- [ ] Add loop mechanic (after level 10, restart at level 1 with score intact; track lap count) <- current
-- [ ] Visual escalation per level (grid color shifts, glow intensity, background hue rotation)
-- [ ] Playtest and feel-tuning pass (edge cases, mobile considerations, speed curves, obstacle fairness)
+- [x] Add loop mechanic (after level 10, restart at level 1 with score intact; track lap count)
+- [x] Visual escalation per level (grid color shifts, glow intensity, background hue rotation)
+- [ ] Playtest and feel-tuning pass (edge cases, mobile considerations, speed curves, obstacle fairness) <- current
