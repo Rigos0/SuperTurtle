@@ -220,8 +220,10 @@ def _log_retry(name: str, error: subprocess.CalledProcessError | OSError) -> Non
     time.sleep(RETRY_DELAY)
 
 
-def run_slow_loop(state_dir: Path, name: str) -> None:
+def run_slow_loop(state_dir: Path, name: str, skills: list[str] | None = None) -> None:
     """Slow loop: Plan -> Groom -> Execute -> Review. 4 agent calls per iteration."""
+    if skills is None:
+        skills = []
     _require_cli(name, "claude")
     _require_cli(name, "codex")
 
@@ -230,6 +232,8 @@ def run_slow_loop(state_dir: Path, name: str) -> None:
 
     print(f"[subturtle:{name}] starting slow loop")
     print(f"[subturtle:{name}] state file: {state_ref}")
+    if skills:
+        print(f"[subturtle:{name}] skills: {', '.join(skills)}")
 
     claude = Claude()
     codex = Codex()
@@ -253,8 +257,10 @@ def run_slow_loop(state_dir: Path, name: str) -> None:
             _log_retry(name, e)
 
 
-def run_yolo_loop(state_dir: Path, name: str) -> None:
+def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -> None:
     """Yolo loop: single Claude call per iteration. Ralph loop style."""
+    if skills is None:
+        skills = []
     _require_cli(name, "claude")
 
     _state_file, state_ref = _resolve_state_ref(state_dir, name)
@@ -262,6 +268,8 @@ def run_yolo_loop(state_dir: Path, name: str) -> None:
 
     print(f"[subturtle:{name}] starting yolo loop (claude)")
     print(f"[subturtle:{name}] state file: {state_ref}")
+    if skills:
+        print(f"[subturtle:{name}] skills: {', '.join(skills)}")
 
     claude = Claude()
     iteration = 0
@@ -275,8 +283,10 @@ def run_yolo_loop(state_dir: Path, name: str) -> None:
             _log_retry(name, e)
 
 
-def run_yolo_codex_loop(state_dir: Path, name: str) -> None:
+def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = None) -> None:
     """Yolo-codex loop: single Codex call per iteration. Ralph loop style."""
+    if skills is None:
+        skills = []
     _require_cli(name, "codex")
 
     _state_file, state_ref = _resolve_state_ref(state_dir, name)
@@ -284,6 +294,8 @@ def run_yolo_codex_loop(state_dir: Path, name: str) -> None:
 
     print(f"[subturtle:{name}] starting yolo-codex loop (codex)")
     print(f"[subturtle:{name}] state file: {state_ref}")
+    if skills:
+        print(f"[subturtle:{name}] skills: {', '.join(skills)}")
 
     codex = Codex()
     iteration = 0
@@ -308,8 +320,10 @@ LOOP_TYPES = {
 }
 
 
-def run_loop(state_dir: Path, name: str, loop_type: str = "slow") -> None:
+def run_loop(state_dir: Path, name: str, loop_type: str = "slow", skills: list[str] | None = None) -> None:
     """Dispatch to the appropriate loop function."""
+    if skills is None:
+        skills = []
     fn = LOOP_TYPES.get(loop_type)
     if fn is None:
         print(
@@ -317,7 +331,7 @@ def run_loop(state_dir: Path, name: str, loop_type: str = "slow") -> None:
             file=sys.stderr,
         )
         sys.exit(1)
-    fn(state_dir, name)
+    fn(state_dir, name, skills)
 
 
 def main() -> None:
@@ -338,9 +352,15 @@ def main() -> None:
         choices=list(LOOP_TYPES.keys()),
         help="Loop type: slow (plan/groom/execute/review), yolo (single Claude call), yolo-codex (single Codex call)",
     )
+    parser.add_argument(
+        "--skills",
+        nargs="*",
+        default=[],
+        help="List of Claude Code skills to load (e.g. frontend testing)",
+    )
     args = parser.parse_args()
 
-    run_loop(state_dir=Path(args.state_dir).resolve(), name=args.name, loop_type=args.type)
+    run_loop(state_dir=Path(args.state_dir).resolve(), name=args.name, loop_type=args.type, skills=args.skills)
 
 
 if __name__ == "__main__":
