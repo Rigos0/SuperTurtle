@@ -1,6 +1,6 @@
 # Current task
 
-All core features implemented and polished. Snake game is production-ready.
+All core features implemented and polished. Snake game is production-ready at root directory.
 
 # End goal with specs
 
@@ -47,3 +47,4 @@ A playable Snake game built with Next.js and React — with level progression. R
 - [x] Add loop mechanic (after level 10, restart at level 1 with score intact; track lap count)
 - [x] Visual escalation per level (grid color shifts, glow intensity, background hue rotation)
 - [x] Playtest and feel-tuning pass (edge cases, mobile considerations, speed curves, obstacle fairness)
+- [x] Relocate snake-game to root directory — moved from .subturtles/test-run/snake-game/ to snake-game/; verified production build succeeds; game is now installable as `cd snake-game && npm install && npm run dev` per spec
