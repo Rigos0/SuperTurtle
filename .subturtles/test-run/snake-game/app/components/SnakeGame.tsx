@@ -401,7 +401,8 @@ function pickNextFood(snake: Point[], obstacles: Set<string>): Point {
   }
 
   if (freeCells.length === 0) {
-    return { x: 0, y: 0 };
+    // Fallback: return center if truly no space (shouldn't happen in normal gameplay)
+    return { x: Math.floor(GRID_SIZE / 2), y: Math.floor(GRID_SIZE / 2) };
   }
 
   return freeCells[randomInt(freeCells.length)];
@@ -869,6 +870,8 @@ export default function SnakeGame() {
     }
   }, []);
 
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase();
@@ -899,9 +902,54 @@ export default function SnakeGame() {
       queueDirection(requestedDirection);
     };
 
+    const onTouchStart = (event: TouchEvent) => {
+      if (event.touches.length === 1) {
+        const touch = event.touches[0];
+        touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+      }
+    };
+
+    const onTouchEnd = (event: TouchEvent) => {
+      if (!touchStartRef.current || event.changedTouches.length === 0) {
+        return;
+      }
+
+      const touch = event.changedTouches[0];
+      const deltaX = touch.clientX - touchStartRef.current.x;
+      const deltaY = touch.clientY - touchStartRef.current.y;
+      const threshold = 30;
+
+      let direction: Direction | null = null;
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        direction = deltaX > threshold ? "right" : deltaX < -threshold ? "left" : null;
+      } else {
+        direction = deltaY > threshold ? "down" : deltaY < -threshold ? "up" : null;
+      }
+
+      if (!direction) {
+        return;
+      }
+
+      if (gameStateRef.current === "start" || gameStateRef.current === "gameover") {
+        resetGame(direction);
+        return;
+      }
+
+      if (gameStateRef.current === "playing") {
+        queueDirection(direction);
+      }
+
+      touchStartRef.current = null;
+    };
+
     window.addEventListener("keydown", onKeyDown, { passive: false });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
+
     return () => {
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchend", onTouchEnd);
     };
   }, [queueDirection, resetGame]);
 
@@ -975,21 +1023,21 @@ export default function SnakeGame() {
   }, [drawFrame, stepGame]);
 
   return (
-    <section className="w-full max-w-3xl rounded-2xl border border-[#04d9ff]/30 bg-[#050712]/80 p-4 shadow-[0_0_30px_rgba(4,217,255,0.2)] backdrop-blur sm:p-6">
-      <header className="mb-5 flex flex-col items-center gap-3 sm:mb-6 sm:flex-row sm:justify-between">
-        <h1 className="neon-pulse text-center text-2xl tracking-[0.2em] text-[#04d9ff] sm:text-3xl">
+    <section className="w-full max-w-3xl rounded-lg sm:rounded-2xl border border-[#04d9ff]/30 bg-[#050712]/80 p-3 sm:p-4 md:p-6 shadow-[0_0_30px_rgba(4,217,255,0.2)] backdrop-blur">
+      <header className="mb-4 flex flex-col items-center gap-2 sm:mb-5 sm:gap-3 md:mb-6 md:flex-row md:justify-between">
+        <h1 className="neon-pulse text-center text-xl sm:text-2xl md:text-3xl tracking-[0.2em] text-[#04d9ff]">
           SNAKE
         </h1>
-        <div className="flex items-center gap-4 text-xs uppercase tracking-[0.18em] sm:text-sm">
+        <div className="flex flex-wrap justify-center items-center gap-2 sm:gap-3 text-[10px] sm:text-xs uppercase tracking-[0.18em] md:text-sm">
           <p className="text-[#04d9ff]">Lap: {lap}</p>
-          <p className="text-[#04d9ff]">Level: {level}</p>
+          <p className="text-[#04d9ff]">Lvl: {level}</p>
           <p className="text-[#39ff14]">Score: {score}</p>
           <p className="text-[#ff6ec7]">High: {highScore}</p>
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-[560px]">
-        <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-[#39ff14]/50 bg-black shadow-[0_0_22px_rgba(57,255,20,0.26)]">
+      <div className="mx-auto w-full max-w-[560px] px-2 sm:px-0">
+        <div className="relative aspect-square w-full overflow-hidden rounded-lg sm:rounded-xl border border-[#39ff14]/50 bg-black shadow-[0_0_22px_rgba(57,255,20,0.26)]">
           <canvas
             ref={canvasRef}
             width={BOARD_SIZE}
@@ -1001,7 +1049,7 @@ export default function SnakeGame() {
       </div>
 
       <p className="mt-4 text-center text-[10px] uppercase tracking-[0.24em] text-[#a4adca] sm:text-xs">
-        Controls: Arrow Keys or WASD
+        Desktop: Arrow Keys or WASD · Mobile: Swipe
       </p>
     </section>
   );
