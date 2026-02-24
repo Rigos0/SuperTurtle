@@ -43,6 +43,55 @@ function getStepMs(level: number, lap: number): number {
   return Math.max(STEP_MS_MIN, STEP_MS_BASE - (effectiveLevel - 1) * 6);
 }
 
+type VisualProperties = {
+  bgColorStart: string;
+  bgColorEnd: string;
+  gridColor: string;
+  obstacleColor: string;
+  obstacleGlow: number;
+  foodGlow: number;
+  snakeHeadGlow: number;
+  snakeBodyGlow: number;
+};
+
+function getVisualPropertiesForLevel(level: number): VisualProperties {
+  // Normalize level to 0-1 range
+  const t = (level - 1) / (TOTAL_LEVELS - 1);
+
+  // Hue rotation: start at cyan (190°) → magenta (300°)
+  const startHue = 190;
+  const endHue = 300;
+  const currentHue = startHue + (endHue - startHue) * t;
+
+  // Background gradient intensifies: darker at start, brighter at end
+  const bgStart = `hsl(${currentHue}, 100%, 4%)`;
+  const bgEnd = `hsl(${currentHue}, 100%, 8%)`;
+
+  // Grid color matches hue but fades slightly as it intensifies
+  const gridOpacity = 0.08 + t * 0.04;
+  const gridColor = `hsla(${currentHue}, 100%, 50%, ${gridOpacity})`;
+
+  // Obstacle color intensifies from cyan towards magenta
+  const obstacleColor = `hsl(${currentHue}, 100%, 50%)`;
+
+  // Glow intensities increase with level (10 → 20)
+  const obstacleGlow = 10 + t * 10;
+  const foodGlow = 16 + t * 12;
+  const snakeHeadGlow = 22 + t * 10;
+  const snakeBodyGlow = 14 + t * 8;
+
+  return {
+    bgColorStart: bgStart,
+    bgColorEnd: bgEnd,
+    gridColor,
+    obstacleColor,
+    obstacleGlow,
+    foodGlow,
+    snakeHeadGlow,
+    snakeBodyGlow,
+  };
+}
+
 const LEVEL_OBSTACLES: Point[][] = [
   [],
   [
@@ -648,13 +697,15 @@ export default function SnakeGame() {
 
     ctx.clearRect(0, 0, BOARD_SIZE, BOARD_SIZE);
 
+    const visual = getVisualPropertiesForLevel(levelRef.current);
+
     const background = ctx.createLinearGradient(0, 0, BOARD_SIZE, BOARD_SIZE);
-    background.addColorStop(0, "#03060f");
-    background.addColorStop(1, "#090d1a");
+    background.addColorStop(0, visual.bgColorStart);
+    background.addColorStop(1, visual.bgColorEnd);
     ctx.fillStyle = background;
     ctx.fillRect(0, 0, BOARD_SIZE, BOARD_SIZE);
 
-    ctx.strokeStyle = "rgba(4, 217, 255, 0.08)";
+    ctx.strokeStyle = visual.gridColor;
     ctx.lineWidth = 1;
     for (let i = 1; i < GRID_SIZE; i += 1) {
       const p = i * CELL_SIZE;
@@ -670,9 +721,9 @@ export default function SnakeGame() {
     }
 
     ctx.save();
-    ctx.fillStyle = "#04d9ff";
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = "#04d9ff";
+    ctx.fillStyle = visual.obstacleColor;
+    ctx.shadowBlur = visual.obstacleGlow;
+    ctx.shadowColor = visual.obstacleColor;
     for (const obstacle of obstaclesRef.current) {
       const [xText, yText] = obstacle.split(",");
       const obstacleX = Number.parseInt(xText, 10);
@@ -699,7 +750,7 @@ export default function SnakeGame() {
     const foodRadius = CELL_SIZE * 0.3;
 
     ctx.save();
-    ctx.shadowBlur = 16;
+    ctx.shadowBlur = visual.foodGlow;
     ctx.shadowColor = "#ff6ec7";
     ctx.fillStyle = "#ff6ec7";
     ctx.beginPath();
@@ -716,10 +767,10 @@ export default function SnakeGame() {
       ctx.save();
       if (index === 0) {
         ctx.fillStyle = "#6bff45";
-        ctx.shadowBlur = 22;
+        ctx.shadowBlur = visual.snakeHeadGlow;
       } else {
         ctx.fillStyle = "#39ff14";
-        ctx.shadowBlur = 14;
+        ctx.shadowBlur = visual.snakeBodyGlow;
       }
       ctx.shadowColor = "#39ff14";
       drawRoundedRect(ctx, x, y, size, size, 6);
@@ -802,13 +853,14 @@ export default function SnakeGame() {
 
         const textScale = 0.9 + Math.sin(t * Math.PI) * 0.12;
         const glow = 18 + Math.sin(t * Math.PI) * 18;
+        const levelColor = visual.obstacleColor;
 
         ctx.save();
         ctx.translate(BOARD_SIZE / 2, BOARD_SIZE / 2);
         ctx.scale(textScale, textScale);
         ctx.globalAlpha = textAlpha;
-        ctx.fillStyle = "#04d9ff";
-        ctx.shadowColor = "#04d9ff";
+        ctx.fillStyle = levelColor;
+        ctx.shadowColor = levelColor;
         ctx.shadowBlur = glow;
         ctx.font = "700 48px monospace";
         ctx.fillText(`LEVEL ${levelRef.current}`, 0, 12);
