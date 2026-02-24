@@ -6,7 +6,7 @@
 
 import type { Context } from "grammy";
 import type { Message } from "grammy/types";
-import { InlineKeyboard } from "grammy";
+import { InlineKeyboard, InputFile } from "grammy";
 import type { StatusCallback } from "../types";
 import { convertMarkdownToHtml, escapeHtml } from "../formatting";
 import {
@@ -77,6 +77,59 @@ export async function checkPendingAskUserRequests(
   }
 
   return buttonsSent;
+}
+
+/**
+ * Check for pending send-turtle requests and send photos.
+ */
+export async function checkPendingSendTurtleRequests(
+  ctx: Context,
+  chatId: number
+): Promise<boolean> {
+  const glob = new Bun.Glob("send-turtle-*.json");
+  let photoSent = false;
+
+  for await (const filename of glob.scan({ cwd: "/tmp", absolute: false })) {
+    const filepath = `/tmp/${filename}`;
+    try {
+      const file = Bun.file(filepath);
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      // Only process pending requests for this chat
+      if (data.status !== "pending") continue;
+      if (String(data.chat_id) !== String(chatId)) continue;
+
+      const url = data.url || "";
+      const caption = data.caption || undefined;
+
+      if (url) {
+        try {
+          // Download image and send as a sticker (renders smaller/cuter than photo)
+          const response = await fetch(url);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const buffer = Buffer.from(await response.arrayBuffer());
+          const inputFile = new InputFile(buffer, "turtle.webp");
+          await ctx.replyWithSticker(inputFile);
+          // Send caption as a separate message if provided
+          if (caption) await ctx.reply(caption);
+        } catch (photoError) {
+          // Photo send failed — try sending as a link instead
+          console.warn(`Failed to send turtle photo, falling back to link:`, photoError);
+          await ctx.reply(`🐢 ${url}${caption ? `\n${caption}` : ""}`);
+        }
+        photoSent = true;
+
+        // Mark as sent
+        data.status = "sent";
+        await Bun.write(filepath, JSON.stringify(data));
+      }
+    } catch (error) {
+      console.warn(`Failed to process send-turtle file ${filepath}:`, error);
+    }
+  }
+
+  return photoSent;
 }
 
 /**

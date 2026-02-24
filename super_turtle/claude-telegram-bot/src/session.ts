@@ -24,7 +24,7 @@ import {
   WORKING_DIR,
 } from "./config";
 import { formatToolStatus } from "./formatting";
-import { checkPendingAskUserRequests } from "./handlers/streaming";
+import { checkPendingAskUserRequests, checkPendingSendTurtleRequests } from "./handlers/streaming";
 import { checkCommandSafety, isPathAllowed } from "./security";
 import type {
   SavedSession,
@@ -426,8 +426,8 @@ class ClaudeSession {
               this.lastTool = toolDisplay;
               console.log(`Tool: ${toolDisplay}`);
 
-              // Don't show tool status for ask_user - the buttons are self-explanatory
-              if (!toolName.startsWith("mcp__ask-user")) {
+              // Don't show tool status for ask_user/send_turtle - the output speaks for itself
+              if (!toolName.startsWith("mcp__ask-user") && !toolName.startsWith("mcp__send-turtle")) {
                 await statusCallback("tool", toolDisplay);
               }
 
@@ -446,6 +446,24 @@ class ClaudeSession {
                     askUserTriggered = true;
                     break;
                   }
+                  if (attempt < 2) {
+                    await new Promise((resolve) => setTimeout(resolve, 100));
+                  }
+                }
+              }
+
+              // Check for pending send_turtle requests after send-turtle MCP tool
+              if (toolName.startsWith("mcp__send-turtle") && ctx && chatId) {
+                // Small delay to let MCP server write the file
+                await new Promise((resolve) => setTimeout(resolve, 200));
+
+                // Retry a few times in case of timing issues
+                for (let attempt = 0; attempt < 3; attempt++) {
+                  const photoSent = await checkPendingSendTurtleRequests(
+                    ctx,
+                    chatId
+                  );
+                  if (photoSent) break;
                   if (attempt < 2) {
                     await new Promise((resolve) => setTimeout(resolve, 100));
                   }
