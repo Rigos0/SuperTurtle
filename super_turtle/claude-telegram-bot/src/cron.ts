@@ -13,7 +13,7 @@ import { join } from "path";
 export interface CronJob {
   id: string;
   prompt: string;
-  chat_id: number;
+  chat_id?: number; // optional — defaults to ALLOWED_USERS[0] at fire time
   type: "one-shot" | "recurring";
   interval_ms: number | null;
   fire_at: number; // milliseconds since epoch

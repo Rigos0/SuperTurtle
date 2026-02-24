@@ -126,7 +126,7 @@ You can schedule yourself to check back later. When a scheduled job fires, the b
 
 **How it works:**
 1. Read `super_turtle/claude-telegram-bot/cron-jobs.json` (JSON array of job objects)
-2. Append a new job with: `id` (6 hex chars), `prompt`, `chat_id` (from `TELEGRAM_CHAT_ID` env var), `type` (`"one-shot"` or `"recurring"`), `fire_at` (epoch ms), `interval_ms` (ms for recurring, `null` for one-shot), `created_at` (ISO string)
+2. Append a new job with: `id` (6 hex chars), `prompt`, `type` (`"one-shot"` or `"recurring"`), `fire_at` (epoch ms), `interval_ms` (ms for recurring, `null` for one-shot), `created_at` (ISO string). **Do NOT include `chat_id`** — the bot auto-fills it from the configured user.
 3. Write the file back. The bot checks every 10 seconds and fires due jobs automatically.
 
 **UX guidelines:**

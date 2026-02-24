@@ -147,7 +147,9 @@ const startCronTimer = () => {
             console.error(`Cron job ${job.id} skipped: ALLOWED_USERS is empty`);
             continue;
           }
-          const userId = ALLOWED_USERS[0];
+          const userId = ALLOWED_USERS[0]!;
+          // Default chat_id to the first allowed user — single-chat bots never need to specify it
+          const chatId: number = job.chat_id ?? userId;
 
           // Append instruction so the agent opens its reply with a scheduled notice
           const injectedPrompt = `${job.prompt}\n\n(This is a scheduled message. Start your response with "🔔 Scheduled:" on its own line before anything else.)`;
@@ -155,17 +157,17 @@ const startCronTimer = () => {
           // Route through handleText — same path as a real user message
           await handleText({
             from: { id: userId, username: "cron", is_bot: false, first_name: "Cron" },
-            chat: { id: job.chat_id, type: "private" },
-            message: { text: injectedPrompt, message_id: 0, date: Math.floor(Date.now() / 1000), chat: { id: job.chat_id, type: "private" } },
+            chat: { id: chatId, type: "private" },
+            message: { text: injectedPrompt, message_id: 0, date: Math.floor(Date.now() / 1000), chat: { id: chatId, type: "private" } },
             reply: async (text: string, opts?: unknown) => {
-              return bot.api.sendMessage(job.chat_id, text, opts as Parameters<typeof bot.api.sendMessage>[2]);
+              return bot.api.sendMessage(chatId, text, opts as Parameters<typeof bot.api.sendMessage>[2]);
             },
             replyWithChatAction: async (action: string) => {
-              await bot.api.sendChatAction(job.chat_id, action as Parameters<typeof bot.api.sendChatAction>[1]);
+              await bot.api.sendChatAction(chatId, action as Parameters<typeof bot.api.sendChatAction>[1]);
             },
             replyWithSticker: async (sticker: unknown) => {
               // @ts-expect-error minimal shim for sticker sending
-              return bot.api.sendSticker(job.chat_id, sticker);
+              return bot.api.sendSticker(chatId, sticker);
             },
             api: bot.api,
           } as unknown as import("grammy").Context);
