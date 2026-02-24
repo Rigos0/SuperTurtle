@@ -28,6 +28,7 @@ import {
   handleVideo,
   handleCallback,
 } from "./handlers";
+import { getCommandLines, formatModelInfo, getUsageLines } from "./handlers/commands";
 import { session } from "./session";
 import { getDueJobs, advanceRecurringJob, removeJob } from "./cron";
 import { bot } from "./bot";
@@ -214,11 +215,29 @@ if (existsSync(RESTART_FILE)) {
 
     // Only update if restart was recent (within 30 seconds)
     if (age < 30000 && data.chat_id && data.message_id) {
+      // Edit the "Restarting..." message to show completion
       await bot.api.editMessageText(
         data.chat_id,
         data.message_id,
         "✅ Bot restarted"
       );
+
+      // Kill previous session (same as /new)
+      await session.kill();
+
+      // Send fresh session message with model info, usage, and commands
+      const { modelName, effortStr } = formatModelInfo(session.model, session.effort);
+      const lines: string[] = [
+        `<b>New session</b>\n`,
+        `<b>Model:</b> ${modelName}${effortStr}`,
+        `<b>Dir:</b> <code>${WORKING_DIR}</code>\n`,
+      ];
+      const usageLines = await getUsageLines();
+      if (usageLines.length > 0) {
+        lines.push(...usageLines, "");
+      }
+      lines.push(`<b>Commands:</b>`, ...getCommandLines());
+      await bot.api.sendMessage(data.chat_id, lines.join("\n"), { parse_mode: "HTML" });
     }
     unlinkSync(RESTART_FILE);
   } catch (e) {
