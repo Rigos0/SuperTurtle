@@ -71,9 +71,9 @@ Summarize for the human: what shipped, what's in flight, any blockers.
 
 SubTurtles are dumb workers. They **cannot stop, pause, or terminate themselves**. They have no awareness of their own lifecycle — they just keep looping until killed externally.
 
-All lifecycle control lives in `ctl` and the meta agent:
-- **Starting** — the meta agent spawns them via `ctl start`.
-- **Stopping** — the meta agent kills them via `ctl stop`, or the **watchdog timer** kills them automatically when their timeout expires.
+All lifecycle control lives in `./super_turtle/subturtle/ctl` and the meta agent:
+- **Starting** — the meta agent spawns them via `./super_turtle/subturtle/ctl start`.
+- **Stopping** — the meta agent kills them via `./super_turtle/subturtle/ctl stop`, or the **watchdog timer** kills them automatically when their timeout expires.
 - **No self-exit** — the SubTurtle loop has no break condition, no iteration limit, no self-termination logic. This is intentional.
 
 This means: if you spawn a SubTurtle, **you are responsible for it**. Every SubTurtle has a timeout (default: 1 hour) after which the watchdog auto-kills it. Use `./super_turtle/subturtle/ctl status` or `./super_turtle/subturtle/ctl list` to monitor time remaining.
