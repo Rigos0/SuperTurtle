@@ -20,6 +20,7 @@ import {
   handleRestart,
   handleRetry,
   handleSubturtle,
+  handleCron,
   handleText,
   handleVoice,
   handlePhoto,
@@ -73,6 +74,7 @@ bot.command("resume", handleResume);
 bot.command("subturtle", handleSubturtle);
 bot.command("restart", handleRestart);
 bot.command("retry", handleRetry);
+bot.command("cron", handleCron);
 
 // ============== Message Handlers ==============
 

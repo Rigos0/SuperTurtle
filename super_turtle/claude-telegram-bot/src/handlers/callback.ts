@@ -12,6 +12,7 @@ import { isAuthorized } from "../security";
 import { auditLog, startTypingIndicator } from "../utils";
 import { StreamingState, createStatusCallback } from "./streaming";
 import { escapeHtml } from "../formatting";
+import { removeJob } from "../cron";
 
 /**
  * Handle callback queries from inline keyboards.
@@ -81,13 +82,19 @@ export async function handleCallback(ctx: Context): Promise<void> {
     return;
   }
 
-  // 6. Handle resume callbacks: resume:{session_id}
+  // 6. Handle cron cancel callbacks: cron_cancel:{job_id}
+  if (callbackData.startsWith("cron_cancel:")) {
+    await handleCronCancelCallback(ctx, callbackData);
+    return;
+  }
+
+  // 7. Handle resume callbacks: resume:{session_id}
   if (callbackData.startsWith("resume:")) {
     await handleResumeCallback(ctx, callbackData);
     return;
   }
 
-  // 3. Parse callback data: askuser:{request_id}:{option_index}
+  // 8. Parse callback data: askuser:{request_id}:{option_index}
   if (!callbackData.startsWith("askuser:")) {
     await ctx.answerCallbackQuery();
     return;
@@ -102,7 +109,7 @@ export async function handleCallback(ctx: Context): Promise<void> {
   const requestId = parts[1]!;
   const optionIndex = parseInt(parts[2]!, 10);
 
-  // 3. Load request file
+  // 9. Load request file
   const requestFile = `/tmp/ask-user-${requestId}.json`;
   let requestData: {
     question: string;
@@ -120,7 +127,7 @@ export async function handleCallback(ctx: Context): Promise<void> {
     return;
   }
 
-  // 4. Get selected option
+  // 10. Get selected option
   if (optionIndex < 0 || optionIndex >= requestData.options.length) {
     await ctx.answerCallbackQuery({ text: "Invalid option" });
     return;
@@ -128,26 +135,26 @@ export async function handleCallback(ctx: Context): Promise<void> {
 
   const selectedOption = requestData.options[optionIndex]!;
 
-  // 5. Update the message to show selection
+  // 11. Update the message to show selection
   try {
     await ctx.editMessageText(`✓ ${selectedOption}`);
   } catch (error) {
     console.debug("Failed to edit callback message:", error);
   }
 
-  // 6. Answer the callback
+  // 12. Answer the callback
   await ctx.answerCallbackQuery({
     text: `Selected: ${selectedOption.slice(0, 50)}`,
   });
 
-  // 7. Delete request file
+  // 13. Delete request file
   try {
     unlinkSync(requestFile);
   } catch (error) {
     console.debug("Failed to delete request file:", error);
   }
 
-  // 8. Send the choice to Claude as a message
+  // 14. Send the choice to Claude as a message
   const message = selectedOption;
 
   // Interrupt any running query - button responses are always immediate
@@ -361,5 +368,35 @@ async function handleResumeCallback(
     // Don't show error to user - session is still resumed, recap just failed
   } finally {
     typing.stop();
+  }
+}
+
+/**
+ * Handle cron cancel callback (cron_cancel:{job_id}).
+ */
+async function handleCronCancelCallback(
+  ctx: Context,
+  callbackData: string
+): Promise<void> {
+  const jobId = callbackData.replace("cron_cancel:", "");
+
+  if (!jobId) {
+    await ctx.answerCallbackQuery({ text: "Invalid job ID" });
+    return;
+  }
+
+  // Remove the job
+  const success = removeJob(jobId);
+
+  if (success) {
+    // Update the message to show cancellation
+    try {
+      await ctx.editMessageText(`✅ Job cancelled`);
+    } catch (error) {
+      console.debug("Failed to edit callback message:", error);
+    }
+    await ctx.answerCallbackQuery({ text: "Job cancelled" });
+  } else {
+    await ctx.answerCallbackQuery({ text: "Job not found or already removed" });
   }
 }
