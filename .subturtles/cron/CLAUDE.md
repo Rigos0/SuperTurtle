@@ -1,6 +1,6 @@
 # Current task
 
-Update META_SHARED.md with cron scheduling instructions for the meta agent
+All core features implemented and documented. Cron system is production-ready.
 
 # End goal with specs
 
@@ -63,6 +63,6 @@ Also add `/cron` to the command list in `handleStart` in commands.ts.
 # Backlog
 
 - [x] Add `/cron` command (handleCron in commands.ts, export in handlers/index.ts, cron_cancel in callback.ts, register in index.ts)
-- [ ] Update META_SHARED.md with cron scheduling instructions for the meta agent <- current
+- [x] Update META_SHARED.md with cron scheduling instructions for the meta agent
 - [x] Add `/cron` to the command list shown by `/start` handler
 - [x] Verify TypeScript compiles cleanly, fix any issues

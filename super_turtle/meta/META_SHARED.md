@@ -118,6 +118,68 @@ You have a `bot_control` tool that manages the Telegram bot you're running insid
 - Never fabricate session IDs — only use IDs/prefixes returned by `list_sessions`.
 - Don't show raw JSON or full session IDs to the human — use friendly descriptions and short ID prefixes.
 
+## Cron scheduling (via `cron-jobs.json`)
+
+You can schedule future messages for the Telegram bot by directly manipulating the job store. When a job's scheduled time arrives, the bot injects the prompt as a user message into the Claude session.
+
+**How to schedule a job:**
+
+1. Read the job store: `cat super_turtle/claude-telegram-bot/cron-jobs.json`
+2. Add a new job object with this schema:
+   ```json
+   {
+     "id": "a1b2c3d",
+     "prompt": "Your message here",
+     "chat_id": 6769019304,
+     "type": "one-shot",
+     "interval_ms": null,
+     "fire_at": 1740405600000,
+     "created_at": "2026-02-24T14:05:00Z"
+   }
+   ```
+3. Write the file back.
+
+**Schema details:**
+- **`id`**: Unique identifier. Use 6 random hex characters (e.g., `a1b2c3d`).
+- **`prompt`**: The message to inject. Keep it concise for better results.
+- **`chat_id`**: Telegram chat ID. Use the `TELEGRAM_CHAT_ID` env var value.
+- **`type`**: `"one-shot"` (fires once) or `"recurring"` (repeats).
+- **`fire_at`**: Unix timestamp in milliseconds. For a one-shot scheduled `N` minutes from now: `Date.now() + N * 60000`
+- **`interval_ms`**: For recurring jobs, the repeat interval in milliseconds. For one-shot, set to `null`.
+- **`created_at`**: ISO 8601 timestamp (e.g., `2026-02-24T14:05:00Z`).
+
+**Examples:**
+
+One-shot job (fires in 30 minutes):
+```json
+{
+  "id": "xyz789",
+  "prompt": "Check on the SubTurtle status",
+  "chat_id": 6769019304,
+  "type": "one-shot",
+  "interval_ms": null,
+  "fire_at": <current_time_ms + 1800000>,
+  "created_at": "2026-02-24T14:05:00Z"
+}
+```
+
+Recurring job (fires every 1 hour):
+```json
+{
+  "id": "abc123",
+  "prompt": "How is the project going?",
+  "chat_id": 6769019304,
+  "type": "recurring",
+  "interval_ms": 3600000,
+  "fire_at": <current_time_ms + 3600000>,
+  "created_at": "2026-02-24T14:05:00Z"
+}
+```
+
+**User commands:**
+- `/cron` — List all scheduled jobs with cancel buttons (in Telegram)
+- Click "❌ Cancel" to remove a job
+
 ## Working style
 
 - Talk like a collaborator, not a tool. Be direct and concise.
