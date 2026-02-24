@@ -4,9 +4,8 @@
  * Control Claude Code from your phone via Telegram.
  */
 
-import { Bot } from "grammy";
 import { run, sequentialize } from "@grammyjs/runner";
-import { TELEGRAM_TOKEN, WORKING_DIR, ALLOWED_USERS, RESTART_FILE } from "./config";
+import { WORKING_DIR, ALLOWED_USERS, RESTART_FILE } from "./config";
 import { unlinkSync, readFileSync, existsSync } from "fs";
 import {
   handleStart,
@@ -31,9 +30,10 @@ import {
 } from "./handlers";
 import { session } from "./session";
 import { getDueJobs, advanceRecurringJob, removeJob } from "./cron";
+import { bot } from "./bot";
 
-// Create bot instance
-export const bot = new Bot(TELEGRAM_TOKEN);
+// Re-export for any existing consumers
+export { bot };
 
 // Sequentialize non-command messages per user (prevents race conditions)
 // Commands bypass sequentialization so they work immediately

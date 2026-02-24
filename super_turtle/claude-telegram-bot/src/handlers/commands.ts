@@ -13,6 +13,36 @@ import { escapeHtml } from "../formatting";
 import { getJobs } from "../cron";
 
 /**
+ * Shared command list for display in /start, /new, and new_session bot-control.
+ */
+export function getCommandLines(): string[] {
+  return [
+    `/new - Start fresh session`,
+    `/model - Switch model/effort`,
+    `/usage - Subscription usage`,
+    `/context - Show Claude context usage`,
+    `/stop - Stop current query`,
+    `/status - Detailed status`,
+    `/resume - Pick from recent sessions`,
+    `/subturtle - Manage SubTurtles`,
+    `/cron - List scheduled jobs`,
+    `/retry - Retry last message`,
+    `/restart - Restart bot`,
+  ];
+}
+
+/**
+ * Format current model + effort as a display string (e.g. "Sonnet | ⚡ high effort").
+ */
+export function formatModelInfo(model: string, effort: string): { modelName: string; effortStr: string } {
+  const models = getAvailableModels();
+  const currentModel = models.find((m) => m.value === model);
+  const modelName = currentModel?.displayName || model;
+  const effortStr = model.includes("haiku") ? "" : ` | ${EFFORT_DISPLAY[effort as EffortLevel]} effort`;
+  return { modelName, effortStr };
+}
+
+/**
  * /start - Show welcome message and status.
  */
 export async function handleStart(ctx: Context): Promise<void> {
@@ -27,22 +57,13 @@ export async function handleStart(ctx: Context): Promise<void> {
   const status = session.isActive ? "Active session" : "No active session";
   const workDir = WORKING_DIR;
 
+  const commandBlock = getCommandLines().join("\n");
   await ctx.reply(
     `🤖 <b>Claude Telegram Bot</b>\n\n` +
       `Status: ${status}\n` +
       `Working directory: <code>${workDir}</code>\n\n` +
       `<b>Commands:</b>\n` +
-      `/new - Start fresh session\n` +
-      `/model - Switch model/effort\n` +
-      `/usage - Subscription usage\n` +
-      `/context - Show Claude context usage\n` +
-      `/stop - Stop current query\n` +
-      `/status - Show detailed status\n` +
-      `/resume - Pick from recent sessions\n` +
-      `/subturtle - Manage SubTurtles\n` +
-      `/cron - List scheduled jobs\n` +
-      `/retry - Retry last message\n` +
-      `/restart - Restart the bot\n\n` +
+      `${commandBlock}\n\n` +
       `<b>Tips:</b>\n` +
       `• Prefix with <code>!</code> to interrupt current query\n` +
       `• Use "think" keyword for extended reasoning\n` +
@@ -76,10 +97,7 @@ export async function handleNew(ctx: Context): Promise<void> {
   await session.kill();
 
   // Get model info
-  const models = getAvailableModels();
-  const currentModel = models.find((m) => m.value === session.model);
-  const modelName = currentModel?.displayName || session.model;
-  const effortStr = session.model.includes("haiku") ? "" : ` | ${EFFORT_DISPLAY[session.effort]} effort`;
+  const { modelName, effortStr } = formatModelInfo(session.model, session.effort);
 
   // Build message
   const lines: string[] = [
@@ -94,16 +112,7 @@ export async function handleNew(ctx: Context): Promise<void> {
     lines.push(...usageLines, "");
   }
 
-  lines.push(
-    `<b>Commands:</b>`,
-    `/model - Switch model/effort`,
-    `/usage - Subscription usage`,
-    `/context - Show Claude context usage`,
-    `/stop - Stop current query`,
-    `/status - Detailed status`,
-    `/resume - Pick from recent sessions`,
-    `/restart - Restart bot`,
-  );
+  lines.push(`<b>Commands:</b>`, ...getCommandLines());
 
   await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
 }

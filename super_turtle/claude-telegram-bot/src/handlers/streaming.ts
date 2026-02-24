@@ -14,9 +14,11 @@ import {
   TELEGRAM_SAFE_LIMIT,
   STREAMING_THROTTLE_MS,
   BUTTON_LABEL_MAX_LENGTH,
+  WORKING_DIR,
 } from "../config";
 import type { ClaudeSession } from "../session";
-import { getUsageLines } from "./commands";
+import { bot } from "../bot";
+import { getUsageLines, getCommandLines, formatModelInfo } from "./commands";
 
 /**
  * Create inline keyboard for ask_user options.
@@ -164,7 +166,7 @@ export async function checkPendingBotControlRequests(
       let result: string;
 
       try {
-        result = await executeBotControlAction(sessionObj, action, params);
+        result = await executeBotControlAction(sessionObj, action, params, chatId);
       } catch (err) {
         data.status = "error";
         data.error = String(err);
@@ -193,6 +195,7 @@ async function executeBotControlAction(
   sessionObj: ClaudeSession,
   action: string,
   params: Record<string, string>,
+  chatId?: number,
 ): Promise<string> {
   switch (action) {
     case "usage": {
@@ -236,8 +239,34 @@ async function executeBotControlAction(
     }
 
     case "new_session": {
+      // Capture model info before kill (kill only clears sessionId, but be safe)
+      const { modelName, effortStr } = formatModelInfo(sessionObj.model, sessionObj.effort);
+
       await sessionObj.stop();
       await sessionObj.kill();
+
+      // Send command overview to the chat (same as /new)
+      if (chatId) {
+        try {
+          const lines: string[] = [
+            `<b>New session</b>\n`,
+            `<b>Model:</b> ${modelName}${effortStr}`,
+            `<b>Dir:</b> <code>${WORKING_DIR}</code>\n`,
+          ];
+
+          const usageLines = await getUsageLines();
+          if (usageLines.length > 0) {
+            lines.push(...usageLines, "");
+          }
+
+          lines.push(`<b>Commands:</b>`, ...getCommandLines());
+
+          await bot.api.sendMessage(chatId, lines.join("\n"), { parse_mode: "HTML" });
+        } catch (err) {
+          console.warn("Failed to send new session overview:", err);
+        }
+      }
+
       return "Session cleared. Next message will start a fresh session.";
     }
 
