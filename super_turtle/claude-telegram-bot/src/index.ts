@@ -44,8 +44,8 @@ bot.use(
     if (ctx.message?.text?.startsWith("!")) {
       return undefined;
     }
-    // Bare "stop" bypasses queue (acts like /stop)
-    if (ctx.message?.text?.toLowerCase().trim() === "stop") {
+    // Messages starting with "stop" bypass queue (acts like /stop)
+    if (ctx.message?.text?.toLowerCase().trimStart().startsWith("stop")) {
       return undefined;
     }
     // Callback queries (button clicks) are not sequentialized

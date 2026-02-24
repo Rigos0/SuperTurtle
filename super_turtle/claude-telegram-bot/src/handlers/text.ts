@@ -33,6 +33,19 @@ export async function handleText(ctx: Context): Promise<void> {
     return;
   }
 
+  // 1.5. Bare "stop" — intercept and abort (acts like /stop)
+  if (message.toLowerCase().trimStart().startsWith("stop")) {
+    if (session.isRunning) {
+      const result = await session.stop();
+      if (result) {
+        await Bun.sleep(100);
+        session.clearStopRequested();
+      }
+    }
+    // Don't send "stop" to Claude — just swallow it
+    return;
+  }
+
   // 2. Check for interrupt prefix
   message = await checkInterrupt(message);
   if (!message.trim()) {
