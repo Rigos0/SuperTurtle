@@ -1,6 +1,6 @@
 # Current task
 
-Fix remaining `super_turtle/meta/META_SHARED.md` issues (session ID guidance; command path consistency done) <- current
+Run a final consistency check across all three files <- current
 
 # End goal with specs
 
@@ -30,5 +30,5 @@ Acceptance criteria:
 - [x] Review `super_turtle/subturtle/__main__.py` for bugs — check prompt formatting, error handling, function signatures, retry logic
 - [x] Review `super_turtle/subturtle/ctl` for bash issues — quoting, argv flow, ensure_workspace error path, do_list/do_status column alignment
 - [x] Review `super_turtle/meta/META_SHARED.md` for stale/contradictory docs
-- [ ] Fix any issues found, commit each fix separately (command path consistency fixed; session ID guidance pending) <- current
-- [ ] Run a final consistency check across all three files
+- [x] Fix any issues found, commit each fix separately (command path consistency + session ID guidance fixed)
+- [ ] Run a final consistency check across all three files <- current
