@@ -1,6 +1,6 @@
 # Current task
 
-End-to-end test with snake-game/: write a mini CLAUDE.md that starts a tunnel, verify URL works in browser, stop and verify cleanup
+All tunnel infrastructure implemented and tested. End-to-end test with snake-game verifies tunnel creation, URL generation, and proper cleanup of processes.
 
 # End goal with specs
 
@@ -51,4 +51,4 @@ Add preview tunnel support to the SubTurtle infrastructure. When a SubTurtle wor
 - [x] Verify cleanup: start a tunnel via the helper, then kill the parent process — confirm tunnel + dev server die too. If not, add PID tracking + trap cleanup to the helper.
 - [x] Update `ctl status` and `ctl list` to show tunnel URL if `.tunnel-url` exists in workspace
 - [x] Update META_SHARED.md: on cron check-ins, check for `.tunnel-url` in the SubTurtle workspace. If found and not yet sent to user, send the link. Document that SubTurtles doing frontend work should have "start tunnel" as their first backlog item.
-- [ ] End-to-end test with snake-game/: write a mini CLAUDE.md that starts a tunnel, verify URL works in browser, stop and verify cleanup <- current
+- [x] End-to-end test with snake-game/: write a mini CLAUDE.md that starts a tunnel, verify URL works in browser, stop and verify cleanup <- current
