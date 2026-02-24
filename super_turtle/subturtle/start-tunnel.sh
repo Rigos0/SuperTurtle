@@ -16,6 +16,9 @@ set -euo pipefail
 #   Prints the tunnel URL to stdout
 #   Writes the URL to workspace-dir/.tunnel-url
 #   Keeps tunnel + dev server running in the background
+#
+# Cleanup:
+#   When this script is killed or exits, child processes (dev server + tunnel) are terminated.
 
 PROJECT_DIR="${1:?project-dir required}"
 PORT="${2:-3000}"
@@ -26,6 +29,29 @@ PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
 WORKSPACE_DIR="$(cd "$WORKSPACE_DIR" && pwd)"
 
 TUNNEL_URL_FILE="${WORKSPACE_DIR}/.tunnel-url"
+
+# PIDs to track for cleanup
+DEV_PID=""
+TUNNEL_PID=""
+TUNNEL_OUTPUT=""
+
+# Cleanup function: kill tracked processes
+cleanup() {
+  local exit_code=$?
+  if [[ -n "$TUNNEL_OUTPUT" ]] && [[ -f "$TUNNEL_OUTPUT" ]]; then
+    rm -f "$TUNNEL_OUTPUT"
+  fi
+  if [[ -n "$DEV_PID" ]]; then
+    kill "$DEV_PID" 2>/dev/null || true
+  fi
+  if [[ -n "$TUNNEL_PID" ]]; then
+    kill "$TUNNEL_PID" 2>/dev/null || true
+  fi
+  exit $exit_code
+}
+
+# Set trap to run cleanup on EXIT, INT, TERM
+trap cleanup EXIT INT TERM
 
 echo "[start-tunnel] Starting npm dev server in ${PROJECT_DIR}:${PORT}..."
 cd "$PROJECT_DIR"
@@ -38,7 +64,6 @@ WAIT_TIMEOUT=30
 WAIT_ELAPSED=0
 while ! curl -s "http://localhost:${PORT}" > /dev/null 2>&1; do
   if (( WAIT_ELAPSED >= WAIT_TIMEOUT )); then
-    kill $DEV_PID 2>/dev/null || true
     echo "[start-tunnel] ERROR: dev server did not respond after ${WAIT_TIMEOUT}s" >&2
     exit 1
   fi
@@ -50,7 +75,6 @@ echo "[start-tunnel] Dev server ready!"
 # Start cloudflared tunnel, capture URL from stderr
 echo "[start-tunnel] Starting cloudflared tunnel..."
 TUNNEL_OUTPUT=$(mktemp)
-trap "rm -f $TUNNEL_OUTPUT" EXIT
 
 cloudflared tunnel --url "http://localhost:${PORT}" > /dev/null 2> "$TUNNEL_OUTPUT" &
 TUNNEL_PID=$!
@@ -62,8 +86,6 @@ TUNNEL_WAIT_ELAPSED=0
 TUNNEL_URL=""
 while [[ -z "$TUNNEL_URL" ]] && kill -0 $TUNNEL_PID 2>/dev/null; do
   if (( TUNNEL_WAIT_ELAPSED >= TUNNEL_WAIT_TIMEOUT )); then
-    kill $DEV_PID 2>/dev/null || true
-    kill $TUNNEL_PID 2>/dev/null || true
     echo "[start-tunnel] ERROR: cloudflared did not produce URL after ${TUNNEL_WAIT_TIMEOUT}s" >&2
     exit 1
   fi
@@ -77,8 +99,6 @@ while [[ -z "$TUNNEL_URL" ]] && kill -0 $TUNNEL_PID 2>/dev/null; do
 done
 
 if [[ -z "$TUNNEL_URL" ]]; then
-  kill $DEV_PID 2>/dev/null || true
-  kill $TUNNEL_PID 2>/dev/null || true
   echo "[start-tunnel] ERROR: failed to extract tunnel URL" >&2
   exit 1
 fi
@@ -88,5 +108,17 @@ echo "$TUNNEL_URL" > "$TUNNEL_URL_FILE"
 echo "[start-tunnel] Tunnel started! URL written to ${TUNNEL_URL_FILE}"
 echo "$TUNNEL_URL"
 
-# Exit and let processes continue in the background (part of the SubTurtle process group)
-# They will be cleaned up when the SubTurtle process group is killed
+# Keep the script running to maintain the trap handler
+# The processes will be cleaned up when this script is killed
+while true; do
+  # Monitor that both processes are still alive
+  if ! kill -0 "$DEV_PID" 2>/dev/null; then
+    echo "[start-tunnel] Dev server died unexpectedly" >&2
+    exit 1
+  fi
+  if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
+    echo "[start-tunnel] Tunnel died unexpectedly" >&2
+    exit 1
+  fi
+  sleep 5
+done
