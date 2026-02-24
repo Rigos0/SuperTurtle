@@ -5,6 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 SUBTURTLES_DIR="${PROJECT_DIR}/.subturtles"
+DEFAULT_TIMEOUT="1h"
 
 # Use subturtle venv if available, otherwise system python3
 PYTHON="${SCRIPT_DIR}/.venv/bin/python3"
@@ -13,14 +14,17 @@ if [[ ! -x "$PYTHON" ]]; then
 fi
 
 usage() {
-  echo "Usage: ./super_turtle/subturtle/ctl <command> [name]"
+  echo "Usage: ./super_turtle/subturtle/ctl <command> [name] [options]"
   echo ""
   echo "Commands:"
-  echo "  start  [name]   Spawn a SubTurtle (default name: 'default')"
-  echo "  stop   [name]   Stop a SubTurtle gracefully"
-  echo "  status [name]   Check if a SubTurtle is running"
-  echo "  logs   [name]   Tail a SubTurtle's log"
-  echo "  list            List all SubTurtles and their status"
+  echo "  start  [name] [--timeout DURATION]   Spawn a SubTurtle (default timeout: ${DEFAULT_TIMEOUT})"
+  echo "  stop   [name]                        Stop a SubTurtle gracefully"
+  echo "  status [name]                        Check if running + time remaining"
+  echo "  logs   [name]                        Tail a SubTurtle's log"
+  echo "  list                                 List all SubTurtles and their status"
+  echo ""
+  echo "Timeout durations: 30m, 1h, 2h, 4h, etc. Default: ${DEFAULT_TIMEOUT}"
+  echo "SubTurtles auto-terminate when their timeout expires."
   echo ""
   echo "Each SubTurtle gets its own workspace at .subturtles/<name>/ with"
   echo "its own CLAUDE.md, AGENTS.md symlink, PID file, and log file."
@@ -35,6 +39,101 @@ workspace_dir() {
 
 pid_file()  { echo "$(workspace_dir "$1")/subturtle.pid"; }
 log_file()  { echo "$(workspace_dir "$1")/subturtle.log"; }
+meta_file() { echo "$(workspace_dir "$1")/subturtle.meta"; }
+
+# --- Duration helpers ---
+
+# Parse a human duration string (30m, 1h, 2h, 4h) into seconds.
+# Falls back to raw seconds if no suffix.
+parse_duration() {
+  local input="$1"
+  local suffix="${input: -1}"
+
+  # Check if last char is a known unit suffix
+  case "$suffix" in
+    m|M|h|H|d|D)
+      local num="${input%[mMhHdD]}"
+      if ! [[ "$num" =~ ^[0-9]+$ ]]; then
+        echo "ERROR: invalid duration '${input}'" >&2
+        return 1
+      fi
+      case "$suffix" in
+        m|M) echo $(( num * 60 )) ;;
+        h|H) echo $(( num * 3600 )) ;;
+        d|D) echo $(( num * 86400 )) ;;
+      esac
+      ;;
+    *)
+      # No suffix — treat entire input as raw seconds
+      if ! [[ "$input" =~ ^[0-9]+$ ]]; then
+        echo "ERROR: invalid duration '${input}'" >&2
+        return 1
+      fi
+      echo "$input"
+      ;;
+  esac
+}
+
+# Format seconds into a human-readable string (e.g. "1h 23m", "45m", "2m").
+format_duration() {
+  local secs="$1"
+  if (( secs < 0 )); then secs=0; fi
+  local h=$(( secs / 3600 ))
+  local m=$(( (secs % 3600) / 60 ))
+  if (( h > 0 )); then
+    echo "${h}h ${m}m"
+  else
+    echo "${m}m"
+  fi
+}
+
+# Read the .meta file into shell variables: SPAWNED_AT, TIMEOUT_SECONDS, WATCHDOG_PID.
+# Uses grep to extract known keys only — never sources the file directly.
+# Returns 1 if meta file doesn't exist.
+read_meta() {
+  local mf
+  mf="$(meta_file "$1")"
+  if [[ -f "$mf" ]]; then
+    SPAWNED_AT="$(grep -m1 '^SPAWNED_AT=' "$mf" 2>/dev/null | cut -d= -f2)" || true
+    TIMEOUT_SECONDS="$(grep -m1 '^TIMEOUT_SECONDS=' "$mf" 2>/dev/null | cut -d= -f2)" || true
+    WATCHDOG_PID="$(grep -m1 '^WATCHDOG_PID=' "$mf" 2>/dev/null | cut -d= -f2)" || true
+    return 0
+  fi
+  return 1
+}
+
+# Compute seconds remaining before timeout. Negative = overdue.
+time_remaining() {
+  local name="$1"
+  SPAWNED_AT="" TIMEOUT_SECONDS=""
+  if ! read_meta "$name"; then
+    echo ""
+    return
+  fi
+  if [[ -z "$SPAWNED_AT" || -z "$TIMEOUT_SECONDS" ]]; then
+    echo ""
+    return
+  fi
+  local now elapsed remaining
+  now="$(date +%s)"
+  elapsed=$(( now - SPAWNED_AT ))
+  remaining=$(( TIMEOUT_SECONDS - elapsed ))
+  echo "$remaining"
+}
+
+# Format a time-remaining value for display.
+format_time_remaining() {
+  local remaining="$1"
+  if [[ -z "$remaining" ]]; then
+    echo "no timeout"
+    return
+  fi
+  if (( remaining <= 0 )); then
+    echo "OVERDUE"
+  else
+    echo "$(format_duration "$remaining") left"
+  fi
+}
 
 ensure_workspace() {
   local name="${1:-default}"
@@ -103,6 +202,20 @@ read_pid() {
 
 do_start() {
   local name="${1:-default}"
+  local timeout_str="${DEFAULT_TIMEOUT}"
+
+  # Parse --timeout flag from remaining args
+  shift || true
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --timeout) timeout_str="${2:?missing timeout value}"; shift 2 ;;
+      *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  local timeout_secs
+  timeout_secs="$(parse_duration "$timeout_str")" || exit 1
+
   ensure_workspace "$name"
 
   if is_running "$name"; then
@@ -110,14 +223,15 @@ do_start() {
     exit 0
   fi
 
-  local pf lf ws
+  local pf lf mf ws
   pf="$(pid_file "$name")"
   lf="$(log_file "$name")"
+  mf="$(meta_file "$name")"
   ws="$(workspace_dir "$name")"
 
-  rm -f "$pf"
+  rm -f "$pf" "$mf"
 
-  echo "[subturtle:${name}] spawning..."
+  echo "[subturtle:${name}] spawning (timeout: ${timeout_str})..."
   echo "[subturtle:${name}] workspace: ${ws}"
   echo "[subturtle:${name}] log: ${lf}"
 
@@ -158,14 +272,61 @@ with open(pid_file, 'w') as f:
 
 print(f'[subturtle:{name}] spawned (PID {proc.pid})')
 " "$pf" "$lf" "$PYTHON" "$PROJECT_DIR" "$ws" "$name"
+
+  # Read back the PID we just wrote
+  local turtle_pid
+  if [[ ! -f "$pf" ]]; then
+    echo "[subturtle:${name}] ERROR: spawn failed — no PID file written" >&2
+    exit 1
+  fi
+  turtle_pid="$(cat "$pf")"
+
+  # Write metadata (spawn time + timeout)
+  local spawned_at
+  spawned_at="$(date +%s)"
+  cat > "$mf" <<METAEOF
+SPAWNED_AT=${spawned_at}
+TIMEOUT_SECONDS=${timeout_secs}
+METAEOF
+
+  # Spawn watchdog: sleeps for timeout, then kills the sub-turtle.
+  # The watchdog is a fire-and-forget background process — no polling overhead.
+  # disown ensures it survives if the launching terminal closes.
+  (
+    sleep "$timeout_secs"
+    if kill -0 "$turtle_pid" 2>/dev/null; then
+      echo "[subturtle:${name}] TIMEOUT ($(format_duration "$timeout_secs")) — sending SIGTERM to PID ${turtle_pid}" >> "$lf"
+      kill "$turtle_pid" 2>/dev/null || true
+      sleep 5
+      if kill -0 "$turtle_pid" 2>/dev/null; then
+        echo "[subturtle:${name}] SIGTERM didn't work — sending SIGKILL" >> "$lf"
+        kill -9 "$turtle_pid" 2>/dev/null || true
+      fi
+      rm -f "$pf" "$mf"
+      echo "[subturtle:${name}] timed out and killed" >> "$lf"
+    fi
+  ) &
+  local watchdog_pid=$!
+  disown "$watchdog_pid"
+
+  # Append watchdog PID to meta
+  echo "WATCHDOG_PID=${watchdog_pid}" >> "$mf"
+
+  echo "[subturtle:${name}] watchdog armed (${timeout_str}, PID ${watchdog_pid})"
 }
 
 do_stop() {
   local name="${1:-default}"
 
+  # Kill the watchdog first so it doesn't fire after manual stop
+  WATCHDOG_PID=""
+  if read_meta "$name" && [[ -n "${WATCHDOG_PID:-}" ]]; then
+    kill "$WATCHDOG_PID" 2>/dev/null || true
+  fi
+
   if ! is_running "$name"; then
     echo "[subturtle:${name}] not running"
-    rm -f "$(pid_file "$name")"
+    rm -f "$(pid_file "$name")" "$(meta_file "$name")"
     exit 0
   fi
 
@@ -179,7 +340,7 @@ do_stop() {
   for i in $(seq 1 10); do
     if ! kill -0 "$pid" 2>/dev/null; then
       echo "[subturtle:${name}] stopped"
-      rm -f "$(pid_file "$name")"
+      rm -f "$(pid_file "$name")" "$(meta_file "$name")"
       return
     fi
     sleep 1
@@ -187,7 +348,7 @@ do_stop() {
 
   echo "[subturtle:${name}] sending SIGKILL..."
   kill -9 "$pid" 2>/dev/null || true
-  rm -f "$(pid_file "$name")"
+  rm -f "$(pid_file "$name")" "$(meta_file "$name")"
   echo "[subturtle:${name}] killed"
 }
 
@@ -195,13 +356,27 @@ do_status() {
   local name="${1:-default}"
 
   if is_running "$name"; then
-    local pid
+    local pid remaining_secs
     pid="$(read_pid "$name")"
-    echo "[subturtle:${name}] running (PID ${pid})"
+
+    remaining_secs="$(time_remaining "$name")"
+
+    # Build the status line
+    local time_info=""
+    if [[ -n "$remaining_secs" ]]; then
+      SPAWNED_AT="" TIMEOUT_SECONDS=""
+      read_meta "$name" || true
+      local now elapsed
+      now="$(date +%s)"
+      elapsed=$(( now - SPAWNED_AT ))
+      time_info=" — $(format_duration "$elapsed") elapsed, $(format_time_remaining "$remaining_secs")"
+    fi
+
+    echo "[subturtle:${name}] running (PID ${pid})${time_info}"
     ps -o pid,ppid,pgid,sess,state,etime,command -p "$pid" 2>/dev/null || true
   else
     echo "[subturtle:${name}] not running"
-    rm -f "$(pid_file "$name")"
+    rm -f "$(pid_file "$name")" "$(meta_file "$name")"
   fi
 }
 
@@ -232,6 +407,7 @@ do_list() {
 
     local status_str="stopped"
     local pid_str=""
+    local time_str=""
     local pf="${ws}subturtle.pid"
     if [[ -f "$pf" ]]; then
       local pid
@@ -239,6 +415,11 @@ do_list() {
       if kill -0 "$pid" 2>/dev/null; then
         status_str="running"
         pid_str=" (PID ${pid})"
+
+        # Show time remaining from meta
+        local remaining_secs
+        remaining_secs="$(time_remaining "$name")"
+        time_str="$(format_time_remaining "$remaining_secs")"
       fi
     fi
 
@@ -249,7 +430,11 @@ do_list() {
       [[ -z "$task" ]] && task="(no task)"
     fi
 
-    printf "  %-15s %-8s%s  %s\n" "$name" "$status_str" "$pid_str" "$task"
+    if [[ -n "$time_str" ]]; then
+      printf "  %-15s %-8s%-14s %-14s %s\n" "$name" "$status_str" "$pid_str" "$time_str" "$task"
+    else
+      printf "  %-15s %-8s%-14s %-14s %s\n" "$name" "$status_str" "$pid_str" "" "$task"
+    fi
   done
 
   if [[ $found -eq 0 ]]; then
@@ -263,13 +448,18 @@ if [[ $# -lt 1 ]]; then
 fi
 
 CMD="$1"
-NAME="${2:-default}"
+shift
 
 case "$CMD" in
-  start)  do_start "$NAME" ;;
-  stop)   do_stop "$NAME" ;;
-  status) do_status "$NAME" ;;
-  logs)   do_logs "$NAME" ;;
+  start)
+    # First positional arg is name, rest are flags (e.g. --timeout 2h)
+    NAME="${1:-default}"
+    if [[ $# -gt 0 ]]; then shift; fi
+    do_start "$NAME" "$@"
+    ;;
+  stop)   do_stop "${1:-default}" ;;
+  status) do_status "${1:-default}" ;;
+  logs)   do_logs "${1:-default}" ;;
   list)   do_list ;;
   *)      usage ;;
 esac
