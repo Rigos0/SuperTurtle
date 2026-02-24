@@ -744,10 +744,19 @@ export async function handleSubturtle(ctx: Context): Promise<void> {
         idx++;
       }
 
-      // Then comes time like "59m" or "1h" with "left"
-      if (idx < parts.length && parts[idx + 1] === "left") {
-        time = parts[idx]!;
+      // Then comes time like "45m left", "1h 23m left", "no timeout", or "OVERDUE"
+      // Find "left" marker and capture everything before it as time
+      const leftIdx = parts.indexOf("left", idx);
+      if (leftIdx > idx) {
+        time = parts.slice(idx, leftIdx).join(" ");
+        idx = leftIdx + 1; // skip past "left"
+      } else if (idx < parts.length && parts[idx] === "no" && idx + 1 < parts.length && parts[idx + 1] === "timeout") {
+        // Handle "no timeout" case
+        time = "no timeout";
         idx += 2;
+      } else if (idx < parts.length && parts[idx] === "OVERDUE") {
+        time = "OVERDUE";
+        idx++;
       }
     }
 
