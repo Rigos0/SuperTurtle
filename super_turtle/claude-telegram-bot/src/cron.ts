@@ -1,0 +1,169 @@
+/**
+ * Persistent job store for scheduled cron jobs.
+ *
+ * Jobs are stored in a JSON file and loaded/saved synchronously.
+ * Each job has an ID, prompt, chat_id, type (one-shot or recurring),
+ * fire_at timestamp, and optional interval_ms for recurring jobs.
+ */
+
+import { readFileSync, writeFileSync, existsSync } from "fs";
+import { join } from "path";
+
+// Job type definition
+export interface CronJob {
+  id: string;
+  prompt: string;
+  chat_id: number;
+  type: "one-shot" | "recurring";
+  interval_ms: number | null;
+  fire_at: number; // milliseconds since epoch
+  created_at: string; // ISO 8601 format
+}
+
+// Path to the job store
+const CRON_JOBS_FILE = join(import.meta.dir, "../cron-jobs.json");
+
+let jobsCache: CronJob[] = [];
+let cacheLoaded = false;
+
+/**
+ * Load jobs from the persistent store.
+ * Caches the result in memory.
+ */
+export function loadJobs(): CronJob[] {
+  if (cacheLoaded) {
+    return jobsCache;
+  }
+
+  try {
+    if (existsSync(CRON_JOBS_FILE)) {
+      const content = readFileSync(CRON_JOBS_FILE, "utf-8");
+      jobsCache = JSON.parse(content);
+    } else {
+      jobsCache = [];
+    }
+  } catch (error) {
+    console.error("Failed to load cron jobs:", error);
+    jobsCache = [];
+  }
+
+  cacheLoaded = true;
+  return jobsCache;
+}
+
+/**
+ * Save jobs to the persistent store.
+ */
+export function saveJobs(): void {
+  try {
+    writeFileSync(CRON_JOBS_FILE, JSON.stringify(jobsCache, null, 2));
+  } catch (error) {
+    console.error("Failed to save cron jobs:", error);
+  }
+}
+
+/**
+ * Add a new job to the store.
+ * Computes fire_at from delay_ms or interval_ms.
+ * Saves immediately.
+ */
+export function addJob(
+  prompt: string,
+  chat_id: number,
+  type: "one-shot" | "recurring",
+  delay_ms?: number,
+  interval_ms?: number
+): CronJob {
+  // Load existing jobs if not already loaded
+  loadJobs();
+
+  // Generate unique ID (simple: timestamp + random)
+  const id = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+  // Compute fire_at
+  let fire_at = Date.now();
+  if (delay_ms) {
+    fire_at = Date.now() + delay_ms;
+  } else if (interval_ms && type === "recurring") {
+    fire_at = Date.now() + interval_ms;
+  }
+
+  const job: CronJob = {
+    id,
+    prompt,
+    chat_id,
+    type,
+    interval_ms: interval_ms || null,
+    fire_at,
+    created_at: new Date().toISOString(),
+  };
+
+  jobsCache.push(job);
+  saveJobs();
+
+  return job;
+}
+
+/**
+ * Remove a job from the store by ID.
+ * Saves immediately.
+ */
+export function removeJob(id: string): boolean {
+  loadJobs();
+
+  const index = jobsCache.findIndex((job) => job.id === id);
+  if (index === -1) {
+    return false;
+  }
+
+  jobsCache.splice(index, 1);
+  saveJobs();
+
+  return true;
+}
+
+/**
+ * Get all jobs.
+ */
+export function getJobs(): CronJob[] {
+  loadJobs();
+  return [...jobsCache];
+}
+
+/**
+ * Get jobs that are due to fire (fire_at <= now).
+ */
+export function getDueJobs(): CronJob[] {
+  loadJobs();
+
+  const now = Date.now();
+  return jobsCache.filter((job) => job.fire_at <= now);
+}
+
+/**
+ * Advance a recurring job's fire_at time.
+ * Called after a recurring job fires.
+ * Saves immediately.
+ */
+export function advanceRecurringJob(id: string): boolean {
+  loadJobs();
+
+  const job = jobsCache.find((j) => j.id === id);
+  if (!job || job.type !== "recurring" || !job.interval_ms) {
+    return false;
+  }
+
+  job.fire_at = job.fire_at + job.interval_ms;
+  saveJobs();
+
+  return true;
+}
+
+/**
+ * Force reload of jobs from disk.
+ * Useful for testing or if external processes modify the file.
+ */
+export function reloadJobs(): CronJob[] {
+  cacheLoaded = false;
+  return loadJobs();
+}
