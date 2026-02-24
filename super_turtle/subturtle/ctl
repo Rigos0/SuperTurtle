@@ -17,12 +17,13 @@ usage() {
   echo "Usage: ./super_turtle/subturtle/ctl <command> [name] [options]"
   echo ""
   echo "Commands:"
-  echo "  start  [name] [--type TYPE] [--timeout DURATION]"
+  echo "  start  [name] [--type TYPE] [--timeout DURATION] [--skill NAME ...]"
   echo "         Spawn a SubTurtle (default timeout: ${DEFAULT_TIMEOUT})"
   echo "         Types: slow (default), yolo, yolo-codex"
   echo "           slow       — Plan -> Groom -> Execute -> Review (4 calls/iter)"
   echo "           yolo       — Single Claude call per iteration (Ralph loop)"
   echo "           yolo-codex — Single Codex call per iteration (Ralph loop)"
+  echo "         Skills: repeatable --skill flags load Claude Code skills (e.g. --skill frontend --skill testing)"
   echo "  stop   [name]                        Stop a SubTurtle gracefully"
   echo "  status [name]                        Check if running + time remaining"
   echo "  logs   [name]                        Tail a SubTurtle's log"
@@ -186,13 +187,15 @@ do_start() {
   local name="${1:-default}"
   local timeout_str="${DEFAULT_TIMEOUT}"
   local loop_type="slow"
+  local -a skills=()
 
-  # Parse --timeout and --type flags from remaining args
+  # Parse --timeout, --type, and --skill flags from remaining args
   shift || true
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --timeout) timeout_str="${2:?missing timeout value}"; shift 2 ;;
       --type)    loop_type="${2:?missing type value}"; shift 2 ;;
+      --skill)   skills+=("${2:?missing skill name}"); shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -230,7 +233,7 @@ do_start() {
   # and process group — unreachable by the parent's group signals.
   # The launcher exits immediately; child process is orphaned to PID 1.
   "$PYTHON" -c "
-import subprocess, sys, os
+import subprocess, sys, os, json
 
 pid_file   = sys.argv[1]
 log_file   = sys.argv[2]
@@ -239,6 +242,12 @@ cwd        = sys.argv[4]
 state_dir  = sys.argv[5]
 name       = sys.argv[6]
 loop_type  = sys.argv[7]
+skills_json = sys.argv[8] if len(sys.argv) > 8 else '[]'
+
+try:
+    skills = json.loads(skills_json)
+except:
+    skills = []
 
 env = os.environ.copy()
 # Strip Claude Code session vars so child can spawn its own claude processes
@@ -247,8 +256,12 @@ for key in list(env):
         del env[key]
 
 log_fd = open(log_file, 'w')
+cmd = [python, '-u', '-m', 'super_turtle.subturtle', '--state-dir', state_dir, '--name', name, '--type', loop_type]
+if skills:
+    cmd.extend(['--skills'] + skills)
+
 proc = subprocess.Popen(
-    [python, '-u', '-m', 'super_turtle.subturtle', '--state-dir', state_dir, '--name', name, '--type', loop_type],
+    cmd,
     cwd=cwd,
     stdin=subprocess.DEVNULL,
     stdout=log_fd,
@@ -262,7 +275,7 @@ with open(pid_file, 'w') as f:
     f.write(str(proc.pid))
 
 print(f'[subturtle:{name}] spawned as {loop_type} (PID {proc.pid})')
-" "$pf" "$lf" "$PYTHON" "$PROJECT_DIR" "$ws" "$name" "$loop_type"
+" "$pf" "$lf" "$PYTHON" "$PROJECT_DIR" "$ws" "$name" "$loop_type" "$(printf '%s\n' "${skills[@]}" | python3 -c 'import sys, json; print(json.dumps([line.strip() for line in sys.stdin if line.strip()]))')"
 
   # Read back the PID we just wrote
   local turtle_pid
