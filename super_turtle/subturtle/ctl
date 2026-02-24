@@ -4,9 +4,7 @@ set -euo pipefail
 # --- Configuration ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-TMP_DIR="${PROJECT_DIR}/.tmp"
-PID_FILE="${TMP_DIR}/subturtle.pid"
-LOG_FILE="${TMP_DIR}/subturtle.log"
+SUBTURTLES_DIR="${PROJECT_DIR}/.subturtles"
 
 # Use subturtle venv if available, otherwise system python3
 PYTHON="${SCRIPT_DIR}/.venv/bin/python3"
@@ -15,24 +13,83 @@ if [[ ! -x "$PYTHON" ]]; then
 fi
 
 usage() {
-  echo "Usage: ./super_turtle/subturtle/ctl {start|stop|status|logs}"
+  echo "Usage: ./super_turtle/subturtle/ctl <command> [name]"
   echo ""
   echo "Commands:"
-  echo "  start   Spawn a SubTurtle (detached, survives session exit)"
-  echo "  stop    Stop the SubTurtle gracefully"
-  echo "  status  Check if the SubTurtle is running"
-  echo "  logs    Tail the SubTurtle log"
+  echo "  start  [name]   Spawn a SubTurtle (default name: 'default')"
+  echo "  stop   [name]   Stop a SubTurtle gracefully"
+  echo "  status [name]   Check if a SubTurtle is running"
+  echo "  logs   [name]   Tail a SubTurtle's log"
+  echo "  list            List all SubTurtles and their status"
+  echo ""
+  echo "Each SubTurtle gets its own workspace at .subturtles/<name>/ with"
+  echo "its own CLAUDE.md, AGENTS.md symlink, PID file, and log file."
   exit 1
 }
 
-ensure_tmp() {
-  mkdir -p "$TMP_DIR"
+# Resolve the workspace directory for a named SubTurtle
+workspace_dir() {
+  local name="${1:-default}"
+  echo "${SUBTURTLES_DIR}/${name}"
+}
+
+pid_file()  { echo "$(workspace_dir "$1")/subturtle.pid"; }
+log_file()  { echo "$(workspace_dir "$1")/subturtle.log"; }
+
+ensure_workspace() {
+  local name="${1:-default}"
+  local ws
+  ws="$(workspace_dir "$name")"
+
+  mkdir -p "$ws"
+
+  # Create CLAUDE.md if it doesn't exist yet — seed from root if available
+  if [[ ! -f "$ws/CLAUDE.md" ]]; then
+    if [[ -f "$PROJECT_DIR/CLAUDE.md" ]]; then
+      cp "$PROJECT_DIR/CLAUDE.md" "$ws/CLAUDE.md"
+      echo "[subturtle:${name}] seeded CLAUDE.md from project root"
+    else
+      cat > "$ws/CLAUDE.md" <<'SEED'
+# Current task
+
+(no task set)
+
+# End goal with specs
+
+(not defined yet)
+
+# Roadmap (Completed)
+
+- (none yet)
+
+# Roadmap (Upcoming)
+
+- (none yet)
+
+# Backlog
+
+- [ ] Define end goal and first tasks <- current
+- [ ] (placeholder 2)
+- [ ] (placeholder 3)
+- [ ] (placeholder 4)
+- [ ] (placeholder 5)
+SEED
+      echo "[subturtle:${name}] created empty CLAUDE.md"
+    fi
+  fi
+
+  # Create AGENTS.md symlink if missing
+  if [[ ! -L "$ws/AGENTS.md" ]]; then
+    ln -sf CLAUDE.md "$ws/AGENTS.md"
+  fi
 }
 
 is_running() {
-  if [[ -f "$PID_FILE" ]]; then
+  local pf
+  pf="$(pid_file "$1")"
+  if [[ -f "$pf" ]]; then
     local pid
-    pid="$(cat "$PID_FILE")"
+    pid="$(cat "$pf")"
     if kill -0 "$pid" 2>/dev/null; then
       return 0
     fi
@@ -41,35 +98,43 @@ is_running() {
 }
 
 read_pid() {
-  cat "$PID_FILE" 2>/dev/null || echo ""
+  cat "$(pid_file "$1")" 2>/dev/null || echo ""
 }
 
 do_start() {
-  ensure_tmp
+  local name="${1:-default}"
+  ensure_workspace "$name"
 
-  if is_running; then
-    echo "[subturtle] already running (PID $(read_pid))"
+  if is_running "$name"; then
+    echo "[subturtle:${name}] already running (PID $(read_pid "$name"))"
     exit 0
   fi
 
-  rm -f "$PID_FILE"
+  local pf lf ws
+  pf="$(pid_file "$name")"
+  lf="$(log_file "$name")"
+  ws="$(workspace_dir "$name")"
 
-  echo "[subturtle] spawning SubTurtle..."
-  echo "[subturtle] log: ${LOG_FILE}"
+  rm -f "$pf"
+
+  echo "[subturtle:${name}] spawning..."
+  echo "[subturtle:${name}] workspace: ${ws}"
+  echo "[subturtle:${name}] log: ${lf}"
 
   # Spawn the SubTurtle module in a new session via start_new_session=True.
   # This calls os.setsid() in the child, giving it its own session
   # and process group — unreachable by the parent's group signals.
   # The launcher exits immediately; child process is orphaned to PID 1.
   "$PYTHON" -c "
-import subprocess, sys
+import subprocess, sys, os
 
-pid_file = sys.argv[1]
-log_file = sys.argv[2]
-python   = sys.argv[3]
-cwd      = sys.argv[4]
+pid_file   = sys.argv[1]
+log_file   = sys.argv[2]
+python     = sys.argv[3]
+cwd        = sys.argv[4]
+state_dir  = sys.argv[5]
+name       = sys.argv[6]
 
-import os
 env = os.environ.copy()
 # Strip Claude Code session vars so child can spawn its own claude processes
 for key in list(env):
@@ -78,7 +143,7 @@ for key in list(env):
 
 log_fd = open(log_file, 'w')
 proc = subprocess.Popen(
-    [python, '-u', '-m', 'super_turtle.subturtle'],
+    [python, '-u', '-m', 'super_turtle.subturtle', '--state-dir', state_dir, '--name', name],
     cwd=cwd,
     stdin=subprocess.DEVNULL,
     stdout=log_fd,
@@ -91,57 +156,105 @@ log_fd.close()
 with open(pid_file, 'w') as f:
     f.write(str(proc.pid))
 
-print(f'[subturtle] spawned (PID {proc.pid})')
-" "$PID_FILE" "$LOG_FILE" "$PYTHON" "$PROJECT_DIR"
+print(f'[subturtle:{name}] spawned (PID {proc.pid})')
+" "$pf" "$lf" "$PYTHON" "$PROJECT_DIR" "$ws" "$name"
 }
 
 do_stop() {
-  if ! is_running; then
-    echo "[subturtle] not running"
-    rm -f "$PID_FILE"
+  local name="${1:-default}"
+
+  if ! is_running "$name"; then
+    echo "[subturtle:${name}] not running"
+    rm -f "$(pid_file "$name")"
     exit 0
   fi
 
   local pid
-  pid="$(read_pid)"
-  echo "[subturtle] stopping SubTurtle (PID ${pid})..."
+  pid="$(read_pid "$name")"
+  echo "[subturtle:${name}] stopping (PID ${pid})..."
 
   kill "$pid" 2>/dev/null || true
 
   local i
   for i in $(seq 1 10); do
     if ! kill -0 "$pid" 2>/dev/null; then
-      echo "[subturtle] stopped"
-      rm -f "$PID_FILE"
+      echo "[subturtle:${name}] stopped"
+      rm -f "$(pid_file "$name")"
       return
     fi
     sleep 1
   done
 
-  echo "[subturtle] sending SIGKILL..."
+  echo "[subturtle:${name}] sending SIGKILL..."
   kill -9 "$pid" 2>/dev/null || true
-  rm -f "$PID_FILE"
-  echo "[subturtle] killed"
+  rm -f "$(pid_file "$name")"
+  echo "[subturtle:${name}] killed"
 }
 
 do_status() {
-  if is_running; then
+  local name="${1:-default}"
+
+  if is_running "$name"; then
     local pid
-    pid="$(read_pid)"
-    echo "[subturtle] running (PID ${pid})"
+    pid="$(read_pid "$name")"
+    echo "[subturtle:${name}] running (PID ${pid})"
     ps -o pid,ppid,pgid,sess,state,etime,command -p "$pid" 2>/dev/null || true
   else
-    echo "[subturtle] not running"
-    rm -f "$PID_FILE"
+    echo "[subturtle:${name}] not running"
+    rm -f "$(pid_file "$name")"
   fi
 }
 
 do_logs() {
-  if [[ ! -f "$LOG_FILE" ]]; then
-    echo "[subturtle] no log file found at ${LOG_FILE}"
+  local name="${1:-default}"
+  local lf
+  lf="$(log_file "$name")"
+
+  if [[ ! -f "$lf" ]]; then
+    echo "[subturtle:${name}] no log file found at ${lf}"
     exit 1
   fi
-  tail -n "${LINES:-50}" -f "$LOG_FILE"
+  tail -n "${LINES:-50}" -f "$lf"
+}
+
+do_list() {
+  if [[ ! -d "$SUBTURTLES_DIR" ]]; then
+    echo "No SubTurtles found."
+    return
+  fi
+
+  local found=0
+  for ws in "$SUBTURTLES_DIR"/*/; do
+    [[ -d "$ws" ]] || continue
+    local name
+    name="$(basename "$ws")"
+    found=1
+
+    local status_str="stopped"
+    local pid_str=""
+    local pf="${ws}subturtle.pid"
+    if [[ -f "$pf" ]]; then
+      local pid
+      pid="$(cat "$pf")"
+      if kill -0 "$pid" 2>/dev/null; then
+        status_str="running"
+        pid_str=" (PID ${pid})"
+      fi
+    fi
+
+    # Read current task from this SubTurtle's CLAUDE.md
+    local task="(no task)"
+    if [[ -f "${ws}CLAUDE.md" ]]; then
+      task="$(sed -n '/^# Current task/,/^# /{/^# /!p;}' "${ws}CLAUDE.md" | grep -v '^$' | head -1 | sed 's/ *<- current$//')"
+      [[ -z "$task" ]] && task="(no task)"
+    fi
+
+    printf "  %-15s %-8s%s  %s\n" "$name" "$status_str" "$pid_str" "$task"
+  done
+
+  if [[ $found -eq 0 ]]; then
+    echo "No SubTurtles found."
+  fi
 }
 
 # --- Main ---
@@ -149,10 +262,14 @@ if [[ $# -lt 1 ]]; then
   usage
 fi
 
-case "$1" in
-  start)  do_start ;;
-  stop)   do_stop ;;
-  status) do_status ;;
-  logs)   do_logs ;;
+CMD="$1"
+NAME="${2:-default}"
+
+case "$CMD" in
+  start)  do_start "$NAME" ;;
+  stop)   do_stop "$NAME" ;;
+  status) do_status "$NAME" ;;
+  logs)   do_logs "$NAME" ;;
+  list)   do_list ;;
   *)      usage ;;
 esac

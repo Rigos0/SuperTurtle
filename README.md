@@ -12,11 +12,14 @@ Autonomous coding system: **Super Turtle** (meta agent) directs **SubTurtles** (
 
 Message the bot. It runs Claude with access to the repo — ask it anything.
 
-## SubTurtle (autonomous worker)
+## SubTurtles (autonomous workers)
+
+Each SubTurtle gets its own workspace at `.subturtles/<name>/` with its own CLAUDE.md state file. Multiple can run concurrently on different tasks.
 
 ```bash
-./super_turtle/subturtle/ctl start   # spawn a SubTurtle
-./super_turtle/subturtle/ctl status  # check if running
-./super_turtle/subturtle/ctl logs    # tail output
-./super_turtle/subturtle/ctl stop    # stop
+./super_turtle/subturtle/ctl start [name]    # spawn a SubTurtle (default: 'default')
+./super_turtle/subturtle/ctl stop  [name]    # stop it
+./super_turtle/subturtle/ctl status [name]   # check if running
+./super_turtle/subturtle/ctl logs  [name]    # tail output
+./super_turtle/subturtle/ctl list            # list all SubTurtles
 ```

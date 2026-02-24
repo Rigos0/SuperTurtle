@@ -30,6 +30,9 @@ Thumbs.db
 # Temp / integration artifacts
 .tmp/
 
+# SubTurtle workspaces (runtime state, not committed)
+.subturtles/
+
 # Claude Code (local-only)
 .claude/settings.local.json
 .claude/.DS_Store
