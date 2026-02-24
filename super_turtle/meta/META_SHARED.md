@@ -96,7 +96,7 @@ After step 6 (spawn), immediately schedule a recurring cron job (default: every 
 | **Backlog complete** — all items checked off | Stop the SubTurtle. Update root CLAUDE.md. Progress to next task (see below). |
 | **Stuck** — no commits in 2+ check-ins, or logs show errors/loops | Stop the SubTurtle. Diagnose the issue. Restart with adjusted state, or escalate to the human. |
 | **Off-track** — commits don't match the backlog, or quality issues | Stop the SubTurtle. Course-correct the CLAUDE.md. Restart. |
-| **Making good progress** — commits flowing, backlog advancing | Let it keep going. Do nothing. |
+| **Making good progress** — commits flowing, backlog advancing | Let it keep going. If the SubTurtle is on its last 1-2 backlog items, reschedule the cron to fire sooner (1-2 min instead of 5) so you catch completion quickly. |
 | **SubTurtle already dead** (timeout/crash) | Check what got done. Progress or restart as needed. |
 
 **Progressing to the next task:**
