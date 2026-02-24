@@ -308,7 +308,7 @@ export async function handleModel(ctx: Context): Promise<void> {
 /**
  * Fetch and format usage info as HTML lines. Returns empty array on failure.
  */
-async function getUsageLines(): Promise<string[]> {
+export async function getUsageLines(): Promise<string[]> {
   try {
     const proc = Bun.spawnSync([
       "security",

@@ -24,7 +24,7 @@ import {
   WORKING_DIR,
 } from "./config";
 import { formatToolStatus } from "./formatting";
-import { checkPendingAskUserRequests, checkPendingSendTurtleRequests } from "./handlers/streaming";
+import { checkPendingAskUserRequests, checkPendingBotControlRequests, checkPendingSendTurtleRequests } from "./handlers/streaming";
 import { checkCommandSafety, isPathAllowed } from "./security";
 import type {
   SavedSession,
@@ -124,7 +124,7 @@ export function getAvailableModels(): ModelInfo[] {
   return AVAILABLE_MODELS;
 }
 
-class ClaudeSession {
+export class ClaudeSession {
   sessionId: string | null = null;
   lastActivity: Date | null = null;
   queryStarted: Date | null = null;
@@ -426,8 +426,12 @@ class ClaudeSession {
               this.lastTool = toolDisplay;
               console.log(`Tool: ${toolDisplay}`);
 
-              // Don't show tool status for ask_user/send_turtle - the output speaks for itself
-              if (!toolName.startsWith("mcp__ask-user") && !toolName.startsWith("mcp__send-turtle")) {
+              // Don't show tool status for MCP tools that handle their own output
+              if (
+                !toolName.startsWith("mcp__ask-user") &&
+                !toolName.startsWith("mcp__send-turtle") &&
+                !toolName.startsWith("mcp__bot-control")
+              ) {
                 await statusCallback("tool", toolDisplay);
               }
 
@@ -464,6 +468,23 @@ class ClaudeSession {
                     chatId
                   );
                   if (photoSent) break;
+                  if (attempt < 2) {
+                    await new Promise((resolve) => setTimeout(resolve, 100));
+                  }
+                }
+              }
+
+              // Fulfil bot-control requests (usage, model switch, sessions)
+              // The MCP server is polling the request file — we execute and write the result back.
+              if (toolName.startsWith("mcp__bot-control") && chatId) {
+                await new Promise((resolve) => setTimeout(resolve, 200));
+
+                for (let attempt = 0; attempt < 3; attempt++) {
+                  const handled = await checkPendingBotControlRequests(
+                    this,
+                    chatId
+                  );
+                  if (handled) break;
                   if (attempt < 2) {
                     await new Promise((resolve) => setTimeout(resolve, 100));
                   }

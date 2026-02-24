@@ -15,6 +15,8 @@ import {
   STREAMING_THROTTLE_MS,
   BUTTON_LABEL_MAX_LENGTH,
 } from "../config";
+import type { ClaudeSession } from "../session";
+import { getUsageLines } from "./commands";
 
 /**
  * Create inline keyboard for ask_user options.
@@ -130,6 +132,149 @@ export async function checkPendingSendTurtleRequests(
   }
 
   return photoSent;
+}
+
+/**
+ * Check for pending bot-control requests, execute the action, and write
+ * the result back so the MCP server's polling loop can pick it up.
+ *
+ * Unlike ask_user this does NOT break the event loop — Claude continues
+ * after receiving the tool result.
+ */
+export async function checkPendingBotControlRequests(
+  sessionObj: ClaudeSession,
+  chatId: number,
+): Promise<boolean> {
+  const glob = new Bun.Glob("bot-control-*.json");
+  let handled = false;
+
+  for await (const filename of glob.scan({ cwd: "/tmp", absolute: false })) {
+    const filepath = `/tmp/${filename}`;
+    try {
+      const file = Bun.file(filepath);
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      // Only process pending requests for this chat
+      if (data.status !== "pending") continue;
+      if (String(data.chat_id) !== String(chatId)) continue;
+
+      const action: string = data.action;
+      const params: Record<string, string> = data.params || {};
+      let result: string;
+
+      try {
+        result = await executeBotControlAction(sessionObj, action, params);
+      } catch (err) {
+        data.status = "error";
+        data.error = String(err);
+        await Bun.write(filepath, JSON.stringify(data, null, 2));
+        handled = true;
+        continue;
+      }
+
+      // Write result back for MCP server to pick up
+      data.status = "completed";
+      data.result = result;
+      await Bun.write(filepath, JSON.stringify(data, null, 2));
+      handled = true;
+    } catch (error) {
+      console.warn(`Failed to process bot-control file ${filepath}:`, error);
+    }
+  }
+
+  return handled;
+}
+
+/**
+ * Execute a single bot-control action and return a text result.
+ */
+async function executeBotControlAction(
+  sessionObj: ClaudeSession,
+  action: string,
+  params: Record<string, string>,
+): Promise<string> {
+  switch (action) {
+    case "usage": {
+      const lines = await getUsageLines();
+      if (lines.length === 0) return "Failed to fetch usage data.";
+      // Strip HTML tags but keep the unicode bar characters intact.
+      // Wrap in a pre-formatted block so Claude passes it through verbatim.
+      const plain = lines.map((l) => l.replace(/<[^>]+>/g, "")).join("\n\n");
+      return `USAGE DATA (show this to the user as-is, in a code block):\n\n${plain}`;
+    }
+
+    case "switch_model": {
+      const { getAvailableModels } = await import("../session");
+      const models = getAvailableModels();
+
+      if (params.model) {
+        const requestedModel = params.model;
+        const match = models.find(
+          (m) =>
+            m.value === requestedModel ||
+            m.displayName.toLowerCase() === requestedModel.toLowerCase(),
+        );
+        if (!match) {
+          const valid = models.map((m) => `${m.displayName} (${m.value})`).join(", ");
+          return `Unknown model "${requestedModel}". Available: ${valid}`;
+        }
+        sessionObj.model = match.value;
+      }
+
+      if (params.effort) {
+        const effort = params.effort.toLowerCase();
+        if (!["low", "medium", "high"].includes(effort)) {
+          return `Invalid effort "${params.effort}". Use: low, medium, high`;
+        }
+        sessionObj.effort = effort as "low" | "medium" | "high";
+      }
+
+      const currentModel = models.find((m) => m.value === sessionObj.model);
+      const displayName = currentModel?.displayName || sessionObj.model;
+      return `Model switched. Now using: ${displayName}, effort: ${sessionObj.effort}`;
+    }
+
+    case "new_session": {
+      await sessionObj.stop();
+      await sessionObj.kill();
+      return "Session cleared. Next message will start a fresh session.";
+    }
+
+    case "list_sessions": {
+      const sessions = sessionObj.getSessionList();
+      if (sessions.length === 0) return "No saved sessions.";
+
+      const lines = sessions.map((s, i) => {
+        const date = new Date(s.saved_at).toLocaleString("en-US", {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        });
+        return `${i + 1}. "${s.title}" (${date}) — ID: ${s.session_id.slice(0, 8)}...`;
+      });
+      return lines.join("\n");
+    }
+
+    case "resume_session": {
+      const sessionId = params.session_id;
+      if (!sessionId) return "Missing session_id parameter.";
+
+      // Support both full ID and short prefix
+      const sessions = sessionObj.getSessionList();
+      const match = sessions.find(
+        (s) => s.session_id === sessionId || s.session_id.startsWith(sessionId),
+      );
+      if (!match) return `No session found matching "${sessionId}".`;
+
+      const [success, message] = sessionObj.resumeSession(match.session_id);
+      return success ? `Resumed: "${match.title}"` : `Failed: ${message}`;
+    }
+
+    default:
+      return `Unknown action: ${action}`;
+  }
 }
 
 /**
