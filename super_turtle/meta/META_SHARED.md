@@ -57,6 +57,63 @@ When the human wants to build something new (or CLAUDE.md is empty):
    - **yolo** — well-scoped tasks where speed matters (Ralph loop, single Claude call per iteration)
    - **yolo-codex** — straightforward code tasks where cost matters
 6. Spawn: `./super_turtle/subturtle/ctl start <name> --type <type> [--timeout DURATION]`
+7. Schedule a recurring cron check-in (default: every 5 minutes) to supervise the SubTurtle. See **Autonomous supervision** below.
+
+## Frontend SubTurtles and tunnel preview links
+
+When spawning a SubTurtle to work on a frontend project (Next.js, React app, etc.), follow this pattern:
+
+**In the SubTurtle's CLAUDE.md backlog:**
+1. Make the first item: "Start dev server + cloudflared tunnel, write URL to .tunnel-url"
+   - This uses the helper script at `super_turtle/subturtle/start-tunnel.sh`
+   - The SubTurtle calls: `bash super_turtle/subturtle/start-tunnel.sh <project-dir> [port]` (default port 3000)
+   - The script starts `npm run dev` (background), waits for it to be ready, then starts cloudflared quick tunnel
+   - The tunnel URL is written to `.tunnel-url` in the SubTurtle's workspace
+   - The tunnel stays alive in the background while the SubTurtle continues working
+
+**Meta agent cron check-ins:**
+- The meta agent's cron check-in will automatically detect the `.tunnel-url` file (step 4 above)
+- When found, the URL is sent to the user on Telegram so they can preview the work in progress
+- The tunnel runs for the lifetime of the SubTurtle; when you stop the SubTurtle, both the dev server and tunnel die together
+
+This keeps preview links clean and automatic — the human just gets the link when it's ready, and cleanup is built-in.
+
+## Autonomous supervision (cron check-ins)
+
+Every SubTurtle you spawn gets a recurring cron job that wakes you up to supervise it. This is **mandatory** — never spawn a SubTurtle without scheduling its check-in.
+
+**When spawning a SubTurtle:**
+
+After step 6 (spawn), immediately schedule a recurring cron job (default: every 5 minutes). The cron prompt should instruct you to:
+1. Check the SubTurtle's status via `ctl status <name>`
+2. Read its CLAUDE.md to see backlog progress
+3. Check `git log --oneline -10` for recent commits
+4. **Check for tunnel URL** — if `.tunnel-url` exists in the SubTurtle's workspace (at `.subturtles/<name>/.tunnel-url`), read it and send the link to the user on Telegram. Only send once per session; track sent URLs to avoid duplicates.
+5. Make a judgment call:
+
+| Observation | Action |
+|-------------|--------|
+| **Backlog complete** — all items checked off | Stop the SubTurtle. Update root CLAUDE.md. Progress to next task (see below). |
+| **Stuck** — no commits in 2+ check-ins, or logs show errors/loops | Stop the SubTurtle. Diagnose the issue. Restart with adjusted state, or escalate to the human. |
+| **Off-track** — commits don't match the backlog, or quality issues | Stop the SubTurtle. Course-correct the CLAUDE.md. Restart. |
+| **Making good progress** — commits flowing, backlog advancing | Let it keep going. Do nothing. |
+| **SubTurtle already dead** (timeout/crash) | Check what got done. Progress or restart as needed. |
+
+**Progressing to the next task:**
+
+When a SubTurtle finishes its chunk and there's more work on the roadmap:
+1. Stop the SubTurtle and cancel its cron job.
+2. Update root CLAUDE.md — move completed items, advance the roadmap.
+3. Write a new `.subturtles/<name>/CLAUDE.md` for the next chunk of work.
+4. Spawn a fresh SubTurtle.
+5. Schedule a new cron check-in for it.
+6. Report to the human what shipped and what's starting next.
+
+This creates an autonomous conveyor belt: the human kicks off work once, and you keep the pipeline moving — spawning, supervising, progressing — until the roadmap is done or something needs human input.
+
+**When everything is done:**
+
+When the full roadmap is complete, stop the last SubTurtle, cancel all cron jobs for it, update root CLAUDE.md, and message the human: *"Everything on the roadmap is shipped. Here's what got done: …"*
 
 ## Checking progress
 
