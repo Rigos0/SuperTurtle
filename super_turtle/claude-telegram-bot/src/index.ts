@@ -19,6 +19,7 @@ import {
   handleResume,
   handleRestart,
   handleRetry,
+  handleSubturtle,
   handleText,
   handleVoice,
   handlePhoto,
@@ -43,6 +44,10 @@ bot.use(
     if (ctx.message?.text?.startsWith("!")) {
       return undefined;
     }
+    // Bare "stop" bypasses queue (acts like /stop)
+    if (ctx.message?.text?.toLowerCase().trim() === "stop") {
+      return undefined;
+    }
     // Callback queries (button clicks) are not sequentialized
     if (ctx.callbackQuery) {
       return undefined;
@@ -62,6 +67,7 @@ bot.command("usage", handleUsage);
 bot.command("context", handleContext);
 bot.command("model", handleModel);
 bot.command("resume", handleResume);
+bot.command("subturtle", handleSubturtle);
 bot.command("restart", handleRestart);
 bot.command("retry", handleRetry);
 

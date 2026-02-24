@@ -38,6 +38,7 @@ export async function handleStart(ctx: Context): Promise<void> {
       `/stop - Stop current query\n` +
       `/status - Show detailed status\n` +
       `/resume - Pick from recent sessions\n` +
+      `/subturtle - Manage SubTurtles\n` +
       `/retry - Retry last message\n` +
       `/restart - Restart the bot\n\n` +
       `<b>Tips:</b>\n` +
@@ -677,4 +678,125 @@ export async function handleRetry(ctx: Context): Promise<void> {
   } as Context;
 
   await handleText(fakeCtx);
+}
+
+/**
+ * /subturtle - List all SubTurtles with status and controls.
+ */
+export async function handleSubturtle(ctx: Context): Promise<void> {
+  const userId = ctx.from?.id;
+
+  if (!isAuthorized(userId, ALLOWED_USERS)) {
+    await ctx.reply("Unauthorized.");
+    return;
+  }
+
+  // Run ctl list command
+  const ctlPath = `${WORKING_DIR}/super_turtle/subturtle/ctl`;
+  const proc = Bun.spawnSync([ctlPath, "list"], { cwd: WORKING_DIR });
+  const output = proc.stdout.toString().trim();
+
+  if (!output || output.includes("No SubTurtles")) {
+    await ctx.reply("📋 <b>SubTurtles</b>\n\nNo SubTurtles running", { parse_mode: "HTML" });
+    return;
+  }
+
+  // Parse the output into structured data
+  interface SubTurtle {
+    name: string;
+    status: string;
+    type: string;
+    pid?: string;
+    time?: string;
+    task: string;
+  }
+
+  const turtles: SubTurtle[] = [];
+  const lines = output.split("\n");
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
+
+    // Parse columnar output: name status type pid time task
+    // Format from ctl list uses variable widths, so we need to be flexible
+    const parts = line.trim().split(/\s+/);
+    if (parts.length < 2) continue;
+
+    let idx = 0;
+    const name = parts[idx++]!;
+    const status = parts[idx++]!;
+
+    let type = "";
+    let pid = "";
+    let time = "";
+    let task = "";
+
+    // Status can be "running" or "stopped"
+    if (status === "running") {
+      // After running, next could be type (slow, yolo, yolo-codex)
+      if (["slow", "yolo", "yolo-codex"].includes(parts[idx]!)) {
+        type = parts[idx++]!;
+      }
+
+      // Then comes (PID nnn)
+      if (parts[idx] === "(PID") {
+        pid = parts[++idx]!.replace(")", "");
+        idx++;
+      }
+
+      // Then comes time like "59m" or "1h" with "left"
+      if (idx < parts.length && parts[idx + 1] === "left") {
+        time = parts[idx]!;
+        idx += 2;
+      }
+    }
+
+    // Remaining is task (join with spaces)
+    if (idx < parts.length) {
+      task = parts.slice(idx).join(" ");
+    }
+
+    turtles.push({ name, status, type, pid, time, task });
+  }
+
+  if (turtles.length === 0) {
+    await ctx.reply("📋 <b>SubTurtles</b>\n\nNo SubTurtles found", { parse_mode: "HTML" });
+    return;
+  }
+
+  // Build message and inline keyboard
+  const messageLines: string[] = ["🐢 <b>SubTurtles</b>\n"];
+
+  const keyboard: Array<Array<{ text: string; callback_data: string }>> = [];
+
+  for (const turtle of turtles) {
+    // Format the turtle info line
+    let statusEmoji = turtle.status === "running" ? "🟢" : "⚫";
+    let typeStr = turtle.type ? ` <code>${escapeHtml(turtle.type)}</code>` : "";
+    let timeStr = turtle.time ? ` • ${escapeHtml(turtle.time)} left` : "";
+    let taskStr = turtle.task ? ` • ${escapeHtml(turtle.task)}` : "";
+
+    messageLines.push(
+      `${statusEmoji} <b>${escapeHtml(turtle.name)}</b>${typeStr}${timeStr}${taskStr}`
+    );
+
+    // Add buttons for running turtles
+    if (turtle.status === "running") {
+      keyboard.push([
+        {
+          text: "📋 Logs",
+          callback_data: `subturtle_logs:${turtle.name}`,
+        },
+        {
+          text: "🛑 Stop",
+          callback_data: `subturtle_stop:${turtle.name}`,
+        },
+      ]);
+    }
+  }
+
+  await ctx.reply(messageLines.join("\n"), {
+    parse_mode: "HTML",
+    reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined,
+  });
 }

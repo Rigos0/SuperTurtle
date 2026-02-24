@@ -13,6 +13,7 @@ export {
   handleResume,
   handleRestart,
   handleRetry,
+  handleSubturtle,
 } from "./commands";
 export { handleText } from "./text";
 export { handleVoice } from "./voice";

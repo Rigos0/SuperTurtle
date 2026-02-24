@@ -5,12 +5,13 @@
  */
 
 import type { Context } from "grammy";
-import { unlinkSync } from "fs";
+import { unlinkSync, readFileSync, existsSync } from "fs";
 import { session, getAvailableModels, EFFORT_DISPLAY, type EffortLevel } from "../session";
-import { ALLOWED_USERS } from "../config";
+import { ALLOWED_USERS, WORKING_DIR, TELEGRAM_SAFE_LIMIT } from "../config";
 import { isAuthorized } from "../security";
 import { auditLog, startTypingIndicator } from "../utils";
 import { StreamingState, createStatusCallback } from "./streaming";
+import { escapeHtml } from "../formatting";
 
 /**
  * Handle callback queries from inline keyboards.
@@ -68,7 +69,19 @@ export async function handleCallback(ctx: Context): Promise<void> {
     return;
   }
 
-  // 4. Handle resume callbacks: resume:{session_id}
+  // 4. Handle subturtle logs callbacks: subturtle_logs:{name}
+  if (callbackData.startsWith("subturtle_logs:")) {
+    await handleSubturtleLogsCallback(ctx, callbackData);
+    return;
+  }
+
+  // 5. Handle subturtle stop callbacks: subturtle_stop:{name}
+  if (callbackData.startsWith("subturtle_stop:")) {
+    await handleSubturtleStopCallback(ctx, callbackData);
+    return;
+  }
+
+  // 6. Handle resume callbacks: resume:{session_id}
   if (callbackData.startsWith("resume:")) {
     await handleResumeCallback(ctx, callbackData);
     return;
@@ -185,6 +198,105 @@ export async function handleCallback(ctx: Context): Promise<void> {
     }
   } finally {
     typing.stop();
+  }
+}
+
+/**
+ * Handle subturtle logs callback (subturtle_logs:{name}).
+ */
+async function handleSubturtleLogsCallback(
+  ctx: Context,
+  callbackData: string
+): Promise<void> {
+  const name = callbackData.replace("subturtle_logs:", "");
+
+  if (!name) {
+    await ctx.answerCallbackQuery({ text: "Invalid SubTurtle name" });
+    return;
+  }
+
+  const logFile = `${WORKING_DIR}/.subturtles/${name}/subturtle.log`;
+
+  // Check if log file exists
+  if (!existsSync(logFile)) {
+    await ctx.answerCallbackQuery({ text: "Log file not found" });
+    return;
+  }
+
+  try {
+    const content = readFileSync(logFile, "utf-8");
+    const lines = content.split("\n");
+    const lastLines = lines.slice(-50).filter((line) => line.trim()).join("\n");
+
+    if (!lastLines) {
+      await ctx.reply(`📋 <b>Logs for ${escapeHtml(name)}</b>\n\n<code>No log content</code>`, {
+        parse_mode: "HTML",
+      });
+      await ctx.answerCallbackQuery({ text: "Log is empty" });
+      return;
+    }
+
+    // Chunk if needed (4000 char limit)
+    const chunks: string[] = [];
+    const maxChunkSize = TELEGRAM_SAFE_LIMIT - 100; // Leave room for formatting
+    if (lastLines.length > maxChunkSize) {
+      for (let i = 0; i < lastLines.length; i += maxChunkSize) {
+        chunks.push(lastLines.slice(i, i + maxChunkSize));
+      }
+    } else {
+      chunks.push(lastLines);
+    }
+
+    // Send first chunk with header
+    for (let i = 0; i < chunks.length; i++) {
+      const header =
+        i === 0 ? `📋 <b>Logs for ${escapeHtml(name)}</b> (last ~50 lines)\n\n` : "";
+      const footer = chunks.length > 1 && i < chunks.length - 1 ? "\n\n<i>... continued ...</i>" : "";
+      await ctx.reply(`${header}<code>${escapeHtml(chunks[i]!)}</code>${footer}`, {
+        parse_mode: "HTML",
+      });
+    }
+
+    await ctx.answerCallbackQuery({ text: `Logs for ${name}` });
+  } catch (error) {
+    console.error(`Failed to read log file for ${name}:`, error);
+    await ctx.answerCallbackQuery({ text: "Failed to read logs" });
+  }
+}
+
+/**
+ * Handle subturtle stop callback (subturtle_stop:{name}).
+ */
+async function handleSubturtleStopCallback(
+  ctx: Context,
+  callbackData: string
+): Promise<void> {
+  const name = callbackData.replace("subturtle_stop:", "");
+
+  if (!name) {
+    await ctx.answerCallbackQuery({ text: "Invalid SubTurtle name" });
+    return;
+  }
+
+  try {
+    const ctlPath = `${WORKING_DIR}/super_turtle/subturtle/ctl`;
+    const proc = Bun.spawnSync([ctlPath, "stop", name], { cwd: WORKING_DIR });
+    const output = proc.stdout.toString();
+
+    // Check if the output indicates success
+    const isSuccess = output.includes("stopped") || output.includes("killing");
+
+    if (isSuccess) {
+      await ctx.editMessageText(`✅ <b>${escapeHtml(name)}</b> stopped`, {
+        parse_mode: "HTML",
+      });
+      await ctx.answerCallbackQuery({ text: `${name} stopped` });
+    } else {
+      await ctx.answerCallbackQuery({ text: `Failed to stop ${name}` });
+    }
+  } catch (error) {
+    console.error(`Failed to stop SubTurtle ${name}:`, error);
+    await ctx.answerCallbackQuery({ text: "Failed to stop SubTurtle" });
   }
 }
 
