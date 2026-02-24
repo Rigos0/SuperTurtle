@@ -1,6 +1,6 @@
 # Current task
 
-All core features implemented and polished. Snake game is production-ready and installed at root.
+All core features implemented and polished. Snake game is production-ready and installed at root with clean build (no warnings).
 
 # End goal with specs
 
