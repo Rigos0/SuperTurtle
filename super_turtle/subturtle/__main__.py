@@ -235,8 +235,9 @@ def run_slow_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
     if skills:
         print(f"[subturtle:{name}] skills: {', '.join(skills)}")
 
-    claude = Claude()
-    codex = Codex()
+    add_dirs = ["super_turtle/skills"] if skills else []
+    claude = Claude(add_dirs=add_dirs)
+    codex = Codex(add_dirs=add_dirs)
     iteration = 0
 
     while True:
@@ -271,7 +272,8 @@ def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
     if skills:
         print(f"[subturtle:{name}] skills: {', '.join(skills)}")
 
-    claude = Claude()
+    add_dirs = ["super_turtle/skills"] if skills else []
+    claude = Claude(add_dirs=add_dirs)
     iteration = 0
 
     while True:
@@ -297,7 +299,8 @@ def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = N
     if skills:
         print(f"[subturtle:{name}] skills: {', '.join(skills)}")
 
-    codex = Codex()
+    add_dirs = ["super_turtle/skills"] if skills else []
+    codex = Codex(add_dirs=add_dirs)
     iteration = 0
 
     while True:

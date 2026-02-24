@@ -73,13 +73,17 @@ class Claude:
 class Codex:
     """Codex agent -- execution mode."""
 
-    def __init__(self, cwd: str | Path = ".") -> None:
+    def __init__(self, cwd: str | Path = ".", add_dirs: list[str] | None = None) -> None:
         self.cwd = Path(cwd).resolve()
+        self.add_dirs = add_dirs or []
 
     def execute(self, prompt: str) -> str:
         """Execute a prompt with full auto-approval. Returns agent output."""
         print(f"[codex] executing in {self.cwd} ...")
-        cmd = ["codex", "exec", "--yolo", prompt]
+        cmd = ["codex", "exec", "--yolo"]
+        for add_dir in self.add_dirs:
+            cmd.extend(["--add-dir", add_dir])
+        cmd.append(prompt)
         result = _run_streaming(cmd, self.cwd)
         print("[codex] done")
         return result

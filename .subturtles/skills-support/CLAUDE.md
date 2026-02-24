@@ -1,6 +1,6 @@
 # Current task
 
-Update all loop functions (yolo, slow, yolo-codex) to pass `add_dirs` through to their Claude/Codex instances.
+Create `super_turtle/skills/.claude/skills/frontend/SKILL.md` — React/Next.js best practices, component patterns, styling, accessibility, testing.
 
 # End goal with specs
 
@@ -67,8 +67,8 @@ Note: we use a single `--add-dir` for all skills (they all live under the same `
 - [x] Add `--skill <name>` flag parsing to `ctl start` — repeatable flag, store skill names, pass them to the Python SubTurtle process as extra args
 - [x] Update SubTurtle `__main__.py` entry point to accept `--skills` argument and pass it through to the loop functions
 - [x] Update `agents.py` `Claude` class to accept `add_dirs: list[str]` param, include `--add-dir` flags in all `claude` CLI calls (plan + execute)
-- [ ] Update all loop functions (yolo, slow, yolo-codex) to pass `add_dirs` through to their Claude/Codex instances <- current
-- [ ] Create `super_turtle/skills/.claude/skills/frontend/SKILL.md` — React/Next.js best practices, component patterns, styling, accessibility, testing
+- [x] Update all loop functions (yolo, slow, yolo-codex) to pass `add_dirs` through to their Claude/Codex instances
+- [ ] Create `super_turtle/skills/.claude/skills/frontend/SKILL.md` — React/Next.js best practices, component patterns, styling, accessibility, testing <- current
 - [ ] Create `super_turtle/skills/.claude/skills/remotion/SKILL.md` — Remotion video composition, rendering, asset management
 - [ ] Update `ctl status` and `ctl list` to show active skills (read from subturtle.meta)
 - [ ] Update META_SHARED.md: document `--skill` usage, list available skills, guidance on when to attach which skills
