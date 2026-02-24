@@ -413,8 +413,9 @@ export const MyVideo = () => {
 
 ### Using External Libraries
 
-Integrate charts, three.js, and other libraries:
+Integrate charts, three.js, and other libraries. Most React libraries work seamlessly:
 
+**Chart Example:**
 ```tsx
 import { PieChart, BarChart } from 'react-chartjs-2';
 
@@ -437,6 +438,28 @@ export const ChartVideo = () => {
   );
 };
 ```
+
+**Three.js Integration:**
+```tsx
+import { Canvas } from '@react-three/fiber';
+import { Box, OrbitControls } from '@react-three/drei';
+
+export const ThreeJSScene = () => {
+  return (
+    <div style={{ width: '100%', height: '100%' }}>
+      <Canvas>
+        <Box args={[1, 1, 1]} position={[0, 0, 0]}>
+          <meshBasicMaterial color="orange" />
+        </Box>
+        <OrbitControls autoRotate />
+        <ambientLight intensity={0.5} />
+      </Canvas>
+    </div>
+  );
+};
+```
+
+**Note:** Test library compatibility with Remotion's browser environment. Some DOM-heavy libraries may need configuration.
 
 ### Conditional Rendering Based on Frame
 
@@ -626,6 +649,165 @@ REMOTION_BROWSER_LAUNCH_ARGS=--no-sandbox
 REMOTION_FFMPEG_LOG_LEVEL=error
 ```
 
+## Error Handling & Validation
+
+### Input Validation
+
+Validate composition props at the component level:
+
+```tsx
+interface VideoProps {
+  title: string;
+  duration?: number;
+  fps?: number;
+}
+
+export const MyVideo: React.FC<VideoProps> = ({
+  title,
+  duration = 300,
+  fps = 30,
+}) => {
+  // Validate critical inputs
+  if (!title || title.trim().length === 0) {
+    throw new Error('Title is required');
+  }
+  if (duration <= 0 || duration > 86400) { // Max 1 day
+    throw new Error('Duration must be between 1 and 86400 frames');
+  }
+  if (![24, 30, 60].includes(fps)) {
+    throw new Error('FPS must be 24, 30, or 60');
+  }
+
+  return (
+    <div>
+      <h1>{title}</h1>
+    </div>
+  );
+};
+```
+
+### Asset Validation
+
+Check asset existence before rendering:
+
+```tsx
+export const SafeImage = ({ src, fallback }: { src: string; fallback: string }) => {
+  const [loaded, setLoaded] = React.useState(false);
+  const [error, setError] = React.useState(false);
+
+  return (
+    <img
+      src={error ? fallback : src}
+      onLoad={() => setLoaded(true)}
+      onError={() => setError(true)}
+      style={{
+        opacity: loaded ? 1 : 0,
+        transition: 'opacity 0.3s',
+        width: '100%',
+        height: '100%',
+      }}
+    />
+  );
+};
+```
+
+### Safe Rendering Wrapper
+
+Wrap render calls with error boundaries:
+
+```tsx
+import { renderMedia, selectComposition } from '@remotion/renderer';
+
+async function safeRender(compositionId: string, outputPath: string) {
+  try {
+    const composition = await selectComposition({
+      serveUrl: 'http://localhost:3000',
+      id: compositionId,
+    });
+
+    if (!composition) {
+      throw new Error(`Composition "${compositionId}" not found`);
+    }
+
+    const result = await renderMedia({
+      composition,
+      serveUrl: 'http://localhost:3000',
+      outputLocation: outputPath,
+    });
+
+    console.log('Render succeeded:', result);
+    return result;
+  } catch (error) {
+    console.error('Render failed:', error);
+    throw error;
+  }
+}
+```
+
+## Testing Compositions
+
+### Unit Testing Components
+
+Test composition components like regular React components:
+
+```tsx
+import { render } from '@testing-library/react';
+import { MyVideo } from './MyVideo';
+
+describe('MyVideo', () => {
+  it('renders with default props', () => {
+    const { container } = render(<MyVideo title="Test" />);
+    expect(container.textContent).toContain('Test');
+  });
+
+  it('throws error on empty title', () => {
+    expect(() => <MyVideo title="" />).toThrow();
+  });
+});
+```
+
+### Testing Animation Values
+
+Test interpolation and animation logic:
+
+```tsx
+import { interpolate } from 'remotion';
+
+describe('animations', () => {
+  it('interpolates correctly', () => {
+    const value = interpolate(15, [0, 30], [0, 100], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    });
+    expect(value).toBe(50); // Halfway point
+  });
+
+  it('clamps values outside range', () => {
+    const tooSmall = interpolate(-10, [0, 100], [0, 100], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    });
+    expect(tooSmall).toBe(0);
+  });
+});
+```
+
+### Testing Render Output
+
+Use Remotion's test utilities:
+
+```tsx
+import { expect, it } from 'vitest';
+import { expectToThrow } from '@remotion/expect';
+import { MyVideo } from './MyVideo';
+
+it('should render without errors', async () => {
+  await expectToThrow(async () => {
+    await expect(<MyVideo title="Valid" duration={300} />).resolves.toBeTruthy();
+  });
+});
+```
+
 ## Debugging & Troubleshooting
 
 ### Frame Counting Issues
@@ -657,9 +839,142 @@ console.log(`Frame: ${frame}/${durationInFrames} @ ${fps}fps`);
 - Verify composition doesn't have infinite loops
 - Reduce complexity in development, use lazy loading
 
+## Best Practices for Large-Scale Projects
+
+### Composition Structure & Reusability
+
+Organize compositions into modular, reusable components:
+
+```tsx
+// compositions/layout.tsx - Reusable layout wrapper
+interface LayoutProps {
+  children: React.ReactNode;
+  backgroundColor?: string;
+  width?: number;
+  height?: number;
+}
+
+export const VideoLayout: React.FC<LayoutProps> = ({
+  children,
+  backgroundColor = '#000',
+  width = 1920,
+  height = 1080,
+}) => {
+  return (
+    <AbsoluteFill style={{ backgroundColor, width, height }}>
+      {children}
+    </AbsoluteFill>
+  );
+};
+
+// compositions/scenes/TitleScene.tsx - Reusable scene
+interface TitleSceneProps {
+  title: string;
+  subtitle: string;
+  duration: number;
+}
+
+export const TitleScene: React.FC<TitleSceneProps> = ({
+  title,
+  subtitle,
+  duration,
+}) => {
+  const frame = useCurrentFrame();
+  const fadeIn = interpolate(frame, [0, 30], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+
+  return (
+    <div style={{ opacity: fadeIn, padding: 60 }}>
+      <h1>{title}</h1>
+      <h2>{subtitle}</h2>
+    </div>
+  );
+};
+```
+
+### Configuration Management
+
+Keep rendering configs centralized:
+
+```tsx
+// config/render.ts
+export const RENDER_CONFIG = {
+  width: 1920,
+  height: 1080,
+  fps: 30,
+  codec: 'h264' as const,
+  pixelFormat: 'yuv420p' as const,
+  quality: 'high' as const,
+} as const;
+
+export const COMPOSITION_CONFIG = {
+  defaultDuration: 300,
+  defaultFps: 30,
+} as const;
+```
+
+### File Organization
+
+Suggested structure for larger projects:
+
+```
+src/
+  compositions/
+    Root.tsx          # Main composition registry
+    scenes/
+      TitleScene.tsx
+      MainScene.tsx
+    components/
+      Header.tsx
+      Footer.tsx
+      Effects/
+        FadeIn.tsx
+        Bounce.tsx
+    utils/
+      animations.ts
+      timing.ts
+  config/
+    render.ts
+    timings.ts
+  tests/
+    animations.test.ts
+```
+
+### Memory Management
+
+For compositions with many assets or state:
+
+```tsx
+export const HeavyComposition: React.FC<Props> = ({ items }) => {
+  // Memoize expensive computations
+  const processed = useMemo(() => {
+    return items.map(item => expensiveTransform(item));
+  }, [items]);
+
+  // Cleanup on unmount for any subscriptions
+  useEffect(() => {
+    return () => {
+      // Cleanup code
+    };
+  }, []);
+
+  // Limit re-renders with custom comparison
+  return (
+    <>
+      {processed.map((item, i) => (
+        <Scene key={i} data={item} />
+      ))}
+    </>
+  );
+};
+```
+
 ## Resources
 
 - [Remotion Documentation](https://remotion.dev/docs)
 - [Remotion Examples & Showcase](https://remotion.dev/showcase)
 - [FFmpeg Docs](https://ffmpeg.org/ffmpeg.html) (for codec options)
 - [React Hooks API](https://react.dev/reference/react)
+- [Remotion Performance Guide](https://remotion.dev/docs/performance)
