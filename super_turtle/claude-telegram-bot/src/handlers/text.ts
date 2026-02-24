@@ -35,6 +35,9 @@ export async function handleText(ctx: Context): Promise<void> {
 
   // 1.5. Bare "stop" — intercept and abort (acts like /stop)
   if (message.toLowerCase().trimStart().startsWith("stop")) {
+    // Kill typing indicator immediately so the bot stops showing "typing..."
+    session.stopTyping();
+
     if (session.isRunning) {
       const result = await session.stop();
       if (result) {
@@ -78,6 +81,7 @@ export async function handleText(ctx: Context): Promise<void> {
 
   // 7. Start typing indicator
   const typing = startTypingIndicator(ctx);
+  session.typingController = typing;
 
   // 8. Create streaming state and callback
   let state = new StreamingState();
@@ -146,4 +150,5 @@ export async function handleText(ctx: Context): Promise<void> {
   // 11. Cleanup
   stopProcessing();
   typing.stop();
+  session.typingController = null;
 }

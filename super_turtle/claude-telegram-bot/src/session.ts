@@ -167,6 +167,23 @@ export class ClaudeSession {
   private _isProcessing = false;
   private _wasInterruptedByNewMessage = false;
 
+  // Exposed so the stop handler can kill typing immediately
+  private _typingController: { stop: () => void } | null = null;
+
+  set typingController(ctrl: { stop: () => void } | null) {
+    this._typingController = ctrl;
+  }
+
+  /**
+   * Stop the typing indicator immediately (called from stop handler).
+   */
+  stopTyping(): void {
+    if (this._typingController) {
+      this._typingController.stop();
+      this._typingController = null;
+    }
+  }
+
   get isActive(): boolean {
     return this.sessionId !== null;
   }

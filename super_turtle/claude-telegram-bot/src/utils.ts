@@ -206,6 +206,7 @@ let sessionModule: {
   session: {
     isRunning: boolean;
     stop: () => Promise<"stopped" | "pending" | false>;
+    stopTyping: () => void;
     markInterrupt: () => void;
     clearStopRequested: () => void;
   };
@@ -225,6 +226,7 @@ export async function checkInterrupt(text: string): Promise<string> {
 
   if (sessionModule.session.isRunning) {
     console.log("! prefix - interrupting current query");
+    sessionModule.session.stopTyping();
     sessionModule.session.markInterrupt();
     await sessionModule.session.stop();
     await Bun.sleep(100);

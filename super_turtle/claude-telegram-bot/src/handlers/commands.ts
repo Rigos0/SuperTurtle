@@ -61,6 +61,7 @@ export async function handleNew(ctx: Context): Promise<void> {
   }
 
   // Stop any running query
+  session.stopTyping();
   if (session.isRunning) {
     const result = await session.stop();
     if (result) {
@@ -115,6 +116,9 @@ export async function handleStop(ctx: Context): Promise<void> {
     await ctx.reply("Unauthorized.");
     return;
   }
+
+  // Kill typing indicator immediately so the bot stops showing "typing..."
+  session.stopTyping();
 
   if (session.isRunning) {
     const result = await session.stop();
