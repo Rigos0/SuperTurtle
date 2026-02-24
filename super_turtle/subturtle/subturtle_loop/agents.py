@@ -1,4 +1,4 @@
-"""Concrete agent classes for headless CLI orchestration."""
+"""Concrete agent classes for SubTurtle loop orchestration."""
 
 import subprocess
 import sys

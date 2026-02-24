@@ -1,4 +1,4 @@
-"""CLI entrypoint for orchestrating one Claude->Codex handoff iteration."""
+"""CLI entrypoint for running one SubTurtle iteration (plan -> groom -> execute)."""
 
 from __future__ import annotations
 

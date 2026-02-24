@@ -1,6 +1,6 @@
 #!/bin/bash
 # Generate natural-language CLAUDE.md rules from config.sh.
-# Usage: super_turtle/orchestrator/claude-md-guard/create-rules-prompt.sh
+# Usage: super_turtle/subturtle/claude-md-guard/create-rules-prompt.sh
 # Outputs a plain-text instructions string to stdout.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

@@ -5,23 +5,23 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 TMP_DIR="${PROJECT_DIR}/.tmp"
-PID_FILE="${TMP_DIR}/orchestrator.pid"
-LOG_FILE="${TMP_DIR}/orchestrator.log"
+PID_FILE="${TMP_DIR}/subturtle.pid"
+LOG_FILE="${TMP_DIR}/subturtle.log"
 
-# Use orchestrator venv if available, otherwise system python3
+# Use subturtle venv if available, otherwise system python3
 PYTHON="${SCRIPT_DIR}/.venv/bin/python3"
 if [[ ! -x "$PYTHON" ]]; then
   PYTHON="python3"
 fi
 
 usage() {
-  echo "Usage: ./super_turtle/orchestrator/ctl {start|stop|status|logs}"
+  echo "Usage: ./super_turtle/subturtle/ctl {start|stop|status|logs}"
   echo ""
   echo "Commands:"
-  echo "  start   Start the orchestrator (detached, survives session exit)"
-  echo "  stop    Stop the orchestrator gracefully"
-  echo "  status  Check if the orchestrator is running"
-  echo "  logs    Tail the orchestrator log"
+  echo "  start   Spawn a SubTurtle (detached, survives session exit)"
+  echo "  stop    Stop the SubTurtle gracefully"
+  echo "  status  Check if the SubTurtle is running"
+  echo "  logs    Tail the SubTurtle log"
   exit 1
 }
 
@@ -48,16 +48,16 @@ do_start() {
   ensure_tmp
 
   if is_running; then
-    echo "[orchestrator-ctl] already running (PID $(read_pid))"
+    echo "[subturtle] already running (PID $(read_pid))"
     exit 0
   fi
 
   rm -f "$PID_FILE"
 
-  echo "[orchestrator-ctl] starting orchestrator..."
-  echo "[orchestrator-ctl] log: ${LOG_FILE}"
+  echo "[subturtle] spawning SubTurtle..."
+  echo "[subturtle] log: ${LOG_FILE}"
 
-  # Spawn the orchestrator module in a new session via start_new_session=True.
+  # Spawn the SubTurtle module in a new session via start_new_session=True.
   # This calls os.setsid() in the child, giving it its own session
   # and process group — unreachable by the parent's group signals.
   # The launcher exits immediately; child process is orphaned to PID 1.
@@ -78,7 +78,7 @@ for key in list(env):
 
 log_fd = open(log_file, 'w')
 proc = subprocess.Popen(
-    [python, '-u', '-m', 'super_turtle.orchestrator'],
+    [python, '-u', '-m', 'super_turtle.subturtle'],
     cwd=cwd,
     stdin=subprocess.DEVNULL,
     stdout=log_fd,
@@ -91,54 +91,54 @@ log_fd.close()
 with open(pid_file, 'w') as f:
     f.write(str(proc.pid))
 
-print(f'[orchestrator-ctl] started (PID {proc.pid})')
+print(f'[subturtle] spawned (PID {proc.pid})')
 " "$PID_FILE" "$LOG_FILE" "$PYTHON" "$PROJECT_DIR"
 }
 
 do_stop() {
   if ! is_running; then
-    echo "[orchestrator-ctl] not running"
+    echo "[subturtle] not running"
     rm -f "$PID_FILE"
     exit 0
   fi
 
   local pid
   pid="$(read_pid)"
-  echo "[orchestrator-ctl] stopping orchestrator (PID ${pid})..."
+  echo "[subturtle] stopping SubTurtle (PID ${pid})..."
 
   kill "$pid" 2>/dev/null || true
 
   local i
   for i in $(seq 1 10); do
     if ! kill -0 "$pid" 2>/dev/null; then
-      echo "[orchestrator-ctl] stopped"
+      echo "[subturtle] stopped"
       rm -f "$PID_FILE"
       return
     fi
     sleep 1
   done
 
-  echo "[orchestrator-ctl] sending SIGKILL..."
+  echo "[subturtle] sending SIGKILL..."
   kill -9 "$pid" 2>/dev/null || true
   rm -f "$PID_FILE"
-  echo "[orchestrator-ctl] killed"
+  echo "[subturtle] killed"
 }
 
 do_status() {
   if is_running; then
     local pid
     pid="$(read_pid)"
-    echo "[orchestrator-ctl] running (PID ${pid})"
+    echo "[subturtle] running (PID ${pid})"
     ps -o pid,ppid,pgid,sess,state,etime,command -p "$pid" 2>/dev/null || true
   else
-    echo "[orchestrator-ctl] not running"
+    echo "[subturtle] not running"
     rm -f "$PID_FILE"
   fi
 }
 
 do_logs() {
   if [[ ! -f "$LOG_FILE" ]]; then
-    echo "[orchestrator-ctl] no log file found at ${LOG_FILE}"
+    echo "[subturtle] no log file found at ${LOG_FILE}"
     exit 1
   fi
   tail -n "${LINES:-50}" -f "$LOG_FILE"

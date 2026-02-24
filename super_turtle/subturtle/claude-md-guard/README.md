@@ -6,10 +6,10 @@ Validates CLAUDE.md / AGENTS.md structure against configurable rules. Two script
 
 ```bash
 # Print section stats and warnings
-super_turtle/orchestrator/claude-md-guard/stats.sh CLAUDE.md
+super_turtle/subturtle/claude-md-guard/stats.sh CLAUDE.md
 
 # Validate (silent on success, exit 2 on failure)
-echo '{"tool_name":"Write","tool_input":{"file_path":"AGENTS.md","content":"..."}}' | super_turtle/orchestrator/claude-md-guard/validate.sh
+echo '{"tool_name":"Write","tool_input":{"file_path":"AGENTS.md","content":"..."}}' | super_turtle/subturtle/claude-md-guard/validate.sh
 ```
 
 ## Files
@@ -41,7 +41,7 @@ In `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/super_turtle/orchestrator/claude-md-guard/validate.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/super_turtle/subturtle/claude-md-guard/validate.sh",
             "timeout": 10
           }
         ]

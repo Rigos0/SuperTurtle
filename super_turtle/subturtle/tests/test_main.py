@@ -1,7 +1,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from agnt_orchestrator import __main__ as handoff_main
+from subturtle_loop import __main__ as handoff_main
 
 
 def test_main_runs_plan_groom_execute(tmp_path, monkeypatch):

@@ -1,6 +1,6 @@
 # agentic
 
-Autonomous coding loop: Claude plans, grooms state, Codex executes, Claude reviews. Repeat.
+Autonomous coding system: **Super Turtle** (meta agent) directs **SubTurtles** (autonomous coding loops) that plan, groom state, execute, and review — one commit at a time.
 
 ## Meta agent (from PC)
 
@@ -12,11 +12,11 @@ Autonomous coding loop: Claude plans, grooms state, Codex executes, Claude revie
 
 Message the bot. It runs Claude with access to the repo — ask it anything.
 
-## Main loop
+## SubTurtle (autonomous worker)
 
 ```bash
-./super_turtle/orchestrator/ctl start   # start
-./super_turtle/orchestrator/ctl status  # check
-./super_turtle/orchestrator/ctl logs    # tail output
-./super_turtle/orchestrator/ctl stop    # stop
+./super_turtle/subturtle/ctl start   # spawn a SubTurtle
+./super_turtle/subturtle/ctl status  # check if running
+./super_turtle/subturtle/ctl logs    # tail output
+./super_turtle/subturtle/ctl stop    # stop
 ```

@@ -1,9 +1,9 @@
-"""Entry point: run from repo root so both agents see the full project."""
+"""SubTurtle: autonomous coding loop that plans, grooms, executes, and reviews."""
 
 import subprocess
 from pathlib import Path
 
-from .agnt_orchestrator import Claude, Codex
+from .subturtle_loop import Claude, Codex
 
 STATS_SCRIPT = Path(__file__).resolve().parent / "claude-md-guard" / "stats.sh"
 

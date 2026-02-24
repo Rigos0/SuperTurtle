@@ -1,4 +1,4 @@
-"""agnt orchestrator - headless coding agent orchestration."""
+"""SubTurtle loop — headless coding agent orchestration."""
 
 from .agents import Claude, Codex
 
