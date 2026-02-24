@@ -34,8 +34,9 @@ def _run_streaming(cmd: list[str], cwd: Path) -> str:
 class Claude:
     """Claude Code agent -- planning mode."""
 
-    def __init__(self, cwd: str | Path = ".") -> None:
+    def __init__(self, cwd: str | Path = ".", add_dirs: list[str] | None = None) -> None:
         self.cwd = Path(cwd).resolve()
+        self.add_dirs = add_dirs or []
 
     def plan(self, prompt: str) -> str:
         """Generate an implementation plan from a prompt. Returns the plan text."""
@@ -45,9 +46,10 @@ class Claude:
             "--permission-mode",
             "plan",
             "--dangerously-skip-permissions",
-            "-p",
-            prompt,
         ]
+        for add_dir in self.add_dirs:
+            cmd.extend(["--add-dir", add_dir])
+        cmd.extend(["-p", prompt])
         result = _run_streaming(cmd, self.cwd)
         print(f"[claude] plan ready ({len(result)} chars)")
         print(result)
@@ -59,9 +61,10 @@ class Claude:
         cmd = [
             "claude",
             "--dangerously-skip-permissions",
-            "-p",
-            prompt,
         ]
+        for add_dir in self.add_dirs:
+            cmd.extend(["--add-dir", add_dir])
+        cmd.extend(["-p", prompt])
         result = _run_streaming(cmd, self.cwd)
         print(f"[claude] executed ready ({len(result)} chars)")
         return result
