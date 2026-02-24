@@ -1,6 +1,6 @@
 # Current task
 
-Update META_SHARED.md: document the two-tier skill system
+Verify end-to-end: spawn a test SubTurtle with the frontend-design skill, check logs to confirm the skill loads
 
 # End goal with specs
 
@@ -50,5 +50,5 @@ There are TWO kinds of skills:
 - [x] Install the official `frontend-design` plugin from the Anthropic registry. Use the `claude` CLI to install it non-interactively. Figure out the exact command (try: `claude plugin install frontend-design`, or `claude /plugin install frontend-design`). Verify it installed successfully.
 - [x] Review the hand-written Remotion skill at `super_turtle/skills/.claude/skills/remotion/SKILL.md` — is it solid? If not, improve it. This one IS correctly custom since no official Remotion plugin exists.
 - [x] Update `ctl status` and `ctl list` to show active skills in subturtle.meta
-- [ ] Update META_SHARED.md: document the two-tier skill system (official plugins installed globally via registry vs custom skills via `--add-dir`), list available official plugins worth installing (frontend-design, code-review, security-guidance, etc.), document `--skill` flag usage, note that skills stay out of the meta agent's context <- current
-- [ ] Verify end-to-end: spawn a test SubTurtle with the frontend-design skill, check logs to confirm the skill loads
+- [x] Update META_SHARED.md: document the two-tier skill system (official plugins installed globally via registry vs custom skills via `--add-dir`), list available official plugins worth installing (frontend-design, code-review, security-guidance, etc.), document `--skill` flag usage, note that skills stay out of the meta agent's context
+- [ ] Verify end-to-end: spawn a test SubTurtle with the frontend-design skill, check logs to confirm the skill loads <- current
