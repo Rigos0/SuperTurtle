@@ -15,6 +15,7 @@ const CELL_SIZE = 24;
 const BOARD_SIZE = GRID_SIZE * CELL_SIZE;
 const STEP_MS_BASE = 115;
 const STEP_MS_MIN = 55;
+const STEP_MS_LAP_2_MIN = 65; // Slightly slower on lap 2+ for balance with complex obstacles
 const FOOD_PER_LEVEL = 5;
 const LEVEL_UP_DURATION_MS = 1200;
 const HIGH_SCORE_KEY = "snake-high-score";
@@ -39,8 +40,14 @@ const DIRECTION_VECTORS: Record<Direction, Point> = {
 };
 
 function getStepMs(level: number, lap: number): number {
-  const effectiveLevel = lap > 1 ? TOTAL_LEVELS : level;
-  return Math.max(STEP_MS_MIN, STEP_MS_BASE - (effectiveLevel - 1) * 6);
+  if (lap > 1) {
+    // Lap 2+: Use full speed progression (level-based) but with a slightly higher floor
+    // This balances difficulty with playability on complex obstacles
+    const minSpeed = STEP_MS_LAP_2_MIN;
+    return Math.max(minSpeed, STEP_MS_BASE - (level - 1) * 5);
+  }
+  // Lap 1: Standard progression
+  return Math.max(STEP_MS_MIN, STEP_MS_BASE - (level - 1) * 6);
 }
 
 type VisualProperties = {
@@ -387,6 +394,50 @@ function randomInt(max: number): number {
   return Math.floor(Math.random() * max);
 }
 
+function isReachableFromSnake(
+  target: Point,
+  snake: Point[],
+  obstacles: Set<string>
+): boolean {
+  // Simple flood-fill BFS to check if target is reachable from snake head
+  const snakeHead = snake[0];
+  const occupied = new Set(snake.map((s) => `${s.x},${s.y}`));
+  const visited = new Set<string>();
+  const queue: Point[] = [snakeHead];
+  visited.add(`${snakeHead.x},${snakeHead.y}`);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (current.x === target.x && current.y === target.y) {
+      return true;
+    }
+
+    // Check all 4 directions
+    for (const direction of Object.values(DIRECTION_VECTORS)) {
+      const next = {
+        x: current.x + direction.x,
+        y: current.y + direction.y,
+      };
+      const key = `${next.x},${next.y}`;
+
+      if (
+        next.x >= 0 &&
+        next.x < GRID_SIZE &&
+        next.y >= 0 &&
+        next.y < GRID_SIZE &&
+        !visited.has(key) &&
+        !obstacles.has(key) &&
+        !occupied.has(key)
+      ) {
+        visited.add(key);
+        queue.push(next);
+      }
+    }
+  }
+
+  return false;
+}
+
 function pickNextFood(snake: Point[], obstacles: Set<string>): Point {
   const occupied = new Set(snake.map((segment) => `${segment.x},${segment.y}`));
   const freeCells: Point[] = [];
@@ -405,7 +456,15 @@ function pickNextFood(snake: Point[], obstacles: Set<string>): Point {
     return { x: Math.floor(GRID_SIZE / 2), y: Math.floor(GRID_SIZE / 2) };
   }
 
-  return freeCells[randomInt(freeCells.length)];
+  // Filter to reachable cells only if possible
+  const reachableCells = freeCells.filter((cell) =>
+    isReachableFromSnake(cell, snake, obstacles)
+  );
+
+  // If no reachable cells found (shouldn't happen in well-designed levels),
+  // fall back to any free cell
+  const candidateCells = reachableCells.length > 0 ? reachableCells : freeCells;
+  return candidateCells[randomInt(candidateCells.length)];
 }
 
 function drawRoundedRect(
@@ -917,7 +976,11 @@ export default function SnakeGame() {
       const touch = event.changedTouches[0];
       const deltaX = touch.clientX - touchStartRef.current.x;
       const deltaY = touch.clientY - touchStartRef.current.y;
-      const threshold = 30;
+
+      // Responsive threshold: use 15% of the smallest mobile dimension, min 30px
+      // This makes swipes feel consistent across different device sizes
+      const minDimension = Math.min(window.innerWidth, window.innerHeight);
+      const threshold = Math.max(30, minDimension * 0.15);
 
       let direction: Direction | null = null;
       if (Math.abs(deltaX) > Math.abs(deltaY)) {
