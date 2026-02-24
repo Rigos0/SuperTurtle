@@ -116,16 +116,23 @@ try {
 
 export { META_PROMPT };
 
-// Dangerous command patterns to block
-export const BLOCKED_PATTERNS = [
-  "rm -rf /",
-  "rm -rf ~",
-  "rm -rf $HOME",
-  "sudo rm",
-  ":(){ :|:& };:", // Fork bomb
-  "> /dev/sd",
-  "mkfs.",
-  "dd if=",
+// Dangerous command patterns to block.
+// Each entry is a regex string (case-insensitive match against the full command).
+// Use word-boundary / end-of-string anchors so "rm -rf /Users/..." doesn't match
+// the rule meant to block "rm -rf /" (delete root).
+export const BLOCKED_PATTERNS: Array<{ regex: string; label: string }> = [
+  // "rm -rf /" — only when "/" is the entire target (end-of-string or followed by whitespace).
+  // Does NOT match "rm -rf /Users/foo/bar".
+  { regex: "rm\\s+-[^\\s]*r[^\\s]*f[^\\s]*\\s+/(\\s|$)", label: "rm -rf / (root)" },
+  // "rm -rf ~" — bare tilde or tilde/ as the entire target.
+  { regex: "rm\\s+-[^\\s]*r[^\\s]*f[^\\s]*\\s+~(\\s|/\\s|/$|$)", label: "rm -rf ~ (home)" },
+  // "rm -rf $HOME" — whole target.
+  { regex: "rm\\s+-[^\\s]*r[^\\s]*f[^\\s]*\\s+\\$HOME(\\s|/\\s|/$|$)", label: "rm -rf $HOME (home)" },
+  { regex: "sudo\\s+rm\\b", label: "sudo rm" },
+  { regex: ":\\(\\)\\{\\s*:\\|:&\\s*\\};:", label: "fork bomb" },
+  { regex: ">\\s*/dev/sd", label: "disk overwrite" },
+  { regex: "\\bmkfs\\.", label: "filesystem format" },
+  { regex: "\\bdd\\s+if=", label: "raw disk operation" },
 ];
 
 // Query timeout (3 minutes)

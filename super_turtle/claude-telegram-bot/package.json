@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "start": "bun run src/index.ts",
-    "start:live": "caffeinate -s bun run src/index.ts",
+    "start:live": "caffeinate -s ./run-loop.sh",
     "dev": "bun --watch run src/index.ts",
     "typecheck": "bun run --bun tsc --noEmit"
   },

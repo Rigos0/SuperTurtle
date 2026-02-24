@@ -122,10 +122,10 @@ export function checkCommandSafety(
 ): [safe: boolean, reason: string] {
   const lowerCommand = command.toLowerCase();
 
-  // Check blocked patterns
+  // Check blocked patterns (regex-based, case-insensitive)
   for (const pattern of BLOCKED_PATTERNS) {
-    if (lowerCommand.includes(pattern.toLowerCase())) {
-      return [false, `Blocked pattern: ${pattern}`];
+    if (new RegExp(pattern.regex, "i").test(command)) {
+      return [false, `Blocked pattern: ${pattern.label}`];
     }
   }
 
