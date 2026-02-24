@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type GameState = "start" | "playing" | "gameover";
+type GameState = "start" | "playing" | "gameover" | "levelup";
 type Direction = "up" | "down" | "left" | "right";
 
 type Point = {
@@ -16,6 +16,7 @@ const BOARD_SIZE = GRID_SIZE * CELL_SIZE;
 const STEP_MS_BASE = 115;
 const STEP_MS_MIN = 55;
 const FOOD_PER_LEVEL = 5;
+const LEVEL_UP_DURATION_MS = 1200;
 const HIGH_SCORE_KEY = "snake-high-score";
 
 const KEY_TO_DIRECTION: Record<string, Direction> = {
@@ -409,6 +410,7 @@ export default function SnakeGame() {
   const animationFrameRef = useRef<number | null>(null);
   const lastFrameRef = useRef<number>(0);
   const accumulatorRef = useRef<number>(0);
+  const levelUpTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     gameStateRef.current = gameState;
@@ -472,6 +474,7 @@ export default function SnakeGame() {
     queuedDirectionRef.current = null;
     accumulatorRef.current = 0;
     lastFrameRef.current = performance.now();
+    levelUpTimerRef.current = null;
 
     setSnake(freshSnake);
     snakeRef.current = freshSnake;
@@ -576,38 +579,30 @@ export default function SnakeGame() {
     setScore(nextScore);
     scoreRef.current = nextScore;
 
+    setSnake(nextSnake);
+    snakeRef.current = nextSnake;
+
     const nextFoodEatenThisLevel = foodEatenThisLevelRef.current + 1;
     if (nextFoodEatenThisLevel === FOOD_PER_LEVEL) {
-      const nextLevel = levelRef.current + 1;
-      const nextObstacles = getObstaclesForLevel(nextLevel);
-      const freshSnake = createInitialSnake();
-      const freshFood = pickNextFood(freshSnake, nextObstacles);
+      if (nextScore > highScoreRef.current) {
+        setHighScore(nextScore);
+        highScoreRef.current = nextScore;
+      }
 
+      const nextLevel = levelRef.current + 1;
       setLevel(nextLevel);
       levelRef.current = nextLevel;
-      accumulatorRef.current = 0;
-
-      setObstacles(nextObstacles);
-      obstaclesRef.current = nextObstacles;
-
-      queuedDirectionRef.current = null;
-      setDirection("right");
-      directionRef.current = "right";
-
-      setSnake(freshSnake);
-      snakeRef.current = freshSnake;
-
-      setFood(freshFood);
-      foodRef.current = freshFood;
 
       setFoodEatenThisLevel(0);
       foodEatenThisLevelRef.current = 0;
+      queuedDirectionRef.current = null;
+      setGameState("levelup");
+      gameStateRef.current = "levelup";
+      levelUpTimerRef.current = performance.now();
+      return;
     } else {
       setFoodEatenThisLevel(nextFoodEatenThisLevel);
       foodEatenThisLevelRef.current = nextFoodEatenThisLevel;
-
-      setSnake(nextSnake);
-      snakeRef.current = nextSnake;
 
       const nextFood = pickNextFood(nextSnake, currentObstacles);
       setFood(nextFood);
@@ -712,7 +707,10 @@ export default function SnakeGame() {
     });
 
     if (gameStateRef.current !== "playing") {
-      ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+      ctx.fillStyle =
+        gameStateRef.current === "levelup"
+          ? "rgba(0, 0, 0, 0.75)"
+          : "rgba(0, 0, 0, 0.55)";
       ctx.fillRect(0, 0, BOARD_SIZE, BOARD_SIZE);
 
       ctx.textAlign = "center";
@@ -768,6 +766,33 @@ export default function SnakeGame() {
         ctx.font = "600 13px monospace";
         ctx.fillText("Press any key to restart", BOARD_SIZE / 2, BOARD_SIZE / 2 + 64);
       }
+
+      if (gameStateRef.current === "levelup") {
+        const levelUpStart = levelUpTimerRef.current ?? performance.now();
+        const elapsed = performance.now() - levelUpStart;
+        const t = Math.max(0, Math.min(1, elapsed / LEVEL_UP_DURATION_MS));
+
+        let textAlpha = 1;
+        if (t < 0.2) {
+          textAlpha = t / 0.2;
+        } else if (t > 0.8) {
+          textAlpha = (1 - t) / 0.2;
+        }
+
+        const textScale = 0.9 + Math.sin(t * Math.PI) * 0.12;
+        const glow = 18 + Math.sin(t * Math.PI) * 18;
+
+        ctx.save();
+        ctx.translate(BOARD_SIZE / 2, BOARD_SIZE / 2);
+        ctx.scale(textScale, textScale);
+        ctx.globalAlpha = textAlpha;
+        ctx.fillStyle = "#04d9ff";
+        ctx.shadowColor = "#04d9ff";
+        ctx.shadowBlur = glow;
+        ctx.font = "700 48px monospace";
+        ctx.fillText(`LEVEL ${levelRef.current}`, 0, 12);
+        ctx.restore();
+      }
     }
   }, []);
 
@@ -787,6 +812,10 @@ export default function SnakeGame() {
 
       if (gameStateRef.current === "gameover") {
         resetGame(requestedDirection);
+        return;
+      }
+
+      if (gameStateRef.current === "levelup") {
         return;
       }
 
@@ -814,13 +843,49 @@ export default function SnakeGame() {
 
       if (gameStateRef.current === "playing") {
         accumulatorRef.current += delta;
-        while (true) {
+        while (gameStateRef.current === "playing") {
           const stepMs = getStepMs(levelRef.current);
           if (accumulatorRef.current < stepMs) {
             break;
           }
           stepGame();
+          if (gameStateRef.current !== "playing") {
+            break;
+          }
           accumulatorRef.current -= stepMs;
+        }
+      }
+
+      if (gameStateRef.current === "levelup") {
+        if (levelUpTimerRef.current === null) {
+          levelUpTimerRef.current = timestamp;
+        }
+
+        const elapsed = timestamp - levelUpTimerRef.current;
+        if (elapsed >= LEVEL_UP_DURATION_MS) {
+          const freshSnake = createInitialSnake();
+          const nextObstacles = getObstaclesForLevel(levelRef.current);
+          const freshFood = pickNextFood(freshSnake, nextObstacles);
+
+          setSnake(freshSnake);
+          snakeRef.current = freshSnake;
+
+          setObstacles(nextObstacles);
+          obstaclesRef.current = nextObstacles;
+
+          setFood(freshFood);
+          foodRef.current = freshFood;
+
+          queuedDirectionRef.current = null;
+          setDirection("right");
+          directionRef.current = "right";
+
+          accumulatorRef.current = 0;
+          lastFrameRef.current = performance.now();
+          levelUpTimerRef.current = null;
+
+          setGameState("playing");
+          gameStateRef.current = "playing";
         }
       }
 
