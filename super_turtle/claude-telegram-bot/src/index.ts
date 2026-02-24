@@ -31,7 +31,7 @@ import {
 } from "./handlers";
 import { session } from "./session";
 import { getDueJobs, advanceRecurringJob, removeJob } from "./cron";
-import type { StatusCallback } from "./types";
+import { StreamingState, createStatusCallback } from "./handlers/streaming";
 
 // Create bot instance
 export const bot = new Bot(TELEGRAM_TOKEN);
@@ -110,11 +110,33 @@ bot.catch((err) => {
 // ============== Cron Timer Loop ==============
 
 /**
+ * Build a minimal Grammy Context-like object from bot.api + chat_id.
+ * Just enough surface area for startTypingIndicator and createStatusCallback.
+ */
+function makeCronContext(chatId: number) {
+  return {
+    chat: { id: chatId },
+    reply: async (text: string, opts?: Record<string, unknown>) => {
+      return bot.api.sendMessage(chatId, text, opts as Parameters<typeof bot.api.sendMessage>[2]);
+    },
+    replyWithChatAction: async (action: string) => {
+      await bot.api.sendChatAction(chatId, action as Parameters<typeof bot.api.sendChatAction>[1]);
+    },
+    replyWithSticker: async (sticker: unknown) => {
+      // @ts-expect-error minimal shim
+      return bot.api.sendSticker(chatId, sticker);
+    },
+    api: bot.api,
+  } as unknown as import("grammy").Context;
+}
+
+/**
  * Timer loop that checks for due cron jobs every 10 seconds.
  * For each due job:
- * 1. Sends an indicator message to the chat
+ * 1. Sends a typing indicator (like normal messages)
  * 2. Injects the prompt through session.sendMessageStreaming
- * 3. Updates/removes the job from store
+ * 3. Uses the real StreamingState/createStatusCallback for proper output
+ * 4. Updates/removes the job from store
  */
 const startCronTimer = () => {
   setInterval(async () => {
@@ -130,6 +152,23 @@ const startCronTimer = () => {
       }
 
       for (const job of dueJobs) {
+        // Build a fake ctx for this chat
+        const ctx = makeCronContext(job.chat_id);
+
+        // Start typing indicator (same loop as normal messages)
+        let typingRunning = true;
+        const typingLoop = async () => {
+          while (typingRunning) {
+            try {
+              await bot.api.sendChatAction(job.chat_id, "typing");
+            } catch (e) {
+              console.debug("Cron typing indicator failed:", e);
+            }
+            await Bun.sleep(4000);
+          }
+        };
+        typingLoop();
+
         try {
           // Send indicator message
           const promptPreview = job.prompt.slice(0, 80);
@@ -138,63 +177,26 @@ const startCronTimer = () => {
             `🔔 Scheduled: ${promptPreview}${job.prompt.length > 80 ? "..." : ""}`
           );
 
-          // Create a status callback that sends chunks to Telegram
-          const chunks: string[] = [];
-          let lastMessageId: number | null = null;
+          // Use the real streaming callback (HTML formatting, throttled edits, etc.)
+          const state = new StreamingState();
+          const statusCallback = createStatusCallback(ctx, state);
 
-          const statusCallback: StatusCallback = async (
-            type: "thinking" | "tool" | "text" | "segment_end" | "done",
-            content: string
-          ) => {
-            // Accumulate text chunks
-            if (type === "text" || type === "tool") {
-              chunks.push(content);
+          // Mark processing so concurrent cron ticks don't overlap
+          const stopProcessing = session.startProcessing();
 
-              // Send or update message when chunk is ready
-              if (type === "segment_end" || chunks.join("").length > 1000) {
-                const text = chunks.join("");
-                if (text.trim()) {
-                  if (lastMessageId) {
-                    try {
-                      await bot.api.editMessageText(job.chat_id, lastMessageId, text);
-                    } catch {
-                      // If edit fails, send new message
-                      const msg = await bot.api.sendMessage(job.chat_id, text);
-                      lastMessageId = msg.message_id;
-                    }
-                  } else {
-                    const msg = await bot.api.sendMessage(job.chat_id, text);
-                    lastMessageId = msg.message_id;
-                  }
-                  chunks.length = 0;
-                }
-              }
-            } else if (type === "done") {
-              // Send any remaining chunks
-              const text = chunks.join("");
-              if (text.trim()) {
-                if (lastMessageId) {
-                  try {
-                    await bot.api.editMessageText(job.chat_id, lastMessageId, text);
-                  } catch {
-                    await bot.api.sendMessage(job.chat_id, text);
-                  }
-                } else {
-                  await bot.api.sendMessage(job.chat_id, text);
-                }
-              }
-            }
-          };
-
-          // Inject the prompt through session.sendMessageStreaming
-          // Use "cron" as username and 0 as userId for cron-triggered jobs
-          await session.sendMessageStreaming(
-            job.prompt,
-            "cron",
-            0,
-            statusCallback,
-            job.chat_id
-          );
+          try {
+            // Inject the prompt through session.sendMessageStreaming
+            await session.sendMessageStreaming(
+              job.prompt,
+              "cron",
+              0,
+              statusCallback,
+              job.chat_id,
+              ctx
+            );
+          } finally {
+            stopProcessing();
+          }
 
           // Update or remove the job
           if (job.type === "recurring") {
@@ -204,7 +206,6 @@ const startCronTimer = () => {
           }
         } catch (error) {
           console.error(`Failed to execute cron job ${job.id}:`, error);
-          // Send error message to chat
           try {
             await bot.api.sendMessage(
               job.chat_id,
@@ -213,6 +214,8 @@ const startCronTimer = () => {
           } catch {
             // Ignore error sending failure notification
           }
+        } finally {
+          typingRunning = false;
         }
       }
     } catch (error) {

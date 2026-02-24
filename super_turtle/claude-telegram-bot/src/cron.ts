@@ -24,17 +24,12 @@ export interface CronJob {
 const CRON_JOBS_FILE = join(import.meta.dir, "../cron-jobs.json");
 
 let jobsCache: CronJob[] = [];
-let cacheLoaded = false;
 
 /**
  * Load jobs from the persistent store.
- * Caches the result in memory.
+ * Always reads from disk so external writes (e.g. from the meta agent) are picked up.
  */
 export function loadJobs(): CronJob[] {
-  if (cacheLoaded) {
-    return jobsCache;
-  }
-
   try {
     if (existsSync(CRON_JOBS_FILE)) {
       const content = readFileSync(CRON_JOBS_FILE, "utf-8");
@@ -47,7 +42,6 @@ export function loadJobs(): CronJob[] {
     jobsCache = [];
   }
 
-  cacheLoaded = true;
   return jobsCache;
 }
 
@@ -161,9 +155,8 @@ export function advanceRecurringJob(id: string): boolean {
 
 /**
  * Force reload of jobs from disk.
- * Useful for testing or if external processes modify the file.
+ * Kept for API compatibility; loadJobs() always reads from disk now.
  */
 export function reloadJobs(): CronJob[] {
-  cacheLoaded = false;
   return loadJobs();
 }
