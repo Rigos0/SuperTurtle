@@ -108,6 +108,7 @@ read_meta() {
     TIMEOUT_SECONDS="$(grep -m1 '^TIMEOUT_SECONDS=' "$mf" 2>/dev/null | cut -d= -f2)" || true
     WATCHDOG_PID="$(grep -m1 '^WATCHDOG_PID=' "$mf" 2>/dev/null | cut -d= -f2)" || true
     LOOP_TYPE="$(grep -m1 '^LOOP_TYPE=' "$mf" 2>/dev/null | cut -d= -f2)" || true
+    SKILLS="$(grep -m1 '^SKILLS=' "$mf" 2>/dev/null | cut -d= -f2)" || true
     return 0
   fi
   return 1
@@ -209,6 +210,10 @@ do_start() {
   local timeout_secs
   timeout_secs="$(parse_duration "$timeout_str")" || exit 1
 
+  # Convert skills array to JSON
+  local skills_json
+  skills_json="$(printf '%s\n' "${skills[@]}" | python3 -c 'import sys, json; print(json.dumps([line.strip() for line in sys.stdin if line.strip()]))' 2>/dev/null || echo '[]')"
+
   ensure_workspace "$name"
 
   if is_running "$name"; then
@@ -285,13 +290,14 @@ print(f'[subturtle:{name}] spawned as {loop_type} (PID {proc.pid})')
   fi
   turtle_pid="$(cat "$pf")"
 
-  # Write metadata (spawn time + timeout)
+  # Write metadata (spawn time + timeout + skills)
   local spawned_at
   spawned_at="$(date +%s)"
   cat > "$mf" <<METAEOF
 SPAWNED_AT=${spawned_at}
 TIMEOUT_SECONDS=${timeout_secs}
 LOOP_TYPE=${loop_type}
+SKILLS=${skills_json}
 METAEOF
 
   # Spawn watchdog: sleeps for timeout, then kills the sub-turtle.
@@ -366,8 +372,9 @@ do_status() {
 
     remaining_secs="$(time_remaining "$name")"
 
-    # Read meta for type info (always attempt)
+    # Read meta for type and skills info (always attempt)
     LOOP_TYPE=""
+    SKILLS=""
     read_meta "$name" || true
     local type_info="${LOOP_TYPE:-slow}"
 
@@ -381,6 +388,12 @@ do_status() {
     fi
 
     echo "[subturtle:${name}] running as ${type_info} (PID ${pid})${time_info}"
+
+    # Show skills if any
+    if [[ -n "$SKILLS" && "$SKILLS" != "[]" ]]; then
+      echo "[subturtle:${name}] skills: ${SKILLS}"
+    fi
+
     ps -o pid,ppid,pgid,sess,state,etime,command -p "$pid" 2>/dev/null || true
 
     # Show tunnel URL if it exists
@@ -426,6 +439,7 @@ do_list() {
     local pid_str=""
     local time_str=""
     local type_str=""
+    local skills_str=""
     local pf="${ws}subturtle.pid"
     if [[ -f "$pf" ]]; then
       local pid
@@ -440,8 +454,12 @@ do_list() {
         time_str="$(format_time_remaining "$remaining_secs")"
 
         LOOP_TYPE=""
+        SKILLS=""
         read_meta "$name" || true
         type_str="${LOOP_TYPE:-slow}"
+        if [[ -n "$SKILLS" && "$SKILLS" != "[]" ]]; then
+          skills_str=" [skills: ${SKILLS}]"
+        fi
       fi
     fi
 
@@ -466,9 +484,9 @@ do_list() {
     fi
 
     if [[ -n "$time_str" ]]; then
-      printf "  %-15s %-8s %-12s %-14s %-14s %s\n" "$name" "$status_str" "$type_str" "$pid_str" "$time_str" "$task"
+      printf "  %-15s %-8s %-12s %-14s %-14s %s%s\n" "$name" "$status_str" "$type_str" "$pid_str" "$time_str" "$task" "$skills_str"
     else
-      printf "  %-15s %-8s %-12s %-14s %-14s %s\n" "$name" "$status_str" "" "$pid_str" "" "$task"
+      printf "  %-15s %-8s %-12s %-14s %-14s %s%s\n" "$name" "$status_str" "" "$pid_str" "" "$task" "$skills_str"
     fi
 
     # Show tunnel URL if it exists
