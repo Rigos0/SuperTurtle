@@ -33,6 +33,7 @@ import { getCommandLines, formatModelInfo, getUsageLines } from "./handlers/comm
 import { session } from "./session";
 import { getDueJobs, advanceRecurringJob, removeJob } from "./cron";
 import { bot } from "./bot";
+import { StreamingState, createSilentStatusCallback } from "./handlers/streaming";
 
 // Re-export for any existing consumers
 export { bot };
@@ -113,12 +114,15 @@ bot.catch((err) => {
 
 /**
  * Timer loop that checks for due cron jobs every 10 seconds.
- * When a job fires, it routes the prompt through handleText — the exact same
- * path as a real user message, with no notification prefix. The job is
- * removed/advanced BEFORE execution so a crash never causes retries. Failures
- * are logged and dropped silently (no retry, no error message to user).
+ * Non-silent jobs are routed through handleText (same path as user text).
+ * Silent jobs run in the background and only notify Telegram if the captured
+ * assistant response contains marker events (completion/error/milestone, etc.).
+ * The job is removed/advanced BEFORE execution so a crash never causes retries.
+ * Failures are logged and dropped silently (no retry, no error message to user).
  */
 const startCronTimer = () => {
+  const notificationMarkers = ["🎉", "⚠️", "⚠", "❌", "🚀", "🔔"];
+
   setInterval(async () => {
     try {
       // Skip if a query is already running
@@ -153,27 +157,82 @@ const startCronTimer = () => {
           const userId = ALLOWED_USERS[0]!;
           // Default chat_id to the first allowed user — single-chat bots never need to specify it
           const chatId: number = job.chat_id ?? userId;
+          const createCronContext = (text: string): import("grammy").Context =>
+            ({
+              from: { id: userId, username: "cron", is_bot: false, first_name: "Cron" },
+              chat: { id: chatId, type: "private" },
+              message: {
+                text,
+                message_id: 0,
+                date: Math.floor(Date.now() / 1000),
+                chat: { id: chatId, type: "private" },
+              },
+              reply: async (replyText: string, opts?: unknown) => {
+                return bot.api.sendMessage(chatId, replyText, opts as Parameters<typeof bot.api.sendMessage>[2]);
+              },
+              replyWithChatAction: async (action: string) => {
+                await bot.api.sendChatAction(chatId, action as Parameters<typeof bot.api.sendChatAction>[1]);
+              },
+              replyWithSticker: async (sticker: unknown) => {
+                // @ts-expect-error minimal shim for sticker sending
+                return bot.api.sendSticker(chatId, sticker);
+              },
+              api: bot.api,
+            }) as unknown as import("grammy").Context;
 
-          // Append instruction so the agent opens its reply with a scheduled notice
-          const injectedPrompt = `${job.prompt}\n\n(This is a scheduled message. Start your response with "🔔 Scheduled:" on its own line before anything else.)`;
+          if (job.silent) {
+            const cronCtx = createCronContext(job.prompt);
+            let keepTyping = true;
+            const typingController = {
+              stop: () => {
+                keepTyping = false;
+              },
+            };
+            session.typingController = typingController;
+            const stopProcessing = session.startProcessing();
 
-          // Route through handleText — same path as a real user message
-          await handleText({
-            from: { id: userId, username: "cron", is_bot: false, first_name: "Cron" },
-            chat: { id: chatId, type: "private" },
-            message: { text: injectedPrompt, message_id: 0, date: Math.floor(Date.now() / 1000), chat: { id: chatId, type: "private" } },
-            reply: async (text: string, opts?: unknown) => {
-              return bot.api.sendMessage(chatId, text, opts as Parameters<typeof bot.api.sendMessage>[2]);
-            },
-            replyWithChatAction: async (action: string) => {
-              await bot.api.sendChatAction(chatId, action as Parameters<typeof bot.api.sendChatAction>[1]);
-            },
-            replyWithSticker: async (sticker: unknown) => {
-              // @ts-expect-error minimal shim for sticker sending
-              return bot.api.sendSticker(chatId, sticker);
-            },
-            api: bot.api,
-          } as unknown as import("grammy").Context);
+            const typingLoop = (async () => {
+              while (keepTyping) {
+                try {
+                  await bot.api.sendChatAction(chatId, "typing");
+                } catch (error) {
+                  console.debug("Silent cron typing indicator failed:", error);
+                }
+                await Bun.sleep(4000);
+              }
+            })();
+
+            try {
+              const state = new StreamingState();
+              const statusCallback = createSilentStatusCallback(cronCtx, state);
+              const response = await session.sendMessageStreaming(
+                job.prompt,
+                "cron",
+                userId,
+                statusCallback,
+                chatId,
+                cronCtx
+              );
+              const capturedText = state.getSilentCapturedText().trim() || response.trim();
+              const shouldNotify = notificationMarkers.some((marker) =>
+                capturedText.includes(marker)
+              );
+              if (shouldNotify && capturedText) {
+                await bot.api.sendMessage(chatId, capturedText);
+              }
+            } finally {
+              typingController.stop();
+              await typingLoop;
+              stopProcessing();
+              session.typingController = null;
+            }
+          } else {
+            // Append instruction so the agent opens its reply with a scheduled notice
+            const injectedPrompt = `${job.prompt}\n\n(This is a scheduled message. Start your response with "🔔 Scheduled:" on its own line before anything else.)`;
+            const cronCtx = createCronContext(injectedPrompt);
+            // Route through handleText — same path as a real user message
+            await handleText(cronCtx);
+          }
         } catch (error) {
           // No retries — let it fail gracefully
           console.error(`Cron job ${job.id} failed (no retry):`, error);
