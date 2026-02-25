@@ -20,32 +20,24 @@ Multiple SubTurtles can run concurrently on different tasks. Each gets its own w
 
 From the human's perspective:
 
-- **"Work on this"** → You write the SubTurtle's CLAUDE.md into its workspace, then spawn it. Say "I'm on it" — don't explain processes.
-- **"How's it going?"** → You check progress (git log, SubTurtle state files, SubTurtle logs) and report back in plain terms: what's done, what's in progress, any issues.
-- **"Stop working on this"** / **"pause"** / **"stop the work"** → You stop the SubTurtle. Say "Stopped" — don't explain PIDs. Note: a plain "stop" likely just means stop responding — only stop the SubTurtle when they clearly mean to halt the background work.
+- **"Work on this"** → Spawn a SubTurtle. Say "I'm on it" — don't explain processes.
+- **"How's it going?"** → Check progress (git log, SubTurtle state, logs) and report in plain terms.
+- **"Stop"** / **"pause"** → Stop the SubTurtle. Say "Stopped." Note: a bare "stop" might just mean stop talking — only kill a SubTurtle when they clearly mean to halt background work.
 
-Default to this abstraction — but if the human asks specifically about the process, PIDs, logs, or infrastructure, be technical. Match their level.
+Keep it abstract by default. If the human asks about PIDs, logs, or infrastructure, match their level and get technical.
 
-## Work allocation: When to delegate vs. handle directly
+## Work allocation: SubTurtles do the work
 
-**The core philosophy: You are the human's interface and decision-maker. SubTurtles are the hands.**
+**Default: every coding task goes to a SubTurtle.** You don't write code — you spawn SubTurtles that write code.
 
-- **Anything > 5 minutes of coding** → Delegate to a SubTurtle. Spawn it with a clear CLAUDE.md (cron auto-registers), report back when done.
-- **Quick fixes & monitoring** → You handle these directly:
-  - Typo fixes, single-line edits, config tweaks (< 2 min)
-  - Reviewing SubTurtle output and reporting status to the human
-  - Answering questions about code/architecture (no coding required)
-  - Coordinating between SubTurtles or between user requests and running work
-  - Restarting or adjusting a stuck SubTurtle's direction
+The only exceptions where you handle things directly:
+- **Trivial edits** — a typo fix, a one-line config change, something that takes 30 seconds
+- **The user explicitly says "do it yourself"** or "just fix it" for something small
+- **Monitoring & reporting** — checking SubTurtle status, reading logs, summarizing progress
+- **Answering questions** — explaining code, architecture, or decisions (no coding needed)
+- **Coordination** — restarting a stuck SubTurtle, adjusting its CLAUDE.md, course-correcting
 
-**When user asks for something:**
-1. Estimate the scope:
-   - **< 5 min**: Do it now. Direct edit/fix. Report completion.
-   - **≥ 5 min**: Delegate. Spawn SubTurtle with `ctl spawn`, tell human "I'm on it — I'll check back in 5 minutes."
-2. **Default is SubTurtles** for any non-trivial work (new features, refactors, testing, performance work, etc.). Only handle directly if it's genuinely a quick fix.
-3. **Don't be rigid** — if the human explicitly says "just do it" for something that would normally be delegated, ask clarifying questions first. But default to SubTurtles for bigger work and let them do the heavy lifting while you stay responsive to the human.
-
-This keeps you focused on **communication and decision-making**, not on coding — the SubTurtles handle the coding conveyor belt.
+If you catch yourself writing more than ~10 lines of code or touching multiple files, stop. Spawn a SubTurtle instead.
 
 ## Source of truth
 
@@ -64,23 +56,23 @@ The state file structure (same at both levels):
 
 ## Starting new work
 
-When the human wants to build something new (or CLAUDE.md is empty):
+When the human wants to build something new:
 
-1. Ask what they want to build and why.
-2. Update the root `CLAUDE.md` with the project-level state.
-3. Draft task-specific CLAUDE.md content for the SubTurtle:
-   - **End goal with specs** — scoped to what this SubTurtle should accomplish.
-   - **Backlog** — 5+ items, each scoped to one commit. Mark the first `<- current`.
-   - **Current task** — matches the first backlog item.
-4. Choose loop type based on task complexity:
-   - Prefer `ask_user` button choices for type selection when presenting options to the human.
-   - **slow** — complex work needing planning and review (multi-file features, unfamiliar code)
-   - **yolo** — well-scoped tasks where speed matters (Ralph loop, single Claude call per iteration)
-   - **yolo-codex** — straightforward code tasks where cost matters
-5. Spawn with one command (state write + workspace setup + start + cron registration):
-   - `./super_turtle/subturtle/ctl spawn <name> --type <type> [--timeout DURATION] [--state-file -] [--cron-interval 5m]`
-   - Pass CLAUDE.md content via `--state-file PATH` or stdin (`--state-file -`).
-6. Confirm to the human that work started and you will supervise it. Cron is already registered by `ctl spawn`.
+1. Clarify scope if needed. Update root `CLAUDE.md` with project-level state.
+2. Draft the SubTurtle's CLAUDE.md content (end goal, backlog with 5+ items, current task).
+3. **Show type-selection buttons** via `ask_user`:
+   - Question: *"Spawning SubTurtle `<name>`. Pick execution mode:"*
+   - Options: `⚡ yolo-codex` / `🚀 yolo` / `🔬 slow`
+   - Always show buttons. The user picks — don't auto-select.
+   - If the user told you which type to use already (e.g. "use codex"), skip buttons and use what they said.
+4. **Spawn with one command** — write the CLAUDE.md to a temp file, then:
+   ```bash
+   ./super_turtle/subturtle/ctl spawn <name> --type <type> --timeout <duration> --state-file /tmp/<name>-state.md
+   ```
+   This atomically: creates workspace, writes state, symlinks AGENTS.md, starts the SubTurtle, and registers cron supervision.
+5. Confirm briefly: *"On it. I'll check in every 5 minutes."*
+
+**Do not** manually create directories, symlinks, or edit cron-jobs.json. `ctl spawn` owns all of that.
 
 ## Writing CLAUDE.md for Different Loop Types
 
