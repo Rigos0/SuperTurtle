@@ -25,23 +25,64 @@ async function probeUsage(codexEnabled: "true" | "false"): Promise<UsageProbeRes
     TELEGRAM_ALLOWED_USERS: "123",
     CLAUDE_WORKING_DIR: process.cwd(),
     CODEX_ENABLED: codexEnabled,
-    OPENAI_ADMIN_KEY: "test-admin-key",
+    HOME: process.env.HOME || "/tmp",
   };
 
   const script = `
     const marker = ${JSON.stringify(marker)};
     const modulePath = ${JSON.stringify(commandsPath)};
 
-    Bun.spawnSync = () => ({
-      stdout: Buffer.from(JSON.stringify({
-        claudeAiOauth: { accessToken: "test-claude-token" },
-      })),
-      stderr: Buffer.from(""),
-      success: true,
-      exitCode: 0,
-    });
-
     let codexFetchCalls = 0;
+
+    const originalSpawnSync = Bun.spawnSync;
+    Bun.spawnSync = (cmd, opts) => {
+      if (Array.isArray(cmd) && cmd[0] === "security") {
+        // Mock security find-generic-password for Claude token
+        return {
+          stdout: Buffer.from(JSON.stringify({
+            claudeAiOauth: { accessToken: "test-claude-token" },
+          })),
+          stderr: Buffer.from(""),
+          success: true,
+          exitCode: 0,
+        };
+      }
+
+      if (Array.isArray(cmd) && cmd[0] === "codex") {
+        // Mock codex exec /stats command to fail, forcing fallback to history file
+        codexFetchCalls += 1;
+        return {
+          stdout: Buffer.from(""),
+          stderr: Buffer.from("error"),
+          success: false,
+          exitCode: 1,
+        };
+      }
+
+      // Fallback to original if not mocked
+      return originalSpawnSync(cmd, opts);
+    };
+
+    const originalFile = Bun.file;
+    Bun.file = (path) => {
+      // Handle all types of paths (string, BunFile, etc.)
+      const pathStr = typeof path === "string" ? path : String(path);
+      if (pathStr && pathStr.includes(".codex/history.jsonl")) {
+        // Return mock history file with recent entries (within 7 days)
+        const now = Math.floor(Date.now() / 1000);
+        const mockHistory = [
+          JSON.stringify({ session_id: "sess-1", ts: now - 100000, text: "Hello world test" }),
+          JSON.stringify({ session_id: "sess-1", ts: now - 50000, text: "Another test message with more words" }),
+          JSON.stringify({ session_id: "sess-2", ts: now - 1000, text: "Third session test" }),
+        ].join("\\n");
+
+        return {
+          text: async () => mockHistory,
+        };
+      }
+      return originalFile(path);
+    };
+
     globalThis.fetch = async (input) => {
       const url = typeof input === "string" ? input : input.url;
 
@@ -49,29 +90,6 @@ async function probeUsage(codexEnabled: "true" | "false"): Promise<UsageProbeRes
         return new Response(
           JSON.stringify({
             five_hour: { utilization: 42, resets_at: "2026-02-25T18:00:00Z" },
-          }),
-          { status: 200 }
-        );
-      }
-
-      if (url.includes("/v1/organization/usage/completions")) {
-        codexFetchCalls += 1;
-        return new Response(
-          JSON.stringify({
-            data: [
-              {
-                results: [
-                  {
-                    num_model_requests: 3,
-                    input_tokens: 1200,
-                    output_tokens: 800,
-                    input_cached_tokens: 100,
-                  },
-                ],
-              },
-            ],
-            has_more: false,
-            next_page: null,
           }),
           { status: 200 }
         );
