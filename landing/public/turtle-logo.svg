@@ -1,0 +1,46 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <!-- Shell -->
+  <ellipse cx="100" cy="100" rx="70" ry="65" fill="#5a7247" opacity="0.9"/>
+  <ellipse cx="100" cy="100" rx="65" ry="60" fill="#6b8555"/>
+
+  <!-- Shell pattern - hexagonal plates -->
+  <circle cx="100" cy="85" r="15" fill="#4a6237" opacity="0.6"/>
+  <circle cx="75" cy="105" r="12" fill="#4a6237" opacity="0.6"/>
+  <circle cx="125" cy="105" r="12" fill="#4a6237" opacity="0.6"/>
+  <circle cx="85" cy="130" r="11" fill="#4a6237" opacity="0.6"/>
+  <circle cx="115" cy="130" r="11" fill="#4a6237" opacity="0.6"/>
+  <circle cx="100" cy="145" r="10" fill="#4a6237" opacity="0.6"/>
+
+  <!-- Head -->
+  <ellipse cx="100" cy="40" rx="28" ry="32" fill="#5a7247"/>
+  <ellipse cx="100" cy="38" rx="24" ry="28" fill="#6b8555"/>
+
+  <!-- Head details -->
+  <circle cx="92" cy="35" r="5" fill="#2d2a26"/>
+  <circle cx="108" cy="35" r="5" fill="#2d2a26"/>
+  <circle cx="93" cy="34" r="2" fill="#faf8f5"/>
+  <circle cx="109" cy="34" r="2" fill="#faf8f5"/>
+
+  <!-- Mouth -->
+  <path d="M 95 45 Q 100 48 105 45" stroke="#2d2a26" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+
+  <!-- Front left leg -->
+  <ellipse cx="65" cy="130" rx="14" ry="18" fill="#5a7247" transform="rotate(-25 65 130)"/>
+  <ellipse cx="55" cy="155" rx="12" ry="16" fill="#6b8555" transform="rotate(-35 55 155)"/>
+
+  <!-- Front right leg -->
+  <ellipse cx="135" cy="130" rx="14" ry="18" fill="#5a7247" transform="rotate(25 135 130)"/>
+  <ellipse cx="145" cy="155" rx="12" ry="16" fill="#6b8555" transform="rotate(35 145 155)"/>
+
+  <!-- Back left leg -->
+  <ellipse cx="70" cy="155" rx="14" ry="18" fill="#4a6237" transform="rotate(-45 70 155)"/>
+  <ellipse cx="55" cy="175" rx="12" ry="16" fill="#5a7247" transform="rotate(-55 55 175)"/>
+
+  <!-- Back right leg -->
+  <ellipse cx="130" cy="155" rx="14" ry="18" fill="#4a6237" transform="rotate(45 130 155)"/>
+  <ellipse cx="145" cy="175" rx="12" ry="16" fill="#5a7247" transform="rotate(55 145 175)"/>
+
+  <!-- Tail -->
+  <path d="M 100 165 Q 105 180 100 190" stroke="#5a7247" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.8"/>
+  <path d="M 100 165 Q 95 180 100 190" stroke="#4a6237" stroke-width="8" fill="none" stroke-linecap="round" opacity="0.6"/>
+</svg>

@@ -1,6 +1,6 @@
 ## Current Task
 
-Redesign "How it works" section: restyle SVG diagram with earthy colors, warm step cards.
+Redesign "Loop types" section: olive/terracotta/sage color scheme, no neon.
 
 ## End Goal with Specs
 
@@ -51,8 +51,8 @@ A landing page that feels warm, natural, and distinctive — NOT the typical dar
 - [x] Update globals.css with earthy color scheme and warm theme variables
 - [x] Redesign Hero section: turtle logo image, warm typography, cream background, no gradients
 - [x] Redesign "What it does" feature grid: soft cream cards, warm shadows, earthy icons
-- [ ] Redesign "How it works" section: restyle SVG diagram with earthy colors, warm step cards <- current
-- [ ] Redesign "Loop types" cards: olive/terracotta/sage color scheme, no neon
+- [x] Redesign "How it works" section: restyle SVG diagram with earthy colors, warm step cards
+- [ ] Redesign "Loop types" cards: olive/terracotta/sage color scheme, no neon <- current
 - [ ] Restyle TypedTerminal component: warm dark brown background, amber/olive accents
 - [ ] Redesign terminal demo and "Getting started" sections with earthy code blocks
 - [ ] Redesign footer: warm light background, earthy links and badges
