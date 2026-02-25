@@ -407,3 +407,165 @@ Add a brief note in the "Autonomous supervision" section documenting:
 
 ---
 
+## Root Files & Config Scan (2026-02-25)
+
+**Files Scanned:** `.gitignore`, `package.json`, `tsconfig.json`, `mcp-config.*`, `cron-jobs.json`, `.env`, `.subturtles/` workspaces
+
+**Summary:** Core config files are well-maintained. One critical config drift issue found and fixed. Stale test artifacts present but properly ignored. SubTurtle workspaces contain completed/test runs with minimal cleanup needed.
+
+---
+
+### 🔴 Critical Issues
+
+#### 1. MCP Configuration Template Out of Sync with Actual Config
+**Files:** `super_turtle/claude-telegram-bot/mcp-config.example.ts` vs `mcp-config.ts`
+**Severity:** Critical
+**Status:** ✅ FIXED
+
+**Issue:**
+The example configuration file (mcp-config.example.ts) had **all MCP servers commented out**, while the actual configuration (mcp-config.ts) has **3 active required servers**:
+- `send-turtle` — internal SubTurtle communication
+- `bot-control` — bot control commands (usage, model switching, sessions)
+- `ask-user` — interactive Telegram button prompts
+
+Anyone setting up the bot from this example template would get a non-functional configuration with no MCP servers enabled. This breaks the bot's core features.
+
+**Fix Applied:**
+Updated mcp-config.example.ts to show all three required servers as active, with optional examples below commented.
+
+```typescript
+// Core SubTurtle MCP servers (required for bot functionality)
+"send-turtle": { command: "bun", args: ["run", `${REPO_ROOT}/send_turtle_mcp/server.ts`] },
+"bot-control": { command: "bun", args: ["run", `${REPO_ROOT}/bot_control_mcp/server.ts`] },
+"ask-user": { command: "bun", args: ["run", `${REPO_ROOT}/ask_user_mcp/server.ts`] },
+```
+
+**Impact:** Setup instructions will now produce a working bot configuration. Prevents new deployments from being broken out of the box.
+
+---
+
+### 🟡 Medium Issues
+
+#### 1. Undocumented Project Artifact Tracked in Git
+**File:** `vojtech/` directory
+**Severity:** Medium
+**Status:** Documented (not fixed)
+
+**Issue:**
+The `vojtech/` directory (contains a fun greeting page with animated turtles) is tracked in git but:
+- Not documented in README or CLAUDE.md
+- Not clear if it's a demo, test, or stale project artifact
+- Takes up git space without context
+
+**Current State:**
+- Committed in git (f9ab680, 668de0c)
+- Not mentioned in project documentation
+- Not in .gitignore (so it's intentionally tracked)
+
+**Recommendation:**
+Either:
+1. Move to a `demos/` or `examples/` folder with clear documentation
+2. Add a note in README explaining what it is
+3. Remove if it was a temporary/test artifact
+
+**Impact:** Low — confusing for future developers reading the git tree.
+
+---
+
+### 🟢 Low Issues
+
+#### 1. Package JSON Dependencies
+**File:** `super_turtle/claude-telegram-bot/package.json`
+**Severity:** Low
+**Status:** OK
+
+**Issue:** No issues found.
+
+**Current State:** ✅
+- Dependencies are pinned to reasonable versions
+- No obvious stale dependencies
+- `@anthropic-ai/claude-agent-sdk` is current (^0.1.76)
+- All main dependencies (grammy, zod, openai) are up-to-date
+
+---
+
+#### 2. TypeScript Configuration
+**File:** `super_turtle/claude-telegram-bot/tsconfig.json`
+**Severity:** Low
+**Status:** OK
+
+**Issue:** No issues found.
+
+**Current State:** ✅
+- Strict mode enabled
+- Good default settings (ESNext target, bundler module resolution)
+- Unused locals/parameters flagged as false (appropriate for exploration)
+
+---
+
+#### 3. Stale Test Artifacts in .tmp Directory
+**File:** `.tmp/` directory
+**Severity:** Low
+**Status:** Documented
+
+**Issue:**
+`.tmp/` contains old test logs and integration artifacts:
+- `orchestrator.log` (592 KB, from Feb 24)
+- `e2e-*` test directories (Feb 22)
+- Old integration test results
+
+**Current State:**
+- Already in .gitignore (won't affect git)
+- Safe to delete (test artifacts only)
+- Doesn't cause functionality issues
+
+**Impact:** Low — clutters local filesystem but won't affect deployments or git.
+
+---
+
+#### 4. Root .env File
+**File:** `.env` (root directory)
+**Severity:** Low
+**Status:** OK
+
+**Issue:** No issues found.
+
+**Current State:** ✅
+- Properly listed in .gitignore
+- Not tracked in git
+- Correctly protected (mode 600)
+
+---
+
+### SubTurtle Workspace Analysis
+
+**Total Workspaces:** 29 (mostly historical/completed work)
+**Running:** 1 (code-quality — current task)
+**Stopped:** 28 (completed or test runs)
+
+**Notable Workspaces:**
+- ✅ `tunnel-support` — Complete, documented completion status
+- ✅ `skills-support` — Complete, has meaningful summary
+- ✅ `codex-usage-fix` — Complete, waiting for assignment
+- ✅ `ux-overhaul` — Recent (< 1 day), active work underway
+- ⚠️ `test-spawn*`, `verify-spawn*`, `dashboard` — Test workspaces, safe to clean
+
+**Recommendation:** Most stopped workspaces have completion messages or "(no task)" status. They're not causing issues and provide a history of work. No urgent cleanup needed. If storage becomes an issue, `test-*` and `verify-*` workspaces can be safely removed as they were created for testing the spawn functionality.
+
+---
+
+## Other Findings
+
+### Configuration File Quality
+- ✅ `.gitignore` is comprehensive and correct (Python, Node, IDE, OS, temp artifacts)
+- ✅ All env files properly ignored (`.env`, `.env.*`, excluding `.env.example`)
+- ✅ SubTurtle workspaces properly excluded from git
+- ✅ Cron jobs file is valid JSON, no stale entries
+
+### Build & Development Setup
+- ✅ Bun-based build system is consistent
+- ✅ TypeScript configuration is modern (ESNext)
+- ✅ MCP server architecture is clean (separate directories per server)
+
+---
+

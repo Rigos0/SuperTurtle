@@ -19,21 +19,31 @@ export const MCP_SERVERS: Record<
   | { command: string; args?: string[]; env?: Record<string, string> }
   | { type: "http"; url: string; headers?: Record<string, string> }
 > = {
-  // Ask User - present options as Telegram inline keyboard buttons
-  // Uncomment to enable interactive button prompts
-  // "ask-user": {
-  //   command: "bun",
-  //   args: ["run", `${REPO_ROOT}/ask_user_mcp/server.ts`]
-  // },
+  // Core SubTurtle MCP servers (required for bot functionality)
+  "send-turtle": {
+    command: "bun",
+    args: ["run", `${REPO_ROOT}/send_turtle_mcp/server.ts`],
+  },
 
-  // Example: Typefully - draft and schedule social posts
+  "bot-control": {
+    command: "bun",
+    args: ["run", `${REPO_ROOT}/bot_control_mcp/server.ts`],
+  },
+
+  // Ask User - present options as Telegram inline keyboard buttons
+  "ask-user": {
+    command: "bun",
+    args: ["run", `${REPO_ROOT}/ask_user_mcp/server.ts`],
+  },
+
+  // Optional: Typefully - draft and schedule social posts
   // Docs: https://support.typefully.com/en/articles/13128440-typefully-mcp-server
   // "typefully": {
   //   type: "http",
   //   url: `https://mcp.typefully.com/mcp?TYPEFULLY_API_KEY=${process.env.TYPEFULLY_API_KEY || ""}`
   // },
 
-  // Example: Things 3 task manager (macOS)
+  // Optional: Things 3 task manager (macOS)
   // Requires: https://github.com/hald/things-mcp
   // "things": {
   //   command: "uv",
