@@ -1,5 +1,5 @@
 ## Current Task
-Read `super_turtle/meta/META_SHARED.md` supervision and cron sections to prepare silent-first documentation updates.
+Update the "Starting new work" section in `super_turtle/meta/META_SHARED.md` to note that `ctl spawn` creates silent cron supervision by default.
 
 ## End Goal with Specs
 All SubTurtle supervision cron jobs are silent by default. The cron prompt instructs the meta agent to only produce notification messages when there's actual news. META_SHARED.md documents the new silent behavior.
@@ -18,9 +18,9 @@ All SubTurtle supervision cron jobs are silent by default. The cron prompt instr
 ## Backlog
 - [x] Read `super_turtle/subturtle/ctl` — find the `register_spawn_cron_job` function (around line 339-403) and understand cron job generation
 - [x] Update `register_spawn_cron_job` in `ctl` — add `"silent": true` to the cron job JSON. Redesign the prompt template to instruct silent behavior with notification markers.
-- [ ] Read `super_turtle/meta/META_SHARED.md` — find the "Autonomous supervision" section (around line 145-190) and the cron scheduling section <- current
-- [ ] Rewrite the supervision section in META_SHARED.md — document silent check-in behavior: what the meta agent does when woken by cron (check silently, only message on news), notification format (🎉🚀⚠️❌), when to escalate
-- [ ] Update the "Starting new work" section in META_SHARED.md to mention that spawned SubTurtles get silent cron by default
+- [x] Read `super_turtle/meta/META_SHARED.md` — find the "Autonomous supervision" section (around line 145-190) and the cron scheduling section
+- [x] Rewrite the supervision section in META_SHARED.md — document silent check-in behavior: what the meta agent does when woken by cron (check silently, only message on news), notification format (🎉🚀⚠️❌), when to escalate
+- [ ] Update the "Starting new work" section in META_SHARED.md to mention that spawned SubTurtles get silent cron by default <- current
 - [ ] Commit all changes
 
 ## Notes

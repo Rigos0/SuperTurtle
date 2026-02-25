@@ -162,24 +162,35 @@ This keeps preview links clean and automatic — the human just gets the link wh
 
 ## Autonomous supervision (cron check-ins)
 
-Every SubTurtle you spawn gets a recurring cron job that wakes you up to supervise it. This is **mandatory** and is auto-registered by `ctl spawn` (default interval: 5 minutes).
+Every SubTurtle you spawn gets a recurring cron job that wakes you up to supervise it. This is **mandatory** and auto-registered by `ctl spawn` (default interval: 5 minutes).
 
-**When spawning a SubTurtle:**
+**Silent-first default:**
+- New `ctl spawn` cron jobs are marked `silent: true`.
+- If a silent check-in finds no notable event, do the supervision work and respond with exactly `[SILENT]` (no user-facing chatter).
+- Legacy cron jobs without a `silent` field are treated as non-silent (backward compatible behavior).
 
-`ctl spawn` writes the recurring cron job for you. The cron prompt instructs you to:
-1. Check the SubTurtle's status via `ctl status <name>`
-2. Read its CLAUDE.md to see backlog progress
-3. Check `git log --oneline -10` for recent commits
-4. **Check for tunnel URL** — if `.tunnel-url` exists in the SubTurtle's workspace (at `.subturtles/<name>/.tunnel-url`), read it and send the link to the user on Telegram. Only send once per session; track sent URLs to avoid duplicates.
-5. Make a judgment call:
+**What to do when cron wakes you:**
+1. Check status via `./super_turtle/subturtle/ctl status <name>`.
+2. Read `.subturtles/<name>/CLAUDE.md` for backlog progress.
+3. Review `git log --oneline -10` for meaningful movement.
+4. Check logs if needed (`./super_turtle/subturtle/ctl logs <name>`).
+5. Check `.subturtles/<name>/.tunnel-url`; if a new URL appears, include it in the next milestone update.
 
-| Observation | Action |
-|-------------|--------|
-| **Backlog complete** — all items checked off | Stop the SubTurtle. Update root CLAUDE.md. Progress to next task (see below). |
-| **Stuck** — no commits in 2+ check-ins, or logs show errors/loops | Stop the SubTurtle. Diagnose the issue. Restart with adjusted state, or escalate to the human. |
-| **Off-track** — commits don't match the backlog, or quality issues | Stop the SubTurtle. Course-correct the CLAUDE.md. Restart. |
-| **Making good progress** — commits flowing, backlog advancing | Let it keep going. If the SubTurtle is on its last 1-2 backlog items, reschedule the cron to fire sooner (1-2 min instead of 5) so you catch completion quickly. |
-| **SubTurtle already dead** (timeout/crash) | Check what got done. Progress or restart as needed. |
+**Only notify the user when there is actual news:**
+- `🎉 Finished` — all backlog items are done. Stop the SubTurtle, report what shipped, and state what starts next (or that the roadmap is complete).
+- `🚀 Milestone` — significant progress since the last report (major backlog checkpoint, first working feature, or new tunnel URL ready).
+- `⚠️ Stuck` — no meaningful progress across 2+ check-ins, repeated loops/retries, or off-track work that requires intervention.
+- `❌ Error` — crash, hard failure, or broken environment preventing autonomous progress.
+
+**Notification format (keep brief and structured):**
+- Start with one marker line: `🎉 Finished: <subturtle-name>`, `🚀 Milestone: <subturtle-name>`, `⚠️ Stuck: <subturtle-name>`, or `❌ Error: <subturtle-name>`.
+- Then 2-4 short lines: current state, evidence (commit/backlog/log signal), and next action.
+- For `⚠️` and `❌`, include whether you already stopped/restarted the SubTurtle and exactly what decision/input is needed from the human (if any).
+
+**Escalate to the human when:**
+- Product direction is ambiguous and a choice changes implementation significantly.
+- You hit repeated failures after one restart/course-correction attempt.
+- Required secrets, credentials, external services, or permissions are missing.
 
 **Progressing to the next task:**
 
