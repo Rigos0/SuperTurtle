@@ -6,8 +6,8 @@
  */
 
 import { readFileSync } from "fs";
-import { WORKING_DIR, META_PROMPT } from "./config";
-import type { StatusCallback } from "./types";
+import { WORKING_DIR, META_PROMPT, MCP_SERVERS } from "./config";
+import type { StatusCallback, McpServerConfig } from "./types";
 
 // Prefs file for Codex (separate from Claude)
 const CODEX_PREFS_FILE = "/tmp/codex-telegram-prefs.json";
@@ -90,6 +90,48 @@ function formatCodexInitError(error: unknown): string {
 }
 
 /**
+ * Check if MCP servers are already configured in ~/.codex/config.toml.
+ * Returns true if any of our 3 servers are found.
+ */
+async function hasExistingMcpConfig(): Promise<boolean> {
+  try {
+    const homeDir = process.env.HOME || "";
+    const configPath = `${homeDir}/.codex/config.toml`;
+    const file = Bun.file(configPath);
+    if (!(await file.exists())) {
+      return false;
+    }
+
+    const content = await file.text();
+    // Check for any of our MCP server names in the config
+    const ourServers = ["send-turtle", "bot-control", "ask-user"];
+    return ourServers.some((server) => content.includes(server));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Convert MCP server config to Codex SDK format.
+ * Codex config expects: { mcp_servers: { name: { command: ..., args: ... } } }
+ */
+function buildCodexMcpConfig(): Record<string, unknown> {
+  const mcpServers: Record<string, Record<string, unknown>> = {};
+
+  for (const [name, config] of Object.entries(MCP_SERVERS)) {
+    if ("command" in config && "args" in config) {
+      mcpServers[name] = {
+        command: config.command,
+        ...(config.args && { args: config.args }),
+        ...(config.env && { env: config.env }),
+      };
+    }
+  }
+
+  return { mcp_servers: mcpServers };
+}
+
+/**
  * Manages Codex sessions using the official Codex SDK.
  */
 export class CodexSession {
@@ -126,7 +168,18 @@ export class CodexSession {
       if (!CodexImpl) {
         throw new Error("Codex export not found in @openai/codex-sdk");
       }
-      this.codex = new CodexImpl();
+
+      // Check if MCP servers are already configured in ~/.codex/config.toml
+      const hasExisting = await hasExistingMcpConfig();
+      if (hasExisting) {
+        console.log("MCP servers found in ~/.codex/config.toml, using existing config");
+        this.codex = new CodexImpl();
+      } else {
+        // Pass MCP config programmatically if not already configured
+        console.log("Passing MCP servers via Codex constructor");
+        const mcpConfig = buildCodexMcpConfig();
+        this.codex = new CodexImpl({ config: mcpConfig });
+      }
     } catch (error) {
       throw new Error(formatCodexInitError(error));
     }
@@ -292,15 +345,10 @@ ${userMessage}`;
           if (itemType === "mcp_tool_call") {
             const toolName = String(item.name || "");
             if (statusCallback) {
-              console.log(`TOOL: ${toolName}`);
-              // Don't show status for MCP tools - they handle their own output
-              if (
-                !toolName.startsWith("mcp__ask-user") &&
-                !toolName.startsWith("mcp__send-turtle") &&
-                !toolName.startsWith("mcp__bot-control")
-              ) {
-                await statusCallback("tool", toolName);
-              }
+              console.log(`MCP TOOL: ${toolName}`);
+              // MCP tools (ask-user, send-turtle, bot-control) are handled by their servers
+              // We just log them here - actual Telegram interaction is handled by the servers
+              // and then detected by handlers/streaming.ts functions
             }
           }
 

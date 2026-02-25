@@ -17,6 +17,9 @@ import {
   StreamingState,
   createSilentStatusCallback,
   createStatusCallback,
+  checkPendingAskUserRequests,
+  checkPendingSendTurtleRequests,
+  checkPendingBotControlRequests,
 } from "./streaming";
 
 export interface HandleTextOptions {
@@ -125,6 +128,40 @@ export async function handleText(
           undefined, // model - use Codex's saved preference
           undefined  // reasoningEffort - use Codex's saved preference
         );
+
+        // Check for pending MCP requests (ask-user buttons, send-turtle stickers, bot-control responses)
+        // These are written to /tmp by MCP servers during tool execution
+        if (chatId) {
+          // Small delay to let MCP servers write files
+          await new Promise((resolve) => setTimeout(resolve, 200));
+
+          // Check ask-user requests (may wait for user selection)
+          for (let attempt = 0; attempt < 3; attempt++) {
+            const buttonsSent = await checkPendingAskUserRequests(ctx, chatId);
+            if (buttonsSent) break;
+            if (attempt < 2) {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+          }
+
+          // Check send-turtle requests
+          for (let attempt = 0; attempt < 3; attempt++) {
+            const photoSent = await checkPendingSendTurtleRequests(ctx, chatId);
+            if (photoSent) break;
+            if (attempt < 2) {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+          }
+
+          // Check bot-control requests
+          for (let attempt = 0; attempt < 3; attempt++) {
+            const handled = await checkPendingBotControlRequests(session, chatId);
+            if (handled) break;
+            if (attempt < 2) {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+          }
+        }
 
         // 10. Audit log
         await auditLog(userId, username, "TEXT_CODEX", message, response);

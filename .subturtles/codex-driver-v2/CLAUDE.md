@@ -1,6 +1,6 @@
 # Current Task
 
-Phase A: Implement streaming support for Codex. Replace `thread.run()` with `thread.runStreamed()`, process ThreadEvent stream, and wire into statusCallback pattern so Codex responses stream in real-time like Claude.
+Phase B: Integrate MCP servers. Check if ~/.codex/config.toml has our 3 MCP servers (send-turtle, bot-control, ask-user). If not, pass MCP config programmatically via Codex constructor using paths from mcp-config.ts. Ensure MCP tool calls are processed correctly.
 
 # End Goal with Specs
 
@@ -155,8 +155,8 @@ Alternatively, the MCP servers may already be configured in `~/.codex/config.tom
 
 - [x] Read all key files listed above to understand current architecture fully
 - [x] Phase A: Replace `thread.run()` with `thread.runStreamed()`, process ThreadEvent stream, wire into statusCallback
-- [ ] Phase A: Handle all event types: agent_message (streaming text), reasoning (thinking), command_execution, file_change, mcp_tool_call, error, todo_list <- current
-- [ ] Phase B: Check ~/.codex/config.toml for existing MCP servers. If missing, pass MCP config via Codex constructor's `config` option using paths from mcp-config.ts
+- [x] Phase A: Handle all event types: agent_message (streaming text), reasoning (thinking), command_execution, file_change, mcp_tool_call, error, todo_list
+- [ ] Phase B: Check ~/.codex/config.toml for existing MCP servers. If missing, pass MCP config via Codex constructor's `config` option using paths from mcp-config.ts <- current
 - [ ] Phase B: Verify MCP tools work end-to-end (ask-user buttons appear, bot-control works, send-turtle sends stickers)
 - [ ] Phase C: Add codexModel + codexReasoningEffort preferences, wire /model command to show Codex models when activeDriver === "codex"
 - [ ] Phase C: Map thinking keywords (think/ultrathink/pensa) to modelReasoningEffort levels
