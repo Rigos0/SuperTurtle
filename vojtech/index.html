@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ahoj Vojtěchu! 🐢</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #00f2fe 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            position: relative;
+            overflow: hidden;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Floating turtle emoji particles */
+        .particle {
+            position: absolute;
+            font-size: 2rem;
+            opacity: 0.6;
+            animation: float 6s infinite ease-in-out;
+            pointer-events: none;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+            50% { transform: translateY(-30px) translateX(10px) rotate(10deg); }
+        }
+
+        .particle:nth-child(2) { animation-delay: 0s; left: 10%; top: 20%; }
+        .particle:nth-child(3) { animation-delay: 1s; right: 15%; top: 30%; }
+        .particle:nth-child(4) { animation-delay: 2s; left: 20%; bottom: 20%; }
+        .particle:nth-child(5) { animation-delay: 3s; right: 25%; bottom: 25%; }
+        .particle:nth-child(6) { animation-delay: 1.5s; right: 5%; top: 50%; }
+
+        .container {
+            text-align: center;
+            z-index: 10;
+            padding: 20px;
+            animation: scaleIn 0.8s ease-out;
+        }
+
+        @keyframes scaleIn {
+            0% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .logo {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 30px;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+
+        h1 {
+            font-size: clamp(2.5rem, 8vw, 4rem);
+            color: white;
+            font-weight: 800;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3), 4px 4px 16px rgba(0, 0, 0, 0.2);
+            letter-spacing: -1px;
+        }
+
+        .greeting {
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
+            margin-bottom: 30px;
+            animation: wave 2s ease-in-out infinite;
+        }
+
+        @keyframes wave {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(15deg); }
+            75% { transform: rotate(-15deg); }
+        }
+
+        .message {
+            font-size: clamp(1rem, 3vw, 1.25rem);
+            color: rgba(255, 255, 255, 0.95);
+            max-width: 500px;
+            line-height: 1.6;
+            text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.2);
+            margin: 0 auto 40px;
+        }
+
+        .message strong {
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .emoji-burst {
+            font-size: 3rem;
+            display: inline-block;
+            margin: 0 10px;
+            animation: burst 1s ease-out;
+        }
+
+        @keyframes burst {
+            0% {
+                opacity: 1;
+                transform: scale(1) rotateZ(0deg);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(2) rotateZ(360deg) translateY(-80px);
+            }
+        }
+
+        .footer {
+            margin-top: 60px;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        .footer a {
+            color: rgba(255, 255, 255, 0.95);
+            text-decoration: none;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.5);
+            transition: border-color 0.3s;
+        }
+
+        .footer a:hover {
+            border-bottom-color: rgba(255, 255, 255, 0.95);
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Floating turtle particles -->
+    <div class="particle">🐢</div>
+    <div class="particle">🐢</div>
+    <div class="particle">🐢</div>
+    <div class="particle">🐢</div>
+    <div class="particle">🐢</div>
+
+    <div class="container">
+        <img src="turtle-logo.png" alt="Turtle Logo" class="logo">
+
+        <div class="greeting">👋</div>
+
+        <h1>Ahoj Vojtěchu!</h1>
+
+        <p class="message">
+            This page was built by an <strong>autonomous turtle</strong> 🐢
+            <br><br>
+            Just to say hi and make you smile!
+            <br><br>
+            Welcome to the Agentic universe, my friend.
+            <br>
+            Where turtles code, and magic happens. ✨
+        </p>
+
+        <div class="footer">
+            <p>🚀 <em>Built with ❤️ by SuperTurtle</em></p>
+        </div>
+    </div>
+
+    <script>
+        // Add random emoji bursts on click
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('greeting')) return;
+
+            const emojis = ['🐢', '✨', '🚀', '💚', '🎉'];
+            const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+
+            const burst = document.createElement('div');
+            burst.className = 'emoji-burst';
+            burst.textContent = emoji;
+            burst.style.position = 'fixed';
+            burst.style.left = e.clientX + 'px';
+            burst.style.top = e.clientY + 'px';
+            burst.style.pointerEvents = 'none';
+            burst.style.zIndex = '1000';
+
+            document.body.appendChild(burst);
+
+            setTimeout(() => burst.remove(), 1000);
+        });
+
+        // Gently rotate floating particles
+        const particles = document.querySelectorAll('.particle');
+        particles.forEach((particle, index) => {
+            particle.style.animationDuration = (5 + index) + 's';
+        });
+    </script>
+</body>
+</html>
