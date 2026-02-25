@@ -1,7 +1,7 @@
 # Codex Support Task - SubTurtle
 
 ## Current Task
-Test /usage command with and without Codex enabled
+Final review and commit
 
 ## End Goal with Specs
 Implement full Codex support in Super Turtle's Telegram bot:
@@ -48,8 +48,8 @@ Implement full Codex support in Super Turtle's Telegram bot:
 - [x] Update README.md with CLOTH subscription explanation
 - [x] Add Codex configuration section to README
 - [x] Test config loading with both enabled/disabled states
-- [ ] Test /usage command with and without Codex enabled <- current
-- [ ] Final review and commit
+- [x] Test /usage command with and without Codex enabled
+- [ ] Final review and commit <- current
 
 ## Notes
 - Working directory: /Users/Richard.Mladek/Documents/projects/agentic
