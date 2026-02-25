@@ -5,10 +5,8 @@
  * No streaming in Phase 1 (buffered responses only).
  */
 
-import { Codex } from "@openai/codex-sdk";
 import { readFileSync } from "fs";
-import { OPENAI_API_KEY, WORKING_DIR, META_PROMPT } from "./config";
-import type { TokenUsage } from "./types";
+import { WORKING_DIR, META_PROMPT } from "./config";
 
 // Prefs file for Codex (separate from Claude)
 const CODEX_PREFS_FILE = "/tmp/codex-telegram-prefs.json";
@@ -35,12 +33,42 @@ function saveCodexPrefs(prefs: CodexPrefs): void {
   }
 }
 
+type CodexTurn = {
+  finalResponse?: string;
+};
+
+type CodexThread = {
+  id: string | null;
+  run(message: string): Promise<CodexTurn>;
+};
+
+type CodexClient = {
+  startThread(options?: {
+    workingDirectory: string;
+    skipGitRepoCheck?: boolean;
+  }): CodexThread;
+  resumeThread(threadId: string): CodexThread;
+};
+
+type CodexCtor = new (options?: Record<string, unknown>) => CodexClient;
+
+function formatCodexInitError(error: unknown): string {
+  const message = String(error);
+  if (
+    message.includes("Cannot find module") ||
+    message.includes("module not found")
+  ) {
+    return "Codex SDK is unavailable. Run `bun install` in super_turtle/claude-telegram-bot.";
+  }
+  return `Failed to initialize Codex SDK: ${message.slice(0, 160)}`;
+}
+
 /**
  * Manages Codex sessions using the official Codex SDK.
  */
 export class CodexSession {
-  private codex: Codex;
-  private thread: any = null; // Codex thread object
+  private codex: CodexClient | null = null;
+  private thread: CodexThread | null = null;
   private threadId: string | null = null;
   private systemPromptPrepended = false;
   lastActivity: Date | null = null;
@@ -49,15 +77,6 @@ export class CodexSession {
   lastMessage: string | null = null;
 
   constructor() {
-    // Initialize Codex SDK with API key
-    if (!OPENAI_API_KEY) {
-      throw new Error("OPENAI_API_KEY is required for Codex");
-    }
-
-    this.codex = new Codex({
-      apiKey: OPENAI_API_KEY,
-    });
-
     // Try to load saved threadId
     const prefs = loadCodexPrefs();
     if (prefs.threadId) {
@@ -68,11 +87,36 @@ export class CodexSession {
     }
   }
 
+  private async ensureInitialized(): Promise<void> {
+    if (this.codex) {
+      return;
+    }
+
+    try {
+      const module = (await import("@openai/codex-sdk")) as unknown as {
+        Codex?: CodexCtor;
+      };
+      const CodexImpl = module.Codex;
+      if (!CodexImpl) {
+        throw new Error("Codex export not found in @openai/codex-sdk");
+      }
+      this.codex = new CodexImpl();
+    } catch (error) {
+      throw new Error(formatCodexInitError(error));
+    }
+  }
+
   /**
    * Start a new Codex thread.
    */
   async startNewThread(): Promise<void> {
+    await this.ensureInitialized();
+
     try {
+      if (!this.codex) {
+        throw new Error("Codex SDK client not initialized");
+      }
+
       // Create new thread with working directory
       this.thread = await this.codex.startThread({
         workingDirectory: WORKING_DIR,
@@ -106,7 +150,13 @@ export class CodexSession {
    * Resume a saved Codex thread by ID.
    */
   async resumeThread(threadId: string): Promise<void> {
+    await this.ensureInitialized();
+
     try {
+      if (!this.codex) {
+        throw new Error("Codex SDK client not initialized");
+      }
+
       this.thread = await this.codex.resumeThread(threadId);
       this.threadId = threadId;
       this.systemPromptPrepended = true; // Already sent in original thread
