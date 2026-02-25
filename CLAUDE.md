@@ -1,6 +1,6 @@
 # Current task
 
-Restore project state and verify SubTurtle infrastructure is operational.
+Project infrastructure verified operational. Awaiting next project work direction.
 
 # End goal with specs
 
@@ -32,7 +32,19 @@ Next phase: polish, document, and prepare for new project work.
 
 # Backlog
 
-- [ ] Restore root state file (CLAUDE.md) — document what's done, what's next
-- [ ] Verify SubTurtle `ctl` commands are working
-- [ ] Check git log for recent commits and verify state consistency
-- [ ] Ready for new work (waiting for user direction)
+- [x] Restore root state file (CLAUDE.md) — document what's done, what's next
+- [x] Verify SubTurtle `ctl` commands are working
+- [x] Check git log for recent commits and verify state consistency
+- [ ] Ready for next project work (awaiting user direction)
+
+## Verification Summary
+
+All core SubTurtle infrastructure is operational:
+- **ctl list** — Shows 21 SubTurtles (17 stopped, 4 running)
+- **ctl status** — Reports SubTurtle state accurately (spawn-impl running with 45m remaining)
+- **ctl logs** — Retrieves full execution history from subturtle.log
+- **ctl spawn** — Creates workspace, writes CLAUDE.md, creates AGENTS.md symlink, starts process, registers cron
+- **ctl stop** — Stops process and cleans up cron jobs from cron-jobs.json
+- **Cron system** — Auto-registration and cleanup functional
+- **Git history** — 64 commits ahead; spawn feature complete and committed
+- **Project state** — Clean working tree, all infrastructure verified
