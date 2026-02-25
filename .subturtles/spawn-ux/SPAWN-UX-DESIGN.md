@@ -5,32 +5,19 @@
 ### Scope of this section
 Design the end-to-end flow from "user asks to build X" to "SubTurtle is running and supervised by cron."
 
-### Current flow (before)
+### Side-by-side flow
 
-| Step | Actor | Action |
+| Step | Before (current) | After (proposed) |
 | --- | --- | --- |
-| 1 | User | Asks meta agent to build something. |
-| 2 | Meta agent | Decides to delegate and picks SubTurtle name/type. |
-| 3 | Meta agent | Runs `mkdir -p .subturtles/<name>/`. |
-| 4 | Meta agent | Writes `.subturtles/<name>/CLAUDE.md` manually. |
-| 5 | Meta agent | Runs `ln -sf CLAUDE.md .subturtles/<name>/AGENTS.md`. |
-| 6 | Meta agent | Runs `./super_turtle/subturtle/ctl start <name> --type <type> --timeout <duration>`. |
-| 7 | Meta agent | Opens `cron-jobs.json`, appends recurring supervision job, writes file back. |
-| 8 | Meta agent | Confirms spawn to user. |
-| 9 | Cron | Fires later and starts supervision loop. |
-
-### Proposed flow (after)
-
-| Step | Actor | Action |
-| --- | --- | --- |
-| 1 | User | Asks meta agent to build something. |
-| 2 | Meta agent | Decides to delegate and prepares SubTurtle task state (`CLAUDE.md` content). |
-| 3 | Meta agent | Requests type choice via Telegram buttons (`ask_user`): `yolo`, `yolo-codex`, `slow` (with recommended default preselected in wording). |
-| 4 | User | Taps one type button. |
-| 5 | Meta agent | Executes one spawn command through `ctl` entry point (new `spawn` flow), passing task state + selected type. |
-| 6 | `ctl` | Atomically: creates workspace, writes/links state files, starts SubTurtle, registers recurring cron check-in, returns summary. |
-| 7 | Meta agent | Sends concise confirmation to user from `ctl` summary. |
-| 8 | Cron | Fires later and starts supervision loop (already registered by `ctl`). |
+| 1 | User asks meta agent to build something. | User asks meta agent to build something. |
+| 2 | Meta agent decides to delegate and picks SubTurtle name/type. | Meta agent decides to delegate and prepares SubTurtle task state (`CLAUDE.md` content). |
+| 3 | Meta agent runs `mkdir -p .subturtles/<name>/`. | Meta agent requests type choice via Telegram buttons (`ask_user`): `yolo`, `yolo-codex`, `slow` (recommended option indicated in text). |
+| 4 | Meta agent writes `.subturtles/<name>/CLAUDE.md` manually. | User taps a type button. |
+| 5 | Meta agent runs `ln -sf CLAUDE.md .subturtles/<name>/AGENTS.md`. | Meta agent runs one command through `ctl` (`spawn`) with selected type + task state input. |
+| 6 | Meta agent runs `./super_turtle/subturtle/ctl start <name> --type <type> --timeout <duration>`. | `ctl` atomically creates workspace, writes state, links `AGENTS.md`, starts SubTurtle, registers recurring cron, and returns summary. |
+| 7 | Meta agent opens `cron-jobs.json`, appends recurring supervision job, writes file back. | Meta agent confirms spawn to user using returned summary fields. |
+| 8 | Meta agent confirms spawn to user. | Cron fires later and supervision is already active (auto-registered). |
+| 9 | Cron fires later and starts supervision loop. | Removed as manual step (covered by step 8 automation). |
 
 ### Before/after delta
 
@@ -171,7 +158,7 @@ Use exactly three options mapped to runtime types:
 - `yolo` (fast for normal coding)
 - `slow` (most thorough for complex/risky work)
 
-Because `ask_user` currently supports string options only (no separate description fields), encode short guidance in the option labels and question text.
+Because `ask_user` currently supports string options only (no separate description fields, see `ask_user_mcp/server.ts` input schema), encode short guidance in the option labels and question text.
 
 Recommended question template:
 
