@@ -1,5 +1,5 @@
 ## Current Task
-All backlog items complete.
+All backlog items complete; no remaining `<- current` item.
 
 ## End Goal with Specs
 SubTurtles can signal completion by writing a STOP directive to their CLAUDE.md. The Python loop checks for this after each iteration and breaks cleanly. Works for all 3 loop types.
@@ -23,3 +23,4 @@ SubTurtles can signal completion by writing a STOP directive to their CLAUDE.md.
 - File: `super_turtle/subturtle/__main__.py` — all loop logic and prompts live here
 - File: `super_turtle/meta/META_SHARED.md` — documentation to update (section at ~line 209)
 - The `_state_file` variable in `run_yolo_loop` and `run_yolo_codex_loop` has an underscore prefix because it was unused — remove the prefix so `_should_stop` can use it
+- Verification (2026-02-25): `python3 -m py_compile super_turtle/subturtle/__main__.py` passed.
