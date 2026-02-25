@@ -722,6 +722,15 @@ case "$CMD" in
     fi
     do_start "$NAME" "$@"
     ;;
+  spawn)
+    # Optional first positional arg is name. If first arg is a flag, use default.
+    NAME="default"
+    if [[ $# -gt 0 && "$1" != --* ]]; then
+      NAME="$1"
+      shift
+    fi
+    do_spawn "$NAME" "$@"
+    ;;
   stop)   do_stop "${1:-default}" ;;
   status) do_status "${1:-default}" ;;
   logs)   do_logs "${1:-default}" ;;
