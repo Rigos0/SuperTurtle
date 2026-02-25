@@ -115,3 +115,7 @@ Use `ctl spawn` for normal work: it seeds state, starts the SubTurtle, and auto-
 ### Next project intake template
 
 For new project kickoff, use the template at `docs/NEXT_PROJECT_INTAKE_TEMPLATE.md` to collect specs and generate the first SubTurtle state file.
+
+### Next project kickoff runbook
+
+For a step-by-step intake-to-spawn checklist, use `docs/NEXT_PROJECT_KICKOFF_RUNBOOK.md`.

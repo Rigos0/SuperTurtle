@@ -1,6 +1,6 @@
 # Current Task
 
-Ready for next project work (awaiting user direction). Intake template and spawn-first kickoff docs prepared on 2026-02-25.
+Ready for next project work (awaiting user direction). Intake template and kickoff runbook are prepared as of 2026-02-25.
 
 # End Goal with Specs
 
@@ -101,3 +101,4 @@ Update the "Starting new work" section to use the new `ctl spawn` flow:
 ## Progress Notes
 
 - 2026-02-25: Added `docs/NEXT_PROJECT_INTAKE_TEMPLATE.md` and updated README quick start to prefer `ctl spawn` and link intake template.
+- 2026-02-25: Added `docs/NEXT_PROJECT_KICKOFF_RUNBOOK.md` and linked it from README for a consistent intake -> spawn -> verify flow.
