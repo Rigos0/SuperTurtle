@@ -71,6 +71,12 @@ ANTHROPIC_API_KEY=sk-ant-api03-...
 
 Note: API usage is billed per token and can get expensive quickly for heavy use.
 
+### Codex Subscription Requirement (CLOTH)
+
+Codex features in this project require an active **CLOTH** subscription on the OpenAI account you use for Codex.
+
+If CLOTH is not active, Codex-specific workflows will not be available. Claude-only bot usage is unaffected.
+
 ## Configuration
 
 ### 1. Create Your Bot
