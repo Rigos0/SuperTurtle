@@ -154,8 +154,8 @@ Alternatively, the MCP servers may already be configured in `~/.codex/config.tom
 # Backlog
 
 - [x] Read all key files listed above to understand current architecture fully
-- [ ] Phase A: Replace `thread.run()` with `thread.runStreamed()`, process ThreadEvent stream, wire into statusCallback <- current
-- [ ] Phase A: Handle all event types: agent_message (streaming text), reasoning (thinking), command_execution, file_change, mcp_tool_call, error, todo_list
+- [x] Phase A: Replace `thread.run()` with `thread.runStreamed()`, process ThreadEvent stream, wire into statusCallback
+- [ ] Phase A: Handle all event types: agent_message (streaming text), reasoning (thinking), command_execution, file_change, mcp_tool_call, error, todo_list <- current
 - [ ] Phase B: Check ~/.codex/config.toml for existing MCP servers. If missing, pass MCP config via Codex constructor's `config` option using paths from mcp-config.ts
 - [ ] Phase B: Verify MCP tools work end-to-end (ask-user buttons appear, bot-control works, send-turtle sends stickers)
 - [ ] Phase C: Add codexModel + codexReasoningEffort preferences, wire /model command to show Codex models when activeDriver === "codex"

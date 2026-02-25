@@ -339,6 +339,17 @@ ${userMessage}`;
               await statusCallback("tool", `Error: ${error}`);
             }
           }
+
+          // TodoListItem - todo list (internal tracking, minimal display)
+          if (itemType === "todo_list") {
+            const todos = item.todos as Array<Record<string, unknown>> | undefined;
+            const count = todos?.length || 0;
+            if (statusCallback && count > 0) {
+              console.log(`TODO LIST: ${count} items`);
+              // Show minimal status - let Claude's text explain the todos
+              await statusCallback("tool", `Todo: ${count} item${count > 1 ? "s" : ""}`);
+            }
+          }
         }
 
         // Handle turn completed
