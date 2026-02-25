@@ -3,7 +3,8 @@
  *
  * Jobs are stored in a JSON file and loaded/saved synchronously.
  * Each job has an ID, prompt, chat_id, type (one-shot or recurring),
- * fire_at timestamp, and optional interval_ms for recurring jobs.
+ * fire_at timestamp, optional interval_ms for recurring jobs,
+ * and optional silent flag for background-only processing.
  */
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
@@ -16,6 +17,7 @@ export interface CronJob {
   chat_id?: number; // optional — defaults to ALLOWED_USERS[0] at fire time
   type: "one-shot" | "recurring";
   interval_ms: number | null;
+  silent?: boolean; // optional — true means job output should stay silent unless notable
   fire_at: number; // milliseconds since epoch
   created_at: string; // ISO 8601 format
 }
@@ -24,6 +26,48 @@ export interface CronJob {
 const CRON_JOBS_FILE = join(import.meta.dir, "../cron-jobs.json");
 
 let jobsCache: CronJob[] = [];
+
+function normalizeJob(raw: unknown): CronJob {
+  if (!raw || typeof raw !== "object") {
+    throw new Error("Job is not an object");
+  }
+
+  const value = raw as Record<string, unknown>;
+
+  if (typeof value.id !== "string") {
+    throw new Error("Job id must be a string");
+  }
+  if (typeof value.prompt !== "string") {
+    throw new Error("Job prompt must be a string");
+  }
+  if (value.type !== "one-shot" && value.type !== "recurring") {
+    throw new Error("Job type must be one-shot or recurring");
+  }
+  if (typeof value.fire_at !== "number") {
+    throw new Error("Job fire_at must be a number");
+  }
+  if (typeof value.created_at !== "string") {
+    throw new Error("Job created_at must be a string");
+  }
+
+  const chatId = typeof value.chat_id === "number" ? value.chat_id : undefined;
+  const interval =
+    typeof value.interval_ms === "number" || value.interval_ms === null
+      ? value.interval_ms
+      : null;
+  const silent = typeof value.silent === "boolean" ? value.silent : undefined;
+
+  return {
+    id: value.id,
+    prompt: value.prompt,
+    chat_id: chatId,
+    type: value.type,
+    interval_ms: interval,
+    silent,
+    fire_at: value.fire_at,
+    created_at: value.created_at,
+  };
+}
 
 /**
  * Load jobs from the persistent store.
@@ -34,7 +78,20 @@ export function loadJobs(): CronJob[] {
     if (existsSync(CRON_JOBS_FILE)) {
       const content = readFileSync(CRON_JOBS_FILE, "utf-8");
       // Only update cache on successful parse — don't wipe jobs on corrupt file
-      jobsCache = JSON.parse(content);
+      const parsed = JSON.parse(content);
+      if (!Array.isArray(parsed)) {
+        throw new Error("Cron jobs file must contain an array");
+      }
+      jobsCache = parsed
+        .map((job, index) => {
+          try {
+            return normalizeJob(job);
+          } catch (error) {
+            console.warn(`Skipping invalid cron job at index ${index}:`, error);
+            return null;
+          }
+        })
+        .filter((job): job is CronJob => job !== null);
     } else {
       jobsCache = [];
     }
@@ -64,7 +121,8 @@ export function addJob(
   chat_id: number,
   type: "one-shot" | "recurring",
   delay_ms?: number,
-  interval_ms?: number
+  interval_ms?: number,
+  silent?: boolean
 ): CronJob {
   // Load existing jobs if not already loaded
   loadJobs();
@@ -86,6 +144,7 @@ export function addJob(
     chat_id,
     type,
     interval_ms: interval_ms || null,
+    silent: silent === true ? true : undefined,
     fire_at,
     created_at: new Date().toISOString(),
   };
