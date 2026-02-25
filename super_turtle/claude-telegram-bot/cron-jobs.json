@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "id": "codex-usage-unified-check",
+    "prompt": "Check SubTurtle codex-usage-unified: run `./super_turtle/subturtle/ctl status codex-usage-unified` and read .subturtles/codex-usage-unified/CLAUDE.md backlog. Check `git log --oneline -5` for recent commits. If backlog complete with unified /usage implementation, stop it and report. If stuck (no commits in 2+ checks), diagnose and restart. If progressing, keep going.",
+    "type": "recurring",
+    "fire_at": 1772010349902,
+    "interval_ms": 300000,
+    "created_at": "2026-02-25T09:43:00Z"
+  }
+]

@@ -80,6 +80,75 @@ When the human wants to build something new (or CLAUDE.md is empty):
 6. Spawn: `./super_turtle/subturtle/ctl start <name> --type <type> [--timeout DURATION]`
 7. Schedule a recurring cron check-in (default: every 5 minutes) to supervise the SubTurtle. See **Autonomous supervision** below.
 
+## Writing CLAUDE.md for Different Loop Types
+
+### For YOLO Loops (Critical: Must Be Specific)
+
+YOLO loops have **NO Plan or Groom phase** — they go straight from reading state to executing. This means the CLAUDE.md must be extremely concrete:
+
+**✅ DO:**
+- List exact file paths: `super_turtle/claude-telegram-bot/src/handlers/commands.ts`
+- Name specific functions: `handleUsage()`, `getCodexQuotaLines()`, `formatUnifiedUsage()`
+- Include output format examples (not prose descriptions):
+  ```
+  📊 Usage & Quotas
+  ✅ Claude Code: 45% used
+  ⚠️ Codex: 85% used
+  ```
+- State acceptance criteria: "Tests pass", "No errors", "Both services visible"
+- Scope to ONE feature per SubTurtle
+- Keep backlog items small (each = one commit)
+
+**❌ DON'T:**
+- Vague goals like "enhance" or "improve"
+- Multi-feature tasks ("refactor everything")
+- Descriptions instead of concrete examples
+- Expect Claude to figure out architecture
+- Create overly long CLAUDE.md (>150 lines is a warning sign)
+
+**Example YOLO CLAUDE.md (Good):**
+```markdown
+## Current Task
+Refactor `/usage` command to show Claude + Codex quota together with status badges.
+
+## End Goal with Specs
+Single message displaying: Claude (session %, weekly %, reset time) + Codex (5h msgs + %, weekly %, reset time). Status badges: ✅ <80%, ⚠️ 80-94%, 🔴 95%+.
+
+## Backlog
+- [ ] Read handleUsage() and getCodexQuotaLines() in commands.ts
+- [ ] Create formatUnifiedUsage() helper that merges Claude + Codex data with badges
+- [ ] Test /usage command works, both services visible
+- [ ] Commit
+
+## Notes
+File: super_turtle/claude-telegram-bot/src/handlers/commands.ts
+Functions to modify: handleUsage() [call both getters in parallel, format unified output]
+```
+
+### For SLOW Loops (Can Be Higher-Level)
+
+Slow loops have a **Groom phase** that validates and refines specs. You can be less prescriptive:
+
+**✅ DO:**
+- Describe the goal and why it matters
+- Explain the architectural approach
+- List potential complexity areas
+- Allow Claude to refine during Groom phase
+
+### CLAUDE.md Bloat Prevention
+
+Every SubTurtle should monitor its own CLAUDE.md size and ask: **"Is this file getting too big?"**
+
+**Warning signs:**
+- CLAUDE.md > 200 lines (split task or archive old sections)
+- Implementation Progress section > 100 lines (summarize & remove completed items)
+- Backlog > 15 items (break into smaller SubTurtles)
+
+**Action:** If warning signs appear, SubTurtle should:
+1. Move completed Implementation Progress to a summary
+2. Propose splitting task into smaller SubTurtles
+3. Ask meta agent to break work into phases
+
 ## Frontend SubTurtles and tunnel preview links
 
 When spawning a SubTurtle to work on a frontend project (Next.js, React app, etc.), follow this pattern:
