@@ -34,6 +34,7 @@ import { session } from "./session";
 import { getDueJobs, advanceRecurringJob, removeJob } from "./cron";
 import { bot } from "./bot";
 import { StreamingState, createSilentStatusCallback } from "./handlers/streaming";
+import { getSilentNotificationText } from "./silent-notifications";
 
 // Re-export for any existing consumers
 export { bot };
@@ -121,8 +122,6 @@ bot.catch((err) => {
  * Failures are logged and dropped silently (no retry, no error message to user).
  */
 const startCronTimer = () => {
-  const notificationMarkers = ["🎉", "⚠️", "⚠", "❌", "🚀", "🔔"];
-
   setInterval(async () => {
     try {
       // Skip if a query is already running
@@ -213,12 +212,12 @@ const startCronTimer = () => {
                 chatId,
                 cronCtx
               );
-              const capturedText = state.getSilentCapturedText().trim() || response.trim();
-              const shouldNotify = notificationMarkers.some((marker) =>
-                capturedText.includes(marker)
+              const notificationText = getSilentNotificationText(
+                state.getSilentCapturedText(),
+                response
               );
-              if (shouldNotify && capturedText) {
-                await bot.api.sendMessage(chatId, capturedText);
+              if (notificationText) {
+                await bot.api.sendMessage(chatId, notificationText);
               }
             } finally {
               typingController.stop();

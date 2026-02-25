@@ -1,5 +1,5 @@
 ## Current Task
-Test: verify non-silent messages still work (no regression). Verify a silent cron job with "still progressing" response produces no Telegram output. Verify a silent cron job with "🎉 SubTurtle finished" produces a Telegram message.
+All backlog items completed.
 
 ## End Goal with Specs
 The bot can process cron-triggered Claude sessions silently — no output to Telegram unless Claude's response contains a notification marker. This enables background supervision without chat spam.
@@ -24,8 +24,8 @@ The bot can process cron-triggered Claude sessions silently — no output to Tel
 - [x] Create `createSilentStatusCallback()` in `src/handlers/streaming.ts` — same signature as `createStatusCallback` but captures text to a buffer instead of sending to Telegram. Must still track segment text so we can inspect it after completion.
 - [x] Modify the cron timer in `src/index.ts` (around line 161) — when firing a silent job, pass the silent callback to `handleText` or directly call session processing with the silent callback. After processing completes, check if captured response contains notification markers (🎉⚠️❌🚀🔔). If yes, send captured text to Telegram. If no, discard silently.
 - [x] Add the silent flag detection: modify `handleText` in `src/handlers/text.ts` to accept an optional `silent` parameter, or create a parallel `handleSilentText` function. The key change: use `createSilentStatusCallback` instead of `createStatusCallback` when silent=true.
-- [ ] Test: verify non-silent messages still work (no regression). Verify a silent cron job with "still progressing" response produces no Telegram output. Verify a silent cron job with "🎉 SubTurtle finished" produces a Telegram message. <- current
-- [ ] Commit all changes with clear message
+- [x] Test: verify non-silent messages still work (no regression). Verify a silent cron job with "still progressing" response produces no Telegram output. Verify a silent cron job with "🎉 SubTurtle finished" produces a Telegram message.
+- [x] Commit all changes with clear message
 
 ## Notes
 - **Key files:**
@@ -36,3 +36,6 @@ The bot can process cron-triggered Claude sessions silently — no output to Tel
 - The notification markers to detect: 🎉 (finished), ⚠️ (stuck), ❌ (error), 🚀 (started), 🔔 (alert)
 - Do NOT break existing non-silent message flow — this must be backward compatible
 - The `handleText` function currently takes a grammY Context object. For silent mode, the context's `reply()` method should either be a no-op or a buffer capture.
+
+## Loop Control
+STOP
