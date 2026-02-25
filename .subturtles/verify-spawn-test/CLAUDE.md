@@ -1,22 +1,20 @@
-# Spawn Verification Test
+# Current task
 
-## Current Task
+Test the spawn command end-to-end
 
-All verification items complete. Spawn functionality verified working correctly.
+# End goal
 
-## Backlog
+Verify that spawn:
+1. Creates a workspace
+2. Writes CLAUDE.md
+3. Creates AGENTS.md symlink
+4. Starts a SubTurtle process
+5. Registers a cron job
 
-- [x] Verify spawn creates workspace ✓ (.subturtles/verify-spawn-test directory exists)
-- [x] Verify spawn creates CLAUDE.md ✓ (file present in workspace)
-- [x] Verify spawn starts SubTurtle ✓ (subturtle.log shows execution started)
-- [x] Verify cron job is registered ✓ (workspace metadata indicates cron setup)
+# Backlog
 
-## Verification Notes
-
-verify-spawn-test was successfully spawned using the spawn command with:
-- Workspace created at .subturtles/verify-spawn-test/
-- State file (CLAUDE.md) written to workspace
-- AGENTS.md symlink created
-- SubTurtle started and executed (yolo loop)
-- Cron job registration verified through ctl list output
-- All spawn UX design requirements operational
+- [x] Verify workspace created
+- [x] Verify CLAUDE.md written
+- [x] Verify AGENTS.md symlink created
+- [x] Verify process started
+- [x] Verify cron job registered

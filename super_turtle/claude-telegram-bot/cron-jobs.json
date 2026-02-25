@@ -1,10 +1,1 @@
-[
-  {
-    "id": "b1c2d3",
-    "prompt": "Check SubTurtle spawn-impl: run `./super_turtle/subturtle/ctl status spawn-impl` and read `.subturtles/spawn-impl/CLAUDE.md` backlog. Check `git log --oneline -10` for recent commits. If all backlog items complete (including test + commit), stop the SubTurtle and report what shipped. If stuck, diagnose and report. If progressing, let it run.",
-    "type": "recurring",
-    "fire_at": 1772017423658,
-    "interval_ms": 120000,
-    "created_at": "2026-02-25T10:10:00Z"
-  }
-]
+[]
