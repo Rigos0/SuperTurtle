@@ -355,6 +355,235 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Loop types Section */}
+      <section id="loop-types" className="relative w-full bg-gradient-to-b from-black to-slate-950 py-20 px-6">
+        {/* Background grid pattern */}
+        <div
+          className="absolute inset-0 opacity-3"
+          style={{
+            backgroundImage: 'linear-gradient(0deg, transparent 24%, rgba(16, 185, 129, 0.03) 25%, rgba(16, 185, 129, 0.03) 26%, transparent 27%, transparent 74%, rgba(16, 185, 129, 0.03) 75%, rgba(16, 185, 129, 0.03) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(16, 185, 129, 0.03) 25%, rgba(16, 185, 129, 0.03) 26%, transparent 27%, transparent 74%, rgba(16, 185, 129, 0.03) 75%, rgba(16, 185, 129, 0.03) 76%, transparent 77%, transparent)',
+            backgroundSize: '50px 50px',
+          }}
+        />
+
+        {/* Subtle accent blur */}
+        <div className="absolute bottom-1/2 right-0 w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl opacity-30" />
+
+        <div className="relative z-10 max-w-6xl mx-auto">
+          {/* Section header */}
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 tracking-tight">
+              Loop types
+            </h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+              Choose the execution strategy that fits your needs. Balance thoroughness, speed, and cost.
+            </p>
+          </div>
+
+          {/* Loop type cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+            {/* Loop type 1: Slow */}
+            <div className="group relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="relative p-8 rounded-xl border border-emerald-500/20 group-hover:border-emerald-500/40 transition-colors duration-300 bg-slate-900/30 backdrop-blur-sm">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-xl font-semibold text-white mb-1">Slow</h3>
+                    <p className="text-sm text-emerald-400">Thorough & Comprehensive</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-500/20 transition-colors duration-300">
+                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+                  Full Plan→Groom→Execute→Review loop. Comprehensive analysis, multiple model calls, best for complex tasks.
+                </p>
+
+                {/* Details */}
+                <div className="space-y-3 border-t border-emerald-500/10 pt-6">
+                  <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                    </svg>
+                    <span className="text-sm text-gray-400">Multi-model reasoning</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                    </svg>
+                    <span className="text-sm text-gray-400">Detailed planning phase</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                    </svg>
+                    <span className="text-sm text-gray-400">Review & validation</span>
+                  </div>
+                </div>
+
+                {/* Best for */}
+                <div className="mt-6 pt-6 border-t border-emerald-500/10">
+                  <p className="text-xs text-emerald-300 font-semibold mb-2">Best for</p>
+                  <p className="text-sm text-gray-400">
+                    Complex features, critical bugs, architectural decisions
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Loop type 2: Yolo */}
+            <div className="group relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="relative p-8 rounded-xl border border-cyan-500/20 group-hover:border-cyan-500/40 transition-colors duration-300 bg-slate-900/30 backdrop-blur-sm">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-xl font-semibold text-white mb-1">Yolo</h3>
+                    <p className="text-sm text-cyan-400">Fast & Direct</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center flex-shrink-0 group-hover:bg-cyan-500/20 transition-colors duration-300">
+                    <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+                  Single Claude call with full context. Quick decisions without the planning overhead. Perfect for straightforward tasks.
+                </p>
+
+                {/* Details */}
+                <div className="space-y-3 border-t border-cyan-500/10 pt-6">
+                  <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-cyan-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                    </svg>
+                    <span className="text-sm text-gray-400">Single API call</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-cyan-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                    </svg>
+                    <span className="text-sm text-gray-400">Direct execution</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-cyan-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                    </svg>
+                    <span className="text-sm text-gray-400">Fast turnaround</span>
+                  </div>
+                </div>
+
+                {/* Best for */}
+                <div className="mt-6 pt-6 border-t border-cyan-500/10">
+                  <p className="text-xs text-cyan-300 font-semibold mb-2">Best for</p>
+                  <p className="text-sm text-gray-400">
+                    Quick fixes, documentation, simple features
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Loop type 3: Yolo-Codex */}
+            <div className="group relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="relative p-8 rounded-xl border border-purple-500/20 group-hover:border-purple-500/40 transition-colors duration-300 bg-slate-900/30 backdrop-blur-sm">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-xl font-semibold text-white mb-1">Yolo-Codex</h3>
+                    <p className="text-sm text-purple-400">Cost-Optimized</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center flex-shrink-0 group-hover:bg-purple-500/20 transition-colors duration-300">
+                    <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+                  Leverage Codex for cost-efficient operations. Fast and budget-friendly for high-volume or resource-constrained runs.
+                </p>
+
+                {/* Details */}
+                <div className="space-y-3 border-t border-purple-500/10 pt-6">
+                  <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-purple-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                    </svg>
+                    <span className="text-sm text-gray-400">Codex-based execution</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-purple-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                    </svg>
+                    <span className="text-sm text-gray-400">Lower token usage</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-purple-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                    </svg>
+                    <span className="text-sm text-gray-400">Minimized costs</span>
+                  </div>
+                </div>
+
+                {/* Best for */}
+                <div className="mt-6 pt-6 border-t border-purple-500/10">
+                  <p className="text-xs text-purple-300 font-semibold mb-2">Best for</p>
+                  <p className="text-sm text-gray-400">
+                    Batch operations, large codebases, budget-conscious runs
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Comparison table */}
+          <div className="rounded-xl border border-emerald-500/20 bg-slate-900/30 backdrop-blur-sm p-8">
+            <h3 className="text-lg font-semibold text-white mb-6">Quick Comparison</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-emerald-500/20">
+                    <th className="text-left py-3 px-4 font-semibold text-gray-300">Dimension</th>
+                    <th className="text-center py-3 px-4 font-semibold text-emerald-400">Slow</th>
+                    <th className="text-center py-3 px-4 font-semibold text-cyan-400">Yolo</th>
+                    <th className="text-center py-3 px-4 font-semibold text-purple-400">Yolo-Codex</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-emerald-500/10">
+                  <tr>
+                    <td className="py-3 px-4 text-gray-400">Throughness</td>
+                    <td className="py-3 px-4 text-center text-emerald-400">★★★★★</td>
+                    <td className="py-3 px-4 text-center text-cyan-400">★★★☆☆</td>
+                    <td className="py-3 px-4 text-center text-purple-400">★★☆☆☆</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 text-gray-400">Speed</td>
+                    <td className="py-3 px-4 text-center text-emerald-400">★★☆☆☆</td>
+                    <td className="py-3 px-4 text-center text-cyan-400">★★★★★</td>
+                    <td className="py-3 px-4 text-center text-purple-400">★★★★☆</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 text-gray-400">Cost</td>
+                    <td className="py-3 px-4 text-center text-emerald-400">Higher</td>
+                    <td className="py-3 px-4 text-center text-cyan-400">Standard</td>
+                    <td className="py-3 px-4 text-center text-purple-400">Lower</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
