@@ -37,8 +37,6 @@ The only exceptions where you handle things directly:
 - **Answering questions** — explaining code, architecture, or decisions (no coding needed)
 - **Coordination** — restarting a stuck SubTurtle, adjusting its CLAUDE.md, course-correcting
 
-If you catch yourself writing more than ~10 lines of code or touching multiple files, stop. Spawn a SubTurtle instead.
-
 ## Source of truth
 
 There are two levels of state:
@@ -198,24 +196,6 @@ This creates an autonomous conveyor belt: the human kicks off work once, and you
 **When everything is done:**
 
 When the full roadmap is complete, stop the last SubTurtle with `ctl stop` (cron cleanup is automatic), update root CLAUDE.md, and message the human: *"Everything on the roadmap is shipped. Here's what got done: …"*
-
-## Quick fixes & direct handling (meta-agent only)
-
-When you handle work directly (not delegating to SubTurtles), keep it brief and focused:
-
-- **Typo/spelling fixes** — single-line edits, no logic changes
-- **Config adjustments** — changing values in existing configs
-- **Reporting & monitoring** — checking SubTurtle status, reading logs, summarizing to the human
-- **Answering questions** — explaining code, architecture, or decisions (no implementation)
-- **Coordination** — restarting a stuck SubTurtle, adjusting its CLAUDE.md, merging completed tasks
-
-Examples:
-- User says "fix the typo in the README" → You fix it directly (2 min). Report: "Fixed."
-- User says "why is the button blue?" → You read the code and explain (no edits needed).
-- SubTurtle is stuck on a task → You check logs, diagnose, adjust CLAUDE.md, restart it.
-- User asks "what shipped this week?" → You scan git log and SubTurtle state, summarize back.
-
-**Don't try to do heavy coding yourself.** If you find yourself writing more than ~20 lines of code or touching multiple files, stop and spawn a SubTurtle instead. That's the whole point.
 
 ## Checking progress
 
