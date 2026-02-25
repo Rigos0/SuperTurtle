@@ -1,6 +1,14 @@
 ## Current Task
 
-Restyle TypedTerminal component and terminal demo sections with warm dark brown background and earthy accent colors.
+Redesign Loop types section: olive/terracotta/sage color scheme, no neon.
+
+**Status**: ✓ COMPLETE - Redesigned all three loop type cards with earthy colors:
+- Slow card: olive green (#5a7247)
+- Yolo card: terracotta (#c07a56)
+- Yolo-Codex card: sage (#8fa87e)
+- Comparison table: updated with earthy color scheme
+- Removed all neon effects, gradients, and dark backgrounds
+- Cards now use warm cream backgrounds (#ffffff) with subtle borders and shadows
 
 ## End Goal with Specs
 
@@ -57,7 +65,6 @@ A landing page that feels warm, natural, and distinctive — NOT the typical dar
 - [ ] Redesign terminal demo and "Getting started" sections with earthy code blocks
 - [ ] Redesign footer: warm light background, earthy links and badges
 - [ ] Final polish: verify no remnants of neon/dark theme, consistent earthy feel throughout
-- [ ] Commit all changes
 
 ## Notes
 
