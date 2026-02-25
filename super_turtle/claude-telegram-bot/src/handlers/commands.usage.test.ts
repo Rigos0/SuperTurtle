@@ -35,6 +35,8 @@ async function probeUsage(codexEnabled: "true" | "false"): Promise<UsageProbeRes
     let codexFetchCalls = 0;
 
     const originalSpawnSync = Bun.spawnSync;
+    const originalSpawn = Bun.spawn;
+
     Bun.spawnSync = (cmd, opts) => {
       if (Array.isArray(cmd) && cmd[0] === "security") {
         // Mock security find-generic-password for Claude token
@@ -48,28 +50,68 @@ async function probeUsage(codexEnabled: "true" | "false"): Promise<UsageProbeRes
         };
       }
 
-      if (Array.isArray(cmd) && cmd[0] === "python3") {
-        // Mock python3 call for Codex quota extractor - use lower percentages so status is ✅
+      // Fallback to original if not mocked
+      return originalSpawnSync(cmd, opts);
+    };
+
+    Bun.spawn = (cmd, opts) => {
+      const cmdPath = Array.isArray(cmd) ? cmd[0] : cmd;
+
+      if (cmdPath && cmdPath.includes("codex") && Array.isArray(cmd) && cmd[1] === "app-server") {
+        // Mock codex app-server JSON-RPC responses
         codexFetchCalls += 1;
-        return {
-          stdout: Buffer.from(JSON.stringify({
-            timestamp: "2026-02-25T10:30:00Z",
-            messages_remaining: 15,
-            window_5h_pct: 70,
-            weekly_limit_pct: 60,
-            reset_times: {
-              window_reset: "in 1h 30m",
-              weekly_reset: "in 2d 3h",
+
+        // Combine all responses into a single newline-delimited JSON output
+        const initResponse = JSON.stringify({ jsonrpc: "2.0", id: 1, result: {} });
+        const rateLimitsResponse = JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          result: {
+            rateLimits: {
+              limitId: "codex",
+              primary: {
+                usedPercent: 70,
+                windowDurationMins: 300,
+                resetsAt: Math.floor(Date.now() / 1000) + 5400,
+              },
+              secondary: {
+                usedPercent: 60,
+                windowDurationMins: 10080,
+                resetsAt: Math.floor(Date.now() / 1000) + 172800,
+              },
+              planType: "pro",
             },
-          })),
-          stderr: Buffer.from(""),
-          success: true,
-          exitCode: 0,
+          },
+        });
+
+        const encoder = new TextEncoder();
+        const fullOutput = encoder.encode(initResponse + "\n" + rateLimitsResponse + "\n");
+
+        let dataReturned = false;
+
+        return {
+          stdin: {
+            write: () => {},
+            end: () => {},
+          },
+          stdout: {
+            getReader: () => ({
+              read: async () => {
+                if (!dataReturned) {
+                  dataReturned = true;
+                  return { done: false, value: fullOutput };
+                }
+                return { done: true, value: undefined };
+              },
+              releaseLock: () => {},
+            }),
+          },
+          kill: () => {},
         };
       }
 
       // Fallback to original if not mocked
-      return originalSpawnSync(cmd, opts);
+      return originalSpawn(cmd, opts);
     };
 
     globalThis.fetch = async (input) => {

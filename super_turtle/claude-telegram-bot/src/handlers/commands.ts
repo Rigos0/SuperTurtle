@@ -515,10 +515,10 @@ function parseClaudePercentage(line: string): number | null {
 }
 
 /**
- * Parse percentage from Codex quota lines (e.g., "   • `85%` used")
+ * Parse percentage from Codex quota lines (e.g., "<code>████░░░░░░░░░░░░░░░░</code> 85% window")
  */
 function parseCodexPercentage(line: string): number | null {
-  const match = line.match(/`(\d+)%`/);
+  const match = line.match(/(\d+)%/);
   return match?.[1] ? parseInt(match[1], 10) : null;
 }
 
@@ -672,53 +672,207 @@ type CodexQuotaData = {
 };
 
 /**
- * Fetch and format Codex quota info from the quota extractor script.
- * Returns empty array on failure.
+ * Fetch and format Codex quota info via codex app-server JSON-RPC protocol.
+ * Returns formatted lines with progress bars and reset times, or empty array on failure.
  */
 async function getCodexQuotaLines(): Promise<string[]> {
   try {
-    const extractorPath = `${WORKING_DIR}/.subturtles/codex-quota-research/codex_quota_extractor.py`;
-    const proc = Bun.spawnSync(["python3", extractorPath, "--timeout", "20"], {
-      timeout: 25000,
+    // Spawn codex app-server process
+    const proc = Bun.spawn(["/opt/homebrew/bin/codex", "app-server"], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
     });
 
-    if (!proc.success || !proc.stdout) {
+    if (!proc.stdin) {
       return [];
     }
 
-    const output = proc.stdout.toString().trim();
-    const quota = JSON.parse(output) as CodexQuotaData;
+    let responseText = "";
+    let messageId = 1;
+    let initComplete = false;
+    let rateLimitsReceived = false;
 
-    if (quota.error) {
-      return [`⚠️ Failed to fetch: ${escapeHtml(quota.error)}`];
+    // Set up timeout for entire operation (8 seconds max)
+    const timeoutPromise = new Promise<void>((resolve) => {
+      setTimeout(() => resolve(), 8000);
+    });
+
+    // Helper to send JSON-RPC message
+    const send = (msg: Record<string, unknown>) => {
+      const line = JSON.stringify(msg) + "\n";
+      proc.stdin!.write(line);
+    };
+
+    // Initialize: send initialize message
+    send({
+      jsonrpc: "2.0",
+      id: messageId++,
+      method: "initialize",
+      params: {
+        clientInfo: {
+          name: "quota-checker",
+          version: "1.0.0",
+        },
+      },
+    });
+
+    // Wait for initialization response and rate limits with timeout
+    const readLoop = (async () => {
+      const reader = proc.stdout!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      try {
+        while (!rateLimitsReceived) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete lines from buffer
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+
+            try {
+              const response = JSON.parse(line) as Record<string, unknown>;
+
+              // Check for initialization response
+              if (!initComplete && response.id === 1) {
+                initComplete = true;
+
+                // Send initialized notification (no id)
+                send({
+                  jsonrpc: "2.0",
+                  method: "initialized",
+                  params: {},
+                });
+
+                // Send rate limits request
+                send({
+                  jsonrpc: "2.0",
+                  id: messageId++,
+                  method: "account/rateLimits/read",
+                  params: {},
+                });
+              }
+
+              // Check for rate limits response
+              if (initComplete && response.result && typeof response.result === "object") {
+                const result = response.result as Record<string, unknown>;
+                if (result.rateLimits) {
+                  rateLimitsReceived = true;
+                  responseText = JSON.stringify(response);
+                  break;
+                }
+              }
+            } catch {
+              // Skip unparseable lines
+            }
+          }
+
+          if (rateLimitsReceived) break;
+        }
+      } catch {
+        // Ignore read errors
+      } finally {
+        reader.releaseLock();
+      }
+    })();
+
+    // Race between read loop and timeout
+    await Promise.race([readLoop, timeoutPromise]);
+
+    // Close the process
+    proc.stdin?.end();
+    proc.kill();
+
+    if (!responseText) {
+      return [];
+    }
+
+    // Parse the response
+    const response = JSON.parse(responseText) as {
+      result?: {
+        rateLimits?: {
+          primary?: { usedPercent?: number; windowDurationMins?: number; resetsAt?: number };
+          secondary?: { usedPercent?: number; windowDurationMins?: number; resetsAt?: number };
+          planType?: string;
+        };
+      };
+    };
+
+    const rateLimits = response.result?.rateLimits;
+    if (!rateLimits) {
+      return [];
     }
 
     const lines: string[] = [];
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-    // 5-hour window section
-    if (quota.messages_remaining !== null && quota.window_5h_pct !== null) {
-      lines.push(`<b>⏱️ 5-Hour Window:</b>`);
-      lines.push(`   • <code>${quota.messages_remaining}</code> messages remaining`);
-      lines.push(`   • <code>${quota.window_5h_pct}%</code> used`);
-    }
+    // Helper function to format progress bar
+    const bar = (pct: number): string => {
+      const filled = Math.round(pct / 5);
+      const empty = 20 - filled;
+      return "\u2588".repeat(filled) + "\u2591".repeat(empty);
+    };
 
-    // Weekly limit section
-    if (quota.weekly_limit_pct !== null) {
-      lines.push(`<b>📅 Weekly Limit:</b>`);
-      lines.push(`   • <code>${quota.weekly_limit_pct}%</code> used`);
-    }
+    // Helper function to format reset time
+    const resetStr = (unixSeconds: number): string => {
+      const d = new Date(unixSeconds * 1000);
+      const now = new Date();
 
-    // Reset times section
-    if (quota.reset_times && Object.keys(quota.reset_times).length > 0) {
-      if (quota.reset_times.window_reset) {
-        lines.push(`<b>⌛ Window Reset:</b> ${escapeHtml(quota.reset_times.window_reset)}`);
+      // If reset is within today, show time
+      if (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+      ) {
+        return d.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          timeZone: tz,
+        });
       }
-      if (quota.reset_times.weekly_reset) {
-        lines.push(`<b>📆 Weekly Reset:</b> ${escapeHtml(quota.reset_times.weekly_reset)}`);
+
+      // Otherwise show date
+      const parts = d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        timeZone: tz,
+      }).split(" ");
+
+      return parts.join(" ");
+    };
+
+    // Format primary window (5-hour)
+    const primary = rateLimits.primary;
+    if (primary) {
+      const pct = primary.usedPercent ?? 0;
+      const windowLabel = primary.windowDurationMins === 300 ? "5h window" : `${primary.windowDurationMins}m window`;
+      const resetTime = primary.resetsAt ? resetStr(primary.resetsAt) : "";
+      lines.push(`<code>${bar(pct)}</code> ${pct}% ${windowLabel}`);
+      if (resetTime) {
+        lines.push(`Resets ${resetTime} (${tz})`);
       }
     }
 
-    return lines.length > 0 ? lines : [];
+    // Format secondary window (weekly)
+    const secondary = rateLimits.secondary;
+    if (secondary) {
+      const pct = secondary.usedPercent ?? 0;
+      const windowLabel = secondary.windowDurationMins === 10080 ? "Weekly" : `${secondary.windowDurationMins}m window`;
+      const resetTime = secondary.resetsAt ? resetStr(secondary.resetsAt) : "";
+      lines.push(`<code>${bar(pct)}</code> ${pct}% ${windowLabel}`);
+      if (resetTime) {
+        lines.push(`Resets ${resetTime} (${tz})`);
+      }
+    }
+
+    return lines;
   } catch (error) {
     return [];
   }
