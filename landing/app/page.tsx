@@ -20,7 +20,7 @@ export default function Home() {
   return (
     <div className="w-full bg-black text-white font-sans">
       {/* Hero Section */}
-      <section className="relative min-h-screen w-full bg-black overflow-hidden">
+      <section id="hero" className="relative min-h-screen w-full bg-black overflow-hidden">
         {/* Animated background with gradient and subtle grid pattern */}
         <div className="absolute inset-0 bg-gradient-to-br from-black via-slate-900 to-black opacity-100" />
 
@@ -108,7 +108,7 @@ export default function Home() {
       </section>
 
       {/* What it does Section */}
-      <section id="features" className="relative w-full bg-gradient-to-b from-black to-slate-950 py-20 px-6">
+      <section id="what-it-does" className="relative w-full bg-gradient-to-b from-black to-slate-950 py-20 px-6">
         {/* Background grid pattern */}
         <div
           className="absolute inset-0 opacity-3"
@@ -844,6 +844,173 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="relative w-full bg-slate-950 border-t border-emerald-500/10 py-12 px-6">
+        {/* Subtle grid pattern */}
+        <div
+          className="absolute inset-0 opacity-3"
+          style={{
+            backgroundImage: 'linear-gradient(0deg, transparent 24%, rgba(16, 185, 129, 0.03) 25%, rgba(16, 185, 129, 0.03) 26%, transparent 27%, transparent 74%, rgba(16, 185, 129, 0.03) 75%, rgba(16, 185, 129, 0.03) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(16, 185, 129, 0.03) 25%, rgba(16, 185, 129, 0.03) 26%, transparent 27%, transparent 74%, rgba(16, 185, 129, 0.03) 75%, rgba(16, 185, 129, 0.03) 76%, transparent 77%, transparent)',
+            backgroundSize: '50px 50px',
+          }}
+        />
+
+        <div className="relative z-10 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+            {/* Left: Project info */}
+            <div>
+              <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                <span>🐢</span> agentic
+              </h3>
+              <p className="text-gray-400 text-sm mb-4">
+                Autonomous agent coordination for Claude Code. Spawn, supervise, and scale your AI workflows.
+              </p>
+              <p className="text-gray-500 text-xs">
+                Made with <span className="text-emerald-400">❤️</span> for developers who love building intelligent systems.
+              </p>
+            </div>
+
+            {/* Center: Quick links */}
+            <div>
+              <h4 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Links</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      document.getElementById('hero')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="text-gray-400 hover:text-emerald-400 transition-colors"
+                  >
+                    Home
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#what-it-does"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      document.getElementById('what-it-does')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="text-gray-400 hover:text-emerald-400 transition-colors"
+                  >
+                    Features
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#how-it-works"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="text-gray-400 hover:text-emerald-400 transition-colors"
+                  >
+                    How it works
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#getting-started"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      document.getElementById('getting-started')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="text-gray-400 hover:text-emerald-400 transition-colors"
+                  >
+                    Get started
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Right: Social & external */}
+            <div>
+              <h4 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Community</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <a
+                    href="https://github.com/yourusername/agentic"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-400 hover:text-emerald-400 transition-colors inline-flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v 3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                    </svg>
+                    GitHub
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://claude.ai"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-400 hover:text-emerald-400 transition-colors inline-flex items-center gap-2"
+                  >
+                    <span>🤖</span> Built with Claude
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://github.com/yourusername/agentic/blob/main/LICENSE"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-400 hover:text-emerald-400 transition-colors"
+                  >
+                    MIT License
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-emerald-500/10 pt-8 mb-8" />
+
+          {/* Bottom section: Badges and copyright */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            {/* Left: Copyright */}
+            <div className="text-center md:text-left text-sm text-gray-500">
+              <p>
+                © {new Date().getFullYear()} agentic. Open source & freely available under the MIT License.
+              </p>
+            </div>
+
+            {/* Right: Badges */}
+            <div className="flex flex-wrap items-center justify-center md:justify-end gap-4">
+              <a
+                href="https://github.com/yourusername/agentic"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition-colors"
+              >
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v 3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                </svg>
+                <span className="text-xs text-emerald-400 font-semibold">View on GitHub</span>
+              </a>
+
+              <a
+                href="https://claude.ai"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 transition-colors"
+              >
+                <span className="text-xs">🤖</span>
+                <span className="text-xs text-blue-400 font-semibold">Claude Code</span>
+              </a>
+
+              <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-cyan-500/30 bg-cyan-500/5">
+                <span className="text-xs">📝</span>
+                <span className="text-xs text-cyan-400 font-semibold">MIT License</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
