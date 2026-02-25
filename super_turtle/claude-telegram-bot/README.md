@@ -113,6 +113,25 @@ OPENAI_API_KEY=sk-...                      # For voice transcription
 
 **Finding your Telegram user ID:** Message [@userinfobot](https://t.me/userinfobot) on Telegram.
 
+### Codex Configuration (Optional)
+
+Enable Codex usage reporting in `/usage` by setting:
+
+```bash
+CODEX_ENABLED=true
+OPENAI_ADMIN_KEY=sk-admin-...  # OpenAI admin key (required for org usage APIs)
+```
+
+Notes:
+
+- `CODEX_ENABLED` defaults to `false`, so Claude usage remains the only section shown in `/usage` unless you explicitly enable Codex.
+- Codex usage stats are fetched from OpenAI organization usage APIs, which require `OPENAI_ADMIN_KEY` (a regular `OPENAI_API_KEY` is not sufficient).
+- `OPENAI_API_KEY` is still used for voice transcription and is separate from Codex usage reporting.
+- If `CODEX_ENABLED=true` but the admin key is missing/invalid, the bot keeps working and shows Codex usage as unavailable.
+- Codex workflows still require an active CLOTH subscription (see section above).
+
+If you are using SubTurtles, the recommended Codex worker type is `yolo-codex` (see [SubTurtle docs](../meta/META_SHARED.md)).
+
 **File access paths:** By default, Claude can access:
 
 - `CLAUDE_WORKING_DIR` (or home directory if not set)
