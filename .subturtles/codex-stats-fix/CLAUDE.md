@@ -2,7 +2,7 @@
 
 ## Current Task
 
-Await next task assignment.
+Await next task assignment (maintenance complete: CODEX_ENABLED config test isolation fix).
 
 ## End Goal with Specs
 
@@ -57,4 +57,5 @@ Replace the current OpenAI API-based Codex usage endpoint with a local approach:
 - Multiple Codex instances are currently running (check with `ps aux | grep codex`)
 - Use `Bun.spawnSync()` to call `codex exec "/stats"` and capture output
 - `codex exec --json "/stats"` emits `turn.completed.usage` with `input_tokens`, `cached_input_tokens`, and `output_tokens`
-- Validation this pass: `bun run typecheck` passed; `bun test` failed in `src/config.test.ts` at CODEX default assertion (`Expected "false", Received "true"`)
+- Maintenance note: fixed `src/config.test.ts` to spawn Bun with `--no-env-file` so local `.env` does not leak into the "unset CODEX_ENABLED" case.
+- Validation this pass: `bun test` passed (5/5); `bun run typecheck` passed.

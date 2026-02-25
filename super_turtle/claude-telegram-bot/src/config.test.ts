@@ -32,7 +32,7 @@ async function probeCodexEnabled(
   `;
 
   const proc = Bun.spawn({
-    cmd: ["bun", "-e", script],
+    cmd: ["bun", "--no-env-file", "-e", script],
     env,
     stdout: "pipe",
     stderr: "pipe",
