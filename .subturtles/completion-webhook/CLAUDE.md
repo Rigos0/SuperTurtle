@@ -1,6 +1,6 @@
 # Current Task
 
-Modify `super_turtle/claude-telegram-bot/src/index.ts` cron timer to handle `BOT_MESSAGE_ONLY:` jobs via direct `bot.api.sendMessage()`, skipping `handleText()`. <- current
+Test end-to-end: spawn a SubTurtle with a trivial task, let it self-stop, verify Telegram notification arrives. <- current
 
 # End Goal with Specs
 
@@ -49,12 +49,12 @@ When a SubTurtle finishes and exits its loop, the user sees a message in Telegra
 - [x] Call `_write_completion_notification()` after the while loop breaks due to STOP directive (NOT on timeout/kill exits)
   - The `_should_stop()` function already prints a log line — use a flag variable like `stopped_by_directive = True`
   - Only call notification if `stopped_by_directive` is True
-- [ ] Modify `super_turtle/claude-telegram-bot/src/index.ts` cron timer section (~line 228) <- current
+- [x] Modify `super_turtle/claude-telegram-bot/src/index.ts` cron timer section (~line 228)
   - When processing a due job, check if `job.prompt.startsWith("BOT_MESSAGE_ONLY:")`
   - If yes: extract message text after prefix, call `bot.api.sendMessage(chatId, message)` directly
   - Skip `handleText()` and session creation entirely
   - Still remove the one-shot job as usual
-- [ ] Test end-to-end: spawn a SubTurtle with a trivial task, let it self-stop, verify Telegram notification arrives
+- [ ] Test end-to-end: spawn a SubTurtle with a trivial task, let it self-stop, verify Telegram notification arrives <- current
 - [ ] Commit all changes
 
 # Notes

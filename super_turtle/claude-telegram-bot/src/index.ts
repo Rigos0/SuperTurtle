@@ -115,13 +115,16 @@ bot.catch((err) => {
 
 /**
  * Timer loop that checks for due cron jobs every 10 seconds.
- * Non-silent jobs are routed through handleText (same path as user text).
+ * Non-silent jobs are routed through handleText (same path as user text),
+ * except BOT_MESSAGE_ONLY jobs which are sent directly to Telegram.
  * Silent jobs run in the background and only notify Telegram if the captured
  * assistant response contains marker events (completion/error/milestone, etc.).
  * The job is removed/advanced BEFORE execution so a crash never causes retries.
  * Failures are logged and dropped silently (no retry, no error message to user).
  */
 const startCronTimer = () => {
+  const BOT_MESSAGE_ONLY_PREFIX = "BOT_MESSAGE_ONLY:";
+
   setInterval(async () => {
     try {
       // Skip if a query is already running
@@ -156,6 +159,17 @@ const startCronTimer = () => {
           const userId = ALLOWED_USERS[0]!;
           // Default chat_id to the first allowed user — single-chat bots never need to specify it
           const chatId: number = job.chat_id ?? userId;
+
+          if (job.prompt.startsWith(BOT_MESSAGE_ONLY_PREFIX)) {
+            const message = job.prompt.slice(BOT_MESSAGE_ONLY_PREFIX.length);
+            if (message.trim().length === 0) {
+              console.warn(`Cron job ${job.id} skipped: BOT_MESSAGE_ONLY payload is empty`);
+              continue;
+            }
+            await bot.api.sendMessage(chatId, message);
+            continue;
+          }
+
           const createCronContext = (text: string): import("grammy").Context =>
             ({
               from: { id: userId, username: "cron", is_bot: false, first_name: "Cron" },
