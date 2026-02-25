@@ -1,6 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import { resolve } from "path";
 
+process.env.TELEGRAM_BOT_TOKEN ||= "test-token";
+process.env.TELEGRAM_ALLOWED_USERS ||= "123";
+process.env.CLAUDE_WORKING_DIR ||= process.cwd();
+
+const { formatUnifiedUsage } = await import("./commands");
+
 type UsageProbePayload = {
   replyCount: number;
   replyText: string;
@@ -175,6 +181,36 @@ async function probeUsage(codexEnabled: "true" | "false"): Promise<UsageProbeRes
 
   return { exitCode, stdout, stderr, payload };
 }
+
+describe("formatUnifiedUsage", () => {
+  it("shows unknown Claude status when usage lines are empty", () => {
+    const output = formatUnifiedUsage([], [], false);
+
+    expect(output).toContain("❓ <b>Claude Code</b>");
+    expect(output).toContain("<i>No usage data available</i>");
+    expect(output).not.toContain("✅ <b>Claude Code</b>");
+  });
+
+  it("shows unknown Codex status and partial summary when Codex data is empty", () => {
+    const output = formatUnifiedUsage(["▓▓▓░░░░ 42% Session"], [], true);
+
+    expect(output).toContain("❓ <b>Codex</b>");
+    expect(output).toContain("<i>No quota data available</i>");
+    expect(output).toContain("❓ <b>Status:</b> Partial data — check above");
+    expect(output).not.toContain("✅ <b>Status:</b> All services operating normally");
+  });
+
+  it("escapes Codex plan type in HTML output", () => {
+    const output = formatUnifiedUsage(
+      ["▓▓▓░░░░ 42% Session"],
+      ["__CODEX_PLAN_TYPE__<script>alert(1)</script>", "<code>████░░░░░░</code> 70% window"],
+      true
+    );
+
+    expect(output).toContain("<b>Codex (&lt;script&gt;alert(1)&lt;/script&gt;)</b>");
+    expect(output).not.toContain("<b>Codex (<script>alert(1)</script>)</b>");
+  });
+});
 
 describe("/usage command with CODEX_ENABLED variations", () => {
   it("returns Claude section only when CODEX_ENABLED=false", async () => {
