@@ -587,22 +587,22 @@ export default function Home() {
       </section>
 
       {/* Terminal Demo Section */}
-      <section id="terminal-demo" className="relative w-full py-20 px-6" style={{ backgroundColor: '#faf8f5' }}>
+      <section id="terminal-demo" className="relative w-full py-16 sm:py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#faf8f5' }}>
         <div className="relative z-10 max-w-6xl mx-auto">
           {/* Section header */}
-          <div className="text-center mb-16">
+          <div className="text-center mb-12 sm:mb-16">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 tracking-tight" style={{ color: '#2d2a26' }}>
               See it in action
             </h2>
-            <p className="text-lg max-w-2xl mx-auto" style={{ color: '#5a7247' }}>
+            <p className="text-base sm:text-lg max-w-2xl mx-auto" style={{ color: '#5a7247' }}>
               Spawning a SubTurtle is as simple as one command. Watch the system initialize and start executing autonomously.
             </p>
           </div>
 
-          {/* Terminal demo */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          {/* Terminal demo - stacked on mobile */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start lg:items-center">
             {/* Left: Terminal */}
-            <div>
+            <div className="w-full min-w-0">
               <TypedTerminal
                 lines={terminalLines}
                 speed={20}
@@ -613,74 +613,74 @@ export default function Home() {
             {/* Right: Explanation */}
             <div className="space-y-6">
               <div className="space-y-3">
-                <h3 className="text-2xl font-semibold" style={{ color: '#2d2a26' }}>Instant autonomous execution</h3>
-                <p className="leading-relaxed" style={{ color: '#5a7247' }}>
+                <h3 className="text-xl sm:text-2xl font-semibold" style={{ color: '#2d2a26' }}>Instant autonomous execution</h3>
+                <p className="text-sm sm:text-base leading-relaxed" style={{ color: '#5a7247' }}>
                   One command spawns a SubTurtle with a dedicated task. It immediately begins its execution loop, working independently with minimal supervision.
                 </p>
               </div>
 
               {/* Key features */}
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {/* Feature 1 */}
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center border" style={{ backgroundColor: 'rgba(90, 114, 71, 0.1)', borderColor: 'rgba(90, 114, 71, 0.3)' }}>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#5a7247' }}>
+                <div className="flex gap-3 sm:gap-4">
+                  <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center border" style={{ backgroundColor: 'rgba(90, 114, 71, 0.1)', borderColor: 'rgba(90, 114, 71, 0.3)' }}>
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#5a7247' }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
                     </svg>
                   </div>
-                  <div>
-                    <h4 className="font-semibold mb-1" style={{ color: '#2d2a26' }}>State file created</h4>
-                    <p className="text-sm" style={{ color: '#5a7247' }}>Isolated CLAUDE.md holds task requirements and execution state.</p>
+                  <div className="min-w-0">
+                    <h4 className="font-semibold text-sm sm:text-base mb-1" style={{ color: '#2d2a26' }}>State file created</h4>
+                    <p className="text-xs sm:text-sm" style={{ color: '#5a7247' }}>Isolated CLAUDE.md holds task requirements and execution state.</p>
                   </div>
                 </div>
 
                 {/* Feature 2 */}
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center border" style={{ backgroundColor: 'rgba(90, 114, 71, 0.1)', borderColor: 'rgba(90, 114, 71, 0.3)' }}>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#5a7247' }}>
+                <div className="flex gap-3 sm:gap-4">
+                  <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center border" style={{ backgroundColor: 'rgba(90, 114, 71, 0.1)', borderColor: 'rgba(90, 114, 71, 0.3)' }}>
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#5a7247' }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
                     </svg>
                   </div>
-                  <div>
-                    <h4 className="font-semibold mb-1" style={{ color: '#2d2a26' }}>Process spawned</h4>
-                    <p className="text-sm" style={{ color: '#5a7247' }}>SubTurtle process starts immediately with its own workspace and PID.</p>
+                  <div className="min-w-0">
+                    <h4 className="font-semibold text-sm sm:text-base mb-1" style={{ color: '#2d2a26' }}>Process spawned</h4>
+                    <p className="text-xs sm:text-sm" style={{ color: '#5a7247' }}>SubTurtle process starts immediately with its own workspace and PID.</p>
                   </div>
                 </div>
 
                 {/* Feature 3 */}
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center border" style={{ backgroundColor: 'rgba(90, 114, 71, 0.1)', borderColor: 'rgba(90, 114, 71, 0.3)' }}>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#5a7247' }}>
+                <div className="flex gap-3 sm:gap-4">
+                  <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center border" style={{ backgroundColor: 'rgba(90, 114, 71, 0.1)', borderColor: 'rgba(90, 114, 71, 0.3)' }}>
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#5a7247' }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
                     </svg>
                   </div>
-                  <div>
-                    <h4 className="font-semibold mb-1" style={{ color: '#2d2a26' }}>Cron supervision registered</h4>
-                    <p className="text-sm" style={{ color: '#5a7247' }}>Periodic check-ins ensure the task stays on track and respects timeout.</p>
+                  <div className="min-w-0">
+                    <h4 className="font-semibold text-sm sm:text-base mb-1" style={{ color: '#2d2a26' }}>Cron supervision registered</h4>
+                    <p className="text-xs sm:text-sm" style={{ color: '#5a7247' }}>Periodic check-ins ensure the task stays on track and respects timeout.</p>
                   </div>
                 </div>
 
                 {/* Feature 4 */}
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center border" style={{ backgroundColor: 'rgba(90, 114, 71, 0.1)', borderColor: 'rgba(90, 114, 71, 0.3)' }}>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#5a7247' }}>
+                <div className="flex gap-3 sm:gap-4">
+                  <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center border" style={{ backgroundColor: 'rgba(90, 114, 71, 0.1)', borderColor: 'rgba(90, 114, 71, 0.3)' }}>
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#5a7247' }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
                     </svg>
                   </div>
-                  <div>
-                    <h4 className="font-semibold mb-1" style={{ color: '#2d2a26' }}>Running autonomously</h4>
-                    <p className="text-sm" style={{ color: '#5a7247' }}>Monitor progress via logs. No further input needed—SubTurtle handles the rest.</p>
+                  <div className="min-w-0">
+                    <h4 className="font-semibold text-sm sm:text-base mb-1" style={{ color: '#2d2a26' }}>Running autonomously</h4>
+                    <p className="text-xs sm:text-sm" style={{ color: '#5a7247' }}>Monitor progress via logs. No further input needed—SubTurtle handles the rest.</p>
                   </div>
                 </div>
               </div>
 
               {/* Live log hint */}
               <div className="pt-4" style={{ borderTopColor: 'rgba(90, 114, 71, 0.2)', borderTopWidth: '1px' }}>
-                <p className="text-sm flex items-center gap-2" style={{ color: '#5a7247' }}>
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <p className="text-xs sm:text-sm flex gap-2" style={{ color: '#5a7247' }}>
+                  <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  Check .subturtles/[name]/subturtle.log for full execution details
+                  <span>Check .subturtles/[name]/subturtle.log for full execution details</span>
                 </p>
               </div>
             </div>
@@ -689,30 +689,30 @@ export default function Home() {
       </section>
 
       {/* Getting Started Section */}
-      <section id="getting-started" className="relative w-full py-20 px-6" style={{ backgroundColor: '#faf8f5' }}>
+      <section id="getting-started" className="relative w-full py-16 sm:py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#faf8f5' }}>
         <div className="relative z-10 max-w-6xl mx-auto">
           {/* Section header */}
-          <div className="text-center mb-16">
+          <div className="text-center mb-12 sm:mb-16">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 tracking-tight" style={{ color: '#2d2a26' }}>
               Get started
             </h2>
-            <p className="text-lg max-w-2xl mx-auto" style={{ color: '#5a7247' }}>
+            <p className="text-base sm:text-lg max-w-2xl mx-auto" style={{ color: '#5a7247' }}>
               Clone the repository, install dependencies, and spawn your first SubTurtle in minutes.
             </p>
           </div>
 
           {/* Installation steps */}
-          <div className="space-y-8">
+          <div className="space-y-6 sm:space-y-8">
             {/* Step 1: Clone */}
             <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full border flex items-center justify-center" style={{ backgroundColor: 'rgba(90, 114, 71, 0.15)', borderColor: 'rgba(90, 114, 71, 0.3)' }}>
-                  <span className="font-bold text-sm" style={{ color: '#5a7247' }}>1</span>
+              <div className="flex items-start gap-3 sm:gap-4 mb-3 sm:mb-4">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full border flex items-center justify-center mt-0.5 sm:mt-0" style={{ backgroundColor: 'rgba(90, 114, 71, 0.15)', borderColor: 'rgba(90, 114, 71, 0.3)' }}>
+                  <span className="font-bold text-xs sm:text-sm" style={{ color: '#5a7247' }}>1</span>
                 </div>
-                <h3 className="text-xl font-semibold" style={{ color: '#2d2a26' }}>Clone the repository</h3>
+                <h3 className="text-base sm:text-xl font-semibold pt-1 sm:pt-0" style={{ color: '#2d2a26' }}>Clone the repository</h3>
               </div>
-              <div className="ml-11 rounded-lg border p-4 font-mono text-sm overflow-x-auto" style={{ backgroundColor: '#1e1c1a', borderColor: 'rgba(90, 114, 71, 0.2)' }}>
-                <div style={{ color: '#e8e8e4' }}>
+              <div className="sm:ml-11 rounded-lg border overflow-x-auto" style={{ backgroundColor: '#1e1c1a', borderColor: 'rgba(90, 114, 71, 0.2)' }}>
+                <div className="p-3 sm:p-4 font-mono text-xs sm:text-sm whitespace-nowrap" style={{ color: '#e8e8e4' }}>
                   <div><span style={{ color: '#d4a574' }}>$</span> git clone https://github.com/yourusername/agentic</div>
                   <div><span style={{ color: '#d4a574' }}>$</span> cd agentic</div>
                 </div>
@@ -721,14 +721,14 @@ export default function Home() {
 
             {/* Step 2: Install */}
             <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full border flex items-center justify-center" style={{ backgroundColor: 'rgba(90, 114, 71, 0.15)', borderColor: 'rgba(90, 114, 71, 0.3)' }}>
-                  <span className="font-bold text-sm" style={{ color: '#5a7247' }}>2</span>
+              <div className="flex items-start gap-3 sm:gap-4 mb-3 sm:mb-4">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full border flex items-center justify-center mt-0.5 sm:mt-0" style={{ backgroundColor: 'rgba(90, 114, 71, 0.15)', borderColor: 'rgba(90, 114, 71, 0.3)' }}>
+                  <span className="font-bold text-xs sm:text-sm" style={{ color: '#5a7247' }}>2</span>
                 </div>
-                <h3 className="text-xl font-semibold" style={{ color: '#2d2a26' }}>Install dependencies</h3>
+                <h3 className="text-base sm:text-xl font-semibold pt-1 sm:pt-0" style={{ color: '#2d2a26' }}>Install dependencies</h3>
               </div>
-              <div className="ml-11 rounded-lg border p-4 font-mono text-sm overflow-x-auto" style={{ backgroundColor: '#1e1c1a', borderColor: 'rgba(90, 114, 71, 0.2)' }}>
-                <div style={{ color: '#e8e8e4' }}>
+              <div className="sm:ml-11 rounded-lg border overflow-x-auto" style={{ backgroundColor: '#1e1c1a', borderColor: 'rgba(90, 114, 71, 0.2)' }}>
+                <div className="p-3 sm:p-4 font-mono text-xs sm:text-sm whitespace-nowrap" style={{ color: '#e8e8e4' }}>
                   <div><span style={{ color: '#d4a574' }}>$</span> npm install</div>
                   <div className="text-xs mt-2" style={{ color: '#8fa87e' }}># or yarn, pnpm, bun</div>
                 </div>
@@ -737,30 +737,30 @@ export default function Home() {
 
             {/* Step 3: Spawn */}
             <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full border flex items-center justify-center" style={{ backgroundColor: 'rgba(90, 114, 71, 0.15)', borderColor: 'rgba(90, 114, 71, 0.3)' }}>
-                  <span className="font-bold text-sm" style={{ color: '#5a7247' }}>3</span>
+              <div className="flex items-start gap-3 sm:gap-4 mb-3 sm:mb-4">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full border flex items-center justify-center mt-0.5 sm:mt-0" style={{ backgroundColor: 'rgba(90, 114, 71, 0.15)', borderColor: 'rgba(90, 114, 71, 0.3)' }}>
+                  <span className="font-bold text-xs sm:text-sm" style={{ color: '#5a7247' }}>3</span>
                 </div>
-                <h3 className="text-xl font-semibold" style={{ color: '#2d2a26' }}>Spawn your first SubTurtle</h3>
+                <h3 className="text-base sm:text-xl font-semibold pt-1 sm:pt-0" style={{ color: '#2d2a26' }}>Spawn your first SubTurtle</h3>
               </div>
-              <div className="ml-11 rounded-lg border p-4 font-mono text-sm overflow-x-auto" style={{ backgroundColor: '#1e1c1a', borderColor: 'rgba(90, 114, 71, 0.2)' }}>
-                <div style={{ color: '#e8e8e4' }}>
-                  <div><span style={{ color: '#d4a574' }}>$</span> ./super_turtle/subturtle/ctl spawn my-task \</div>
-                  <div className="ml-4">--type yolo --timeout 1h</div>
+              <div className="sm:ml-11 rounded-lg border overflow-x-auto" style={{ backgroundColor: '#1e1c1a', borderColor: 'rgba(90, 114, 71, 0.2)' }}>
+                <div className="p-3 sm:p-4 font-mono text-xs sm:text-sm" style={{ color: '#e8e8e4' }}>
+                  <div className="whitespace-nowrap"><span style={{ color: '#d4a574' }}>$</span> ./super_turtle/subturtle/ctl spawn my-task \</div>
+                  <div className="whitespace-nowrap pl-4 sm:pl-0">--type yolo --timeout 1h</div>
                 </div>
               </div>
             </div>
 
             {/* Step 4: Monitor */}
             <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full border flex items-center justify-center" style={{ backgroundColor: 'rgba(90, 114, 71, 0.15)', borderColor: 'rgba(90, 114, 71, 0.3)' }}>
-                  <span className="font-bold text-sm" style={{ color: '#5a7247' }}>4</span>
+              <div className="flex items-start gap-3 sm:gap-4 mb-3 sm:mb-4">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full border flex items-center justify-center mt-0.5 sm:mt-0" style={{ backgroundColor: 'rgba(90, 114, 71, 0.15)', borderColor: 'rgba(90, 114, 71, 0.3)' }}>
+                  <span className="font-bold text-xs sm:text-sm" style={{ color: '#5a7247' }}>4</span>
                 </div>
-                <h3 className="text-xl font-semibold" style={{ color: '#2d2a26' }}>Monitor progress</h3>
+                <h3 className="text-base sm:text-xl font-semibold pt-1 sm:pt-0" style={{ color: '#2d2a26' }}>Monitor progress</h3>
               </div>
-              <div className="ml-11 rounded-lg border p-4 font-mono text-sm overflow-x-auto" style={{ backgroundColor: '#1e1c1a', borderColor: 'rgba(90, 114, 71, 0.2)' }}>
-                <div style={{ color: '#e8e8e4' }}>
+              <div className="sm:ml-11 rounded-lg border overflow-x-auto" style={{ backgroundColor: '#1e1c1a', borderColor: 'rgba(90, 114, 71, 0.2)' }}>
+                <div className="p-3 sm:p-4 font-mono text-xs sm:text-sm whitespace-nowrap" style={{ color: '#e8e8e4' }}>
                   <div><span style={{ color: '#d4a574' }}>$</span> tail -f .subturtles/my-task/subturtle.log</div>
                 </div>
               </div>
@@ -768,9 +768,9 @@ export default function Home() {
           </div>
 
           {/* Additional options */}
-          <div className="mt-16 p-8 rounded-xl border" style={{ backgroundColor: '#f5f3f0', borderColor: 'rgba(90, 114, 71, 0.2)' }}>
-            <h3 className="text-lg font-semibold mb-4" style={{ color: '#2d2a26' }}>Available loop types</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-sm">
+          <div className="mt-12 sm:mt-16 p-4 sm:p-8 rounded-xl border" style={{ backgroundColor: '#f5f3f0', borderColor: 'rgba(90, 114, 71, 0.2)' }}>
+            <h3 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6" style={{ color: '#2d2a26' }}>Available loop types</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 text-xs sm:text-sm">
               <div>
                 <p className="font-semibold mb-2" style={{ color: '#5a7247' }}>--type slow</p>
                 <p style={{ color: '#5a7247' }}>Thorough planning and execution. Best for complex tasks.</p>
@@ -787,21 +787,21 @@ export default function Home() {
           </div>
 
           {/* CTA */}
-          <div className="mt-12 text-center">
-            <p className="mb-6" style={{ color: '#5a7247' }}>Ready to automate your workflow?</p>
+          <div className="mt-10 sm:mt-12 text-center">
+            <p className="mb-4 sm:mb-6 text-sm sm:text-base" style={{ color: '#5a7247' }}>Ready to automate your workflow?</p>
             <a
               href="https://github.com/yourusername/agentic"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-6 py-3 font-semibold rounded-lg transition-colors duration-200"
+              className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-colors duration-200"
               style={{ backgroundColor: '#5a7247', color: 'white' }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#4a5f3b')}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#5a7247')}
             >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v 3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
               </svg>
-              View on GitHub
+              <span>View on GitHub</span>
             </a>
           </div>
         </div>

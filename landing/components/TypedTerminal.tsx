@@ -78,17 +78,17 @@ export function TypedTerminal({ lines, speed = 30, startDelay = 500 }: TypedTerm
   return (
     <div className="w-full rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--terminal-bg)', border: '1px solid rgba(212, 165, 116, 0.3)' }}>
       {/* Terminal header */}
-      <div className="px-4 py-3 flex items-center gap-2" style={{ backgroundColor: 'var(--terminal-bg)', borderBottom: '1px solid rgba(212, 165, 116, 0.2)' }}>
+      <div className="px-3 sm:px-4 py-2 sm:py-3 flex items-center gap-2" style={{ backgroundColor: 'var(--terminal-bg)', borderBottom: '1px solid rgba(212, 165, 116, 0.2)' }}>
         <div className="flex gap-2">
-          <div className="w-3 h-3 rounded-full bg-red-500/60" />
-          <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
-          <div className="w-3 h-3 rounded-full bg-green-500/60" />
+          <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-red-500/60" />
+          <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-yellow-500/60" />
+          <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-green-500/60" />
         </div>
         <span className="text-xs ml-2" style={{ color: 'rgba(232, 232, 228, 0.5)' }}>terminal</span>
       </div>
 
       {/* Terminal content */}
-      <div className="p-4 font-mono text-sm overflow-x-auto min-h-64" style={{ color: 'var(--terminal-text)' }}>
+      <div className="p-3 sm:p-4 font-mono text-xs sm:text-sm overflow-x-auto min-h-48 sm:min-h-64" style={{ color: 'var(--terminal-text)' }}>
         {displayLines.map((line, idx) => (
           <div
             key={idx}
