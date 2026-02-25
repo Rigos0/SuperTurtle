@@ -1,6 +1,6 @@
 # Current Task
 
-Call `_write_completion_notification()` after the while loop breaks due to STOP directive (NOT on timeout/kill exits), using a `stopped_by_directive` flag in each loop. <- current
+Modify `super_turtle/claude-telegram-bot/src/index.ts` cron timer to handle `BOT_MESSAGE_ONLY:` jobs via direct `bot.api.sendMessage()`, skipping `handleText()`. <- current
 
 # End Goal with Specs
 
@@ -46,10 +46,10 @@ When a SubTurtle finishes and exits its loop, the user sees a message in Telegra
   - Build message: `🎉 Finished: <name>\n✓ item1\n✓ item2\n...`
   - Load cron-jobs.json, append one-shot job with `BOT_MESSAGE_ONLY:` prefix, write back
   - Generate unique 6-char hex ID (same pattern as `register_spawn_cron_job` in ctl)
-- [ ] Call `_write_completion_notification()` after the while loop breaks due to STOP directive (NOT on timeout/kill exits) <- current
+- [x] Call `_write_completion_notification()` after the while loop breaks due to STOP directive (NOT on timeout/kill exits)
   - The `_should_stop()` function already prints a log line — use a flag variable like `stopped_by_directive = True`
   - Only call notification if `stopped_by_directive` is True
-- [ ] Modify `super_turtle/claude-telegram-bot/src/index.ts` cron timer section (~line 228)
+- [ ] Modify `super_turtle/claude-telegram-bot/src/index.ts` cron timer section (~line 228) <- current
   - When processing a due job, check if `job.prompt.startsWith("BOT_MESSAGE_ONLY:")`
   - If yes: extract message text after prefix, call `bot.api.sendMessage(chatId, message)` directly
   - Skip `handleText()` and session creation entirely

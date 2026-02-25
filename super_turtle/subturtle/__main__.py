@@ -352,8 +352,12 @@ def run_slow_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
     claude = Claude(add_dirs=add_dirs)
     codex = Codex(add_dirs=add_dirs)
     iteration = 0
+    stopped_by_directive = False
 
     while True:
+        if _should_stop(state_file, name):
+            stopped_by_directive = True
+            break
         iteration += 1
         print(f"[subturtle:{name}] === slow iteration {iteration} ===")
         try:
@@ -371,7 +375,11 @@ def run_slow_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
             _log_retry(name, e)
 
         if _should_stop(state_file, name):
+            stopped_by_directive = True
             break
+
+    if stopped_by_directive:
+        _write_completion_notification(state_dir, name, Path.cwd())
 
 
 def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -> None:
@@ -391,8 +399,12 @@ def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
     add_dirs = ["super_turtle/skills"] if skills else []
     claude = Claude(add_dirs=add_dirs)
     iteration = 0
+    stopped_by_directive = False
 
     while True:
+        if _should_stop(state_file, name):
+            stopped_by_directive = True
+            break
         iteration += 1
         print(f"[subturtle:{name}] === yolo iteration {iteration} ===")
         try:
@@ -401,7 +413,11 @@ def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
             _log_retry(name, e)
 
         if _should_stop(state_file, name):
+            stopped_by_directive = True
             break
+
+    if stopped_by_directive:
+        _write_completion_notification(state_dir, name, Path.cwd())
 
 
 def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = None) -> None:
@@ -421,8 +437,12 @@ def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = N
     add_dirs = ["super_turtle/skills"] if skills else []
     codex = Codex(add_dirs=add_dirs)
     iteration = 0
+    stopped_by_directive = False
 
     while True:
+        if _should_stop(state_file, name):
+            stopped_by_directive = True
+            break
         iteration += 1
         print(f"[subturtle:{name}] === yolo-codex iteration {iteration} ===")
         try:
@@ -431,7 +451,11 @@ def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = N
             _log_retry(name, e)
 
         if _should_stop(state_file, name):
+            stopped_by_directive = True
             break
+
+    if stopped_by_directive:
+        _write_completion_notification(state_dir, name, Path.cwd())
 
 
 # ---------------------------------------------------------------------------
