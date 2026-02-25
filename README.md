@@ -20,6 +20,20 @@ An autonomous coding system built on Claude Code. A lean meta agent orchestrates
 - **Composable specialization** — skills can be mixed and matched per SubTurtle; a single worker can have frontend + testing skills, or video + design skills
 - **Observable by default** — every SubTurtle writes commits, logs, and state files; the meta agent can always answer "what's happening?"
 
+### Work allocation: Meta agent delegates, doesn't code
+
+The meta agent is a **communicator and coordinator**, not a coder. The boundary is simple:
+
+- **> 5 minutes of coding work** → Spawn a SubTurtle. Write its CLAUDE.md, schedule cron supervision, report back when done.
+- **≤ 5 minutes or non-coding** → Meta agent handles it directly:
+  - Quick fixes (typos, single-line edits, config tweaks)
+  - Reporting status to the human
+  - Reviewing and explaining code
+  - Restarting or course-correcting stuck workers
+  - Answering questions about architecture or decisions
+
+This keeps the meta agent **focused on the human interface** (staying responsive, making decisions, reporting progress) while **SubTurtles handle the conveyor belt** (planning, coding, testing, committing). When you ask for something non-trivial, the meta agent spawns a worker and gets back to you in seconds with "I'm on it — I'll check back in 5 minutes." No waiting for a slow agent to code.
+
 ## Architecture
 
 ```
