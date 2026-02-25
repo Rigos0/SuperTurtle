@@ -25,3 +25,4 @@ SubTurtles can signal completion by writing a STOP directive to their CLAUDE.md.
 - The `_state_file` variable in `run_yolo_loop` and `run_yolo_codex_loop` has an underscore prefix because it was unused — remove the prefix so `_should_stop` can use it
 - Verification (2026-02-25): `python3 -m py_compile super_turtle/subturtle/__main__.py` passed.
 - Follow-up (2026-02-25): No additional implementation needed; backlog remains fully complete.
+- Iteration log (2026-02-25): Re-verified STOP wiring via `rg` across `__main__.py` and `META_SHARED.md`; compile check still passes and no new self-stop work remains.
