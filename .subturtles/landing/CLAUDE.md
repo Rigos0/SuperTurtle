@@ -1,6 +1,6 @@
 ## Current Task
 
-Rewrite footer: compact mobile layout, earthy warm.
+Add section divider SVGs (subtle organic wave shapes between major sections).
 
 ## End Goal with Specs
 
@@ -51,8 +51,8 @@ A landing page that looks GREAT on mobile (iPhone-sized screens first), then sca
 - [x] Rewrite "How it works": replace SVG diagram with vertical step-flow (mobile-friendly), keep desktop 2-col
 - [x] Rewrite "Loop types": stacked cards mobile, comparison as stacked blocks (not table) on mobile
 - [x] Rewrite terminal demo + getting started: mobile-readable code blocks, proper overflow handling
-- [ ] Rewrite footer: compact mobile layout, earthy warm <- current
-- [ ] Add section divider SVGs (subtle organic wave shapes between major sections)
+- [x] Rewrite footer: compact mobile layout, earthy warm
+- [ ] Add section divider SVGs (subtle organic wave shapes between major sections) <- current
 - [ ] Final mobile QA: check every section at 375px width, no overflow, readable text, good spacing
 - [ ] Commit all changes
 
