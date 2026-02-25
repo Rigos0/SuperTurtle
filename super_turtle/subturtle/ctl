@@ -216,9 +216,13 @@ do_start() {
   local timeout_secs
   timeout_secs="$(parse_duration "$timeout_str")" || exit 1
 
-  # Convert skills array to JSON
-  local skills_json
-  skills_json="$(printf '%s\n' "${skills[@]}" | python3 -c 'import sys, json; print(json.dumps([line.strip() for line in sys.stdin if line.strip()]))' 2>/dev/null || echo '[]')"
+  # Convert skills array to JSON. Guard empty arrays for bash + nounset compatibility.
+  local skills_json="[]"
+  if (( ${#skills[@]} > 0 )); then
+    skills_json="$(
+      printf '%s\n' "${skills[@]}" | "$PYTHON" -c 'import sys, json; print(json.dumps([line.strip() for line in sys.stdin if line.strip()]))' 2>/dev/null || echo '[]'
+    )"
+  fi
 
   ensure_workspace "$name"
 
@@ -286,7 +290,7 @@ with open(pid_file, 'w') as f:
     f.write(str(proc.pid))
 
 print(f'[subturtle:{name}] spawned as {loop_type} (PID {proc.pid})')
-" "$pf" "$lf" "$PYTHON" "$PROJECT_DIR" "$ws" "$name" "$loop_type" "$(printf '%s\n' "${skills[@]}" | python3 -c 'import sys, json; print(json.dumps([line.strip() for line in sys.stdin if line.strip()]))')"
+" "$pf" "$lf" "$PYTHON" "$PROJECT_DIR" "$ws" "$name" "$loop_type" "$skills_json"
 
   # Read back the PID we just wrote
   local turtle_pid
@@ -496,9 +500,11 @@ do_spawn() {
 
   local -a start_args=("$name" --type "$loop_type" --timeout "$timeout_str")
   local skill
-  for skill in "${skills[@]}"; do
-    start_args+=(--skill "$skill")
-  done
+  if (( ${#skills[@]} > 0 )); then
+    for skill in "${skills[@]}"; do
+      start_args+=(--skill "$skill")
+    done
+  fi
   do_start "${start_args[@]}"
 
   local cron_job_id
