@@ -2,7 +2,8 @@
 
 ## Current Task
 
-Propose implementation approach for Telegram bot integration.
+✓ Completed: Proposed implementation approach for Telegram bot integration.
+Ready for next phase: Add `/codex-quota` command handler and meta agent integration.
 
 ## End Goal with Specs
 
@@ -48,7 +49,7 @@ Discover the exact method to:
 - [x] Document findings in a RESEARCH.md file
 - [x] Build Python pexpect script to extract quota data from interactive Codex
 - [x] Test with real Codex session and validate output format/parsing
-- [ ] Propose implementation approach for Telegram bot integration <- current
+- [x] Propose implementation approach for Telegram bot integration <- current (COMPLETED)
 
 ## Notes
 
@@ -79,3 +80,147 @@ Discover the exact method to:
   - ✓ All expected fields extracted and formatted properly
   - ✓ JSON output format correct and parseable
   - ✓ Regex patterns handle sample /status output accurately
+
+## Telegram Bot Integration Proposal (2026-02-25)
+
+### Overview
+
+The `codex_quota_extractor.py` script provides structured quota data via JSON output. The Telegram bot will integrate this to enable:
+1. **On-demand quota status** — `/codex-quota` command to check current limits
+2. **Meta agent decision support** — Bot can inform meta agent about available quota for loop type selection
+3. **Cron monitoring** — Periodic quota checks to track usage patterns
+4. **User alerts** — Warn when quota is running low
+
+### Architecture
+
+```
+Telegram Bot (TypeScript/Bun)
+  ↓
+  Bun.spawnSync() → python3 codex_quota_extractor.py
+  ↓
+  JSON output parsed
+  ↓
+  Display to user OR store for meta agent OR log for monitoring
+```
+
+### Integration Points
+
+#### 1. **Command Handler**: `/codex-quota`
+- **Location**: `super_turtle/claude-telegram-bot/src/handlers/commands.ts`
+- **Pattern**: Similar to existing `/usage` command that calls external tools
+- **Implementation**:
+  ```typescript
+  export async function handleCodexQuota(ctx: Context): Promise<void> {
+    // Check authorization
+    // Call: Bun.spawnSync([
+    //   "python3",
+    //   "/Users/Richard.Mladek/Documents/projects/agentic/.subturtles/codex-quota-research/codex_quota_extractor.py",
+    //   "--timeout", "20"
+    // ])
+    // Parse JSON output
+    // Format nicely for Telegram
+    // Send to user
+  }
+  ```
+- **Output format for user**:
+  ```
+  📊 Codex Quota Status
+
+  ⏱️ 5-Hour Window:
+    • 40 messages remaining
+    • 10% used
+
+  📅 Weekly Limit:
+    • 45% used
+    • Resets in 4 days 12 hours
+
+  ⌛ Window Reset: in 2 hours 15 minutes
+  ```
+
+#### 2. **Meta Agent Integration**
+- **Location**: `meta/meta_agent.py` (main orchestrator)
+- **Purpose**: Loop type selection based on quota
+- **Pattern**: Before spawning a yolo-codex SubTurtle, check available quota:
+  ```python
+  def select_loop_type(task):
+      quota = get_codex_quota()  # Call python3 extractor
+      if quota['error']:
+          return 'yolo'  # Fallback to regular Claude
+
+      if quota['messages_remaining'] < 10:
+          return 'yolo'  # Codex quota low, use main Claude
+      elif quota['window_5h_pct'] > 80:
+          return 'yolo'  # Codex window heavily used
+      else:
+          return 'yolo-codex'  # Use cost-optimized loop
+  ```
+- **Cache considerations**:
+  - Run extractor every ~5 minutes (avoid hammering Codex)
+  - Cache result in memory with timestamp
+  - Invalidate after 5-minute TTL or on explicit refresh
+
+#### 3. **Cron Job in Telegram Bot**
+- **Location**: `super_turtle/claude-telegram-bot/cron-jobs.json` (add new job)
+- **Purpose**: Periodic quota monitoring and logging
+- **Interval**: Every 30 minutes
+- **Action**: Run extractor, log results, alert if quota < 20% remaining
+- **Example job**:
+  ```json
+  {
+    "id": "codex-quota-monitor",
+    "prompt": "Run `python3 .subturtles/codex-quota-research/codex_quota_extractor.py --verbose` and check results. Log usage patterns. If messages_remaining < 10, send alert to user.",
+    "type": "recurring",
+    "interval_ms": 1800000
+  }
+  ```
+
+### File Locations
+
+- **Extractor script**: `.subturtles/codex-quota-research/codex_quota_extractor.py` ✓ (exists)
+- **Telegram command handler**: `super_turtle/claude-telegram-bot/src/handlers/commands.ts` (add function)
+- **Handler registration**: `super_turtle/claude-telegram-bot/src/index.ts` (register `/codex-quota` command)
+- **Meta agent integration**: `meta/meta_agent.py` (add function for loop selection)
+- **Cron job config**: `super_turtle/claude-telegram-bot/cron-jobs.json` (add new job)
+
+### Error Handling
+
+**Scenarios to handle**:
+1. **Codex not running** — Extractor times out or can't spawn process
+   - → Return error status, suggest user is logged out
+2. **Parse failure** — Output format changed or unrecognized
+   - → Return partial data with notes about what failed
+3. **Timeout** — Codex response takes too long
+   - → Use `--timeout 20` flag (configurable), fallback gracefully
+4. **JSON parse error** — stdout is not valid JSON
+   - → Log stderr for debugging, return error
+
+**User experience**:
+- If error: "⚠️ Could not fetch Codex quota. Make sure you're logged in to Codex."
+- Don't crash the bot — always have a fallback
+
+### Testing Strategy
+
+1. **Unit test** — `codex_quota_extractor.py --test` (already passes) ✓
+2. **Integration test** — Manually run extractor in shell, verify JSON output
+3. **Bot integration test** — Add TypeScript test for command handler using mocked JSON
+4. **End-to-end** — Test `/codex-quota` command with real Codex session running
+5. **Meta agent test** — Verify loop type selection logic with various quota states
+
+### Phase 1 Implementation (This Task)
+
+**Done**: Proposal document above
+
+**Next phase** (separate tasks):
+1. Add `/codex-quota` command handler to Telegram bot
+2. Integrate with meta agent's loop selection logic
+3. Add cron job for periodic monitoring
+4. Test end-to-end with real Codex session
+5. Document in bot's `/help` or `/status` output
+
+### Benefits
+
+- **User visibility**: Know exactly how much Codex quota remains
+- **Cost optimization**: Meta agent can auto-select `yolo-codex` only when quota available
+- **Proactive alerts**: Warn before quota runs out
+- **Monitoring**: Track usage patterns over time for insights
+- **Fallback strategy**: Gracefully degrade to regular Claude if Codex unavailable
