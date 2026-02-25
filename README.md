@@ -102,9 +102,16 @@ Message the bot. It runs Claude with access to the repo — ask it anything.
 Each SubTurtle gets its own workspace at `.subturtles/<name>/` with its own CLAUDE.md state file. Multiple can run concurrently on different tasks.
 
 ```bash
+./super_turtle/subturtle/ctl spawn [name] [--type TYPE] [--timeout DURATION] [--state-file PATH|-] [--cron-interval DURATION] [--skill NAME ...]
 ./super_turtle/subturtle/ctl start [name] [--type TYPE] [--timeout DURATION]
 ./super_turtle/subturtle/ctl stop  [name]       # stop it
 ./super_turtle/subturtle/ctl status [name]       # check if running
 ./super_turtle/subturtle/ctl logs  [name]        # tail output
 ./super_turtle/subturtle/ctl list                # list all SubTurtles
 ```
+
+Use `ctl spawn` for normal work: it seeds state, starts the SubTurtle, and auto-registers cron supervision.
+
+### Next project intake template
+
+For new project kickoff, use the template at `docs/NEXT_PROJECT_INTAKE_TEMPLATE.md` to collect specs and generate the first SubTurtle state file.

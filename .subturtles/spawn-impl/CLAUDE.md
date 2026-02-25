@@ -1,6 +1,6 @@
 # Current Task
 
-Await next project work direction. Spawn infrastructure status re-verified on 2026-02-25.
+Ready for next project work (awaiting user direction). Intake template and spawn-first kickoff docs prepared on 2026-02-25.
 
 # End Goal with Specs
 
@@ -96,4 +96,8 @@ Update the "Starting new work" section to use the new `ctl spawn` flow:
 - [x] Test: run `./super_turtle/subturtle/ctl spawn test-spawn --type yolo --timeout 5m --state-file -` with echo piped in, verify workspace + cron created, then stop and verify cron cleaned up
 - [x] Commit all changes
 - [x] Re-verify operational status on 2026-02-25 (`ctl list`, `ctl status spawn-impl`, log tail check)
-- [ ] Await next project work direction <- current
+- [ ] Ready for next project work (awaiting user direction) <- current
+
+## Progress Notes
+
+- 2026-02-25: Added `docs/NEXT_PROJECT_INTAKE_TEMPLATE.md` and updated README quick start to prefer `ctl spawn` and link intake template.
