@@ -1,6 +1,6 @@
 # Current Task
 
-Fix security bug: unescaped `codexPlanType` in HTML output.
+Fix dead code cleanup in formatUnifiedUsage and remove unused type alias.
 
 # End Goal with Specs
 
@@ -40,8 +40,8 @@ Add tests for:
 # Backlog
 
 - [x] Fix Bug 1: Change ✅ to ❓ for missing data in formatUnifiedUsage (lines 562, 603) and add missing-data flags for summary status (lines 610-620)
-- [ ] Fix Bug 2: Escape codexPlanType with escapeHtml() at line 590 <- current
-- [ ] Fix Bug 3: Remove dead CodexQuotaData type (line 673) and simplify duplicate branch (lines 594-597)
+- [x] Fix Bug 2: Escape codexPlanType with escapeHtml() at line 590
+- [ ] Fix Bug 3: Remove dead CodexQuotaData type (line 673) and simplify duplicate branch (lines 594-597) <- current
 - [ ] Add test cases for empty data, partial data, and HTML escaping in commands.usage.test.ts
 - [ ] Run tests to verify: `cd super_turtle/claude-telegram-bot && npx bun test commands.usage`
 - [ ] Commit all fixes together

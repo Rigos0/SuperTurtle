@@ -595,7 +595,7 @@ export function formatUnifiedUsage(
       if (!codexDataMissing) {
         codexStatus = getStatusEmoji(codexHighestPct);
       }
-      const codexHeader = `${codexStatus} <b>Codex${codexPlanType ? ` (${codexPlanType})` : ""}</b>`;
+      const codexHeader = `${codexStatus} <b>Codex${codexPlanType ? ` (${escapeHtml(codexPlanType)})` : ""}</b>`;
       codexSection.push(codexHeader);
       codexSection.push(...codexDisplayLines.map((line) => {
         // Indent lines that aren't already formatted section headers
