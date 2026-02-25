@@ -1,6 +1,6 @@
 # Current Task
 
-Fix dead code cleanup in formatUnifiedUsage and remove unused type alias.
+Add missing usage formatter test cases for empty data and HTML escaping.
 
 # End Goal with Specs
 
@@ -41,7 +41,7 @@ Add tests for:
 
 - [x] Fix Bug 1: Change ✅ to ❓ for missing data in formatUnifiedUsage (lines 562, 603) and add missing-data flags for summary status (lines 610-620)
 - [x] Fix Bug 2: Escape codexPlanType with escapeHtml() at line 590
-- [ ] Fix Bug 3: Remove dead CodexQuotaData type (line 673) and simplify duplicate branch (lines 594-597) <- current
-- [ ] Add test cases for empty data, partial data, and HTML escaping in commands.usage.test.ts
+- [x] Fix Bug 3: Remove dead CodexQuotaData type (line 673) and simplify duplicate branch (lines 594-597)
+- [ ] Add test cases for empty data, partial data, and HTML escaping in commands.usage.test.ts <- current
 - [ ] Run tests to verify: `cd super_turtle/claude-telegram-bot && npx bun test commands.usage`
 - [ ] Commit all fixes together

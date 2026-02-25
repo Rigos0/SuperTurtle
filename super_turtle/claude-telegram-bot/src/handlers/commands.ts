@@ -597,13 +597,7 @@ export function formatUnifiedUsage(
       }
       const codexHeader = `${codexStatus} <b>Codex${codexPlanType ? ` (${escapeHtml(codexPlanType)})` : ""}</b>`;
       codexSection.push(codexHeader);
-      codexSection.push(...codexDisplayLines.map((line) => {
-        // Indent lines that aren't already formatted section headers
-        if (line.startsWith("<b>")) {
-          return `   ${line}`;
-        }
-        return `   ${line}`;
-      }));
+      codexSection.push(...codexDisplayLines.map((line) => `   ${line}`));
     } else if (codexDisplayLines.length > 0) {
       codexSection.push(`⚠️ <b>Codex</b>`);
       codexSection.push(...codexDisplayLines.map((line) => `   ${line}`));
@@ -679,16 +673,6 @@ export async function handleUsage(ctx: Context): Promise<void> {
     parse_mode: "HTML",
   });
 }
-
-type CodexQuotaData = {
-  timestamp?: string;
-  status_output?: string;
-  messages_remaining?: number | null;
-  window_5h_pct?: number | null;
-  weekly_limit_pct?: number | null;
-  reset_times?: Record<string, string>;
-  error?: string | null;
-};
 
 /**
  * Fetch and format Codex quota info via codex app-server JSON-RPC protocol.
