@@ -28,6 +28,7 @@ SubTurtles can signal completion by writing a STOP directive to their CLAUDE.md.
 - Iteration log (2026-02-25): Re-verified STOP wiring via `rg` across `__main__.py` and `META_SHARED.md`; compile check still passes and no new self-stop work remains.
 - Iteration log (2026-02-25, autonomous pass): Re-verified `_should_stop` references in all three loops and prompt instructions; `python3 -m py_compile super_turtle/subturtle/__main__.py` passed again; backlog stays complete with `## Loop Control` set to `STOP`.
 - Iteration log (2026-02-25, codex pass): Confirmed `STOP_DIRECTIVE` + `_should_stop()` wiring and all three loop break checks remain present; `python3 -m py_compile super_turtle/subturtle/__main__.py` passed; no additional self-stop code changes required.
+- Iteration log (2026-02-25, codex autonomous pass 2): Re-verified `_should_stop()` in slow/yolo/yolo-codex loops and self-completion docs; `python3 -m py_compile super_turtle/subturtle/__main__.py` passed; backlog remains complete with no `<- current` item.
 
 ## Loop Control
 STOP
