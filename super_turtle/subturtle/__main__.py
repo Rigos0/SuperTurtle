@@ -139,6 +139,10 @@ Do ONE commit's worth of focused work on the current task. Follow this sequence:
 
 5. **Commit** — Stage ALL changed files (code + `{state_file}`) and commit with a clear message describing what you implemented. Do NOT commit unrelated files.
 
+6. **Self-stop when complete** — If ALL backlog items in `{state_file}` are `[x]` after your commit:
+   - Append `## Loop Control\nSTOP` to `{state_file}`.
+   - Amend the commit to include this state-file change.
+
 ## Rules
 
 - You MUST read `{state_file}` before doing anything else.
