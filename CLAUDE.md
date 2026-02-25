@@ -1,124 +1,117 @@
+# UX Fundamentals
+
+## What Super Turtle is
+
+An autonomous coding system you talk to on Telegram. You describe what you want built — the system decomposes it, spawns workers, supervises them, and delivers results. You interact with a single conversational agent (the Meta Turtle) who handles everything behind the scenes.
+
+## Core experience principle
+
+**Say what → get results.** The user never thinks about processes, infrastructure, or agent orchestration. They say "build me X" and the system figures out how. The chat shows milestones, not machinery.
+
+## What the user sees
+
+| Event | User sees | User doesn't see |
+|-------|-----------|-------------------|
+| Work starts | "🚀 On it." | SubTurtle spawning, CLAUDE.md creation, cron registration |
+| Work in progress | Nothing (silence = good) | Cron check-ins, status polling, git log inspection |
+| Milestone reached | "🎉 Feature X is done. Starting Y next." | SubTurtle stop/restart, state file updates |
+| Something broke | "⚠️ Hit a snag with X. Here's what happened: ..." | Log tailing, error diagnosis, restart attempts |
+| Everything done | "✅ All done. Here's what shipped: ..." | Cron cleanup, watchdog termination |
+| Preview available | "🔗 Preview: https://..." | Tunnel setup, port management |
+
+## What the user never has to do
+
+- Break down tasks into subtasks (the system decomposes)
+- Choose which loop type to use (the system defaults to cheapest: yolo-codex)
+- Monitor progress (the system checks silently and only reports news)
+- Restart stuck workers (the system detects and recovers)
+- Manage quotas (the system checks usage and routes work to the cheapest resource)
+
+## Interaction model
+
+1. **User sends a message** → Meta agent responds conversationally. If it's a coding task, spawns SubTurtles and confirms briefly.
+2. **Silence** → Work is happening. No news is good news.
+3. **Notification arrives** → Something meaningful happened. Read it — it's worth your attention.
+4. **User asks "how's it going?"** → Meta agent checks and gives a plain-English summary.
+5. **User says "stop"** → Work stops. No questions asked.
+
+## Emotional design
+
+- **Feels like a competent teammate**, not a CI pipeline
+- **Respects attention** — never sends a message that wastes the user's time
+- **Confident but honest** — says "I'm on it" when starting, "I'm stuck" when blocked
+- **Celebrates wins** — completion messages feel like progress, not bureaucracy
+- **Invisible when working** — the best UX is no UX during execution
+
+## Resource management
+
+- **Default to yolo-codex** — Codex is cheap and plentiful. Use it for everything unless the task needs Claude's reasoning.
+- **Claude Code is precious** — every meta agent interaction, every cron check-in costs Claude Code quota. Minimize waste.
+- **Auto-adjust** — when Claude Code is >80%, space out check-ins, shorten responses, force Codex for SubTurtles.
+- **The user shouldn't think about quotas** — the system manages resources silently.
+
+---
+
 # Current task
 
-When user opens this repo for the first time: detect if `.env` is missing or `TELEGRAM_BOT_TOKEN` is not set. If so, run the onboarding wizard to guide them through setup.
+UX Overhaul complete (Phases 1-6). All phases shipped. System is now fully autonomous: specs-driven decomposition, parallel SubTurtles, silent supervision, usage-aware resource management.
 
-## Onboarding Wizard (Step-by-Step Implementation Guide)
-
-**When to trigger:** On first Claude Code open, if `.env` doesn't exist or `TELEGRAM_BOT_TOKEN` not set.
-
-**What to do:**
-
-1. **Welcome** — Show friendly intro explaining Super Turtle and setup (~5 min)
-
-2. **Ask setup preference:**
-   - Personal bot (just me)
-   - Team bot (multiple users)
-   - Skip for now
-
-3. **Collect Telegram bot token:**
-   - Guide user to @BotFather → /newbot
-   - Validate format: `^\d+:[A-Za-z0-9_-]+$`
-   - Retry up to 3 times, then allow skip
-
-4. **Collect user ID:**
-   - Guide user to @userinfobot
-   - Validate: must be digits only
-   - Retry up to 3 times
-
-5. **Ask for OpenAI key (optional):**
-   - For voice transcription
-   - Link to https://platform.openai.com/api/keys
-   - Can skip and add later
-
-6. **Show summary & confirm:**
-   - Display masked token and collected settings
-   - Get user confirmation before proceeding
-
-7. **Create .env file:**
-   - Write to: `super_turtle/claude-telegram-bot/.env`
-   - Format: `KEY=value` pairs (see .env.example)
-   - Ensure it's in .gitignore
-
-8. **Install dependencies:**
-   - Run: `cd super_turtle/claude-telegram-bot && bun install`
-   - Show progress
-   - Handle bun not found error gracefully
-
-9. **Start the bot:**
-   - Run: `bun run src/index.ts`
-   - Wait for "Bot started: @botname" in logs
-
-10. **Verify bot works:**
-    - Ask user to test with /start command
-    - Wait for confirmation (5 min timeout)
-    - Show troubleshooting if no response
-
-11. **Offer SubTurtle spawn:**
-    - Ask if user wants to create first project
-    - Get project description and name
-    - Spawn with: `./super_turtle/subturtle/ctl spawn <name>`
-
-12. **Success message:**
-    - Celebrate! Show what's running
-    - Explain next steps and commands
-
-**Key implementation details:**
-- Use Claude Code's AskUserQuestion for multi-choice prompts
-- Validate all user input before using
-- Handle errors gracefully with helpful recovery steps
-- Never expose secrets in messages (mask tokens)
-- Save state incrementally so user can resume if interrupted
-- Make each step feel conversational, not robotic
-
-**Files to create/modify:**
-- `super_turtle/claude-telegram-bot/.env` (created during setup)
-- Ensure `.gitignore` has `super_turtle/claude-telegram-bot/.env`
-
-**See docs/PRD-onboarding.md for full requirements and spec.**
+Ready for new project work or integration testing.
 
 # End goal with specs
 
-Agentic repository — autonomous agent coordination system (SubTurtles). Core infrastructure is complete:
-- **SubTurtle control** (`ctl` command) — spawn, stop, monitor with timeouts
-- **State management** — CLAUDE.md per agent, symlinked AGENTS.md
-- **Cron supervision** — scheduled check-ins to monitor progress
-- **Loop types** — slow (Plan→Groom→Execute→Review), yolo (single Claude call), yolo-codex (cost-optimized)
-- **Skills system** — agents can load Claude Code skills on demand
-- **Tunnel support** — cloudflared integration for frontend preview links
-- **Snake game** — reference implementation (production-ready, playable, installed at root)
+Agentic repository — autonomous agent coordination system (SubTurtles). Core infrastructure is complete. Now improving the UX to make the system more autonomous and less noisy.
 
-Next phase: polish, document, and prepare for new project work.
+**Core infrastructure (done):**
+- SubTurtle control (`ctl` command) — spawn, stop, monitor with timeouts
+- State management — CLAUDE.md per agent, symlinked AGENTS.md
+- Cron supervision — scheduled check-ins to monitor progress
+- Loop types — slow (Plan→Groom→Execute→Review), yolo (single Claude call), yolo-codex (cost-optimized)
+- Skills system — agents can load Claude Code skills on demand
+- Tunnel support — cloudflared integration for frontend preview links
+- SubTurtle self-stop — agents write `## Loop Control\nSTOP` to exit cleanly
+- Silent check-ins — cron supervision runs silently, only messages user on news
+
+**UX overhaul goal:** The user says "build X" and the system handles everything — decomposition, parallel SubTurtles, supervision, progression — with minimal noise. Chat shows progress milestones, not process spam.
 
 # Roadmap (Completed)
 
 - ✓ Core SubTurtle loop (slow/yolo/yolo-codex types, watchdog, timeout)
-- ✓ Control script (`ctl` start/stop/status/logs/list)
+- ✓ Control script (`ctl` start/stop/status/logs/list + spawn)
 - ✓ Cron job scheduling (one-shot + recurring, auto-fire)
 - ✓ Skills loader system (agents can --skill <name>)
 - ✓ Tunnel support (start-tunnel.sh helper, .tunnel-url tracking)
 - ✓ Snake game (complete with 10 levels, obstacles, visual escalation, neon UI)
 - ✓ Meta agent (decision-making, delegation, supervision)
+- ✓ SubTurtle self-stop (`## Loop Control\nSTOP` directive, _should_stop() check)
+- ✓ UX overhaul proposal (docs/UX-overhaul-proposal.md)
+- ✓ UX Phase 1: Silent check-ins (silent cron, marker-gated notifications, META_SHARED.md updated)
+- ✓ Code quality audit (docs/code-quality-audit.md — 1 critical fixed, 4 medium fixed, 6 documented)
+- ✓ UX Phase 2: Structured message templates (notification formats for all event types)
+- ✓ UX Phase 3: Task decomposition (DECOMPOSITION_PROMPT.md + META_SHARED.md protocol)
+- ✓ UX Phase 4: Pipeline speed (`ctl reschedule-cron` command for dynamic intervals)
+- ✓ UX Phase 5: Enhanced `/status` command (SubTurtle info, git log, usage in one view)
+- ✓ UX Phase 6: Usage-aware resource management (quota decision matrix in META_SHARED.md)
+- ✓ Default loop type changed to yolo-codex
 
 # Roadmap (Upcoming)
 
-- Polish & document meta agent behavior
-- Prepare for next project or feature work
+- Integration testing — verify all UX phases work together end-to-end
+- Update UX-overhaul-proposal.md with completion status
 
 # Backlog
 
-- [x] Restore root state file (CLAUDE.md) — document what's done, what's next
-- [x] Verify SubTurtle `ctl` commands are working
-- [x] Check git log for recent commits and verify state consistency
-- [ ] Ready for next project work (awaiting user direction)
-
-## Verification Summary
-
-All core SubTurtle infrastructure is operational:
-- **ctl list** — Shows 21 SubTurtles (17 stopped, 4 running)
-- **ctl status** — Reports SubTurtle state accurately (spawn-impl running with 45m remaining)
-- **ctl logs** — Retrieves full execution history from subturtle.log
-- **ctl spawn** — Creates workspace, writes CLAUDE.md, creates AGENTS.md symlink, starts process, registers cron
-- **ctl stop** — Stops process and cleans up cron jobs from cron-jobs.json
-- **Cron system** — Auto-registration and cleanup functional
-- **Git history** — 64 commits ahead; spawn feature complete and committed
-- **Project state** — Clean working tree, all infrastructure verified
+- [x] Plan silent check-in architecture
+- [x] Implement silent check-in mechanism in bot + cron system
+- [x] Update META_SHARED.md supervision section for silent behavior
+- [x] Update `ctl spawn` cron prompt generation
+- [x] Test silent check-ins
+- [x] Code quality audit
+- [x] UX Phase 2: Structured message templates
+- [x] UX Phase 3: Task decomposition protocol
+- [x] UX Phase 4: ctl reschedule-cron command
+- [x] UX Phase 5: Enhanced /status command
+- [x] UX Phase 6: Usage-aware resource management
+- [x] Change ctl default to yolo-codex
+- [ ] Integration testing — verify all phases work together <- current
+- [ ] Update UX-overhaul-proposal.md with completion status

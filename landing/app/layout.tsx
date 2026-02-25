@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "agentic – Autonomous Agent Coordination",
+  title: "Super Turtle – Autonomous Agent Coordination",
   description: "Autonomous agent coordination for Claude Code. Spawn SubTurtles to handle complex tasks autonomously with supervision.",
 };
 

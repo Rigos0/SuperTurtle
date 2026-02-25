@@ -1,10 +1,1 @@
-[
-  {
-    "id": "1bd1da",
-    "prompt": "Check SubTurtle landing: run `./super_turtle/subturtle/ctl status landing`, inspect `.subturtles/landing/CLAUDE.md`, and review `git log --oneline -10`. If backlog is complete, stop SubTurtle landing and report shipped work. If stuck/off-track, stop it, diagnose, and restart with corrected state. If progressing, let it run.",
-    "type": "recurring",
-    "fire_at": 1772022454793,
-    "interval_ms": 300000,
-    "created_at": "2026-02-25T12:17:31Z"
-  }
-]
+[]

@@ -270,6 +270,37 @@ This updates the cron job's `interval_ms` in `cron-jobs.json`.
 | Task decomposition creates sprawling work | Define max 5 SubTurtles per request; queue excess work |
 | Faster cron fires cause race conditions | Ensure cron prompt includes locking (don't re-enter if one is running) |
 
+### Phase 6: Usage-Aware Resource Management (High impact)
+
+**Problem:** The meta agent runs on Claude Code, which has tighter quotas than Codex. Every cron check-in, every status report, every conversation burns Claude Code quota. Meanwhile Codex (pro subscription) sits nearly unused. Today's session: Claude Code at 27% session / 35% weekly, Codex at 2%.
+
+**Proposed behavior:**
+
+1. **Default SubTurtle type: yolo-codex** — Unless the task specifically needs Claude's capabilities (complex multi-file reasoning, architecture decisions), default to Codex. The meta agent should always suggest yolo-codex first in the button options.
+
+2. **Usage-aware mode selection:**
+   | Claude Code Usage | Codex Usage | Meta Agent Behavior |
+   |-------------------|-------------|---------------------|
+   | <50% | <50% | Normal operations, any loop type |
+   | 50-80% | <50% | Prefer yolo-codex, reduce cron frequency |
+   | >80% | <50% | Force yolo-codex only, minimal check-ins, shorter responses |
+   | Any | >80% | Switch to yolo (Claude) for SubTurtles, warn user |
+   | >80% | >80% | Alert user, suggest pausing non-critical work |
+
+3. **Periodic usage check** — Meta agent checks usage at session start and every ~30 minutes. Adjusts behavior automatically. No user action needed.
+
+4. **Smart cron frequency** — When Claude Code is high, space out cron check-ins (10-15 min instead of 5). Each check-in costs a Claude Code API call.
+
+5. **Usage in /status command** — Show quota bars alongside SubTurtle status so the user always knows resource state.
+
+**Files to change:**
+- `super_turtle/meta/META_SHARED.md` — add usage-aware behavior rules
+- `super_turtle/subturtle/ctl` — change default loop type from `slow` to `yolo-codex`
+- Cron prompt generation — include usage check instruction
+
+**Effort:** 2-3 hours
+**Impact:** Extends effective session duration by 2-3x by routing work to the cheaper resource
+
 ## Next Steps
 
 1. ✅ Write this proposal (done)

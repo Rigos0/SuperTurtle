@@ -108,7 +108,7 @@ pre code {
 
 /* Card with left accent bar (4px colored left border) */
 .card-accent {
-  @apply bg-white rounded-lg border border-[rgba(74,95,59,0.12)] border-l-4 border-l-[#4a5f3b] shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all duration-200 hover:shadow-[0_8px_16px_rgba(0,0,0,0.10)] hover:-translate-y-1;
+  @apply bg-white rounded-lg border-l-4 border-l-[#4a5f3b] shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all duration-200 hover:shadow-[0_8px_16px_rgba(0,0,0,0.10)] hover:-translate-y-1;
 }
 
 .card-accent.terracotta {

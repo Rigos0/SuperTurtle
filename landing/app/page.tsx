@@ -23,14 +23,14 @@ export default function Home() {
     <div className="w-full text-[#2d2a26] font-sans" style={{ backgroundColor: '#faf8f5' }}>
       <StickyNav />
       {/* Hero Section */}
-      <section id="hero" className="relative min-h-screen w-full overflow-hidden bg-[#faf8f5]">
+      <section id="hero" className="relative sm:min-h-screen w-full overflow-hidden bg-[#faf8f5]">
         {/* Content - Mobile-first, left-aligned layout */}
-        <main className="relative z-10 min-h-screen w-full flex flex-col justify-center px-4 py-16 sm:px-6 lg:px-8 max-w-6xl mx-auto">
+        <main className="relative z-10 sm:min-h-screen w-full flex flex-col sm:justify-center px-4 pt-6 pb-10 sm:py-16 sm:px-6 lg:px-8 max-w-6xl mx-auto">
           <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Left column: Text content (left-aligned on mobile) */}
             <div className="flex flex-col justify-start lg:justify-center">
               {/* Turtle Logo - Mobile: smaller, above text. Desktop: beside text */}
-              <div className="w-24 h-24 sm:w-28 sm:h-28 lg:hidden mb-8 flex-shrink-0">
+              <div className="w-20 h-20 sm:w-28 sm:h-28 lg:hidden mb-4 sm:mb-8 flex-shrink-0">
                 <img
                   src="/turtle-logo.png"
                   alt="Agentic Turtle Logo"
@@ -47,7 +47,7 @@ export default function Home() {
 
               {/* Main heading - Big, bold, left-aligned */}
               <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6 leading-tight tracking-tighter text-[#1a1815]">
-                agentic
+                Super Turtle
               </h1>
 
               {/* Tagline */}
@@ -74,7 +74,7 @@ export default function Home() {
               {/* CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                 <a
-                  href="https://github.com/anthropics/agentic"
+                  href="https://github.com/anthropics/super-turtle"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-primary flex items-center justify-center gap-2 px-6 py-3 text-sm sm:text-base"
@@ -122,11 +122,11 @@ export default function Home() {
       <section id="what-it-does" className="relative w-full py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#faf8f5' }}>
         <div className="relative z-10 max-w-6xl mx-auto">
           {/* Section header */}
-          <div className="text-center mb-12 sm:mb-16">
+          <div className="mb-12 sm:mb-16">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 tracking-tight text-[#1a1815]">
               What it does
             </h2>
-            <p className="text-lg max-w-2xl mx-auto leading-relaxed text-[#4a4642]">
+            <p className="text-lg leading-relaxed text-[#4a4642]">
               Three core capabilities that power autonomous agent coordination.
             </p>
           </div>
@@ -728,9 +728,10 @@ export default function Home() {
                 <h3 className="text-base sm:text-xl font-semibold pt-1 sm:pt-0" style={{ color: '#2d2a26' }}>Clone the repository</h3>
               </div>
               <div className="sm:ml-11 rounded-lg border overflow-x-auto" style={{ backgroundColor: '#1e1c1a', borderColor: 'rgba(90, 114, 71, 0.2)' }}>
-                <div className="p-3 sm:p-4 font-mono text-xs sm:text-sm whitespace-nowrap" style={{ color: '#e8e8e4' }}>
-                  <div><span style={{ color: '#d4a574' }}>$</span> git clone https://github.com/yourusername/agentic</div>
-                  <div><span style={{ color: '#d4a574' }}>$</span> cd agentic</div>
+                <div className="p-3 sm:p-4 font-mono text-xs sm:text-sm" style={{ color: '#e8e8e4' }}>
+                  <div className="whitespace-nowrap"><span style={{ color: '#d4a574' }}>$</span> git clone \</div>
+                  <div className="whitespace-nowrap pl-2 sm:pl-4"><span style={{ color: 'rgba(212, 165, 116, 0.5)' }}>›</span> https://github.com/anthropics/super-turtle</div>
+                  <div className="whitespace-nowrap"><span style={{ color: '#d4a574' }}>$</span> cd super-turtle</div>
                 </div>
               </div>
             </div>
@@ -806,7 +807,7 @@ export default function Home() {
           <div className="mt-10 sm:mt-12 text-center">
             <p className="mb-4 sm:mb-6 text-sm sm:text-base" style={{ color: '#5a7247' }}>Ready to automate your workflow?</p>
             <a
-              href="https://github.com/yourusername/agentic"
+              href="https://github.com/anthropics/super-turtle"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-colors duration-200"
@@ -834,7 +835,7 @@ export default function Home() {
             {/* Left: Project info */}
             <div>
               <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3 flex items-center gap-2" style={{ color: '#1a1815' }}>
-                <span>🐢</span> agentic
+                <span>🐢</span> Super Turtle
               </h3>
               <p className="text-xs sm:text-sm mb-2 sm:mb-3 leading-relaxed" style={{ color: '#4a5f3b' }}>
                 Autonomous agent coordination for Claude Code. Spawn, supervise, and scale.
@@ -917,7 +918,7 @@ export default function Home() {
               <ul className="space-y-1.5 text-xs sm:text-sm">
                 <li>
                   <a
-                    href="https://github.com/yourusername/agentic"
+                    href="https://github.com/anthropics/super-turtle"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 transition-colors duration-150"
@@ -956,14 +957,14 @@ export default function Home() {
             {/* Left: Copyright and tagline */}
             <div className="text-center sm:text-left text-xs sm:text-sm" style={{ color: '#8fa87e' }}>
               <p>
-                © {new Date().getFullYear()} agentic • MIT License
+                © {new Date().getFullYear()} Super Turtle • MIT License
               </p>
             </div>
 
             {/* Right: Badges */}
             <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2">
               <a
-                href="https://github.com/yourusername/agentic"
+                href="https://github.com/anthropics/super-turtle"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs transition-colors duration-150"
