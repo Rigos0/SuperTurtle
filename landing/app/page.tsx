@@ -194,154 +194,113 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Architecture diagram */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            {/* Left: Flow diagram */}
-            <div className="flex justify-center">
-              <svg viewBox="0 0 400 600" className="w-full max-w-md" xmlns="http://www.w3.org/2000/svg">
-                {/* Define gradients with earthy colors */}
-                <defs>
-                  <linearGradient id="humanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style={{ stopColor: '#5a7247', stopOpacity: 1 }} />
-                    <stop offset="100%" style={{ stopColor: '#8fa87e', stopOpacity: 1 }} />
-                  </linearGradient>
-                  <linearGradient id="metaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style={{ stopColor: '#c07a56', stopOpacity: 1 }} />
-                    <stop offset="100%" style={{ stopColor: '#a5654a', stopOpacity: 1 }} />
-                  </linearGradient>
-                </defs>
+          {/* Step-by-step flow - vertical on mobile, 2-col on desktop */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
+            {/* Left: Vertical step flow (mobile-friendly) */}
+            <div className="space-y-4">
+              {/* Step 1 */}
+              <div className="flex gap-4">
+                <div className="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg" style={{ backgroundColor: '#5a7247' }}>
+                  1
+                </div>
+                <div className="flex-1 pt-1">
+                  <h4 className="font-semibold mb-2" style={{ color: '#1a1815' }}>Initiate via CLI or Telegram</h4>
+                  <p className="text-sm leading-relaxed" style={{ color: '#6b6460' }}>
+                    Send a command to spawn a SubTurtle with a specific task and loop type.
+                  </p>
+                </div>
+              </div>
 
-                {/* Title */}
-                <text x="200" y="30" fontSize="18" fontWeight="bold" fill="#2d2a26" textAnchor="middle">
-                  Agent Coordination Flow
-                </text>
+              {/* Connector line (hidden on mobile, visible on desktop) */}
+              <div className="flex ml-6 justify-center">
+                <div className="w-1 h-8" style={{ backgroundColor: 'rgba(90, 114, 71, 0.2)' }}></div>
+              </div>
 
-                {/* Step 1: Human/Developer */}
-                <rect x="100" y="60" width="200" height="70" rx="8" fill="url(#humanGrad)" fillOpacity="0.1" stroke="#5a7247" strokeWidth="2" />
-                <circle cx="150" cy="95" r="6" fill="#5a7247" />
-                <text x="160" y="100" fontSize="14" fontWeight="bold" fill="#2d2a26">You (Developer)</text>
-                <circle cx="250" cy="95" r="6" fill="#5a7247" />
-                <text x="170" y="115" fontSize="12" fill="#6b6460">Telegram / CLI command</text>
+              {/* Step 2 */}
+              <div className="flex gap-4">
+                <div className="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg" style={{ backgroundColor: '#c07a56' }}>
+                  2
+                </div>
+                <div className="flex-1 pt-1">
+                  <h4 className="font-semibold mb-2" style={{ color: '#1a1815' }}>Meta Agent spawns SubTurtles</h4>
+                  <p className="text-sm leading-relaxed" style={{ color: '#6b6460' }}>
+                    Each SubTurtle gets its own workspace, CLAUDE.md state file, and execution environment.
+                  </p>
+                </div>
+              </div>
 
-                {/* Arrow 1 */}
-                <line x1="200" y1="130" x2="200" y2="160" stroke="#5a7247" strokeWidth="2" />
-                <polygon points="200,160 195,150 205,150" fill="#5a7247" />
+              {/* Connector line */}
+              <div className="flex ml-6 justify-center">
+                <div className="w-1 h-8" style={{ backgroundColor: 'rgba(90, 114, 71, 0.2)' }}></div>
+              </div>
 
-                {/* Step 2: Meta Agent */}
-                <rect x="80" y="160" width="240" height="70" rx="8" fill="url(#metaGrad)" fillOpacity="0.1" stroke="#c07a56" strokeWidth="2" />
-                <circle cx="120" cy="195" r="6" fill="#c07a56" />
-                <text x="130" y="200" fontSize="14" fontWeight="bold" fill="#2d2a26">Meta Agent</text>
-                <circle cx="310" cy="195" r="6" fill="#c07a56" />
-                <text x="145" y="220" fontSize="12" fill="#6b6460">Spawns SubTurtles with scoped tasks</text>
+              {/* Step 3 */}
+              <div className="flex gap-4">
+                <div className="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg" style={{ backgroundColor: '#8fa87e' }}>
+                  3
+                </div>
+                <div className="flex-1 pt-1">
+                  <h4 className="font-semibold mb-2" style={{ color: '#1a1815' }}>SubTurtle executes its loop</h4>
+                  <p className="text-sm leading-relaxed" style={{ color: '#6b6460' }}>
+                    Read state → Plan → Execute → Commit. Runs autonomously based on loop type selection.
+                  </p>
+                </div>
+              </div>
 
-                {/* Arrow 2 */}
-                <line x1="200" y1="230" x2="200" y2="260" stroke="#8fa87e" strokeWidth="2" />
-                <polygon points="200,260 195,250 205,250" fill="#8fa87e" />
+              {/* Connector line */}
+              <div className="flex ml-6 justify-center">
+                <div className="w-1 h-8" style={{ backgroundColor: 'rgba(90, 114, 71, 0.2)' }}></div>
+              </div>
 
-                {/* Step 3: SubTurtles (multiple) */}
-                {/* SubTurtle 1 */}
-                <rect x="20" y="260" width="110" height="100" rx="8" fill="#8fa87e" fillOpacity="0.08" stroke="#8fa87e" strokeWidth="1.5" />
-                <text x="75" y="285" fontSize="12" fontWeight="bold" fill="#5a7247" textAnchor="middle">SubTurtle 1</text>
-                <text x="75" y="310" fontSize="10" fill="#6b6460" textAnchor="middle">Read State</text>
-                <text x="75" y="330" fontSize="10" fill="#6b6460" textAnchor="middle">↓ Plan</text>
-                <text x="75" y="350" fontSize="10" fill="#6b6460" textAnchor="middle">↓ Execute ↓ Commit</text>
-
-                {/* SubTurtle 2 */}
-                <rect x="145" y="260" width="110" height="100" rx="8" fill="#8fa87e" fillOpacity="0.08" stroke="#8fa87e" strokeWidth="1.5" />
-                <text x="200" y="285" fontSize="12" fontWeight="bold" fill="#5a7247" textAnchor="middle">SubTurtle 2</text>
-                <text x="200" y="310" fontSize="10" fill="#6b6460" textAnchor="middle">Read State</text>
-                <text x="200" y="330" fontSize="10" fill="#6b6460" textAnchor="middle">↓ Plan</text>
-                <text x="200" y="350" fontSize="10" fill="#6b6460" textAnchor="middle">↓ Execute ↓ Commit</text>
-
-                {/* SubTurtle N */}
-                <rect x="270" y="260" width="110" height="100" rx="8" fill="#8fa87e" fillOpacity="0.08" stroke="#8fa87e" strokeWidth="1.5" />
-                <text x="325" y="285" fontSize="12" fontWeight="bold" fill="#5a7247" textAnchor="middle">SubTurtle N</text>
-                <text x="325" y="310" fontSize="10" fill="#6b6460" textAnchor="middle">Read State</text>
-                <text x="325" y="330" fontSize="10" fill="#6b6460" textAnchor="middle">↓ Plan</text>
-                <text x="325" y="350" fontSize="10" fill="#6b6460" textAnchor="middle">↓ Execute ↓ Commit</text>
-
-                {/* Arrow 3 */}
-                <line x1="200" y1="360" x2="200" y2="390" stroke="#c07a56" strokeWidth="2" />
-                <polygon points="200,390 195,380 205,380" fill="#c07a56" />
-
-                {/* Step 4: Codebase & Meta Supervision */}
-                <rect x="60" y="390" width="280" height="80" rx="8" fill="#c07a56" fillOpacity="0.1" stroke="#c07a56" strokeWidth="2" />
-                <circle cx="100" cy="420" r="6" fill="#c07a56" />
-                <text x="110" y="425" fontSize="13" fontWeight="bold" fill="#2d2a26">Codebase Modified</text>
-                <circle cx="310" cy="430" r="6" fill="#c07a56" />
-                <text x="110" y="450" fontSize="11" fill="#6b6460">Git commits, state files, artifacts</text>
-                <text x="110" y="470" fontSize="11" fill="#6b6460">Meta Agent supervises, progresses tasks</text>
-
-                {/* Feedback arrow back to Meta Agent */}
-                <path d="M 360 420 Q 380 300 240 200" stroke="#8fa87e" strokeWidth="2" fill="none" strokeDasharray="5,5" />
-                <polygon points="240,200 245,210 235,210" fill="#8fa87e" />
-              </svg>
+              {/* Step 4 */}
+              <div className="flex gap-4">
+                <div className="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg" style={{ backgroundColor: '#c07a56' }}>
+                  4
+                </div>
+                <div className="flex-1 pt-1">
+                  <h4 className="font-semibold mb-2" style={{ color: '#1a1815' }}>Meta Agent supervises & progresses</h4>
+                  <p className="text-sm leading-relaxed" style={{ color: '#6b6460' }}>
+                    Monitors progress via cron check-ins, course-corrects if needed, and advances to the next task.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {/* Right: Description */}
-            <div className="space-y-6">
+            {/* Right: Summary and highlight */}
+            <div className="flex flex-col justify-start lg:justify-center space-y-6">
               <div className="space-y-3">
-                <h3 className="text-2xl font-semibold" style={{ color: '#2d2a26' }}>Step-by-step coordination</h3>
-                <p className="leading-relaxed" style={{ color: '#6b6460' }}>
-                  The Meta Agent orchestrates autonomous SubTurtles to tackle complex tasks across your codebase.
+                <h3 className="text-2xl font-semibold" style={{ color: '#1a1815' }}>Step-by-step coordination</h3>
+                <p className="text-base leading-relaxed" style={{ color: '#6b6460' }}>
+                  The Meta Agent orchestrates autonomous SubTurtles to tackle complex tasks across your codebase. Each step is tracked, auditable, and fully version-controlled.
                 </p>
               </div>
 
-              {/* Step descriptions */}
-              <div className="space-y-4">
-                {/* Step 1 */}
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(90, 114, 71, 0.1)', border: '1px solid rgba(90, 114, 71, 0.2)' }}>
-                    <span className="font-bold text-sm" style={{ color: '#5a7247' }}>1</span>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-1" style={{ color: '#2d2a26' }}>Initiate via CLI or Telegram</h4>
-                    <p className="text-sm" style={{ color: '#6b6460' }}>Send a command to spawn a SubTurtle with a specific task and loop type.</p>
-                  </div>
-                </div>
-
-                {/* Step 2 */}
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(192, 122, 86, 0.1)', border: '1px solid rgba(192, 122, 86, 0.2)' }}>
-                    <span className="font-bold text-sm" style={{ color: '#c07a56' }}>2</span>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-1" style={{ color: '#2d2a26' }}>Meta Agent spawns SubTurtles</h4>
-                    <p className="text-sm" style={{ color: '#6b6460' }}>Each SubTurtle gets its own workspace, CLAUDE.md state file, and execution environment.</p>
-                  </div>
-                </div>
-
-                {/* Step 3 */}
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(143, 168, 126, 0.1)', border: '1px solid rgba(143, 168, 126, 0.2)' }}>
-                    <span className="font-bold text-sm" style={{ color: '#8fa87e' }}>3</span>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-1" style={{ color: '#2d2a26' }}>SubTurtle executes its loop</h4>
-                    <p className="text-sm" style={{ color: '#6b6460' }}>Read state → Plan → Execute → Commit. Runs autonomously based on loop type selection.</p>
-                  </div>
-                </div>
-
-                {/* Step 4 */}
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(192, 122, 86, 0.1)', border: '1px solid rgba(192, 122, 86, 0.2)' }}>
-                    <span className="font-bold text-sm" style={{ color: '#c07a56' }}>4</span>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-1" style={{ color: '#2d2a26' }}>Meta Agent supervises & progresses</h4>
-                    <p className="text-sm" style={{ color: '#6b6460' }}>Monitors progress via cron check-ins, course-corrects if needed, and advances to the next task.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Visual emphasis */}
-              <div className="pt-4" style={{ borderTop: '1px solid rgba(90, 114, 71, 0.2)' }}>
-                <p className="text-sm flex items-center gap-2" style={{ color: '#5a7247' }}>
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              {/* Key benefits cards */}
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" style={{ color: '#5a7247' }}>
                     <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
                   </svg>
-                  Everything is version-controlled and auditable
-                </p>
+                  <p className="text-sm" style={{ color: '#6b6460' }}>
+                    <span className="font-semibold" style={{ color: '#1a1815' }}>Autonomous execution:</span> SubTurtles work independently without human intervention
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" style={{ color: '#c07a56' }}>
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                  </svg>
+                  <p className="text-sm" style={{ color: '#6b6460' }}>
+                    <span className="font-semibold" style={{ color: '#1a1815' }}>Fully auditable:</span> Every change is committed with complete state tracking
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" style={{ color: '#8fa87e' }}>
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                  </svg>
+                  <p className="text-sm" style={{ color: '#6b6460' }}>
+                    <span className="font-semibold" style={{ color: '#1a1815' }}>Flexible strategies:</span> Choose execution speed and cost with loop types
+                  </p>
+                </div>
               </div>
             </div>
           </div>
