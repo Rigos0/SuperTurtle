@@ -2,7 +2,7 @@
 
 ## Current Task
 
-Await next task assignment (maintenance verified on February 25, 2026; tests and typecheck passing).
+Await next task assignment (maintenance verified on February 25, 2026 at 09:24 CET; tests and typecheck passing).
 
 ## End Goal with Specs
 
@@ -47,7 +47,7 @@ Replace the current OpenAI API-based Codex usage endpoint with a local approach:
 - [x] Run `bun test` and `bun run typecheck` — verify all tests pass
 - [x] Update `.env.example` to reflect that only `CODEX_ENABLED=true` is needed
 - [x] Final review and commit
-- [ ] Await next task assignment (validation heartbeat recorded on February 25, 2026) <- current
+- [ ] Await next task assignment (validation heartbeat recorded on February 25, 2026 at 09:24 CET) <- current
 
 ## Notes
 
@@ -60,3 +60,4 @@ Replace the current OpenAI API-based Codex usage endpoint with a local approach:
 - Maintenance note: fixed `src/config.test.ts` to spawn Bun with `--no-env-file` so local `.env` does not leak into the "unset CODEX_ENABLED" case.
 - Validation this pass: `bun test` passed (5/5); `bun run typecheck` passed.
 - Validation heartbeat (February 25, 2026): `bun test` passed (5/5); `bun run typecheck` passed.
+- Validation heartbeat (February 25, 2026 at 09:24 CET): `bun test` passed (5/5); `bun run typecheck` passed.
