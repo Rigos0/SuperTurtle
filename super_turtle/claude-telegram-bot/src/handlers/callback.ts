@@ -71,6 +71,42 @@ export async function handleCallback(ctx: Context): Promise<void> {
     return;
   }
 
+  // 3b. Handle Codex model selection: codex_model:{model_id}
+  if (callbackData.startsWith("codex_model:")) {
+    const { getAvailableCodexModels } = await import("../codex-session");
+    const modelId = callbackData.replace("codex_model:", "");
+    const models = getAvailableCodexModels();
+    const model = models.find((m) => m.value === modelId);
+
+    if (model) {
+      codexSession.model = modelId;
+      await ctx.editMessageText(`<b>Codex Model:</b> ${model.displayName}\n<b>Reasoning Effort:</b> ${codexSession.reasoningEffort}`, { parse_mode: "HTML" });
+      await ctx.answerCallbackQuery({ text: `Codex model set to ${model.displayName}` });
+    } else {
+      await ctx.answerCallbackQuery({ text: "Unknown Codex model" });
+    }
+    return;
+  }
+
+  // 3c. Handle Codex effort selection: codex_effort:{level}
+  if (callbackData.startsWith("codex_effort:")) {
+    const effort = callbackData.replace("codex_effort:", "") as any;
+    const validEfforts = ["minimal", "low", "medium", "high", "xhigh"];
+
+    if (validEfforts.includes(effort)) {
+      codexSession.reasoningEffort = effort;
+      const { getAvailableCodexModels } = await import("../codex-session");
+      const models = getAvailableCodexModels();
+      const model = models.find((m) => m.value === codexSession.model);
+      const modelName = model?.displayName || codexSession.model;
+      await ctx.editMessageText(`<b>Codex Model:</b> ${modelName}\n<b>Reasoning Effort:</b> ${effort}`, { parse_mode: "HTML" });
+      await ctx.answerCallbackQuery({ text: `Codex reasoning effort set to ${effort}` });
+    } else {
+      await ctx.answerCallbackQuery({ text: "Unknown effort level" });
+    }
+    return;
+  }
+
   // 4. Handle driver selection: switch:{driver}
   if (callbackData.startsWith("switch:")) {
     const driver = callbackData.replace("switch:", "") as "claude" | "codex";
@@ -116,6 +152,12 @@ export async function handleCallback(ctx: Context): Promise<void> {
   // 7. Handle resume callbacks: resume:{session_id}
   if (callbackData.startsWith("resume:")) {
     await handleResumeCallback(ctx, callbackData);
+    return;
+  }
+
+  // 7b. Handle Codex resume callbacks: codex_resume:{session_id}
+  if (callbackData.startsWith("codex_resume:")) {
+    await handleCodexResumeCallback(ctx, callbackData);
     return;
   }
 
@@ -390,6 +432,63 @@ async function handleResumeCallback(
     );
   } catch (error) {
     console.error("Error getting recap:", error);
+    // Don't show error to user - session is still resumed, recap just failed
+  } finally {
+    typing.stop();
+  }
+}
+
+/**
+ * Handle Codex resume session callback (codex_resume:{session_id}).
+ */
+async function handleCodexResumeCallback(
+  ctx: Context,
+  callbackData: string
+): Promise<void> {
+  const userId = ctx.from?.id;
+  const username = ctx.from?.username || "unknown";
+  const chatId = ctx.chat?.id;
+  const sessionId = callbackData.replace("codex_resume:", "");
+
+  if (!sessionId || !userId || !chatId) {
+    await ctx.answerCallbackQuery({ text: "Invalid session ID" });
+    return;
+  }
+
+  // Check if Codex session is already active
+  if (codexSession.isActive) {
+    await ctx.answerCallbackQuery({ text: "Codex session already active" });
+    return;
+  }
+
+  // Resume the selected Codex session
+  const [success, message] = await codexSession.resumeSession(sessionId);
+
+  if (!success) {
+    await ctx.answerCallbackQuery({ text: message, show_alert: true });
+    return;
+  }
+
+  // Update the original message to show selection
+  try {
+    await ctx.editMessageText(`✅ ${message}`);
+  } catch (error) {
+    console.debug("Failed to edit Codex resume message:", error);
+  }
+  await ctx.answerCallbackQuery({ text: "Codex session resumed!" });
+
+  // Send a hidden recap prompt to Codex
+  const recapPrompt =
+    "Please write a very concise recap of where we are in this conversation, to refresh my memory. Max 2-3 sentences.";
+
+  const typing = startTypingIndicator(ctx);
+  const state = new StreamingState();
+  const statusCallback = createStatusCallback(ctx, state);
+
+  try {
+    await codexSession.sendMessage(recapPrompt, statusCallback);
+  } catch (error) {
+    console.error("Error getting Codex recap:", error);
     // Don't show error to user - session is still resumed, recap just failed
   } finally {
     typing.stop();

@@ -395,6 +395,7 @@ export async function handleStatus(ctx: Context): Promise<void> {
 
 /**
  * /resume - Show list of sessions to resume with inline keyboard.
+ * Routes to Claude or Codex based on activeDriver.
  */
 export async function handleResume(ctx: Context): Promise<void> {
   const userId = ctx.from?.id;
@@ -404,16 +405,25 @@ export async function handleResume(ctx: Context): Promise<void> {
     return;
   }
 
-  if (session.isActive) {
-    await ctx.reply("Sessione già attiva. Usa /new per iniziare da capo.");
+  // Get sessions based on active driver
+  let sessions;
+  let driverName: string;
+
+  if (session.activeDriver === "codex") {
+    sessions = codexSession.getSessionList();
+    driverName = "Codex";
+  } else {
+    sessions = session.getSessionList();
+    driverName = "Claude";
+  }
+
+  if (session.isActive || (session.activeDriver === "codex" && codexSession.isActive)) {
+    await ctx.reply(`${driverName} session already active. Use /new to start fresh.`);
     return;
   }
 
-  // Get saved sessions
-  const sessions = session.getSessionList();
-
   if (sessions.length === 0) {
-    await ctx.reply("❌ Nessuna sessione salvata.");
+    await ctx.reply(`❌ No saved ${driverName} sessions.`);
     return;
   }
 
@@ -421,11 +431,11 @@ export async function handleResume(ctx: Context): Promise<void> {
   const buttons = sessions.map((s) => {
     // Format date: "18/01 10:30"
     const date = new Date(s.saved_at);
-    const dateStr = date.toLocaleDateString("it-IT", {
+    const dateStr = date.toLocaleDateString("en-US", {
       day: "2-digit",
       month: "2-digit",
     });
-    const timeStr = date.toLocaleTimeString("it-IT", {
+    const timeStr = date.toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
     });
@@ -434,15 +444,16 @@ export async function handleResume(ctx: Context): Promise<void> {
     const titlePreview =
       s.title.length > 35 ? s.title.slice(0, 32) + "..." : s.title;
 
+    const callbackPrefix = session.activeDriver === "codex" ? "codex_resume" : "resume";
     return [
       {
         text: `📅 ${dateStr} ${timeStr} - "${titlePreview}"`,
-        callback_data: `resume:${s.session_id}`,
+        callback_data: `${callbackPrefix}:${s.session_id}`,
       },
     ];
   });
 
-  await ctx.reply("📋 <b>Sessioni salvate</b>\n\nSeleziona una sessione da riprendere:", {
+  await ctx.reply(`📋 <b>${driverName} Sessions</b>\n\nSelect a session to resume:`, {
     parse_mode: "HTML",
     reply_markup: {
       inline_keyboard: buttons,

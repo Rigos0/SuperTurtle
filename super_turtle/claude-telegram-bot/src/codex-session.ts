@@ -7,10 +7,12 @@
 
 import { readFileSync } from "fs";
 import { WORKING_DIR, META_PROMPT, MCP_SERVERS } from "./config";
-import type { StatusCallback, McpServerConfig } from "./types";
+import type { StatusCallback, McpServerConfig, SavedSession, SessionHistory } from "./types";
 
 // Prefs file for Codex (separate from Claude)
 const CODEX_PREFS_FILE = "/tmp/codex-telegram-prefs.json";
+const CODEX_SESSION_FILE = "/tmp/codex-telegram-session.json";
+const MAX_CODEX_SESSIONS = 5;
 
 interface CodexPrefs {
   threadId?: string;
@@ -190,6 +192,7 @@ export class CodexSession {
   lastError: string | null = null;
   lastErrorTime: Date | null = null;
   lastMessage: string | null = null;
+  lastUsage: { input_tokens: number; output_tokens: number } | null = null;
 
   get model(): string { return this._model; }
   set model(value: string) {
@@ -484,8 +487,9 @@ ${userMessage}`;
           }
         }
 
-        // Handle turn completed
+        // Handle turn completed - capture token usage
         if (event.type === "turn_completed" && event.usage) {
+          this.lastUsage = event.usage;
           console.log(
             `Codex usage: in=${event.usage.input_tokens} out=${event.usage.output_tokens}`
           );
@@ -511,6 +515,10 @@ ${userMessage}`;
       this.lastError = null;
       this.lastErrorTime = null;
 
+      // Save session for resumption later
+      const title = userMessage.length > 50 ? userMessage.slice(0, 47) + "..." : userMessage;
+      this.saveSession(title);
+
       return responseParts.join("") || "No response from Codex.";
     } catch (error) {
       console.error("Error sending message to Codex:", error);
@@ -518,6 +526,115 @@ ${userMessage}`;
       this.lastErrorTime = new Date();
       throw error;
     }
+  }
+
+  /**
+   * Save current thread to multi-session history.
+   */
+  saveSession(title?: string): void {
+    if (!this.threadId) return;
+
+    try {
+      // Load existing session history
+      const history = this.loadSessionHistory();
+
+      // Create new session entry
+      const newSession: SavedSession = {
+        session_id: this.threadId,
+        saved_at: new Date().toISOString(),
+        working_dir: WORKING_DIR,
+        title: title || "Codex session",
+      };
+
+      // Remove any existing entry with same session_id (update in place)
+      const existingIndex = history.sessions.findIndex(
+        (s) => s.session_id === this.threadId
+      );
+      if (existingIndex !== -1) {
+        history.sessions[existingIndex] = newSession;
+      } else {
+        // Add new session at the beginning
+        history.sessions.unshift(newSession);
+      }
+
+      // Keep only the last MAX_CODEX_SESSIONS
+      history.sessions = history.sessions.slice(0, MAX_CODEX_SESSIONS);
+
+      // Save
+      Bun.write(CODEX_SESSION_FILE, JSON.stringify(history, null, 2));
+      console.log(`Codex session saved: ${this.threadId!.slice(0, 8)}...`);
+    } catch (error) {
+      console.warn(`Failed to save Codex session: ${error}`);
+    }
+  }
+
+  /**
+   * Load session history from disk.
+   */
+  private loadSessionHistory(): SessionHistory {
+    try {
+      const file = Bun.file(CODEX_SESSION_FILE);
+      if (!file.size) {
+        return { sessions: [] };
+      }
+
+      const text = readFileSync(CODEX_SESSION_FILE, "utf-8");
+      return JSON.parse(text) as SessionHistory;
+    } catch {
+      return { sessions: [] };
+    }
+  }
+
+  /**
+   * Get list of saved Codex sessions for display.
+   */
+  getSessionList(): SavedSession[] {
+    const history = this.loadSessionHistory();
+    // Filter to only sessions for current working directory
+    return history.sessions.filter(
+      (s) => !s.working_dir || s.working_dir === WORKING_DIR
+    );
+  }
+
+  /**
+   * Resume a specific session by ID.
+   */
+  async resumeSession(sessionId: string): Promise<[success: boolean, message: string]> {
+    const history = this.loadSessionHistory();
+    const sessionData = history.sessions.find((s) => s.session_id === sessionId);
+
+    if (!sessionData) {
+      return [false, "Codex session not found"];
+    }
+
+    if (sessionData.working_dir && sessionData.working_dir !== WORKING_DIR) {
+      return [
+        false,
+        `Codex session for different directory: ${sessionData.working_dir}`,
+      ];
+    }
+
+    try {
+      await this.resumeThread(sessionId);
+      console.log(
+        `Resumed Codex session ${sessionData.session_id.slice(0, 8)}... - "${sessionData.title}"`
+      );
+      return [true, `Resumed Codex session: "${sessionData.title}"`];
+    } catch (error) {
+      return [false, `Failed to resume session: ${String(error).slice(0, 100)}`];
+    }
+  }
+
+  /**
+   * Resume the most recent persisted session.
+   */
+  async resumeLast(): Promise<[success: boolean, message: string]> {
+    const sessions = this.getSessionList();
+    if (sessions.length === 0) {
+      return [false, "No saved Codex sessions"];
+    }
+
+    return this.resumeSession(sessions[0]!.session_id);
   }
 
   /**
