@@ -276,6 +276,9 @@ def run_slow_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
         except (subprocess.CalledProcessError, OSError) as e:
             _log_retry(name, e)
 
+        if _should_stop(state_file, name):
+            break
+
 
 def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -> None:
     """Yolo loop: single Claude call per iteration. Ralph loop style."""
@@ -283,7 +286,7 @@ def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
         skills = []
     _require_cli(name, "claude")
 
-    _state_file, state_ref = _resolve_state_ref(state_dir, name)
+    state_file, state_ref = _resolve_state_ref(state_dir, name)
     prompt = YOLO_PROMPT.format(state_file=state_ref)
 
     print(f"[subturtle:{name}] 🐢 spawned (yolo loop: claude)")
@@ -303,6 +306,9 @@ def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
         except (subprocess.CalledProcessError, OSError) as e:
             _log_retry(name, e)
 
+        if _should_stop(state_file, name):
+            break
+
 
 def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = None) -> None:
     """Yolo-codex loop: single Codex call per iteration. Ralph loop style."""
@@ -310,7 +316,7 @@ def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = N
         skills = []
     _require_cli(name, "codex")
 
-    _state_file, state_ref = _resolve_state_ref(state_dir, name)
+    state_file, state_ref = _resolve_state_ref(state_dir, name)
     prompt = YOLO_PROMPT.format(state_file=state_ref)
 
     print(f"[subturtle:{name}] 🐢 spawned (yolo-codex loop: codex)")
@@ -329,6 +335,9 @@ def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = N
             codex.execute(prompt)
         except (subprocess.CalledProcessError, OSError) as e:
             _log_retry(name, e)
+
+        if _should_stop(state_file, name):
+            break
 
 
 # ---------------------------------------------------------------------------
