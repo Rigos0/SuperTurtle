@@ -1,5 +1,5 @@
 ## Current Task
-Check root files and config — package.json, .gitignore, any stale config. Check `.subturtles/` for orphaned workspaces that should be cleaned <- current
+Write final audit summary and complete the code quality report <- current
 
 ## End Goal with Specs
 A thorough code quality report at `docs/code-quality-audit.md` AND fixes for anything that can be safely fixed without changing behavior.
@@ -31,9 +31,9 @@ A thorough code quality report at `docs/code-quality-audit.md` AND fixes for any
 - [x] Scan `super_turtle/claude-telegram-bot/src/` — all TypeScript files. Check for dead code, unused imports, error handling gaps, inconsistencies
 - [x] Scan `super_turtle/subturtle/` — Python loop code, ctl bash script, agents.py. Check for dead code, error handling, stale references
 - [x] Scan `super_turtle/meta/` — META_SHARED.md, claude-meta script. Check for stale instructions, inconsistencies with actual behavior
-- [ ] Check root files and config — package.json, .gitignore, any stale config. Check `.subturtles/` for orphaned workspaces that should be cleaned <- current
-- [ ] Write final audit summary, commit all fixes + the audit report
-- [ ] Commit all changes
+- [x] Check root files and config — package.json, .gitignore, any stale config. Check `.subturtles/` for orphaned workspaces that should be cleaned
+- [ ] Write final audit summary and verify all findings documented <- current
+- [ ] Commit state file updates
 
 ## Notes
 - Be thorough but practical — focus on things that actually matter
