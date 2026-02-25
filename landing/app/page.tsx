@@ -1,4 +1,22 @@
+'use client';
+
+import { TypedTerminal } from '@/components/TypedTerminal';
+
 export default function Home() {
+  const terminalLines = [
+    { text: '$ ./ctl spawn auth-feature --type yolo --timeout 2h', isCommand: true },
+    { text: '', isOutput: true },
+    { text: 'Spawning SubTurtle "auth-feature"...', isOutput: true },
+    { text: 'Writing state to .subturtles/auth-feature/CLAUDE.md', isOutput: true },
+    { text: 'Creating workspace directory...', isOutput: true },
+    { text: '', isOutput: true },
+    { text: 'Started (PID 42891, timeout: 2h)', isOutput: true },
+    { text: 'Registered cron check-in every 5m', isOutput: true },
+    { text: '', isOutput: true },
+    { text: 'SubTurtle is now running autonomously.', isOutput: true },
+    { text: 'View logs: tail -f .subturtles/auth-feature/subturtle.log', isOutput: true },
+  ];
+
   return (
     <div className="w-full bg-black text-white font-sans">
       {/* Hero Section */}
@@ -580,6 +598,120 @@ export default function Home() {
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Terminal Demo Section */}
+      <section id="terminal-demo" className="relative w-full bg-black py-20 px-6">
+        {/* Background grid pattern */}
+        <div
+          className="absolute inset-0 opacity-3"
+          style={{
+            backgroundImage: 'linear-gradient(0deg, transparent 24%, rgba(16, 185, 129, 0.03) 25%, rgba(16, 185, 129, 0.03) 26%, transparent 27%, transparent 74%, rgba(16, 185, 129, 0.03) 75%, rgba(16, 185, 129, 0.03) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(16, 185, 129, 0.03) 25%, rgba(16, 185, 129, 0.03) 26%, transparent 27%, transparent 74%, rgba(16, 185, 129, 0.03) 75%, rgba(16, 185, 129, 0.03) 76%, transparent 77%, transparent)',
+            backgroundSize: '50px 50px',
+          }}
+        />
+
+        {/* Subtle accent blur */}
+        <div className="absolute top-1/4 right-1/3 w-96 h-96 bg-teal-500/5 rounded-full blur-3xl opacity-30" />
+
+        <div className="relative z-10 max-w-6xl mx-auto">
+          {/* Section header */}
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 tracking-tight">
+              See it in action
+            </h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+              Spawning a SubTurtle is as simple as one command. Watch the system initialize and start executing autonomously.
+            </p>
+          </div>
+
+          {/* Terminal demo */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            {/* Left: Terminal */}
+            <div>
+              <TypedTerminal
+                lines={terminalLines}
+                speed={20}
+                startDelay={300}
+              />
+            </div>
+
+            {/* Right: Explanation */}
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <h3 className="text-2xl font-semibold text-white">Instant autonomous execution</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  One command spawns a SubTurtle with a dedicated task. It immediately begins its execution loop, working independently with minimal supervision.
+                </p>
+              </div>
+
+              {/* Key features */}
+              <div className="space-y-4">
+                {/* Feature 1 */}
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white mb-1">State file created</h4>
+                    <p className="text-sm text-gray-400">Isolated CLAUDE.md holds task requirements and execution state.</p>
+                  </div>
+                </div>
+
+                {/* Feature 2 */}
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white mb-1">Process spawned</h4>
+                    <p className="text-sm text-gray-400">SubTurtle process starts immediately with its own workspace and PID.</p>
+                  </div>
+                </div>
+
+                {/* Feature 3 */}
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white mb-1">Cron supervision registered</h4>
+                    <p className="text-sm text-gray-400">Periodic check-ins ensure the task stays on track and respects timeout.</p>
+                  </div>
+                </div>
+
+                {/* Feature 4 */}
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white mb-1">Running autonomously</h4>
+                    <p className="text-sm text-gray-400">Monitor progress via logs. No further input needed—SubTurtle handles the rest.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Live log hint */}
+              <div className="pt-4 border-t border-emerald-500/20">
+                <p className="text-sm text-emerald-300 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Check .subturtles/[name]/subturtle.log for full execution details
+                </p>
+              </div>
             </div>
           </div>
         </div>
