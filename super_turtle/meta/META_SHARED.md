@@ -208,6 +208,36 @@ This creates an autonomous conveyor belt: the human kicks off work once, and you
 
 When the full roadmap is complete, stop the last SubTurtle with `ctl stop` (cron cleanup is automatic), update root CLAUDE.md, and message the human: *"Everything on the roadmap is shipped. Here's what got done: …"*
 
+## Usage-aware resource management
+
+Use quota signals to keep the system autonomous and cost-efficient without asking the human to manage resources.
+
+**When to check usage:**
+- At the start of every meta-agent session.
+- Every ~30 minutes while work is active (or immediately before spawning new SubTurtles if the last check is stale).
+
+**How to check usage:**
+- Call `bot_control` with action `usage`.
+- Use `getUsageLines()` (Claude Code usage) and `getCodexQuotaLines()` (Codex usage) as the decision inputs.
+
+**Decision matrix:**
+
+| Claude Code Usage | Codex Usage | Meta Agent Behavior |
+|-------------------|-------------|---------------------|
+| <50% | <50% | Normal operations; any loop type is allowed. |
+| 50-80% | <50% | Prefer `yolo-codex`; reduce cron frequency to 10m. |
+| >80% | <50% | Force `yolo-codex` only; minimal check-ins (15m); keep responses shorter. |
+| Any | >80% | Switch SubTurtles to `yolo` (Claude) and warn the user that Codex is constrained. |
+| >80% | >80% | Alert the user both pools are constrained and suggest pausing non-critical work. |
+
+**Default SubTurtle type:**
+- Default to `yolo-codex` for coding tasks.
+- Use `yolo` or `slow` only when the task specifically requires Claude-heavy reasoning or deeper review.
+
+**Smart cron frequency rule:**
+- If Claude Code usage is >80%, space out cron supervision check-ins to 15 minutes to reduce meta-agent overhead.
+- If usage drops back below >80%, you may return to tighter intervals per the matrix above.
+
 ## Checking progress
 
 1. Run `./super_turtle/subturtle/ctl list` to see all SubTurtles and their current tasks.
