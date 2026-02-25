@@ -88,6 +88,7 @@ const PREFS_FILE = "/tmp/claude-telegram-prefs.json";
 interface UserPrefs {
   model: string;
   effort: EffortLevel;
+  activeDriver?: "claude" | "codex";
 }
 
 function loadPrefs(): Partial<UserPrefs> {
@@ -136,6 +137,9 @@ export class ClaudeSession {
   lastMessage: string | null = null;
   conversationTitle: string | null = null;
 
+  // Driver selection
+  private _activeDriver: "claude" | "codex" = "claude";
+
   // Model settings (loaded from disk)
   private _model: string;
   private _effort: EffortLevel;
@@ -149,15 +153,23 @@ export class ClaudeSession {
   get effort(): EffortLevel { return this._effort; }
   set effort(value: EffortLevel) {
     this._effort = value;
-    savePrefs({ model: this._model, effort: this._effort });
+    savePrefs({ model: this._model, effort: this._effort, activeDriver: this._activeDriver });
+  }
+
+  get activeDriver(): "claude" | "codex" { return this._activeDriver; }
+  set activeDriver(value: "claude" | "codex") {
+    this._activeDriver = value;
+    savePrefs({ model: this._model, effort: this._effort, activeDriver: this._activeDriver });
+    console.log(`Switched to ${value} driver`);
   }
 
   constructor() {
     const prefs = loadPrefs();
     this._model = prefs.model || "claude-sonnet-4-6";
     this._effort = prefs.effort || "high";
-    if (prefs.model || prefs.effort) {
-      console.log(`Loaded preferences: model=${this._model}, effort=${this._effort}`);
+    this._activeDriver = prefs.activeDriver || "claude";
+    if (prefs.model || prefs.effort || prefs.activeDriver) {
+      console.log(`Loaded preferences: model=${this._model}, effort=${this._effort}, driver=${this._activeDriver}`);
     }
   }
 

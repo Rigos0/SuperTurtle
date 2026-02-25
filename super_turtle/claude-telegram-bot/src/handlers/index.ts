@@ -11,6 +11,7 @@ export {
   handleCodexQuota,
   handleContext,
   handleModel,
+  handleSwitch,
   handleResume,
   handleRestart,
   handleRetry,

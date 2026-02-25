@@ -16,6 +16,7 @@ import {
   handleCodexQuota,
   handleContext,
   handleModel,
+  handleSwitch,
   handleResume,
   handleRestart,
   handleRetry,
@@ -74,6 +75,7 @@ bot.command("usage", handleUsage);
 bot.command("codex-quota", handleCodexQuota);
 bot.command("context", handleContext);
 bot.command("model", handleModel);
+bot.command("switch", handleSwitch);
 bot.command("resume", handleResume);
 bot.command("subturtle", handleSubturtle);
 bot.command("restart", handleRestart);

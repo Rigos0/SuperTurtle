@@ -7,6 +7,7 @@
 import type { Context } from "grammy";
 import { unlinkSync, readFileSync, existsSync } from "fs";
 import { session, getAvailableModels, EFFORT_DISPLAY, type EffortLevel } from "../session";
+import { codexSession } from "../codex-session";
 import { ALLOWED_USERS, WORKING_DIR, TELEGRAM_SAFE_LIMIT } from "../config";
 import { isAuthorized } from "../security";
 import { auditLog, startTypingIndicator } from "../utils";
@@ -70,7 +71,31 @@ export async function handleCallback(ctx: Context): Promise<void> {
     return;
   }
 
-  // 4. Handle subturtle logs callbacks: subturtle_logs:{name}
+  // 4. Handle driver selection: switch:{driver}
+  if (callbackData.startsWith("switch:")) {
+    const driver = callbackData.replace("switch:", "") as "claude" | "codex";
+    if (driver === "claude") {
+      session.activeDriver = "claude";
+      await ctx.editMessageText(`<b>Current driver:</b> claude 🔵`, { parse_mode: "HTML" });
+      await ctx.answerCallbackQuery({ text: "Switched to Claude Code" });
+    } else if (driver === "codex") {
+      try {
+        if (!codexSession.isActive) {
+          await codexSession.startNewThread();
+        }
+        session.activeDriver = "codex";
+        await ctx.editMessageText(`<b>Current driver:</b> codex 🟢`, { parse_mode: "HTML" });
+        await ctx.answerCallbackQuery({ text: "Switched to Codex" });
+      } catch (error) {
+        await ctx.answerCallbackQuery({ text: `Codex error: ${String(error).slice(0, 50)}` });
+      }
+    } else {
+      await ctx.answerCallbackQuery({ text: "Unknown driver" });
+    }
+    return;
+  }
+
+  // 5. Handle subturtle logs callbacks: subturtle_logs:{name}
   if (callbackData.startsWith("subturtle_logs:")) {
     await handleSubturtleLogsCallback(ctx, callbackData);
     return;

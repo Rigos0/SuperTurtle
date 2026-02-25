@@ -6,6 +6,7 @@
 
 import type { Context } from "grammy";
 import { session, getAvailableModels, EFFORT_DISPLAY, type EffortLevel } from "../session";
+import { codexSession } from "../codex-session";
 import {
   WORKING_DIR,
   ALLOWED_USERS,
@@ -25,6 +26,7 @@ export function getCommandLines(): string[] {
   return [
     `/new - Start fresh session`,
     `/model - Switch model/effort`,
+    `/switch - Switch between Claude & Codex`,
     `/usage - Subscription usage`,
     `/codex-quota - Codex quota status`,
     `/context - Show Claude context usage`,
@@ -494,6 +496,78 @@ export async function handleModel(ctx: Context): Promise<void> {
       },
     }
   );
+}
+
+/**
+ * /switch - Switch between Claude Code and Codex drivers.
+ */
+export async function handleSwitch(ctx: Context): Promise<void> {
+  const userId = ctx.from?.id;
+
+  if (!isAuthorized(userId, ALLOWED_USERS)) {
+    await ctx.reply("Unauthorized.");
+    return;
+  }
+
+  if (!CODEX_ENABLED) {
+    await ctx.reply("❌ Codex is not enabled. Set CODEX_ENABLED=true in environment.");
+    return;
+  }
+
+  // Parse command: /switch codex or /switch claude
+  const args = ctx.message?.text?.split(/\s+/).slice(1) || [];
+  const target = args[0]?.toLowerCase();
+
+  if (!target) {
+    // No argument — show options
+    const currentDriver = session.activeDriver;
+    const driverEmoji = currentDriver === "codex" ? "🟢" : "🔵";
+    await ctx.reply(
+      `<b>Current driver:</b> ${currentDriver} ${driverEmoji}\n\n` +
+        `Switch to:`,
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: `${currentDriver === "claude" ? "✔ " : ""}Claude Code 🔵`,
+                callback_data: "switch:claude",
+              },
+            ],
+            [
+              {
+                text: `${currentDriver === "codex" ? "✔ " : ""}Codex 🟢`,
+                callback_data: "switch:codex",
+              },
+            ],
+          ],
+        },
+      }
+    );
+    return;
+  }
+
+  // Direct switch via argument
+  if (target === "claude") {
+    session.activeDriver = "claude";
+    await ctx.reply("✅ Switched to Claude Code 🔵");
+  } else if (target === "codex") {
+    session.activeDriver = "codex";
+    try {
+      // Initialize Codex session if needed
+      if (!codexSession.isActive) {
+        await codexSession.startNewThread();
+      }
+    } catch (error) {
+      session.activeDriver = "claude"; // Fallback on error
+      await ctx.reply(`❌ Failed to switch to Codex: ${String(error).slice(0, 100)}`);
+      return;
+    }
+    await ctx.reply("✅ Switched to Codex 🟢");
+  } else {
+    await ctx.reply(`❌ Unknown driver: ${target}. Use /switch claude or /switch codex`);
+  }
 }
 
 /**

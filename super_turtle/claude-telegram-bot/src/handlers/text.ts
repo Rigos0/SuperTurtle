@@ -4,6 +4,7 @@
 
 import type { Context, NextFunction } from "grammy";
 import { session } from "../session";
+import { codexSession } from "../codex-session";
 import { ALLOWED_USERS } from "../config";
 import { isAuthorized, rateLimiter } from "../security";
 import {
@@ -109,69 +110,110 @@ export async function handleText(
     ? createSilentStatusCallback(ctx, state)
     : createStatusCallback(ctx, state);
 
-  // 9. Send to Claude with retry logic for crashes
-  const MAX_RETRIES = 1;
+  // 9. Route to active driver (Claude or Codex)
+  let response: string;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  if (session.activeDriver === "codex") {
+    // Codex path
     try {
-      const response = await session.sendMessageStreaming(
-        message,
-        username,
-        userId,
-        statusCallback,
-        chatId,
-        ctx
-      );
+      typing.stop();
+
+      if (!statusCallback || typeof statusCallback !== "function") {
+        throw new Error("Status callback not available");
+      }
+
+      await statusCallback("tool", "🟢 Sending to Codex...");
+
+      response = await codexSession.sendMessage(message);
 
       // 10. Audit log
-      await auditLog(userId, username, "TEXT", message, response);
-      break; // Success - exit retry loop
+      await auditLog(userId, username, "TEXT_CODEX", message, response);
+
+      // Send response
+      if (!silent) {
+        // Split long responses
+        const TELEGRAM_MESSAGE_LIMIT = 4096;
+        if (response.length > TELEGRAM_MESSAGE_LIMIT) {
+          const chunks = response.match(new RegExp(`.{1,${TELEGRAM_MESSAGE_LIMIT}}`, "g")) || [];
+          for (const chunk of chunks) {
+            await ctx.reply(chunk);
+          }
+        } else {
+          await ctx.reply(response);
+        }
+      }
     } catch (error) {
+      console.error("Codex error:", error);
       const errorStr = String(error);
-      const isClaudeCodeCrash = errorStr.includes("exited with code");
-
-      // Clean up any partial messages from this attempt
-      for (const toolMsg of state.toolMessages) {
-        try {
-          await ctx.api.deleteMessage(toolMsg.chat.id, toolMsg.message_id);
-        } catch {
-          // Ignore cleanup errors
-        }
+      if (!silent) {
+        await ctx.reply(`❌ Codex error: ${errorStr.slice(0, 100)}`);
       }
+    }
+  } else {
+    // Claude path (original)
+    const MAX_RETRIES = 1;
 
-      // Retry on Claude Code crash (not user cancellation)
-      if (isClaudeCodeCrash && attempt < MAX_RETRIES) {
-        console.log(
-          `Claude Code crashed, retrying (attempt ${attempt + 2}/${MAX_RETRIES + 1})...`
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        response = await session.sendMessageStreaming(
+          message,
+          username,
+          userId,
+          statusCallback,
+          chatId,
+          ctx
         );
-        await session.kill(); // Clear corrupted session
-        if (!silent) {
-          await ctx.reply(`⚠️ Claude crashed, retrying...`);
-        }
-        // Reset state for retry
-        state = new StreamingState();
-        statusCallback = silent
-          ? createSilentStatusCallback(ctx, state)
-          : createStatusCallback(ctx, state);
-        continue;
-      }
 
-      // Final attempt failed or non-retryable error
-      console.error("Error processing message:", error);
+        // 10. Audit log
+        await auditLog(userId, username, "TEXT", message, response);
+        break; // Success - exit retry loop
+      } catch (error) {
+        const errorStr = String(error);
+        const isClaudeCodeCrash = errorStr.includes("exited with code");
 
-      // Check if it was a cancellation
-      if (errorStr.includes("abort") || errorStr.includes("cancel")) {
-        // Only show "Query stopped" if it was an explicit stop, not an interrupt from a new message
-        const wasInterrupt = session.consumeInterruptFlag();
-        if (!silent && !wasInterrupt) {
-          await ctx.reply("🛑 Query stopped.");
+        // Clean up any partial messages from this attempt
+        for (const toolMsg of state.toolMessages) {
+          try {
+            await ctx.api.deleteMessage(toolMsg.chat.id, toolMsg.message_id);
+          } catch {
+            // Ignore cleanup errors
+          }
         }
-      } else {
-        if (!silent) {
-          await ctx.reply(`❌ Error: ${errorStr.slice(0, 200)}`);
+
+        // Retry on Claude Code crash (not user cancellation)
+        if (isClaudeCodeCrash && attempt < MAX_RETRIES) {
+          console.log(
+            `Claude Code crashed, retrying (attempt ${attempt + 2}/${MAX_RETRIES + 1})...`
+          );
+          await session.kill(); // Clear corrupted session
+          if (!silent) {
+            await ctx.reply(`⚠️ Claude crashed, retrying...`);
+          }
+          // Reset state for retry
+          state = new StreamingState();
+          statusCallback = silent
+            ? createSilentStatusCallback(ctx, state)
+            : createStatusCallback(ctx, state);
+          continue;
         }
+
+        // Final attempt failed or non-retryable error
+        console.error("Error processing message:", error);
+
+        // Check if it was a cancellation
+        if (errorStr.includes("abort") || errorStr.includes("cancel")) {
+          // Only show "Query stopped" if it was an explicit stop, not an interrupt from a new message
+          const wasInterrupt = session.consumeInterruptFlag();
+          if (!silent && !wasInterrupt) {
+            await ctx.reply("🛑 Query stopped.");
+          }
+        } else {
+          if (!silent) {
+            await ctx.reply(`❌ Error: ${errorStr.slice(0, 200)}`);
+          }
+        }
+        break; // Exit loop after handling error
       }
-      break; // Exit loop after handling error
     }
   }
 
