@@ -275,3 +275,135 @@ All fixes have been:
 
 Critical issues eliminated; medium/low issues documented for future consideration.
 
+---
+
+## Meta Agent Documentation Scan (2026-02-25)
+
+**Files Scanned:** `super_turtle/meta/META_SHARED.md`, `super_turtle/meta/claude-meta`
+
+**Summary:** Comprehensive meta agent documentation is well-structured and generally accurate. No critical issues found. Some inconsistencies between documented capabilities and actual deployment context.
+
+---
+
+### 🔴 Critical Issues
+None found.
+
+---
+
+### 🟡 Medium Issues
+
+#### 1. Inconsistent Meta Agent Context Documentation
+**File:** `super_turtle/meta/META_SHARED.md:62-65, 250-268`
+**Severity:** Medium
+**Status:** Documented (not fixed — documentation clarification needed)
+
+**Issue:**
+META_SHARED.md is written as if the meta agent is a standalone system that can use Claude Code's `ask_user` tool (line 62) and access MCP tools for bot control (line 250). However, META_SHARED.md is actually injected as system instructions into a Telegram bot context via the `claude-meta` wrapper script, not into a Claude Code session.
+
+Lines 62-65 reference:
+```markdown
+**Show type-selection buttons** via `ask_user`:
+```
+
+This suggests Claude Code's AskUserQuestion tool, which won't be available in a Telegram bot context. The actual mechanism for user prompts in Telegram would be different (inline buttons, message prompts).
+
+Similarly, the `bot_control` MCP tool (lines 250-268) is documented as available to the meta agent, but it only exists when the Telegram bot's MCP server is running.
+
+**Recommendation:**
+Add a note at the top of META_SHARED.md clarifying:
+- This document defines instructions for the meta agent running inside the Telegram bot
+- The `ask_user` references are pseudo-code; actual implementation uses Telegram buttons
+- The `bot_control` MCP tool is conditional on the bot's MCP server being active
+
+**Impact:** Confusion for future maintainers who read this document outside the bot context.
+
+---
+
+#### 2. Unverified Model Names in bot_control Documentation
+**File:** `super_turtle/meta/META_SHARED.md:257`
+**Severity:** Medium (if models change)
+**Status:** Documented
+
+**Issue:**
+Lines 257-258 list specific Claude model IDs:
+```
+models: `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`
+```
+
+These should be verified against the actual bot_control MCP server implementation and kept in sync if new Claude models are released.
+
+**Current State:**
+The bot_control MCP server (bot_control_mcp/server.ts:50-51) also hardcodes these same model names. If Claude releases new models, both files must be updated in sync.
+
+**Recommendation:**
+Consider extracting model list to a shared configuration file (e.g., `super_turtle/config/models.json`) and importing it into both META_SHARED.md and bot_control_mcp/server.ts to prevent drift.
+
+**Impact:** If models become stale, the meta agent's instructions will be incorrect, confusing users.
+
+---
+
+### 🟢 Low Issues
+
+#### 1. `claude-meta` Script Uses `--dangerously-skip-permissions` Flag
+**File:** `super_turtle/meta/claude-meta:27`
+**Severity:** Low
+**Status:** Documented (no action needed)
+
+**Issue:**
+The script uses `--dangerously-skip-permissions`, which bypasses permission checks. This is appropriate for a local meta agent that needs to manage the full codebase, but it should be used carefully.
+
+```bash
+exec claude --dangerously-skip-permissions --append-system-prompt "$meta_text" "$@"
+```
+
+**Current State:** ✅ Appropriate use — the meta agent needs full access to coordinate SubTurtles.
+
+**Impact:** None; this is intentional and documented.
+
+---
+
+#### 2. Missing Validation of `.tunnel-url` Tracking in Cron Prompts
+**File:** `super_turtle/meta/META_SHARED.md:156-161, 173`
+**Severity:** Low
+**Status:** Documented
+
+**Issue:**
+META_SHARED.md documents that the meta agent's cron check-ins should detect and send `.tunnel-url` files to the user (line 173). However, there's no mention of:
+- How to avoid sending duplicate URLs across multiple check-ins
+- How to validate that the URL is still alive before sending it
+
+The comment at line 173 mentions "Track sent URLs to avoid duplicates," but this tracking mechanism is not described elsewhere in the document.
+
+**Recommendation:**
+Add a brief note in the "Autonomous supervision" section documenting:
+- Store sent tunnel URLs in `.subturtles/<name>/.sent-tunnel-urls` (or similar)
+- Check before sending; skip if already sent
+- Validate URL is still alive by making a HEAD request (optional, but safer)
+
+**Impact:** Low — without tracking, users might receive multiple identical tunnel URLs in their Telegram chat, which is annoying but not critical.
+
+---
+
+## Other Findings
+
+### Meta Agent Script Quality
+- ✅ Proper shell error handling (`set -euo pipefail`)
+- ✅ Clear error messages with helpful hints
+- ✅ Validates preconditions (AGENTS.md existence, prompt file readability)
+- ✅ Logs metadata (cwd, prompt size) for debugging
+
+### Documentation Completeness
+- ✅ SubTurtle command syntax is comprehensive and accurate
+- ✅ Loop type descriptions (slow/yolo/yolo-codex) are correct
+- ✅ State file structure documentation matches actual implementation
+- ✅ Cron supervision workflow is detailed and practical
+- ⚠️ bot_control tool availability is context-dependent but not clarified
+
+### Consistency Checks
+- ✅ All `ctl` commands documented in META_SHARED.md match actual ctl script
+- ✅ Timeout handling matches implementation
+- ✅ STOP directive for self-completion is accurate
+- ✅ `.subturtles/<name>/` workspace structure matches actual layout
+
+---
+
