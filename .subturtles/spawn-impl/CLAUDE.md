@@ -1,6 +1,6 @@
 # Current Task
 
-Store CRON_JOB_ID in subturtle.meta after successful cron write.
+Extend `do_stop()` with cron cleanup (read CRON_JOB_ID from meta, remove from cron-jobs.json).
 
 # End Goal with Specs
 
@@ -88,8 +88,8 @@ Update the "Starting new work" section to use the new `ctl spawn` flow:
 
 - [x] Add `do_spawn()` function to `ctl` with state input (stdin/file), workspace setup, and start delegation
 - [x] Add cron auto-registration in `do_spawn()` using Python JSON manipulation
-- [ ] Store CRON_JOB_ID in subturtle.meta after successful cron write <- current
-- [ ] Extend `do_stop()` with cron cleanup (read CRON_JOB_ID from meta, remove from cron-jobs.json)
+- [x] Store CRON_JOB_ID in subturtle.meta after successful cron write
+- [ ] Extend `do_stop()` with cron cleanup (read CRON_JOB_ID from meta, remove from cron-jobs.json) <- current
 - [ ] Update usage() help text with spawn subcommand
 - [ ] Wire `spawn` into the case statement at bottom of ctl
 - [ ] Update META_SHARED.md with new spawn flow and auto-cron docs

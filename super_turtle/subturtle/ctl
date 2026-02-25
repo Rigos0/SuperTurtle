@@ -469,6 +469,8 @@ do_spawn() {
     exit 1
   fi
 
+  echo "CRON_JOB_ID=${cron_job_id}" >> "$(meta_file "$name")"
+
   echo "[subturtle:${name}] cron registered (${cron_job_id}, every ${cron_interval})"
 }
 
