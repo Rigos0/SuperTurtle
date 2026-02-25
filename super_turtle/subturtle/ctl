@@ -21,14 +21,14 @@ usage() {
   echo "Commands:"
   echo "  start  [name] [--type TYPE] [--timeout DURATION] [--skill NAME ...]"
   echo "         Spawn a SubTurtle (default timeout: ${DEFAULT_TIMEOUT})"
-  echo "         Types: slow (default), yolo, yolo-codex"
+  echo "         Types: slow, yolo, yolo-codex (default)"
   echo "           slow       — Plan -> Groom -> Execute -> Review (4 calls/iter)"
   echo "           yolo       — Single Claude call per iteration (Ralph loop)"
   echo "           yolo-codex — Single Codex call per iteration (Ralph loop)"
   echo "         Skills: repeatable --skill flags load Claude Code skills (e.g. --skill frontend --skill testing)"
   echo "  spawn [name] [--type TYPE] [--timeout DURATION] [--state-file PATH|-] [--cron-interval DURATION] [--skill NAME ...]"
   echo "         Create workspace, seed CLAUDE.md from --state-file/stdin, start SubTurtle, and auto-register cron"
-  echo "         Defaults: --type slow, --timeout ${DEFAULT_TIMEOUT}, --cron-interval 10m"
+  echo "         Defaults: --type yolo-codex, --timeout ${DEFAULT_TIMEOUT}, --cron-interval 10m"
   echo "  stop   [name]                        Stop a SubTurtle gracefully"
   echo "  status [name]                        Check if running + time remaining"
   echo "  logs   [name]                        Tail a SubTurtle's log"
@@ -194,7 +194,7 @@ read_pid() {
 do_start() {
   local name="${1:-default}"
   local timeout_str="${DEFAULT_TIMEOUT}"
-  local loop_type="slow"
+  local loop_type="yolo-codex"
   local -a skills=()
 
   # Parse --timeout, --type, and --skill flags from remaining args
@@ -531,7 +531,7 @@ PY
 do_spawn() {
   local name="${1:-default}"
   local timeout_str="${DEFAULT_TIMEOUT}"
-  local loop_type="slow"
+  local loop_type="yolo-codex"
   local cron_interval="10m"
   local state_file=""
   local -a skills=()
@@ -669,7 +669,7 @@ do_status() {
     LOOP_TYPE=""
     SKILLS=""
     read_meta "$name" || true
-    local type_info="${LOOP_TYPE:-slow}"
+    local type_info="${LOOP_TYPE:-yolo-codex}"
 
     # Build the status line
     local time_info=""
@@ -749,7 +749,7 @@ do_list() {
         LOOP_TYPE=""
         SKILLS=""
         read_meta "$name" || true
-        type_str="${LOOP_TYPE:-slow}"
+        type_str="${LOOP_TYPE:-yolo-codex}"
         if [[ -n "$SKILLS" && "$SKILLS" != "[]" ]]; then
           skills_str=" [skills: ${SKILLS}]"
         fi

@@ -183,9 +183,33 @@ Every SubTurtle you spawn gets a recurring cron job that wakes you up to supervi
 - `❌ Error` — crash, hard failure, or broken environment preventing autonomous progress.
 
 **Notification format (keep brief and structured):**
-- Start with one marker line: `🎉 Finished: <subturtle-name>`, `🚀 Milestone: <subturtle-name>`, `⚠️ Stuck: <subturtle-name>`, or `❌ Error: <subturtle-name>`.
-- Then 2-4 short lines: current state, evidence (commit/backlog/log signal), and next action.
-- For `⚠️` and `❌`, include whether you already stopped/restarted the SubTurtle and exactly what decision/input is needed from the human (if any).
+```text
+🚀 Started: <name>
+Working on: <task description>
+Mode: <yolo-codex|yolo|slow> | Timeout: <duration>
+
+🎉 Finished: <name>
+✓ <item 1>
+✓ <item 2>
+✓ <item 3>
+Next: <what happens next, or "Roadmap complete">
+
+⚠️ Stuck: <name>
+No progress for <N> check-ins.
+Last activity: <description>
+Action: <what meta agent did — stopped, restarted, needs human input>
+
+❌ Error: <name>
+<error description>
+Action: <what meta agent did>
+
+📍 Milestone: <name>
+<N>/<total> backlog items complete.
+Latest: <what just shipped>
+
+🔗 Preview: <name>
+<url>
+```
 
 **Escalate to the human when:**
 - Product direction is ambiguous and a choice changes implementation significantly.
