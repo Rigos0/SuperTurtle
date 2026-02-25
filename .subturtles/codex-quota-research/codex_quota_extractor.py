@@ -14,6 +14,33 @@ from datetime import datetime
 from pathlib import Path
 
 
+def _strip_ansi(text):
+    """
+    Remove ANSI escape sequences from terminal output.
+
+    Handles:
+    - CSI sequences: ESC[...letter or ESC]...BEL/ST
+    - SGR (Select Graphic Rendition): ESC[...m
+    - Cursor positioning and movement
+    - Other control codes
+    """
+    if not text:
+        return text
+
+    # Remove all ANSI escape sequences
+    # This pattern handles:
+    # - \x1b[?...h\x1b[?...l (mode sequences)
+    # - \x1b[...m (colors/formatting)
+    # - \x1b[...H (cursor positioning)
+    # - \x1b[...A-Z (other cursor/navigation)
+    # - \x1b]...(\x07|\x1b\\) (OSC sequences)
+    text = re.sub(r'\x1b\[[^a-zA-Z]*[a-zA-Z]', '', text)  # CSI sequences
+    text = re.sub(r'\x1b\].*?(?:\x07|\x1b\\)', '', text)  # OSC sequences
+    text = re.sub(r'\x1b[()][0-9A-B]', '', text)  # Character set selection
+    text = re.sub(r'\x07', '', text)  # BEL character
+    return text
+
+
 def extract_codex_quota(timeout=15, verbose=False, codex_path=None):
     """
     Extract quota from Codex /status command output.
@@ -49,12 +76,14 @@ def extract_codex_quota(timeout=15, verbose=False, codex_path=None):
         if verbose:
             print(f"[*] Spawning Codex process ({codex_path})...", file=sys.stderr)
 
-        # Spawn Codex with minimal options
+        # Spawn Codex with --no-alt-screen to disable TUI alternate screen
+        # This simplifies output parsing by avoiding complex terminal control sequences
         codex_process = pexpect.spawn(codex_path,
+                                       args=['--no-alt-screen'],
                                        timeout=timeout,
                                        encoding='utf-8',
                                        echo=False,
-                                       maxread=4096)
+                                       maxread=8192)
 
         # Set terminal size to avoid wrapping issues
         codex_process.setwinsize(40, 100)
@@ -95,18 +124,39 @@ def extract_codex_quota(timeout=15, verbose=False, codex_path=None):
         # Send status command
         codex_process.sendline('/status')
 
-        # Capture output until next prompt
+        # Capture output - wait for rendering to complete
+        # The TUI renders in stages, so we need to wait and collect all output
+        status_output = ''
         try:
+            # Read initial response
             codex_process.expect(r'>', timeout=timeout)
+            status_output = codex_process.before
+
+            # Try to read any additional output that may still be coming
+            import time
+            time.sleep(0.5)  # Brief pause for TUI rendering
+            try:
+                additional = codex_process.read_nonblocking(timeout=0.5)
+                if additional:
+                    status_output += additional
+            except pexpect.TIMEOUT:
+                pass
+            except pexpect.EOF:
+                pass
+
         except pexpect.TIMEOUT:
             if verbose:
                 print("[!] Timeout waiting for status output (may still have data)", file=sys.stderr)
+            # Still capture whatever we got
+            try:
+                status_output = codex_process.before + codex_process.read_nonblocking()
+            except Exception:
+                status_output = codex_process.before
         except pexpect.EOF:
             if verbose:
                 print("[*] Codex process ended", file=sys.stderr)
 
         # Get captured output
-        status_output = codex_process.before
         quota_data['status_output'] = status_output
 
         if verbose:
@@ -156,6 +206,9 @@ def _parse_status_output(output, quota_data):
 
     if not output:
         return
+
+    # Strip ANSI escape sequences from TUI output
+    output = _strip_ansi(output)
 
     # Pattern 1: Messages remaining (before "window" context)
     # Looks for: "X messages remaining" in any context
