@@ -353,11 +353,14 @@ name = sys.argv[2]
 interval_ms = int(sys.argv[3])
 
 prompt = (
-    f"Check SubTurtle {name}: run `./super_turtle/subturtle/ctl status {name}`, "
-    f"inspect `.subturtles/{name}/CLAUDE.md`, and review `git log --oneline -10`. "
-    f"If backlog is complete, stop SubTurtle {name} and report shipped work. "
-    f"If stuck/off-track, stop it, diagnose, and restart with corrected state. "
-    f"If progressing, let it run."
+    f"[SILENT CHECK-IN] Check SubTurtle {name}: run `./super_turtle/subturtle/ctl status {name}`, "
+    f"inspect `.subturtles/{name}/CLAUDE.md`, and review `git log --oneline -10`.\n"
+    "Rules: Do NOT message the user unless one of these conditions is met:\n"
+    f"- 🎉 SubTurtle completed all backlog items -> stop SubTurtle {name} and report what shipped\n"
+    f"- ⚠️ SubTurtle appears stuck (no meaningful progress across 2+ checks) -> stop it, diagnose, and report\n"
+    "- ❌ SubTurtle errored, crashed, or is otherwise broken -> report the error clearly\n"
+    "- 🚀 New milestone reached (significant backlog progress) -> send one brief update\n"
+    "If SubTurtle is progressing normally without notable events, respond with only: [SILENT]"
 )
 
 jobs = []
@@ -388,6 +391,7 @@ now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
 job = {
     "id": job_id,
     "prompt": prompt,
+    "silent": True,
     "type": "recurring",
     "fire_at": now_ms + interval_ms,
     "interval_ms": interval_ms,
