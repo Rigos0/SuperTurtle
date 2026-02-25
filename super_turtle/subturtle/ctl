@@ -715,6 +715,30 @@ do_logs() {
   tail -n "${LINES:-50}" -f "$lf"
 }
 
+do_archive() {
+  local name="${1:-default}"
+  local ws archive_root archive_ws
+  ws="$(workspace_dir "$name")"
+  archive_root="${SUBTURTLES_DIR}/.archive"
+  archive_ws="${archive_root}/${name}"
+
+  if is_running "$name"; then
+    echo "[subturtle:${name}] ERROR: cannot archive while running (PID $(read_pid "$name"))" >&2
+    exit 1
+  fi
+
+  if [[ ! -d "$ws" ]]; then
+    echo "[subturtle:${name}] ERROR: workspace not found at ${ws}" >&2
+    exit 1
+  fi
+
+  mkdir -p "$archive_root"
+  rm -rf "$archive_ws"
+  mv "$ws" "$archive_ws"
+
+  echo "[subturtle:${name}] archived to ${archive_ws}"
+}
+
 do_list() {
   if [[ ! -d "$SUBTURTLES_DIR" ]]; then
     echo "No SubTurtles found."
