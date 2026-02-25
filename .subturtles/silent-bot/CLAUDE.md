@@ -1,5 +1,5 @@
 ## Current Task
-Add the silent flag detection: modify `handleText` in `src/handlers/text.ts` to accept an optional `silent` parameter, or create a parallel `handleSilentText` function. The key change: use `createSilentStatusCallback` instead of `createStatusCallback` when silent=true.
+Test: verify non-silent messages still work (no regression). Verify a silent cron job with "still progressing" response produces no Telegram output. Verify a silent cron job with "🎉 SubTurtle finished" produces a Telegram message.
 
 ## End Goal with Specs
 The bot can process cron-triggered Claude sessions silently — no output to Telegram unless Claude's response contains a notification marker. This enables background supervision without chat spam.
@@ -23,8 +23,8 @@ The bot can process cron-triggered Claude sessions silently — no output to Tel
 - [x] Add `silent?: boolean` field support to cron job schema — update `getDueJobs()` and related functions in `src/handlers/commands.ts` or wherever cron utils live
 - [x] Create `createSilentStatusCallback()` in `src/handlers/streaming.ts` — same signature as `createStatusCallback` but captures text to a buffer instead of sending to Telegram. Must still track segment text so we can inspect it after completion.
 - [x] Modify the cron timer in `src/index.ts` (around line 161) — when firing a silent job, pass the silent callback to `handleText` or directly call session processing with the silent callback. After processing completes, check if captured response contains notification markers (🎉⚠️❌🚀🔔). If yes, send captured text to Telegram. If no, discard silently.
-- [ ] Add the silent flag detection: modify `handleText` in `src/handlers/text.ts` to accept an optional `silent` parameter, or create a parallel `handleSilentText` function. The key change: use `createSilentStatusCallback` instead of `createStatusCallback` when silent=true. <- current
-- [ ] Test: verify non-silent messages still work (no regression). Verify a silent cron job with "still progressing" response produces no Telegram output. Verify a silent cron job with "🎉 SubTurtle finished" produces a Telegram message.
+- [x] Add the silent flag detection: modify `handleText` in `src/handlers/text.ts` to accept an optional `silent` parameter, or create a parallel `handleSilentText` function. The key change: use `createSilentStatusCallback` instead of `createStatusCallback` when silent=true.
+- [ ] Test: verify non-silent messages still work (no regression). Verify a silent cron job with "still progressing" response produces no Telegram output. Verify a silent cron job with "🎉 SubTurtle finished" produces a Telegram message. <- current
 - [ ] Commit all changes with clear message
 
 ## Notes

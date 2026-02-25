@@ -2,7 +2,7 @@
  * Text message handler for Claude Telegram Bot.
  */
 
-import type { Context } from "grammy";
+import type { Context, NextFunction } from "grammy";
 import { session } from "../session";
 import { ALLOWED_USERS } from "../config";
 import { isAuthorized, rateLimiter } from "../security";
@@ -12,12 +12,28 @@ import {
   checkInterrupt,
   startTypingIndicator,
 } from "../utils";
-import { StreamingState, createStatusCallback } from "./streaming";
+import {
+  StreamingState,
+  createSilentStatusCallback,
+  createStatusCallback,
+} from "./streaming";
+
+export interface HandleTextOptions {
+  silent?: boolean;
+}
 
 /**
  * Handle incoming text messages.
  */
-export async function handleText(ctx: Context): Promise<void> {
+export async function handleText(
+  ctx: Context,
+  nextOrOptions?: NextFunction | HandleTextOptions
+): Promise<void> {
+  const options =
+    typeof nextOrOptions === "function" || nextOrOptions === undefined
+      ? {}
+      : nextOrOptions;
+  const silent = options.silent ?? false;
   const userId = ctx.from?.id;
   const username = ctx.from?.username || "unknown";
   const chatId = ctx.chat?.id;
@@ -29,7 +45,9 @@ export async function handleText(ctx: Context): Promise<void> {
 
   // 1. Authorization check
   if (!isAuthorized(userId, ALLOWED_USERS)) {
-    await ctx.reply("Unauthorized. Contact the bot owner for access.");
+    if (!silent) {
+      await ctx.reply("Unauthorized. Contact the bot owner for access.");
+    }
     return;
   }
 
@@ -59,9 +77,11 @@ export async function handleText(ctx: Context): Promise<void> {
   const [allowed, retryAfter] = rateLimiter.check(userId);
   if (!allowed) {
     await auditLogRateLimit(userId, username, retryAfter!);
-    await ctx.reply(
-      `⏳ Rate limited. Please wait ${retryAfter!.toFixed(1)} seconds.`
-    );
+    if (!silent) {
+      await ctx.reply(
+        `⏳ Rate limited. Please wait ${retryAfter!.toFixed(1)} seconds.`
+      );
+    }
     return;
   }
 
@@ -85,7 +105,9 @@ export async function handleText(ctx: Context): Promise<void> {
 
   // 8. Create streaming state and callback
   let state = new StreamingState();
-  let statusCallback = createStatusCallback(ctx, state);
+  let statusCallback = silent
+    ? createSilentStatusCallback(ctx, state)
+    : createStatusCallback(ctx, state);
 
   // 9. Send to Claude with retry logic for crashes
   const MAX_RETRIES = 1;
@@ -123,10 +145,14 @@ export async function handleText(ctx: Context): Promise<void> {
           `Claude Code crashed, retrying (attempt ${attempt + 2}/${MAX_RETRIES + 1})...`
         );
         await session.kill(); // Clear corrupted session
-        await ctx.reply(`⚠️ Claude crashed, retrying...`);
+        if (!silent) {
+          await ctx.reply(`⚠️ Claude crashed, retrying...`);
+        }
         // Reset state for retry
         state = new StreamingState();
-        statusCallback = createStatusCallback(ctx, state);
+        statusCallback = silent
+          ? createSilentStatusCallback(ctx, state)
+          : createStatusCallback(ctx, state);
         continue;
       }
 
@@ -137,11 +163,13 @@ export async function handleText(ctx: Context): Promise<void> {
       if (errorStr.includes("abort") || errorStr.includes("cancel")) {
         // Only show "Query stopped" if it was an explicit stop, not an interrupt from a new message
         const wasInterrupt = session.consumeInterruptFlag();
-        if (!wasInterrupt) {
+        if (!silent && !wasInterrupt) {
           await ctx.reply("🛑 Query stopped.");
         }
       } else {
-        await ctx.reply(`❌ Error: ${errorStr.slice(0, 200)}`);
+        if (!silent) {
+          await ctx.reply(`❌ Error: ${errorStr.slice(0, 200)}`);
+        }
       }
       break; // Exit loop after handling error
     }
