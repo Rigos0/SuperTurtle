@@ -703,8 +703,9 @@ async function getCodexQuotaLines(): Promise<string[]> {
     let rateLimitsReceived = false;
 
     // Set up timeout for entire operation (8 seconds max)
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const timeoutPromise = new Promise<void>((resolve) => {
-      setTimeout(() => resolve(), 8000);
+      timeoutId = setTimeout(() => resolve(), 8000);
     });
 
     // Helper to send JSON-RPC message
@@ -794,6 +795,10 @@ async function getCodexQuotaLines(): Promise<string[]> {
 
     // Race between read loop and timeout
     await Promise.race([readLoop, timeoutPromise]);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
 
     // Close the process
     proc.stdin?.end();
