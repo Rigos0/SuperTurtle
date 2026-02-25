@@ -1,71 +1,67 @@
 ## Current Task
 
-✅ COMPLETE — Landing page redesign finished with full earthy aesthetic.
-
-**Status**: Removed all remaining blur effects (blur-3xl and backdrop-blur-sm) from loop types section and comparison table. Page now has clean, consistent earthy design throughout matching craft coffee shop aesthetic specifications.
+Build sticky nav header component (turtle logo + "agentic" + GitHub CTA, appears on scroll). This will be needed before rewriting page sections.
 
 ## End Goal with Specs
 
-A landing page that feels warm, natural, and distinctive — NOT the typical dark-mode AI startup template. Think more like a well-crafted open-source project page that happens to have personality.
+A landing page that looks GREAT on mobile (iPhone-sized screens first), then scales up. More personality, more opinionated layout decisions, less "template energy."
 
-**Logo / Mascot:**
-- The project logo is the Emoji Kitchen turtle (turtle + turtle combo from Google's Emoji Kitchen)
-- Download the sticker image from: `https://www.gstatic.com/android/keyboard/emojikitchen/20231113/u1f422/u1f422_u1f422.png`
-- Save it to `landing/public/turtle-logo.png`
-- Use this as the hero logo / mascot prominently. It should feel like the face of the project.
+**Mobile-first priorities:**
+- Hero must be punchy on a phone screen — turtle logo not too big (96px max on mobile), headline tight
+- Cards stack cleanly in single column, no awkward padding
+- Terminal demo should be readable on mobile (smaller font, horizontal scroll if needed)
+- Touch-friendly tap targets (min 44px)
+- No horizontal overflow anywhere
+- Sections should breathe — generous vertical spacing but not wasteful
+- SVG architecture diagram should be replaced with a simpler mobile-friendly version (the current SVG doesn't scale well) — use a vertical step list instead
 
-**Design direction — EARTHY & NATURAL:**
-- Background: warm off-white / cream (#faf8f5 or similar), NOT black
-- Text: dark warm brown/charcoal (#2d2a26 or similar), NOT pure white
-- Accent colors: warm olive green (#5a7247), terracotta/clay (#c07a56), muted sage (#8fa87e) — earthy palette
-- Cards/sections: soft paper-like backgrounds, subtle shadows, NO neon borders or glowing effects
-- Typography: keep Geist Sans but make it feel editorial — generous line-height, comfortable reading
-- NO gradient text, NO neon glows, NO glowing grid backgrounds, NO blur orbs
-- Subtle texture welcome (light paper grain, gentle noise) but keep it minimal
-- Think: "craft coffee shop menu design" meets "thoughtful developer documentation"
+**More opinionated design choices:**
+- Use a sticky/fixed nav header on scroll with turtle logo + "agentic" + GitHub link (appears after scrolling past hero)
+- Hero: LEFT-align the text on mobile (centered feels generic). Turtle sits to the right or above.
+- Feature cards: use a distinctive left-border accent (4px colored bar) instead of full border — feels more editorial
+- Section dividers: use a subtle wavy or organic line SVG between major sections (not just flat color changes)
+- Typography: Make headings BIGGER and bolder. Use tight letter-spacing on the main title. More contrast between heading and body sizes.
+- The comparison table in loop types: convert to a stacked mobile layout (not a table) on small screens
+- Add a small "Built by turtles 🐢" tagline somewhere playful
 
-**What to keep from current version:**
-- All 7 sections (Hero, What it does, How it works, Loop types, Terminal demo, Getting started, Footer)
-- The same content/copy structure and information
-- The TypedTerminal component (but restyle it to match earthy theme — think warm terminal colors)
-- The SVG architecture diagram (but restyle with earthy colors)
+**Color & style (keep earthy but push it):**
+- Background: keep warm cream (#faf8f5)
+- PRIMARY accent: olive green (#4a5f3b) — slightly darker/richer than before
+- SECONDARY accent: terracotta (#b86f4c) — slightly warmer
+- TERTIARY: sage (#8fa87e)
+- Text: #1a1815 for headings (near black, warm), #4a4642 for body
+- Cards: white (#ffffff) with subtle warm shadow, left accent bar
+- Terminal blocks: #1a1815 background, amber prompt (#d4a574)
+- Use Tailwind's `@apply` in globals.css for reusable patterns. Stop using inline style={{}} — use CSS custom properties + Tailwind classes
 
-**What to change:**
-- EVERY visual style: backgrounds, colors, borders, gradients, hover effects
-- Hero: turtle logo image front and center, warm typography, no gradient text
-- Feature cards: soft cream backgrounds with subtle borders, warm shadows
-- Terminal: warm dark brown background (#1e1c1a) instead of pure black, amber/olive accent colors instead of emerald
-- Code blocks: similar warm dark treatment
-- Footer: warm, light — not dark/black
-- Loop type cards: use earthy color differentiation (olive for slow, terracotta for yolo, sage for yolo-codex) instead of emerald/cyan/purple
-- All hover effects: subtle warmth (slight background shifts), no neon glow effects
-
-**Technical:**
-- Rewrite `landing/app/page.tsx` completely with new styles
-- Update `landing/app/globals.css` with earthy theme variables
-- Update `landing/app/layout.tsx` metadata if needed
-- Restyle `landing/components/TypedTerminal.tsx` to match
-- Keep Next.js 15, Tailwind CSS 4, static export
+**Technical approach:**
+- Rewrite `landing/app/page.tsx` completely — MOBILE FIRST
+- Use Tailwind responsive prefixes properly: base = mobile, `sm:` = tablet, `lg:` = desktop
+- Update `landing/app/globals.css` — add reusable utility classes, clean up CSS vars
+- Keep TypedTerminal component as-is (it already works, just ensure mobile sizing)
+- Keep the same 7 content sections but restructure layouts for mobile
+- Max page.tsx complexity: aim for ~600 lines, not 1000+. Extract repeated patterns.
 
 ## Backlog
 
-- [x] Download emoji kitchen turtle logo to landing/public/turtle-logo.png
-- [x] Update globals.css with earthy color scheme and warm theme variables
-- [x] Redesign Hero section: turtle logo image, warm typography, cream background, no gradients
-- [x] Redesign "What it does" feature grid: soft cream cards, warm shadows, earthy icons
-- [x] Redesign "How it works" section: restyle SVG diagram with earthy colors, warm step cards
-- [x] Redesign "Loop types" cards: olive/terracotta/sage color scheme, no neon
-- [x] Restyle TypedTerminal component: warm dark brown background, amber/olive accents
-- [x] Redesign terminal demo and "Getting started" sections with earthy code blocks
-- [x] Redesign footer: warm light background, earthy links and badges
-- [x] Final polish: verify no remnants of neon/dark theme, consistent earthy feel throughout
+- [x] Rewrite globals.css: clean CSS variables, add utility classes (@apply patterns), remove unused styles
+- [ ] Build sticky nav header component (turtle logo + "agentic" + GitHub CTA, appears on scroll) <- current
+- [ ] Rewrite Hero section: mobile-first, left-aligned text, big bold headline, turtle logo, GitHub CTA
+- [ ] Rewrite "What it does" cards: left accent bar design, clean single-column mobile stack
+- [ ] Rewrite "How it works": replace SVG diagram with vertical step-flow (mobile-friendly), keep desktop 2-col
+- [ ] Rewrite "Loop types": stacked cards mobile, comparison as stacked blocks (not table) on mobile
+- [ ] Rewrite terminal demo + getting started: mobile-readable code blocks, proper overflow handling
+- [ ] Rewrite footer: compact mobile layout, earthy warm
+- [ ] Add section divider SVGs (subtle organic wave shapes between major sections)
+- [ ] Final mobile QA: check every section at 375px width, no overflow, readable text, good spacing
+- [ ] Commit all changes
 
 ## Notes
 
 - Project dir: `landing/` at repo root
-- Dev server should already be running on port 3000
-- Turtle logo URL: https://www.gstatic.com/android/keyboard/emojikitchen/20231113/u1f422/u1f422_u1f422.png
-- The existing page.tsx is ~1000 lines — rewrite the whole thing, don't try to patch
-- TypedTerminal component is at `landing/components/TypedTerminal.tsx`
-- Keep all section IDs (hero, what-it-does, how-it-works, loop-types, terminal-demo, getting-started) for anchor links
-- The tunnel is already running — changes will be visible live
+- Dev server running on port 3000, tunnel active
+- Turtle logo already at `landing/public/turtle-logo.png` (emoji kitchen turtle+turtle)
+- TypedTerminal component at `landing/components/TypedTerminal.tsx` — don't rewrite, just ensure mobile sizing
+- Test at 375px width (iPhone SE) as the baseline mobile size
+- All Tailwind classes: base = mobile, sm: = 640px+, md: = 768px+, lg: = 1024px+
+- Keep all section IDs for anchor links

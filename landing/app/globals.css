@@ -2,159 +2,161 @@
 
 :root {
   /* Primary background - warm cream */
-  --background: #faf8f5;
-  --foreground: #2d2a26;
+  --bg-page: #faf8f5;
 
-  /* Earthy accent colors */
-  --color-olive: #5a7247;
-  --color-terracotta: #c07a56;
+  /* Text colors */
+  --text-heading: #1a1815;
+  --text-body: #4a4642;
+  --text-light: #6b6562;
+
+  /* Earthy accent colors (updated to match design specs) */
+  --color-olive: #4a5f3b;
+  --color-terracotta: #b86f4c;
   --color-sage: #8fa87e;
 
   /* Terminal/code block colors */
-  --terminal-bg: #1e1c1a;
+  --terminal-bg: #1a1815;
   --terminal-text: #e8e8e4;
-  --terminal-accent: #d4a574;
-  --terminal-secondary: #8fa87e;
+  --terminal-prompt: #d4a574;
+  --terminal-accent: #8fa87e;
 
-  /* Neutral shades for borders and subtle backgrounds */
-  --color-cream-light: #f5f3f0;
-  --color-cream-lighter: #fffbf8;
-  --color-brown-light: #4a4642;
-  --color-brown-dark: #1a1815;
+  /* Card and UI element backgrounds */
+  --card-bg: #ffffff;
+  --card-bg-subtle: #f5f3f0;
 
-  /* Subtle shadow color - warm tone */
-  --shadow-color: rgba(0, 0, 0, 0.08);
-  --shadow-color-strong: rgba(0, 0, 0, 0.12);
-
-  /* Border colors - warm toned */
-  --border-color: rgba(90, 114, 71, 0.15);
-  --border-color-light: rgba(90, 114, 71, 0.08);
+  /* Borders and shadows */
+  --border-subtle: rgba(74, 95, 59, 0.12);
+  --border-light: rgba(74, 95, 59, 0.08);
+  --shadow-sm: rgba(0, 0, 0, 0.06);
+  --shadow-md: rgba(0, 0, 0, 0.10);
+  --shadow-warm: rgba(184, 111, 76, 0.08);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bg-page);
+  --color-foreground: var(--text-body);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  /* Extended colors for Tailwind */
-  --color-olive-50: #f7f9f5;
-  --color-olive-100: #edf1e7;
-  --color-olive-200: #dce5cf;
-  --color-olive-300: #c5d4b1;
-  --color-olive-400: #a4bb7f;
+  /* Olive color scale (PRIMARY) */
+  --color-olive-50: #f8faf5;
+  --color-olive-100: #eef2e8;
+  --color-olive-200: #dfe7d4;
+  --color-olive-300: #c8d8b6;
+  --color-olive-400: #aac392;
   --color-olive-500: #8fa87e;
-  --color-olive-600: #5a7247;
+  --color-olive-600: #6d8f5d;
   --color-olive-700: #4a5f3b;
-  --color-olive-800: #3a4a2d;
-  --color-olive-900: #2a361f;
+  --color-olive-800: #3d4d31;
+  --color-olive-900: #2f3a25;
 
-  --color-terracotta-50: #fdf7f4;
-  --color-terracotta-100: #fae9e3;
-  --color-terracotta-200: #f3d4c5;
-  --color-terracotta-300: #e8b8a0;
-  --color-terracotta-400: #db8f68;
-  --color-terracotta-500: #c07a56;
-  --color-terracotta-600: #a5654a;
-  --color-terracotta-700: #8a533e;
-  --color-terracotta-800: #704234;
-  --color-terracotta-900: #58332a;
+  /* Terracotta color scale (SECONDARY) */
+  --color-terracotta-50: #fdf8f5;
+  --color-terracotta-100: #faeae2;
+  --color-terracotta-200: #f3d3c3;
+  --color-terracotta-300: #e9b4a0;
+  --color-terracotta-400: #dd8f70;
+  --color-terracotta-500: #c97d59;
+  --color-terracotta-600: #b86f4c;
+  --color-terracotta-700: #9b5a3f;
+  --color-terracotta-800: #7e4733;
+  --color-terracotta-900: #6a3729;
 }
 
+/* Base styles */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  @apply bg-[#faf8f5] text-[#4a4642] transition-colors duration-300;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
 }
 
-/* Typography enhancements */
+/* Typography */
 h1, h2, h3, h4, h5, h6 {
-  color: var(--color-brown-dark);
-  font-weight: 600;
+  @apply text-[#1a1815] font-bold;
 }
 
-/* Links with warm tone */
+h1 {
+  @apply text-3xl sm:text-4xl lg:text-5xl leading-tight;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  @apply text-2xl sm:text-3xl lg:text-4xl leading-snug;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  @apply text-xl sm:text-2xl leading-snug;
+}
+
+/* Links */
 a {
-  color: var(--color-olive);
-  text-decoration: none;
-  transition: color 0.2s ease;
+  @apply text-[#4a5f3b] no-underline transition-colors duration-200 hover:text-[#b86f4c];
 }
 
-a:hover {
-  color: var(--color-terracotta);
-}
-
-/* Code blocks and pre elements */
+/* Code elements */
 code {
-  background: var(--terminal-bg);
-  color: var(--terminal-text);
-  padding: 0.2em 0.4em;
-  border-radius: 0.3em;
-  font-family: var(--font-mono);
-  font-size: 0.9em;
+  @apply bg-[#1a1815] text-[#e8e8e4] px-1 py-0.5 rounded font-mono text-sm;
 }
 
 pre {
-  background: var(--terminal-bg);
-  color: var(--terminal-text);
-  padding: 1em;
-  border-radius: 0.5em;
-  overflow-x: auto;
-  border: 1px solid var(--border-color);
+  @apply bg-[#1a1815] text-[#e8e8e4] p-4 rounded-lg overflow-x-auto border border-[rgba(74,95,59,0.12)] whitespace-pre-wrap break-words;
 }
 
 pre code {
-  background: none;
-  padding: 0;
-  border-radius: 0;
+  @apply bg-transparent text-inherit p-0 rounded-none;
 }
 
-/* Card-like elements */
-.card-warm {
-  background: var(--color-cream-light);
-  border: 1px solid var(--border-color);
-  border-radius: 0.5em;
-  box-shadow: 0 1px 3px var(--shadow-color);
-  transition: all 0.2s ease;
+/* Card with left accent bar (4px colored left border) */
+.card-accent {
+  @apply bg-white rounded-lg border border-[rgba(74,95,59,0.12)] border-l-4 border-l-[#4a5f3b] shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all duration-200 hover:shadow-[0_8px_16px_rgba(0,0,0,0.10)] hover:-translate-y-1;
 }
 
-.card-warm:hover {
-  border-color: var(--color-olive);
-  box-shadow: 0 4px 12px var(--shadow-color-strong);
-  transform: translateY(-2px);
+.card-accent.terracotta {
+  @apply border-l-[#b86f4c];
 }
 
-/* Buttons with warm styling */
-.btn-warm-primary {
-  background: var(--color-olive);
-  color: white;
-  padding: 0.75em 1.5em;
-  border-radius: 0.375em;
-  font-weight: 600;
-  transition: all 0.2s ease;
-  border: none;
-  cursor: pointer;
+.card-accent.sage {
+  @apply border-l-[#8fa87e];
 }
 
-.btn-warm-primary:hover {
-  background: var(--color-olive-700);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(90, 114, 71, 0.2);
+/* Rounded card without accent */
+.card-simple {
+  @apply bg-white rounded-lg border border-[rgba(74,95,59,0.12)] shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all duration-200;
 }
 
-.btn-warm-secondary {
-  background: transparent;
-  color: var(--color-olive);
-  padding: 0.75em 1.5em;
-  border-radius: 0.375em;
-  font-weight: 600;
-  transition: all 0.2s ease;
-  border: 1px solid var(--color-olive);
-  cursor: pointer;
+/* Primary button */
+.btn-primary {
+  @apply bg-[#4a5f3b] text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:bg-[#3d4d31] hover:-translate-y-0.5 hover:shadow-[0_8px_16px_rgba(74,95,59,0.2)] active:translate-y-0;
 }
 
-.btn-warm-secondary:hover {
-  background: var(--color-olive);
-  color: white;
+/* Secondary button (outline) */
+.btn-secondary {
+  @apply bg-transparent text-[#4a5f3b] px-6 py-3 rounded-lg font-semibold border border-[#4a5f3b] transition-all duration-200 hover:bg-[#4a5f3b] hover:text-white hover:-translate-y-0.5;
+}
+
+/* Section spacing utilities */
+.section-padding {
+  @apply py-12 sm:py-16 lg:py-20;
+}
+
+.section-container {
+  @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+/* Sticky nav (appears on scroll) */
+.sticky-nav {
+  @apply fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm shadow-md transition-transform duration-300;
+}
+
+/* Accent color utilities */
+.accent-olive {
+  @apply text-[#4a5f3b];
+}
+
+.accent-terracotta {
+  @apply text-[#b86f4c];
+}
+
+.accent-sage {
+  @apply text-[#8fa87e];
 }
