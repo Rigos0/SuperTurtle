@@ -76,29 +76,30 @@ export function TypedTerminal({ lines, speed = 30, startDelay = 500 }: TypedTerm
   }, [lines, speed, startDelay]);
 
   return (
-    <div className="w-full bg-slate-950 rounded-lg border border-emerald-500/20 overflow-hidden">
+    <div className="w-full rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--terminal-bg)', border: '1px solid rgba(212, 165, 116, 0.3)' }}>
       {/* Terminal header */}
-      <div className="bg-slate-900 px-4 py-3 border-b border-emerald-500/20 flex items-center gap-2">
+      <div className="px-4 py-3 flex items-center gap-2" style={{ backgroundColor: 'var(--terminal-bg)', borderBottom: '1px solid rgba(212, 165, 116, 0.2)' }}>
         <div className="flex gap-2">
           <div className="w-3 h-3 rounded-full bg-red-500/60" />
           <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
           <div className="w-3 h-3 rounded-full bg-green-500/60" />
         </div>
-        <span className="text-xs text-gray-500 ml-2">terminal</span>
+        <span className="text-xs ml-2" style={{ color: 'rgba(232, 232, 228, 0.5)' }}>terminal</span>
       </div>
 
       {/* Terminal content */}
-      <div className="p-4 font-mono text-sm text-gray-200 overflow-x-auto min-h-64">
+      <div className="p-4 font-mono text-sm overflow-x-auto min-h-64" style={{ color: 'var(--terminal-text)' }}>
         {displayLines.map((line, idx) => (
           <div
             key={idx}
-            className={`leading-relaxed ${
-              line.isCommand ? 'text-emerald-400' : line.isOutput ? 'text-gray-300' : ''
-            }`}
+            className="leading-relaxed"
+            style={{
+              color: line.isCommand ? 'var(--terminal-accent)' : line.isOutput ? 'var(--terminal-text)' : 'var(--terminal-text)',
+            }}
           >
-            {line.isCommand && <span className="text-gray-500">$ </span>}
+            {line.isCommand && <span style={{ color: 'rgba(212, 165, 116, 0.7)' }}>$ </span>}
             <span>{line.text}</span>
-            {!line.isComplete && <span className="animate-pulse text-emerald-400">▊</span>}
+            {!line.isComplete && <span className="animate-pulse" style={{ color: 'var(--terminal-accent)' }}>▊</span>}
           </div>
         ))}
       </div>

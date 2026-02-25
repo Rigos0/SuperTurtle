@@ -1,14 +1,13 @@
 ## Current Task
 
-Redesign Loop types section: olive/terracotta/sage color scheme, no neon.
+Restyle TypedTerminal component: warm dark brown background, amber/olive accents.
 
-**Status**: ✓ COMPLETE - Redesigned all three loop type cards with earthy colors:
-- Slow card: olive green (#5a7247)
-- Yolo card: terracotta (#c07a56)
-- Yolo-Codex card: sage (#8fa87e)
-- Comparison table: updated with earthy color scheme
-- Removed all neon effects, gradients, and dark backgrounds
-- Cards now use warm cream backgrounds (#ffffff) with subtle borders and shadows
+**Status**: ✓ COMPLETE - Updated TypedTerminal.tsx with:
+- Warm dark brown background (#1e1c1a) using CSS variable `--terminal-bg`
+- Amber accent color (#d4a574) for command prompts and cursor using `--terminal-accent`
+- Removed emerald green borders and text colors
+- Terminal text now uses warm light color (#e8e8e4)
+- Borders use amber with reduced opacity for subtle styling
 
 ## End Goal with Specs
 
@@ -61,8 +60,8 @@ A landing page that feels warm, natural, and distinctive — NOT the typical dar
 - [x] Redesign "What it does" feature grid: soft cream cards, warm shadows, earthy icons
 - [x] Redesign "How it works" section: restyle SVG diagram with earthy colors, warm step cards
 - [x] Redesign "Loop types" cards: olive/terracotta/sage color scheme, no neon
-- [ ] Restyle TypedTerminal component: warm dark brown background, amber/olive accents <- current
-- [ ] Redesign terminal demo and "Getting started" sections with earthy code blocks
+- [x] Restyle TypedTerminal component: warm dark brown background, amber/olive accents
+- [ ] Redesign terminal demo and "Getting started" sections with earthy code blocks <- current
 - [ ] Redesign footer: warm light background, earthy links and badges
 - [ ] Final polish: verify no remnants of neon/dark theme, consistent earthy feel throughout
 
