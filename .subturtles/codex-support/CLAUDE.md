@@ -1,7 +1,7 @@
 # Codex Support Task - SubTurtle
 
 ## Current Task
-All backlog items completed
+No remaining backlog items (closure verification completed on 2026-02-25)
 
 ## End Goal with Specs
 Implement full Codex support in Super Turtle's Telegram bot:
@@ -56,6 +56,7 @@ Implement full Codex support in Super Turtle's Telegram bot:
 - Bot source: super_turtle/claude-telegram-bot
 - Use yolo-codex SubTurtle type for this work (single Claude call per iteration)
 - Final validation completed on 2026-02-25 (`bun test`, `bun run typecheck` both pass in `super_turtle/claude-telegram-bot`)
+- Closure verification rerun on 2026-02-25 (`bun test`, `bun run typecheck` both pass in `super_turtle/claude-telegram-bot`)
 - Codex usage API research (2026-02-25):
   - Endpoint: `GET https://api.openai.com/v1/organization/usage/completions`
   - Auth: `Authorization: Bearer $OPENAI_ADMIN_KEY` (organization usage endpoints require an admin API key)
