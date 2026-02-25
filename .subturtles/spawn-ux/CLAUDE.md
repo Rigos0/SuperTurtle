@@ -1,6 +1,6 @@
 # Current Task
 
-Design Telegram button interaction pattern for type selection.
+Design cron auto-registration and cleanup.
 
 # End Goal with Specs
 
@@ -77,7 +77,7 @@ Before designing, read these files to understand the current system:
 - [x] Read META_SHARED.md, ctl script, cron-jobs.json, and ask-user MCP to understand current system
 - [x] Design the proposed spawn flow (before/after comparison)
 - [x] Design `ctl spawn` CLI interface (flags, stdin, output)
-- [ ] Design Telegram button interaction pattern for type selection <- current
-- [ ] Design cron auto-registration and cleanup
+- [x] Design Telegram button interaction pattern for type selection
+- [ ] Design cron auto-registration and cleanup <- current
 - [ ] Design meta agent behavior changes for META_SHARED.md
 - [ ] Write complete design to .subturtles/spawn-ux/SPAWN-UX-DESIGN.md

@@ -149,4 +149,76 @@ Read state file directly:
 
 ---
 
-Remaining sections (Telegram button policy, cron cleanup rules, META_SHARED.md changes) are intentionally deferred to subsequent backlog items.
+## 3. Telegram Button Flow (Type Selection)
+
+### Decision rule: when to show buttons
+
+Default policy: show type-selection buttons for every new SubTurtle spawn. This keeps control explicit and aligns with the requirement that the user has final say.
+
+Exception: allow "Quick spawn" only when all of these are true:
+
+1. Task urgency is high and waiting for a click is materially slower (for example, user explicitly says "start now").
+2. The meta agent has a strong default recommendation from heuristics.
+3. The user has previously opted into quick mode (session-level preference).
+
+If exception conditions are not met, always show buttons.
+
+### Button set and wording
+
+Use exactly three options mapped to runtime types:
+
+- `yolo-codex` (fastest + cheapest for straightforward coding)
+- `yolo` (fast for normal coding)
+- `slow` (most thorough for complex/risky work)
+
+Because `ask_user` currently supports string options only (no separate description fields), encode short guidance in the option labels and question text.
+
+Recommended question template:
+
+```text
+I can delegate this to a SubTurtle. Pick execution mode (recommended: {recommended_type}):
+```
+
+Recommended option labels:
+
+- `yolo-codex - fastest, lowest cost`
+- `yolo - fast balanced`
+- `slow - deepest review`
+
+When one type is recommended, prefix that option with `[recommended]` in the options list so recommendation is visible without changing semantics.
+
+### Interaction sequence
+
+1. Meta agent drafts task state (`CLAUDE.md` content) and computes `recommended_type`.
+2. Meta agent calls `ask_user` with question + 3 buttons.
+3. Meta agent ends turn immediately (required by `ask_user` contract).
+4. User taps a button; selected label comes back as the next user message.
+5. Meta agent parses selected label to canonical type (`yolo-codex`, `yolo`, `slow`).
+6. Meta agent runs `ctl spawn <name> --type <selected>` with prepared state input.
+7. Meta agent posts spawn confirmation using `ctl` summary.
+
+### Parsing and robustness rules
+
+- Parsing should be prefix-based and case-insensitive so decorated labels still map correctly:
+  - `[recommended] yolo-codex ...` -> `yolo-codex`
+  - `yolo ...` -> `yolo`
+  - `slow ...` -> `slow`
+- If response cannot be parsed (unexpected free text), fall back to a two-step retry:
+  - Show buttons again once with a short clarification.
+  - If still ambiguous, use `recommended_type` and state that fallback was used.
+
+### Quick spawn mode
+
+Quick spawn is an explicit optimization mode, not the default behavior.
+
+- Trigger: user says equivalent of "quick spawn" / "don't ask mode" / "always use defaults for now".
+- Behavior: skip `ask_user`, use `recommended_type`, and immediately run `ctl spawn`.
+- Confirmation message must include:
+  - chosen type
+  - that quick mode bypassed buttons
+  - one-tap way to re-enable prompts (for example: "say 'prompt me for type' anytime")
+- Scope: session-local only (do not persist across unrelated future sessions unless a persistent preference system is introduced).
+
+---
+
+Remaining sections (cron cleanup rules, META_SHARED.md changes) are intentionally deferred to subsequent backlog items.
