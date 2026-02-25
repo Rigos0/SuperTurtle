@@ -101,6 +101,8 @@ You are the reviewer. The plan below has been implemented. Your job:
    - Do NOT fix them now.
    - Add a backlog item to {state_file} for the next iteration describing the
      refactoring or cleanup needed.
+5. If ALL backlog items in {state_file} are `[x]`, append `## Loop Control\nSTOP`
+   to {state_file}.
 
 ## The plan that was executed
 
