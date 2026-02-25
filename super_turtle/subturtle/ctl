@@ -954,7 +954,15 @@ case "$CMD" in
   stop)   do_stop "${1:-default}" ;;
   status) do_status "${1:-default}" ;;
   logs)   do_logs "${1:-default}" ;;
-  list)   do_list ;;
+  list)   do_list "$@" ;;
+  archive)
+    if [[ $# -ne 1 ]]; then
+      echo "Usage: ./super_turtle/subturtle/ctl archive <name>" >&2
+      exit 1
+    fi
+    do_archive "$1"
+    ;;
+  gc)     do_gc "$@" ;;
   reschedule-cron)
     if [[ $# -ne 2 ]]; then
       echo "Usage: ./super_turtle/subturtle/ctl reschedule-cron <name> <interval>" >&2

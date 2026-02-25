@@ -1,6 +1,6 @@
 # Current Task
 
-Update the case statement at bottom of script to wire up `archive`, `gc`, and `list --archived`.
+Test: run `ctl list`, `ctl archive` on a stopped SubTurtle, `ctl gc --max-age 0m`, `ctl list --archived`.
 
 # End Goal with Specs
 
@@ -30,8 +30,8 @@ Two new commands in `ctl`:
 - [x] Add `do_gc()` function: iterate stopped SubTurtles, check mtime vs max-age, call do_archive for each
 - [x] Update `do_list()` to skip `.archive` dir and support `--archived` flag
 - [x] Update `usage()` text with new commands
-- [ ] Update the case statement at bottom of script to wire up `archive`, `gc`, and `list --archived` <- current
-- [ ] Test: run `ctl list`, `ctl archive` on a stopped SubTurtle, `ctl gc --max-age 0m`, `ctl list --archived`
+- [x] Update the case statement at bottom of script to wire up `archive`, `gc`, and `list --archived`
+- [ ] Test: run `ctl list`, `ctl archive` on a stopped SubTurtle, `ctl gc --max-age 0m`, `ctl list --archived` <- current
 - [ ] Commit
 
 # Notes
