@@ -230,7 +230,7 @@ def run_slow_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
     state_file, state_ref = _resolve_state_ref(state_dir, name)
     prompts = build_prompts(state_ref)
 
-    print(f"[subturtle:{name}] starting slow loop")
+    print(f"[subturtle:{name}] 🐢 spawned (slow loop: plan → groom → execute → review)")
     print(f"[subturtle:{name}] state file: {state_ref}")
     if skills:
         print(f"[subturtle:{name}] skills: {', '.join(skills)}")
@@ -267,7 +267,7 @@ def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
     _state_file, state_ref = _resolve_state_ref(state_dir, name)
     prompt = YOLO_PROMPT.format(state_file=state_ref)
 
-    print(f"[subturtle:{name}] starting yolo loop (claude)")
+    print(f"[subturtle:{name}] 🐢 spawned (yolo loop: claude)")
     print(f"[subturtle:{name}] state file: {state_ref}")
     if skills:
         print(f"[subturtle:{name}] skills: {', '.join(skills)}")
@@ -294,7 +294,7 @@ def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = N
     _state_file, state_ref = _resolve_state_ref(state_dir, name)
     prompt = YOLO_PROMPT.format(state_file=state_ref)
 
-    print(f"[subturtle:{name}] starting yolo-codex loop (codex)")
+    print(f"[subturtle:{name}] 🐢 spawned (yolo-codex loop: codex)")
     print(f"[subturtle:{name}] state file: {state_ref}")
     if skills:
         print(f"[subturtle:{name}] skills: {', '.join(skills)}")
