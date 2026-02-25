@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "id": "ca37cf",
+    "prompt": "Check SubTurtle verify-spawn-test: run `./super_turtle/subturtle/ctl status verify-spawn-test`, inspect `.subturtles/verify-spawn-test/CLAUDE.md`, and review `git log --oneline -10`. If backlog is complete, stop SubTurtle verify-spawn-test and report shipped work. If stuck/off-track, stop it, diagnose, and restart with corrected state. If progressing, let it run.",
+    "type": "recurring",
+    "fire_at": 1772019900705,
+    "interval_ms": 300000,
+    "created_at": "2026-02-25T11:40:00Z"
+  }
+]
