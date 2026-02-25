@@ -185,11 +185,6 @@ const startCronTimer = () => {
   }, 10000); // 10 seconds
 };
 
-// Start the cron timer when bot is ready
-const startCronTimerWhenReady = () => {
-  startCronTimer();
-};
-
 // ============== Startup ==============
 
 console.log("=".repeat(50));
@@ -204,7 +199,7 @@ const botInfo = await bot.api.getMe();
 console.log(`Bot started: @${botInfo.username}`);
 
 // Start cron timer
-startCronTimerWhenReady();
+startCronTimer();
 
 // Drop any messages that arrived while the bot was offline
 await bot.api.deleteWebhook({ drop_pending_updates: true });
@@ -244,6 +239,7 @@ if (existsSync(RESTART_FILE)) {
     unlinkSync(RESTART_FILE);
   } catch (e) {
     console.warn("Failed to update restart message:", e);
+    // Attempt cleanup of restart file; ignore if it doesn't exist or unlink fails
     try { unlinkSync(RESTART_FILE); } catch {}
   }
 }
