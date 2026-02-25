@@ -2,7 +2,7 @@
 
 ## Current Task
 
-Build proof of concept Python script to extract quota from interactive Codex `/status` command using pexpect.
+Test Python pexpect script with real Codex session and validate output format parsing is correct.
 
 ## End Goal with Specs
 
@@ -45,9 +45,9 @@ Discover the exact method to:
 - [x] Try non-interactive approaches: `codex --json`, `codex exec`, API endpoints
 - [x] Investigate Codex local storage: ~/.codex/sessions, ~/.codex/log, cache files
 - [x] Search Codex CLI source code or documentation for quota/usage APIs
-- [x] Document findings in a RESEARCH.md file <- current
-- [ ] Build Python pexpect script to extract quota data from interactive Codex
-- [ ] Test with real Codex session and validate output format/parsing
+- [x] Document findings in a RESEARCH.md file
+- [x] Build Python pexpect script to extract quota data from interactive Codex
+- [ ] Test with real Codex session and validate output format/parsing <- current
 - [ ] Propose implementation approach for Telegram bot integration
 
 ## Notes
@@ -56,3 +56,20 @@ Discover the exact method to:
 - Goal: get "tokens left" / "remaining quota" for subscription (like Claude Code `/status`)
 - Use case: meta agent decides loop type (yolo-codex vs yolo) based on available quota
 - Constraint: must work non-interactively or with minimal manual intervention
+
+## Implementation Progress
+
+### Completed (2026-02-25)
+- Created `codex_quota_extractor.py` — full-featured Python pexpect script
+  - Spawns interactive Codex session
+  - Sends `/status` command
+  - Parses output to extract:
+    - `messages_remaining` — count of messages in current 5-hour window
+    - `window_5h_pct` — usage percentage of 5-hour limit
+    - `weekly_limit_pct` — usage percentage of weekly limit
+    - `reset_times` — when limits reset (dict with window_reset, weekly_reset)
+  - Returns structured JSON output
+  - Supports `--test` mode for validation with sample data
+  - Includes verbose logging with `--verbose` flag
+  - Error handling and process cleanup
+- Test mode validates all parsing logic correctly
