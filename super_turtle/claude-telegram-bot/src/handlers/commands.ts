@@ -13,6 +13,7 @@ import {
   RESTART_FILE,
   TELEGRAM_SAFE_LIMIT,
   CODEX_ENABLED,
+  DRIVER_ABSTRACTION_V1,
 } from "../config";
 import { getContextReport } from "../context-command";
 import { isAuthorized } from "../security";
@@ -248,14 +249,31 @@ export async function handleStop(ctx: Context): Promise<void> {
   // Kill typing indicator immediately so the bot stops showing "typing..."
   session.stopTyping();
 
-  if (session.isRunning) {
-    const result = await session.stop();
+  if (DRIVER_ABSTRACTION_V1) {
+    const { getCurrentDriver } = await import("../drivers/registry");
+    await getCurrentDriver().stop();
+    return;
+  }
+
+  // Route based on active driver
+  if (session.activeDriver === "codex") {
+    const result = await codexSession.stop();
     if (result) {
-      // Wait for the abort to be processed, then clear stopRequested so next message can proceed
+      // Wait for the abort to be processed
       await Bun.sleep(100);
-      session.clearStopRequested();
     }
     // Silent stop - no message shown
+  } else {
+    // Claude stop
+    if (session.isRunning) {
+      const result = await session.stop();
+      if (result) {
+        // Wait for the abort to be processed, then clear stopRequested so next message can proceed
+        await Bun.sleep(100);
+        session.clearStopRequested();
+      }
+      // Silent stop - no message shown
+    }
   }
   // If nothing running, also stay silent
 }
@@ -273,11 +291,32 @@ export async function handleStatus(ctx: Context): Promise<void> {
 
   const lines: string[] = ["📊 <b>Bot Status</b>\n"];
 
-  // Session status
-  if (session.isActive) {
-    lines.push(`✅ Session: Active (${session.sessionId?.slice(0, 8)}...)`);
+  const abstractionDriver = DRIVER_ABSTRACTION_V1
+    ? (await import("../drivers/registry")).getCurrentDriver()
+    : null;
+  const abstractionSnapshot = abstractionDriver?.getStatusSnapshot() || null;
+
+  // Session status (driver-specific)
+  if (abstractionSnapshot) {
+    if (abstractionSnapshot.isActive) {
+      lines.push(
+        `✅ ${abstractionSnapshot.driverName} Session: Active (${abstractionSnapshot.sessionId?.slice(0, 8)}...)`
+      );
+    } else {
+      lines.push(`⚪ ${abstractionSnapshot.driverName} Session: None`);
+    }
+  } else if (session.activeDriver === "codex") {
+    if (codexSession.isActive) {
+      lines.push(`✅ Codex Session: Active (${codexSession.getThreadId()?.slice(0, 8)}...)`);
+    } else {
+      lines.push("⚪ Codex Session: None");
+    }
   } else {
-    lines.push("⚪ Session: None");
+    if (session.isActive) {
+      lines.push(`✅ Claude Session: Active (${session.sessionId?.slice(0, 8)}...)`);
+    } else {
+      lines.push("⚪ Claude Session: None");
+    }
   }
 
   // Query status
@@ -297,34 +336,62 @@ export async function handleStatus(ctx: Context): Promise<void> {
   }
 
   // Last activity
-  if (session.lastActivity) {
+  const lastActivity = abstractionSnapshot?.lastActivity || session.lastActivity;
+  if (lastActivity) {
     const ago = Math.floor(
-      (Date.now() - session.lastActivity.getTime()) / 1000
+      (Date.now() - lastActivity.getTime()) / 1000
     );
     lines.push(`\n⏱️ Last activity: ${ago}s ago`);
   }
 
-  // Usage stats
-  if (session.lastUsage) {
-    const usage = session.lastUsage;
-    lines.push(
-      `\n📈 Last query usage:`,
-      `   Input: ${usage.input_tokens?.toLocaleString() || "?"} tokens`,
-      `   Output: ${usage.output_tokens?.toLocaleString() || "?"} tokens`
-    );
-    if (usage.cache_read_input_tokens) {
+  // Usage stats (driver-specific)
+  if (abstractionSnapshot) {
+    const usage = abstractionSnapshot.lastUsage;
+    if (usage) {
+      const usageLabel =
+        abstractionSnapshot.driverName === "Codex" ? " (Codex)" : "";
       lines.push(
-        `   Cache read: ${usage.cache_read_input_tokens.toLocaleString()}`
+        `\n📈 Last query usage${usageLabel}:`,
+        `   Input: ${usage.inputTokens.toLocaleString()} tokens`,
+        `   Output: ${usage.outputTokens.toLocaleString()} tokens`
       );
+      if (usage.cacheReadInputTokens) {
+        lines.push(`   Cache read: ${usage.cacheReadInputTokens.toLocaleString()}`);
+      }
+    }
+  } else if (session.activeDriver === "codex") {
+    if (codexSession.lastUsage) {
+      const usage = codexSession.lastUsage;
+      lines.push(
+        `\n📈 Last query usage (Codex):`,
+        `   Input: ${usage.input_tokens?.toLocaleString() || "?"} tokens`,
+        `   Output: ${usage.output_tokens?.toLocaleString() || "?"} tokens`
+      );
+    }
+  } else {
+    if (session.lastUsage) {
+      const usage = session.lastUsage;
+      lines.push(
+        `\n📈 Last query usage:`,
+        `   Input: ${usage.input_tokens?.toLocaleString() || "?"} tokens`,
+        `   Output: ${usage.output_tokens?.toLocaleString() || "?"} tokens`
+      );
+      if (usage.cache_read_input_tokens) {
+        lines.push(
+          `   Cache read: ${usage.cache_read_input_tokens.toLocaleString()}`
+        );
+      }
     }
   }
 
   // Error status
-  if (session.lastError) {
-    const ago = session.lastErrorTime
-      ? Math.floor((Date.now() - session.lastErrorTime.getTime()) / 1000)
+  const lastError = abstractionSnapshot?.lastError || session.lastError;
+  const lastErrorTime = abstractionSnapshot?.lastErrorTime || session.lastErrorTime;
+  if (lastError) {
+    const ago = lastErrorTime
+      ? Math.floor((Date.now() - lastErrorTime.getTime()) / 1000)
       : "?";
-    lines.push(`\n⚠️ Last error (${ago}s ago):`, `   ${session.lastError}`);
+    lines.push(`\n⚠️ Last error (${ago}s ago):`, `   ${lastError}`);
   }
 
   // Working directory
@@ -974,7 +1041,20 @@ export async function handleUsage(ctx: Context): Promise<void> {
     return;
   }
 
-  const unifiedOutput = formatUnifiedUsage(usageLines, codexQuotaLines, CODEX_ENABLED);
+  let unifiedOutput = formatUnifiedUsage(usageLines, codexQuotaLines, CODEX_ENABLED);
+
+  // Add Codex token usage from last turn if available
+  if (CODEX_ENABLED && codexSession.lastUsage) {
+    const usage = codexSession.lastUsage;
+    const codexTokenUsage = [
+      "",
+      "<b>📊 Codex Last Query Tokens</b>",
+      `   Input: ${usage.input_tokens?.toLocaleString() || "?"} tokens`,
+      `   Output: ${usage.output_tokens?.toLocaleString() || "?"} tokens`,
+    ];
+    unifiedOutput += "\n" + codexTokenUsage.join("\n");
+  }
+
   await ctx.reply(unifiedOutput, {
     parse_mode: "HTML",
   });

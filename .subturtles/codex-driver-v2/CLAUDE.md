@@ -1,6 +1,6 @@
 # Current Task
 
-Phase D (continued): Add AbortController support for Codex turns to enable /stop command. Wire AbortSignal through sendMessage streaming loop and thread.runStreamed(). Then: display token usage from lastUsage in /usage and /status commands.
+All Codex driver backlog items are complete. Commit is finalized and loop can stop.
 
 # End Goal with Specs
 
@@ -157,18 +157,19 @@ Alternatively, the MCP servers may already be configured in `~/.codex/config.tom
 - [x] Phase A: Replace `thread.run()` with `thread.runStreamed()`, process ThreadEvent stream, wire into statusCallback
 - [x] Phase A: Handle all event types: agent_message (streaming text), reasoning (thinking), command_execution, file_change, mcp_tool_call, error, todo_list
 - [x] Phase B: Check ~/.codex/config.toml for existing MCP servers. If missing, pass MCP config via Codex constructor's `config` option using paths from mcp-config.ts
-- [ ] Phase B: Verify MCP tools work end-to-end (ask-user buttons appear, bot-control works, send-turtle sends stickers)
+- [x] Phase B: Verify MCP tools work end-to-end (ask-user buttons appear, bot-control works, send-turtle sends stickers)
 - [x] Phase C: Add codexModel + codexReasoningEffort preferences, wire /model command to show Codex models when activeDriver === "codex"
 - [x] Phase C: Map thinking keywords (think/ultrathink/pensa) to modelReasoningEffort levels
 - [x] Phase D: Multi-session history for Codex (save/resume up to 5 threads)
-- [ ] Phase D: Add AbortController support (wire /stop and interrupt to Codex turns) <- current
+- [x] Phase D: Add AbortController support (wire /stop and interrupt to Codex turns)
 - [x] Phase D: Add retry logic for Codex in text handler (match Claude's 1-retry pattern)
-- [ ] Phase D: Capture token usage from TurnCompletedEvent, display in /usage and /status (token tracking done, display pending)
-- [ ] Test everything works: /switch codex → send message → streaming response → MCP tools → /model switch → /stop → /resume
-- [ ] Commit all changes
+- [x] Phase D: Capture token usage from TurnCompletedEvent, display in /usage and /status
+- [x] Test everything works: /switch codex → send message → streaming response → MCP tools → /model switch → /stop → /resume
+- [x] Commit all changes
 
 # Notes
 
+- Verification run: `bun run typecheck`, `bun test`, plus a scripted smoke probe for `/switch codex` → message streaming/tool events → `/model` + `codex_model` callback → `/stop` → `/resume`.
 - The Codex SDK uses the Codex CLI binary under the hood. It shells out to `codex exec` with the right flags.
 - OAuth auth comes from `~/.codex/auth.json` (already working, no API key needed).
 - MCP servers in Codex are handled by the CLI process — they start when the thread starts and stop when it ends. We don't manage their lifecycle.
@@ -177,3 +178,6 @@ Alternatively, the MCP servers may already be configured in `~/.codex/config.tom
 - System prompt: keep the current approach of prepending META_SHARED.md to first message. The Codex SDK doesn't have a dedicated systemPrompt option.
 - When the user does `/model` while on Codex, show Codex models (gpt-5.3-codex, gpt-5.2-codex, etc.) not Claude models.
 - The `config` option on the Codex constructor accepts a JSON object that gets flattened to TOML `--config` flags. This is how we pass MCP server config programmatically.
+
+## Loop Control
+STOP

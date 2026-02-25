@@ -68,6 +68,19 @@ function getTextFromMessage(msg: SDKMessage): string | null {
   return textParts.length > 0 ? textParts.join("") : null;
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function normalizeQueryError(error: unknown): Error {
+  const message = getErrorMessage(error).replace(/\s+/g, " ").trim();
+  const compact = message.length > 300 ? `${message.slice(0, 297)}...` : message;
+  return new Error(compact);
+}
+
 /**
  * Manages Claude Code sessions using the Agent SDK V1.
  */
@@ -568,20 +581,27 @@ export class ClaudeSession {
 
       // V1 query completes automatically when the generator ends
     } catch (error) {
-      const errorStr = String(error).toLowerCase();
+      const normalizedError = normalizeQueryError(error);
+      const errorStr = normalizedError.message.toLowerCase();
       const isCleanupError =
         errorStr.includes("cancel") || errorStr.includes("abort");
+      const isPostCompletionError = queryCompleted || askUserTriggered;
 
+      // Claude CLI may exit non-zero after emitting a completed "result" event.
+      // Treat that as success to avoid duplicate retries/errors.
       if (
-        isCleanupError &&
-        (queryCompleted || askUserTriggered || this.stopRequested)
+        (isCleanupError &&
+          (isPostCompletionError || this.stopRequested)) ||
+        isPostCompletionError
       ) {
-        console.warn(`Suppressed post-completion error: ${error}`);
+        console.warn(
+          `Suppressed post-completion error: ${normalizedError.message}`
+        );
       } else {
-        console.error(`Error in query: ${error}`);
-        this.lastError = String(error).slice(0, 100);
+        console.error(`Error in query: ${normalizedError.message}`);
+        this.lastError = normalizedError.message.slice(0, 100);
         this.lastErrorTime = new Date();
-        throw error;
+        throw normalizedError;
       }
     } finally {
       this.isQueryRunning = false;

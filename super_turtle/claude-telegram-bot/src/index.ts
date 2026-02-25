@@ -40,6 +40,31 @@ import { getSilentNotificationText } from "./silent-notifications";
 // Re-export for any existing consumers
 export { bot };
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function summarizeCronError(error: unknown): string {
+  const message = getErrorMessage(error)
+    .replace(/\s+/g, " ")
+    .trim();
+  return message.length > 300 ? `${message.slice(0, 297)}...` : message;
+}
+
+function isLikelyQuotaOrLimitError(errorSummary: string): boolean {
+  const text = errorSummary.toLowerCase();
+  return (
+    text.includes("quota") ||
+    text.includes("usage") ||
+    text.includes("rate limit") ||
+    text.includes("limit reached") ||
+    text.includes("insufficient")
+  );
+}
+
 // Sequentialize non-command messages per user (prevents race conditions)
 // Commands bypass sequentialization so they work immediately
 bot.use(
@@ -122,7 +147,7 @@ bot.catch((err) => {
  * Silent jobs run in the background and only notify Telegram if the captured
  * assistant response contains marker events (completion/error/milestone, etc.).
  * The job is removed/advanced BEFORE execution so a crash never causes retries.
- * Failures are logged and dropped silently (no retry, no error message to user).
+ * Failures are logged and reported to Telegram (no retry).
  */
 const startCronTimer = () => {
   const BOT_MESSAGE_ONLY_PREFIX = "BOT_MESSAGE_ONLY:";
@@ -152,15 +177,18 @@ const startCronTimer = () => {
           removeJob(job.id);
         }
 
+        const userId = ALLOWED_USERS[0];
+        const chatId: number | undefined = job.chat_id ?? userId;
+
         try {
           // Bail if no allowed users are configured — can't authenticate
           if (ALLOWED_USERS.length === 0) {
             console.error(`Cron job ${job.id} skipped: ALLOWED_USERS is empty`);
             continue;
           }
-          const userId = ALLOWED_USERS[0]!;
+          const resolvedUserId = userId!;
           // Default chat_id to the first allowed user — single-chat bots never need to specify it
-          const chatId: number = job.chat_id ?? userId;
+          const resolvedChatId: number = chatId!;
 
           if (job.prompt.startsWith(BOT_MESSAGE_ONLY_PREFIX)) {
             const message = job.prompt.slice(BOT_MESSAGE_ONLY_PREFIX.length);
@@ -168,29 +196,29 @@ const startCronTimer = () => {
               console.warn(`Cron job ${job.id} skipped: BOT_MESSAGE_ONLY payload is empty`);
               continue;
             }
-            await bot.api.sendMessage(chatId, message);
+            await bot.api.sendMessage(resolvedChatId, message);
             continue;
           }
 
           const createCronContext = (text: string): import("grammy").Context =>
             ({
-              from: { id: userId, username: "cron", is_bot: false, first_name: "Cron" },
-              chat: { id: chatId, type: "private" },
+              from: { id: resolvedUserId, username: "cron", is_bot: false, first_name: "Cron" },
+              chat: { id: resolvedChatId, type: "private" },
               message: {
                 text,
                 message_id: 0,
                 date: Math.floor(Date.now() / 1000),
-                chat: { id: chatId, type: "private" },
+                chat: { id: resolvedChatId, type: "private" },
               },
               reply: async (replyText: string, opts?: unknown) => {
-                return bot.api.sendMessage(chatId, replyText, opts as Parameters<typeof bot.api.sendMessage>[2]);
+                return bot.api.sendMessage(resolvedChatId, replyText, opts as Parameters<typeof bot.api.sendMessage>[2]);
               },
               replyWithChatAction: async (action: string) => {
-                await bot.api.sendChatAction(chatId, action as Parameters<typeof bot.api.sendChatAction>[1]);
+                await bot.api.sendChatAction(resolvedChatId, action as Parameters<typeof bot.api.sendChatAction>[1]);
               },
               replyWithSticker: async (sticker: unknown) => {
                 // @ts-expect-error minimal shim for sticker sending
-                return bot.api.sendSticker(chatId, sticker);
+                return bot.api.sendSticker(resolvedChatId, sticker);
               },
               api: bot.api,
             }) as unknown as import("grammy").Context;
@@ -209,7 +237,7 @@ const startCronTimer = () => {
             const typingLoop = (async () => {
               while (keepTyping) {
                 try {
-                  await bot.api.sendChatAction(chatId, "typing");
+                  await bot.api.sendChatAction(resolvedChatId, "typing");
                 } catch (error) {
                   console.debug("Silent cron typing indicator failed:", error);
                 }
@@ -223,9 +251,9 @@ const startCronTimer = () => {
               const response = await session.sendMessageStreaming(
                 job.prompt,
                 "cron",
-                userId,
+                resolvedUserId,
                 statusCallback,
-                chatId,
+                resolvedChatId,
                 cronCtx
               );
               const notificationText = getSilentNotificationText(
@@ -233,7 +261,7 @@ const startCronTimer = () => {
                 response
               );
               if (notificationText) {
-                await bot.api.sendMessage(chatId, notificationText);
+                await bot.api.sendMessage(resolvedChatId, notificationText);
               }
             } finally {
               typingController.stop();
@@ -249,8 +277,26 @@ const startCronTimer = () => {
             await handleText(cronCtx);
           }
         } catch (error) {
-          // No retries — let it fail gracefully
-          console.error(`Cron job ${job.id} failed (no retry):`, error);
+          // No retries — report failure and continue with future jobs
+          const errorSummary = summarizeCronError(error);
+          console.error(`Cron job ${job.id} failed (no retry): ${errorSummary}`);
+
+          if (chatId) {
+            try {
+              const quotaHint = isLikelyQuotaOrLimitError(errorSummary)
+                ? "\nLikely cause: Claude usage/quota limit reached."
+                : "";
+              await bot.api.sendMessage(
+                chatId,
+                `❌ Scheduled job failed (${job.id}).\n${errorSummary}${quotaHint}`
+              );
+            } catch (notifyError) {
+              const notifySummary = summarizeCronError(notifyError);
+              console.error(
+                `Failed to notify Telegram about cron error for ${job.id}: ${notifySummary}`
+              );
+            }
+          }
         }
       }
     } catch (error) {

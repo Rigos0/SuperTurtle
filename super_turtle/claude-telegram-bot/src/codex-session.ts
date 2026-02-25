@@ -188,6 +188,9 @@ export class CodexSession {
   private systemPromptPrepended = false;
   private _model: string;
   private _reasoningEffort: CodexEffortLevel;
+  private abortController: AbortController | null = null;
+  private stopRequested = false;
+  private isQueryRunning = false;
   lastActivity: Date | null = null;
   lastError: string | null = null;
   lastErrorTime: Date | null = null;
@@ -232,6 +235,22 @@ export class CodexSession {
     if (prefs.model || prefs.reasoningEffort) {
       console.log(`Codex preferences: model=${this._model}, reasoningEffort=${this._reasoningEffort}`);
     }
+  }
+
+  /**
+   * Stop the currently running query or mark for cancellation.
+   * Returns: "stopped" if query was aborted, "pending" if will be cancelled, false if nothing running
+   */
+  async stop(): Promise<"stopped" | "pending" | false> {
+    // If a query is actively running, abort it
+    if (this.isQueryRunning && this.abortController) {
+      this.stopRequested = true;
+      this.abortController.abort();
+      console.log("Codex stop requested - aborting current query");
+      return "stopped";
+    }
+
+    return false;
   }
 
   private async ensureInitialized(): Promise<void> {
@@ -379,8 +398,15 @@ ${userMessage}`;
         this.systemPromptPrepended = true;
       }
 
+      // Create abort controller for cancellation
+      this.abortController = new AbortController();
+      this.isQueryRunning = true;
+      this.stopRequested = false;
+
       // Run with streaming
-      const streamedTurn = await this.thread.runStreamed(messageToSend);
+      const streamedTurn = await this.thread.runStreamed(messageToSend, {
+        signal: this.abortController.signal,
+      });
 
       // Process the event stream
       const responseParts: string[] = [];
@@ -389,6 +415,12 @@ ${userMessage}`;
       let lastTextUpdate = 0;
 
       for await (const event of streamedTurn.events) {
+        // Check for abort
+        if (this.stopRequested) {
+          console.log("Codex query aborted by user");
+          break;
+        }
+
         // Handle different event types
         if (event.type === "item_completed" && event.item) {
           const item = event.item as Record<string, unknown>;
@@ -525,6 +557,8 @@ ${userMessage}`;
       this.lastError = String(error).slice(0, 100);
       this.lastErrorTime = new Date();
       throw error;
+    } finally {
+      this.isQueryRunning = false;
     }
   }
 
