@@ -1,6 +1,6 @@
 # Current Task
 
-Phase C: Add model switching for Codex. Add codexModel and codexReasoningEffort preferences (persisted in CodexPrefs). Wire `/model` command to show Codex models when activeDriver === "codex". Map thinking keywords (think/ultrathink/pensa) to modelReasoningEffort levels and pass to startThread.
+Phase D: Session Management & Polish. Add multi-session history for Codex (save/resume up to 5 threads), AbortController support for /stop, token usage tracking and display in /usage command.
 
 # End Goal with Specs
 
@@ -158,11 +158,11 @@ Alternatively, the MCP servers may already be configured in `~/.codex/config.tom
 - [x] Phase A: Handle all event types: agent_message (streaming text), reasoning (thinking), command_execution, file_change, mcp_tool_call, error, todo_list
 - [x] Phase B: Check ~/.codex/config.toml for existing MCP servers. If missing, pass MCP config via Codex constructor's `config` option using paths from mcp-config.ts
 - [ ] Phase B: Verify MCP tools work end-to-end (ask-user buttons appear, bot-control works, send-turtle sends stickers)
-- [ ] Phase C: Add codexModel + codexReasoningEffort preferences, wire /model command to show Codex models when activeDriver === "codex" <- current
-- [ ] Phase C: Map thinking keywords (think/ultrathink/pensa) to modelReasoningEffort levels
-- [ ] Phase D: Multi-session history for Codex (save/resume up to 5 threads)
+- [x] Phase C: Add codexModel + codexReasoningEffort preferences, wire /model command to show Codex models when activeDriver === "codex"
+- [x] Phase C: Map thinking keywords (think/ultrathink/pensa) to modelReasoningEffort levels
+- [ ] Phase D: Multi-session history for Codex (save/resume up to 5 threads) <- current
 - [ ] Phase D: Add AbortController support (wire /stop and interrupt to Codex turns)
-- [ ] Phase D: Add retry logic for Codex in text handler (match Claude's 1-retry pattern)
+- [x] Phase D: Add retry logic for Codex in text handler (match Claude's 1-retry pattern)
 - [ ] Phase D: Capture token usage from TurnCompletedEvent, display in /usage and /status
 - [ ] Test everything works: /switch codex → send message → streaming response → MCP tools → /model switch → /stop → /resume
 - [ ] Commit all changes
