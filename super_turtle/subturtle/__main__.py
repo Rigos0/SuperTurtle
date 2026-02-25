@@ -192,6 +192,25 @@ def _resolve_state_ref(state_dir: Path, name: str) -> tuple[Path, str]:
 # ---------------------------------------------------------------------------
 
 RETRY_DELAY = 10  # seconds to wait after an agent crash before retrying
+STOP_DIRECTIVE = "## Loop Control\nSTOP"
+
+
+def _should_stop(state_file: Path, name: str) -> bool:
+    """Return True when the SubTurtle wrote the STOP directive to its state file."""
+    try:
+        state_text = state_file.read_text(encoding="utf-8")
+    except OSError as error:
+        print(
+            f"[subturtle:{name}] WARNING: could not read state file for stop check: {error}",
+            file=sys.stderr,
+        )
+        return False
+
+    if STOP_DIRECTIVE in state_text:
+        print(f"[subturtle:{name}] 🛑 agent wrote STOP directive — exiting loop")
+        return True
+
+    return False
 
 
 def _require_cli(name: str, cli_name: str) -> None:
