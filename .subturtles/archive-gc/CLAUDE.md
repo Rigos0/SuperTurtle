@@ -1,6 +1,6 @@
 # Current Task
 
-Add `do_gc()` in `./super_turtle/subturtle/ctl` to archive stopped SubTurtles older than a max age using workspace mtime + `parse_duration()`.
+Update `do_list()` in `./super_turtle/subturtle/ctl` to skip `.archive` and support `--archived` output (name + archive date).
 
 # End Goal with Specs
 
@@ -27,8 +27,8 @@ Two new commands in `ctl`:
 
 - [x] Read the full `ctl` script to understand structure and helpers
 - [x] Add `do_archive()` function: validate not running, mkdir -p `.subturtles/.archive`, mv workspace
-- [ ] Add `do_gc()` function: iterate stopped SubTurtles, check mtime vs max-age, call do_archive for each <- current
-- [ ] Update `do_list()` to skip `.archive` dir and support `--archived` flag
+- [x] Add `do_gc()` function: iterate stopped SubTurtles, check mtime vs max-age, call do_archive for each
+- [ ] Update `do_list()` to skip `.archive` dir and support `--archived` flag <- current
 - [ ] Update `usage()` text with new commands
 - [ ] Update the case statement at bottom of script to wire up `archive`, `gc`, and `list --archived`
 - [ ] Test: run `ctl list`, `ctl archive` on a stopped SubTurtle, `ctl gc --max-age 0m`, `ctl list --archived`

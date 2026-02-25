@@ -739,6 +739,56 @@ do_archive() {
   echo "[subturtle:${name}] archived to ${archive_ws}"
 }
 
+do_gc() {
+  local max_age_str="1d"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --max-age)
+        max_age_str="${2:?missing duration for --max-age}"
+        shift 2
+        ;;
+      *)
+        echo "ERROR: unknown option for gc: $1" >&2
+        echo "Usage: ./super_turtle/subturtle/ctl gc [--max-age DURATION]" >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  local max_age_seconds
+  max_age_seconds="$(parse_duration "$max_age_str")" || exit 1
+
+  local now cutoff
+  now="$(date +%s)"
+  cutoff=$(( now - max_age_seconds ))
+
+  if [[ ! -d "$SUBTURTLES_DIR" ]]; then
+    return
+  fi
+
+  local ws name mtime
+  for ws in "$SUBTURTLES_DIR"/*/; do
+    [[ -d "$ws" ]] || continue
+    name="$(basename "$ws")"
+
+    if is_running "$name"; then
+      continue
+    fi
+
+    if ! mtime="$(stat -f '%m' "$ws" 2>/dev/null)"; then
+      mtime="$(stat -c '%Y' "$ws" 2>/dev/null)" || {
+        echo "[subturtle:${name}] ERROR: unable to read workspace mtime" >&2
+        continue
+      }
+    fi
+
+    if (( mtime <= cutoff )); then
+      do_archive "$name"
+    fi
+  done
+}
+
 do_list() {
   if [[ ! -d "$SUBTURTLES_DIR" ]]; then
     echo "No SubTurtles found."
