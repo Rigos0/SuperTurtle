@@ -1,6 +1,6 @@
 # Current Task
 
-Design the proposed spawn flow (before/after comparison).
+Design `ctl spawn` CLI interface (flags, stdin, output).
 
 # End Goal with Specs
 
@@ -75,8 +75,8 @@ Before designing, read these files to understand the current system:
 # Backlog
 
 - [x] Read META_SHARED.md, ctl script, cron-jobs.json, and ask-user MCP to understand current system
-- [ ] Design the proposed spawn flow (before/after comparison) <- current
-- [ ] Design `ctl spawn` CLI interface (flags, stdin, output)
+- [x] Design the proposed spawn flow (before/after comparison)
+- [ ] Design `ctl spawn` CLI interface (flags, stdin, output) <- current
 - [ ] Design Telegram button interaction pattern for type selection
 - [ ] Design cron auto-registration and cleanup
 - [ ] Design meta agent behavior changes for META_SHARED.md
