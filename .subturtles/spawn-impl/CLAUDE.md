@@ -1,6 +1,6 @@
 # Current Task
 
-Add cron auto-registration in `do_spawn()` using Python JSON manipulation.
+Store CRON_JOB_ID in subturtle.meta after successful cron write.
 
 # End Goal with Specs
 
@@ -87,8 +87,8 @@ Update the "Starting new work" section to use the new `ctl spawn` flow:
 # Backlog
 
 - [x] Add `do_spawn()` function to `ctl` with state input (stdin/file), workspace setup, and start delegation
-- [ ] Add cron auto-registration in `do_spawn()` using Python JSON manipulation <- current
-- [ ] Store CRON_JOB_ID in subturtle.meta after successful cron write
+- [x] Add cron auto-registration in `do_spawn()` using Python JSON manipulation
+- [ ] Store CRON_JOB_ID in subturtle.meta after successful cron write <- current
 - [ ] Extend `do_stop()` with cron cleanup (read CRON_JOB_ID from meta, remove from cron-jobs.json)
 - [ ] Update usage() help text with spawn subcommand
 - [ ] Wire `spawn` into the case statement at bottom of ctl
