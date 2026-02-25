@@ -1,6 +1,6 @@
 # Current Task
 
-Test: run `ctl list`, `ctl archive` on a stopped SubTurtle, `ctl gc --max-age 0m`, `ctl list --archived`.
+All backlog items completed.
 
 # End Goal with Specs
 
@@ -31,8 +31,8 @@ Two new commands in `ctl`:
 - [x] Update `do_list()` to skip `.archive` dir and support `--archived` flag
 - [x] Update `usage()` text with new commands
 - [x] Update the case statement at bottom of script to wire up `archive`, `gc`, and `list --archived`
-- [ ] Test: run `ctl list`, `ctl archive` on a stopped SubTurtle, `ctl gc --max-age 0m`, `ctl list --archived` <- current
-- [ ] Commit
+- [x] Test: run `ctl list`, `ctl archive` on a stopped SubTurtle, `ctl gc --max-age 0m`, `ctl list --archived`
+- [x] Commit
 
 # Notes
 
@@ -41,3 +41,11 @@ Two new commands in `ctl`:
 - Archive dir: `.subturtles/.archive/<name>/` (flat, no date suffix needed — name is unique)
 - For mtime checking in `do_gc`, use `stat -f '%m'` on macOS to get epoch seconds, compare against `$(date +%s) - max_age_seconds`
 - Do NOT use `find` — iterate the directories manually like `do_list` does
+- Verification run completed in isolated temp harness:
+  - `ctl list` showed active stopped workspaces (`alpha`, `beta`, `gamma`)
+  - `ctl archive alpha` moved `alpha` into `.subturtles/.archive/alpha`
+  - `ctl gc --max-age 0m` archived remaining stopped workspaces
+  - `ctl list --archived` listed only archived workspaces with archive timestamps
+
+## Loop Control
+STOP
