@@ -2,8 +2,8 @@
 
 ## Current Task
 
-✓ Completed: Proposed implementation approach for Telegram bot integration.
-Ready for next phase: Add `/codex-quota` command handler and meta agent integration.
+✓ Completed: Telegram bot `/codex-quota` command handler implemented.
+Ready for next phase: Integrate with meta agent's loop selection logic.
 
 ## End Goal with Specs
 
@@ -49,7 +49,12 @@ Discover the exact method to:
 - [x] Document findings in a RESEARCH.md file
 - [x] Build Python pexpect script to extract quota data from interactive Codex
 - [x] Test with real Codex session and validate output format/parsing
-- [x] Propose implementation approach for Telegram bot integration <- current (COMPLETED)
+- [x] Propose implementation approach for Telegram bot integration
+- [x] Add `/codex-quota` command handler to Telegram bot
+- [ ] Integrate with meta agent's loop selection logic <- current
+- [ ] Add cron job for periodic quota monitoring
+- [ ] Test end-to-end with real Codex session
+- [ ] Document in bot's `/help` or `/status` output
 
 ## Notes
 
@@ -206,16 +211,27 @@ Telegram Bot (TypeScript/Bun)
 4. **End-to-end** — Test `/codex-quota` command with real Codex session running
 5. **Meta agent test** — Verify loop type selection logic with various quota states
 
-### Phase 1 Implementation (This Task)
+### Phase 1 Implementation (In Progress)
 
-**Done**: Proposal document above
+**Completed (2026-02-25)**:
+- ✓ Proposal document for Telegram bot integration
+- ✓ Added `/codex-quota` command handler to Telegram bot
+  - **Location**: `super_turtle/claude-telegram-bot/src/handlers/commands.ts`
+  - **Handler**: `handleCodexQuota()` function
+  - **Features**:
+    - Calls `python3 codex_quota_extractor.py --timeout 20`
+    - Parses JSON output from extractor
+    - Formats quota data for Telegram (messages remaining, usage %, reset times)
+    - Shows helpful error message if quota unavailable
+    - Displays progress message during fetch, then removes it
+  - **Registration**: Registered in `src/index.ts` and exported from `src/handlers/index.ts`
+  - **Command list**: Added `/codex-quota` to `getCommandLines()` output
 
 **Next phase** (separate tasks):
-1. Add `/codex-quota` command handler to Telegram bot
-2. Integrate with meta agent's loop selection logic
-3. Add cron job for periodic monitoring
-4. Test end-to-end with real Codex session
-5. Document in bot's `/help` or `/status` output
+1. Integrate with meta agent's loop selection logic
+2. Add cron job for periodic monitoring
+3. Test end-to-end with real Codex session
+4. Document in bot's `/help` or `/status` output
 
 ### Benefits
 

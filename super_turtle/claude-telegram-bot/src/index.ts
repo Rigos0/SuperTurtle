@@ -13,6 +13,7 @@ import {
   handleStop,
   handleStatus,
   handleUsage,
+  handleCodexQuota,
   handleContext,
   handleModel,
   handleResume,
@@ -68,6 +69,7 @@ bot.command("new", handleNew);
 bot.command("stop", handleStop);
 bot.command("status", handleStatus);
 bot.command("usage", handleUsage);
+bot.command("codex-quota", handleCodexQuota);
 bot.command("context", handleContext);
 bot.command("model", handleModel);
 bot.command("resume", handleResume);

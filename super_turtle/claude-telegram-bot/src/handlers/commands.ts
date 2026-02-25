@@ -26,6 +26,7 @@ export function getCommandLines(): string[] {
     `/new - Start fresh session`,
     `/model - Switch model/effort`,
     `/usage - Subscription usage`,
+    `/codex-quota - Codex quota status`,
     `/context - Show Claude context usage`,
     `/stop - Stop current query`,
     `/status - Detailed status`,
@@ -547,6 +548,114 @@ export async function handleUsage(ctx: Context): Promise<void> {
   await ctx.reply(`<b>Usage</b>\n\n${sections.join("\n\n")}`, {
     parse_mode: "HTML",
   });
+}
+
+type CodexQuotaData = {
+  timestamp?: string;
+  status_output?: string;
+  messages_remaining?: number | null;
+  window_5h_pct?: number | null;
+  weekly_limit_pct?: number | null;
+  reset_times?: Record<string, string>;
+  error?: string | null;
+};
+
+/**
+ * Fetch and format Codex quota info from the quota extractor script.
+ * Returns empty array on failure.
+ */
+async function getCodexQuotaLines(): Promise<string[]> {
+  try {
+    const extractorPath = `${WORKING_DIR}/.subturtles/codex-quota-research/codex_quota_extractor.py`;
+    const proc = Bun.spawnSync(["python3", extractorPath, "--timeout", "20"], {
+      timeout: 25000,
+    });
+
+    if (!proc.success || !proc.stdout) {
+      return [];
+    }
+
+    const output = proc.stdout.toString().trim();
+    const quota = JSON.parse(output) as CodexQuotaData;
+
+    if (quota.error) {
+      return [`⚠️ Failed to fetch: ${escapeHtml(quota.error)}`];
+    }
+
+    const lines: string[] = [];
+
+    // 5-hour window section
+    if (quota.messages_remaining !== null && quota.window_5h_pct !== null) {
+      lines.push(`<b>⏱️ 5-Hour Window:</b>`);
+      lines.push(`   • <code>${quota.messages_remaining}</code> messages remaining`);
+      lines.push(`   • <code>${quota.window_5h_pct}%</code> used`);
+    }
+
+    // Weekly limit section
+    if (quota.weekly_limit_pct !== null) {
+      lines.push(`<b>📅 Weekly Limit:</b>`);
+      lines.push(`   • <code>${quota.weekly_limit_pct}%</code> used`);
+    }
+
+    // Reset times section
+    if (quota.reset_times && Object.keys(quota.reset_times).length > 0) {
+      if (quota.reset_times.window_reset) {
+        lines.push(`<b>⌛ Window Reset:</b> ${escapeHtml(quota.reset_times.window_reset)}`);
+      }
+      if (quota.reset_times.weekly_reset) {
+        lines.push(`<b>📆 Weekly Reset:</b> ${escapeHtml(quota.reset_times.weekly_reset)}`);
+      }
+    }
+
+    return lines.length > 0 ? lines : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+/**
+ * /codex-quota - Show Codex quota status from /status command.
+ */
+export async function handleCodexQuota(ctx: Context): Promise<void> {
+  const userId = ctx.from?.id;
+
+  if (!isAuthorized(userId, ALLOWED_USERS)) {
+    await ctx.reply("Unauthorized.");
+    return;
+  }
+
+  const progress = await ctx.reply("📊 Fetching Codex quota...");
+
+  try {
+    const quotaLines = await getCodexQuotaLines();
+
+    if (quotaLines.length === 0) {
+      await ctx.reply(
+        "⚠️ <b>Codex Quota</b>\n\n" +
+        "Could not fetch quota. Make sure:\n" +
+        "• Codex is logged in (`codex login`)\n" +
+        "• You have an active ChatGPT Pro subscription\n" +
+        "• Codex is installed at /opt/homebrew/bin/codex",
+        { parse_mode: "HTML" }
+      );
+    } else {
+      await ctx.reply(
+        `📊 <b>Codex Quota</b>\n\n${quotaLines.join("\n")}`,
+        { parse_mode: "HTML" }
+      );
+    }
+  } catch (error) {
+    await ctx.reply(
+      `❌ <b>Error fetching Codex quota:</b>\n${escapeHtml(String(error).slice(0, 150))}`,
+      { parse_mode: "HTML" }
+    );
+  } finally {
+    try {
+      await ctx.api.deleteMessage(progress.chat.id, progress.message_id);
+    } catch {
+      // Ignore failures to remove transient progress messages.
+    }
+  }
 }
 
 function chunkText(text: string, chunkSize = TELEGRAM_SAFE_LIMIT): string[] {
