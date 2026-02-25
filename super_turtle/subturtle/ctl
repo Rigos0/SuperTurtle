@@ -261,7 +261,7 @@ skills_json = sys.argv[8] if len(sys.argv) > 8 else '[]'
 
 try:
     skills = json.loads(skills_json)
-except:
+except (ValueError, TypeError):
     skills = []
 
 env = os.environ.copy()

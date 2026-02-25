@@ -88,7 +88,7 @@ TUNNEL_PID=$!
 TUNNEL_WAIT_TIMEOUT=10
 TUNNEL_WAIT_START=$(date +%s)
 TUNNEL_URL=""
-while [[ -z "$TUNNEL_URL" ]] && kill -0 $TUNNEL_PID 2>/dev/null; do
+while [[ -z "$TUNNEL_URL" ]] && kill -0 "$TUNNEL_PID" 2>/dev/null; do
   TUNNEL_WAIT_ELAPSED=$(($(date +%s) - TUNNEL_WAIT_START))
   if (( TUNNEL_WAIT_ELAPSED >= TUNNEL_WAIT_TIMEOUT )); then
     echo "[start-tunnel] ERROR: cloudflared did not produce URL after ${TUNNEL_WAIT_TIMEOUT}s" >&2

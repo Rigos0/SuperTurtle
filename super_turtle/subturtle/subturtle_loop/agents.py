@@ -20,7 +20,8 @@ def _run_streaming(cmd: list[str], cwd: Path) -> str:
         text=True,
     )
     lines: list[str] = []
-    assert proc.stdout is not None
+    if proc.stdout is None:
+        raise RuntimeError("stdout is None despite PIPE being set")
     for line in proc.stdout:
         sys.stderr.write(line)
         sys.stderr.flush()
@@ -56,7 +57,7 @@ class Claude:
         return result
 
     def execute(self, prompt: str) -> str:
-        """Generate an implementation plan from a prompt. Returns the plan text."""
+        """Execute a prompt (run Claude without plan mode). Returns the output text."""
         print(f"[claude] executing in {self.cwd} ...")
         cmd = [
             "claude",
