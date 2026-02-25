@@ -464,9 +464,6 @@ export default function Home() {
 
       {/* Loop types Section */}
       <section id="loop-types" className="relative w-full py-20 px-6 overflow-hidden" style={{ backgroundColor: '#faf8f5' }}>
-        {/* Subtle accent blur */}
-        <div className="absolute top-1/3 right-0 w-80 h-80 rounded-full blur-3xl opacity-10" style={{ backgroundColor: 'rgba(90, 114, 71, 0.1)' }} />
-
         <div className="relative z-10 max-w-6xl mx-auto">
           {/* Section header */}
           <div className="text-center mb-16">
@@ -483,7 +480,7 @@ export default function Home() {
             {/* Loop type 1: Slow */}
             <div className="group relative">
               <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ backgroundColor: 'rgba(90, 114, 71, 0.05)' }} />
-              <div className="relative p-8 rounded-xl border transition-colors duration-300 backdrop-blur-sm" style={{ backgroundColor: '#ffffff', borderColor: 'rgba(90, 114, 71, 0.2)', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)' }}>
+              <div className="relative p-8 rounded-xl border transition-colors duration-300" style={{ backgroundColor: '#ffffff', borderColor: 'rgba(90, 114, 71, 0.2)', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)' }}>
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div>
@@ -537,7 +534,7 @@ export default function Home() {
             {/* Loop type 2: Yolo */}
             <div className="group relative">
               <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ backgroundColor: 'rgba(192, 122, 86, 0.05)' }} />
-              <div className="relative p-8 rounded-xl border transition-colors duration-300 backdrop-blur-sm" style={{ backgroundColor: '#ffffff', borderColor: 'rgba(192, 122, 86, 0.2)', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)' }}>
+              <div className="relative p-8 rounded-xl border transition-colors duration-300" style={{ backgroundColor: '#ffffff', borderColor: 'rgba(192, 122, 86, 0.2)', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)' }}>
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div>
@@ -591,7 +588,7 @@ export default function Home() {
             {/* Loop type 3: Yolo-Codex */}
             <div className="group relative">
               <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ backgroundColor: 'rgba(143, 168, 126, 0.05)' }} />
-              <div className="relative p-8 rounded-xl border transition-colors duration-300 backdrop-blur-sm" style={{ backgroundColor: '#ffffff', borderColor: 'rgba(143, 168, 126, 0.2)', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)' }}>
+              <div className="relative p-8 rounded-xl border transition-colors duration-300" style={{ backgroundColor: '#ffffff', borderColor: 'rgba(143, 168, 126, 0.2)', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)' }}>
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div>
@@ -644,7 +641,7 @@ export default function Home() {
           </div>
 
           {/* Comparison table */}
-          <div className="rounded-xl border backdrop-blur-sm p-8" style={{ backgroundColor: '#ffffff', borderColor: 'rgba(90, 114, 71, 0.2)' }}>
+          <div className="rounded-xl border p-8" style={{ backgroundColor: '#ffffff', borderColor: 'rgba(90, 114, 71, 0.2)' }}>
             <h3 className="text-lg font-semibold mb-6" style={{ color: '#2d2a26' }}>Quick Comparison</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
