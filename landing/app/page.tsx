@@ -136,84 +136,156 @@ export default function Home() {
       </section>
 
       {/* What it does Section */}
-      <section id="what-it-does" className="relative w-full bg-gradient-to-b from-black to-slate-950 py-20 px-6">
-        {/* Background grid pattern */}
-        <div
-          className="absolute inset-0 opacity-5"
-          style={{
-            backgroundImage: 'linear-gradient(0deg, transparent 24%, rgba(16, 185, 129, 0.03) 25%, rgba(16, 185, 129, 0.03) 26%, transparent 27%, transparent 74%, rgba(16, 185, 129, 0.03) 75%, rgba(16, 185, 129, 0.03) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(16, 185, 129, 0.03) 25%, rgba(16, 185, 129, 0.03) 26%, transparent 27%, transparent 74%, rgba(16, 185, 129, 0.03) 75%, rgba(16, 185, 129, 0.03) 76%, transparent 77%, transparent)',
-            backgroundSize: '50px 50px',
-          }}
-        />
-
-        {/* Subtle accent blur */}
-        <div className="absolute top-1/2 right-0 w-80 h-80 bg-teal-500/5 rounded-full blur-3xl opacity-50" />
-
+      <section id="what-it-does" className="relative w-full py-20 px-6" style={{ backgroundColor: '#faf8f5' }}>
         <div className="relative z-10 max-w-6xl mx-auto">
           {/* Section header */}
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 tracking-tight">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 tracking-tight" style={{ color: '#2d2a26' }}>
               What it does
             </h2>
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+            <p className="text-lg max-w-2xl mx-auto leading-relaxed" style={{ color: '#4a4642' }}>
               Three core capabilities that power autonomous agent coordination.
             </p>
           </div>
 
           {/* Feature grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Feature 1: Spawn workers */}
-            <div className="group relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative p-8 rounded-xl border border-emerald-500/20 group-hover:border-emerald-500/40 transition-colors duration-300 bg-slate-900/30 backdrop-blur-sm">
+            {/* Feature 1: Spawn workers - Olive Green */}
+            <div className="group relative transition-transform duration-300 hover:-translate-y-1">
+              <div
+                className="relative p-8 rounded-lg border transition-all duration-300"
+                style={{
+                  backgroundColor: '#f5f3f0',
+                  borderColor: '#5a7247',
+                  borderWidth: '1px',
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.08)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 12px 24px rgba(90, 114, 71, 0.12)';
+                  e.currentTarget.style.borderColor = '#4a5f3b';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.08)';
+                  e.currentTarget.style.borderColor = '#5a7247';
+                }}
+              >
                 {/* Icon */}
-                <div className="w-12 h-12 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-4 group-hover:bg-emerald-500/20 transition-colors duration-300">
-                  <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                <div
+                  className="w-12 h-12 rounded-lg flex items-center justify-center mb-4 transition-colors duration-300"
+                  style={{
+                    backgroundColor: 'rgba(90, 114, 71, 0.1)',
+                    borderColor: 'rgba(90, 114, 71, 0.3)',
+                    borderWidth: '1px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(90, 114, 71, 0.15)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(90, 114, 71, 0.1)';
+                  }}
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ color: '#5a7247' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                   </svg>
                 </div>
 
                 {/* Content */}
-                <h3 className="text-xl font-semibold mb-3 text-white">Spawn workers</h3>
-                <p className="text-gray-400 leading-relaxed">
+                <h3 className="text-xl font-semibold mb-3" style={{ color: '#2d2a26' }}>Spawn workers</h3>
+                <p className="leading-relaxed" style={{ color: '#4a4642' }}>
                   Launch SubTurtles autonomously to handle complex tasks. Each worker gets its own workspace, state file, and supervision loop.
                 </p>
               </div>
             </div>
 
-            {/* Feature 2: Multiple loop types */}
-            <div className="group relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative p-8 rounded-xl border border-emerald-500/20 group-hover:border-emerald-500/40 transition-colors duration-300 bg-slate-900/30 backdrop-blur-sm">
+            {/* Feature 2: Multiple loop types - Terracotta */}
+            <div className="group relative transition-transform duration-300 hover:-translate-y-1">
+              <div
+                className="relative p-8 rounded-lg border transition-all duration-300"
+                style={{
+                  backgroundColor: '#f5f3f0',
+                  borderColor: '#c07a56',
+                  borderWidth: '1px',
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.08)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 12px 24px rgba(192, 122, 86, 0.12)';
+                  e.currentTarget.style.borderColor = '#a5654a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.08)';
+                  e.currentTarget.style.borderColor = '#c07a56';
+                }}
+              >
                 {/* Icon */}
-                <div className="w-12 h-12 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-4 group-hover:bg-emerald-500/20 transition-colors duration-300">
-                  <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4m0 0l-4 4m4-4H3" />
+                <div
+                  className="w-12 h-12 rounded-lg flex items-center justify-center mb-4 transition-colors duration-300"
+                  style={{
+                    backgroundColor: 'rgba(192, 122, 86, 0.1)',
+                    borderColor: 'rgba(192, 122, 86, 0.3)',
+                    borderWidth: '1px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(192, 122, 86, 0.15)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(192, 122, 86, 0.1)';
+                  }}
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ color: '#c07a56' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4m0 0l-4 4m4-4H3" />
                   </svg>
                 </div>
 
                 {/* Content */}
-                <h3 className="text-xl font-semibold mb-3 text-white">Multiple loop types</h3>
-                <p className="text-gray-400 leading-relaxed">
+                <h3 className="text-xl font-semibold mb-3" style={{ color: '#2d2a26' }}>Multiple loop types</h3>
+                <p className="leading-relaxed" style={{ color: '#4a4642' }}>
                   Choose your execution strategy: slow (thorough), yolo (fast), or yolo-codex (cost-optimized). Tailor to your needs.
                 </p>
               </div>
             </div>
 
-            {/* Feature 3: Self-supervising */}
-            <div className="group relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative p-8 rounded-xl border border-emerald-500/20 group-hover:border-emerald-500/40 transition-colors duration-300 bg-slate-900/30 backdrop-blur-sm">
+            {/* Feature 3: Self-supervising - Sage Green */}
+            <div className="group relative transition-transform duration-300 hover:-translate-y-1">
+              <div
+                className="relative p-8 rounded-lg border transition-all duration-300"
+                style={{
+                  backgroundColor: '#f5f3f0',
+                  borderColor: '#8fa87e',
+                  borderWidth: '1px',
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.08)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 12px 24px rgba(143, 168, 126, 0.12)';
+                  e.currentTarget.style.borderColor = '#7a9467';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.08)';
+                  e.currentTarget.style.borderColor = '#8fa87e';
+                }}
+              >
                 {/* Icon */}
-                <div className="w-12 h-12 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-4 group-hover:bg-emerald-500/20 transition-colors duration-300">
-                  <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <div
+                  className="w-12 h-12 rounded-lg flex items-center justify-center mb-4 transition-colors duration-300"
+                  style={{
+                    backgroundColor: 'rgba(143, 168, 126, 0.1)',
+                    borderColor: 'rgba(143, 168, 126, 0.3)',
+                    borderWidth: '1px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(143, 168, 126, 0.15)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(143, 168, 126, 0.1)';
+                  }}
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ color: '#8fa87e' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
 
                 {/* Content */}
-                <h3 className="text-xl font-semibold mb-3 text-white">Self-supervising</h3>
-                <p className="text-gray-400 leading-relaxed">
+                <h3 className="text-xl font-semibold mb-3" style={{ color: '#2d2a26' }}>Self-supervising</h3>
+                <p className="leading-relaxed" style={{ color: '#4a4642' }}>
                   Cron-based check-ins, automatic restarts, and progress tracking. Workers supervise themselves with minimal intervention.
                 </p>
               </div>

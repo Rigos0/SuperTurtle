@@ -1,6 +1,6 @@
 ## Current Task
 
-Redesign "What it does" feature grid: soft cream cards, warm shadows, earthy icons.
+Redesign "How it works" section: restyle SVG diagram with earthy colors, warm step cards.
 
 ## End Goal with Specs
 
@@ -50,8 +50,8 @@ A landing page that feels warm, natural, and distinctive — NOT the typical dar
 - [x] Download emoji kitchen turtle logo to landing/public/turtle-logo.png
 - [x] Update globals.css with earthy color scheme and warm theme variables
 - [x] Redesign Hero section: turtle logo image, warm typography, cream background, no gradients
-- [ ] Redesign "What it does" feature grid: soft cream cards, warm shadows, earthy icons <- current
-- [ ] Redesign "How it works" section: restyle SVG diagram with earthy colors, warm step cards
+- [x] Redesign "What it does" feature grid: soft cream cards, warm shadows, earthy icons
+- [ ] Redesign "How it works" section: restyle SVG diagram with earthy colors, warm step cards <- current
 - [ ] Redesign "Loop types" cards: olive/terracotta/sage color scheme, no neon
 - [ ] Restyle TypedTerminal component: warm dark brown background, amber/olive accents
 - [ ] Redesign terminal demo and "Getting started" sections with earthy code blocks
