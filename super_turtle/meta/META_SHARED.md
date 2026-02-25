@@ -67,8 +67,8 @@ When the human wants to build something new:
    ```bash
    ./super_turtle/subturtle/ctl spawn <name> --type <type> --timeout <duration> --state-file /tmp/<name>-state.md
    ```
-   This atomically: creates workspace, writes state, symlinks AGENTS.md, starts the SubTurtle, and registers cron supervision.
-5. Confirm briefly: *"On it. I'll check in every 5 minutes."*
+   This atomically: creates workspace, writes state, symlinks AGENTS.md, starts the SubTurtle, and registers cron supervision with `silent: true` by default.
+5. Confirm briefly: *"On it. Silent supervision is running every 5 minutes; I'll only message you on milestones, completion, stuck states, or errors."*
 
 **Do not** manually create directories, symlinks, or edit cron-jobs.json. `ctl spawn` owns all of that.
 
