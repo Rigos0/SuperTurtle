@@ -1,6 +1,6 @@
 # Current Task
 
-Usage fixes complete. Waiting for next direction.
+Usage fixes complete and re-verified on 2026-02-25. Waiting for next direction.
 
 # End Goal with Specs
 
@@ -45,3 +45,4 @@ Add tests for:
 - [x] Add test cases for empty data, partial data, and HTML escaping in commands.usage.test.ts
 - [x] Run tests to verify: `cd super_turtle/claude-telegram-bot && npx bun test commands.usage`
 - [x] Commit all fixes together
+- [x] Re-verify usage tests after completion (2026-02-25): `cd super_turtle/claude-telegram-bot && npx bun test commands.usage`
