@@ -1,6 +1,6 @@
 # Current Task
 
-Design meta agent behavior changes for META_SHARED.md.
+Write complete design to .subturtles/spawn-ux/SPAWN-UX-DESIGN.md.
 
 # End Goal with Specs
 
@@ -79,5 +79,5 @@ Before designing, read these files to understand the current system:
 - [x] Design `ctl spawn` CLI interface (flags, stdin, output)
 - [x] Design Telegram button interaction pattern for type selection
 - [x] Design cron auto-registration and cleanup
-- [ ] Design meta agent behavior changes for META_SHARED.md <- current
-- [ ] Write complete design to .subturtles/spawn-ux/SPAWN-UX-DESIGN.md
+- [x] Design meta agent behavior changes for META_SHARED.md
+- [ ] Write complete design to .subturtles/spawn-ux/SPAWN-UX-DESIGN.md <- current

@@ -318,3 +318,91 @@ Behavior:
 - If no job exists, create new one.
 
 This avoids duplicate supervision loops across restart cycles.
+
+---
+
+## 5. Meta Agent Behavior Changes (`META_SHARED.md`)
+
+### Behavioral shift
+
+Current meta instructions require manual multi-step spawn (`mkdir`, write state, symlink, `ctl start`, edit cron file).  
+New instructions should treat spawn as a single high-level action through `ctl spawn`, with user type selection handled by `ask_user` unless quick mode is active.
+
+### What the meta agent does differently
+
+Old behavior:
+
+- choose type internally
+- run manual workspace/file setup commands
+- run `ctl start`
+- manually append recurring cron job
+
+New behavior:
+
+1. Draft SubTurtle state content (`CLAUDE.md`) for `.subturtles/<name>/CLAUDE.md`.
+2. Choose a `recommended_type` using existing heuristics.
+3. If quick mode is off, call `ask_user` with 3 type buttons and end turn.
+4. Parse returned button choice into canonical type.
+5. Call one command:
+   ```bash
+   ./super_turtle/subturtle/ctl spawn <name> --type <selected_type> [--timeout DURATION]
+   ```
+   passing state via stdin or `--state-file`.
+6. Report concise spawn summary to the user (name, type, timeout, cron interval).
+
+The meta agent no longer edits `cron-jobs.json` directly during normal spawn flow.
+
+### Type-selection policy in meta instructions
+
+Add explicit policy text:
+
+- Default: always prompt the user with buttons (`yolo-codex`, `yolo`, `slow`) before spawn.
+- Include a recommendation in prompt text (for example: "recommended: yolo-codex").
+- Quick mode exception: skip buttons only when user opted in and urgency is high/explicit.
+- If selection parsing fails, re-prompt once; then fall back to `recommended_type` and disclose fallback.
+
+### Proposed replacement for "Starting new work" section
+
+Replace the current numbered workflow with:
+
+1. Ask what the user wants to build and why.
+2. Update root `CLAUDE.md` with project-level state.
+3. Prepare SubTurtle task state content (future `.subturtles/<name>/CLAUDE.md`).
+4. Determine `recommended_type` (`slow`, `yolo`, or `yolo-codex`).
+5. If quick mode is not active, present Telegram type buttons via `ask_user` and wait for selection.
+6. Spawn via one command (`ctl spawn`) with state input + selected type (+ optional timeout).
+7. Confirm: SubTurtle started and supervision check-ins are scheduled automatically.
+
+### Proposed wording snippet for `META_SHARED.md`
+
+```markdown
+## Starting new work
+
+When delegating a new coding task:
+
+1. Ask clarifying questions and update root `CLAUDE.md`.
+2. Draft the SubTurtle state (`CLAUDE.md` content) with a clear end goal and backlog.
+3. Recommend a loop type, then ask the user to choose via buttons: `yolo-codex`, `yolo`, `slow`.
+4. Spawn with one command:
+   `./super_turtle/subturtle/ctl spawn <name> --type <selected> [--timeout DURATION]`
+   Pass state via stdin or `--state-file`.
+5. Confirm the spawn briefly (type, timeout, cron interval).
+
+Do not manually create workspace directories, symlinks, or cron entries during normal spawn; `ctl spawn` owns that workflow.
+```
+
+### Autonomous supervision section adjustments
+
+Update supervision text to match ownership boundaries:
+
+- Keep the rule: every delegated SubTurtle must be supervised on a recurring interval.
+- Change implementation detail: supervision is auto-registered by `ctl spawn` (default 5m), not manually scheduled by meta.
+- Keep judgment-call table (backlog complete / stuck / off-track / progressing / dead), unchanged in intent.
+- Keep cleanup requirement: when stopping a SubTurtle, ensure cron is removed; operationally this happens through `ctl stop`.
+
+### Migration and compatibility notes
+
+- During rollout, `META_SHARED.md` may include a temporary fallback:
+  - if `ctl spawn` is unavailable, use legacy manual flow.
+- Once `ctl spawn` is shipped and stable, remove fallback instructions to reduce drift.
+- Canonical entry point remains `ctl`; meta instructions should avoid direct cron file mutation except emergency repair.
