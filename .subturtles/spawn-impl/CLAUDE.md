@@ -1,6 +1,6 @@
 # Current Task
 
-Backlog complete. Operational verification rerun on 2026-02-25; waiting for next task.
+Await next project work direction. Spawn infrastructure status re-verified on 2026-02-25.
 
 # End Goal with Specs
 
@@ -95,3 +95,5 @@ Update the "Starting new work" section to use the new `ctl spawn` flow:
 - [x] Update META_SHARED.md with new spawn flow and auto-cron docs
 - [x] Test: run `./super_turtle/subturtle/ctl spawn test-spawn --type yolo --timeout 5m --state-file -` with echo piped in, verify workspace + cron created, then stop and verify cron cleaned up
 - [x] Commit all changes
+- [x] Re-verify operational status on 2026-02-25 (`ctl list`, `ctl status spawn-impl`, log tail check)
+- [ ] Await next project work direction <- current
