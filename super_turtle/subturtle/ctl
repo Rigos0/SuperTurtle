@@ -111,6 +111,7 @@ read_meta() {
     WATCHDOG_PID="$(grep -m1 '^WATCHDOG_PID=' "$mf" 2>/dev/null | cut -d= -f2)" || true
     LOOP_TYPE="$(grep -m1 '^LOOP_TYPE=' "$mf" 2>/dev/null | cut -d= -f2)" || true
     SKILLS="$(grep -m1 '^SKILLS=' "$mf" 2>/dev/null | cut -d= -f2)" || true
+    CRON_JOB_ID="$(grep -m1 '^CRON_JOB_ID=' "$mf" 2>/dev/null | cut -d= -f2)" || true
     return 0
   fi
   return 1
@@ -395,6 +396,44 @@ print(job_id)
 PY
 }
 
+remove_spawn_cron_job() {
+  local cron_job_id="$1"
+  local cron_jobs_file="$CRON_JOBS_FILE"
+
+  "$PYTHON" - "$cron_jobs_file" "$cron_job_id" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+cron_jobs_path = Path(sys.argv[1])
+cron_job_id = sys.argv[2]
+
+if not cron_jobs_path.exists():
+    raise FileNotFoundError(f"cron jobs file not found: {cron_jobs_path}")
+
+raw = cron_jobs_path.read_text(encoding="utf-8").strip()
+jobs = []
+if raw:
+    parsed = json.loads(raw)
+    if not isinstance(parsed, list):
+        raise ValueError("cron-jobs.json must contain a JSON array")
+    jobs = parsed
+
+new_jobs = []
+removed = False
+for job in jobs:
+    if isinstance(job, dict) and str(job.get("id")) == cron_job_id:
+        removed = True
+        continue
+    new_jobs.append(job)
+
+if not removed:
+    raise RuntimeError(f"cron job id not found: {cron_job_id}")
+
+cron_jobs_path.write_text(json.dumps(new_jobs, indent=2) + "\n", encoding="utf-8")
+PY
+}
+
 do_spawn() {
   local name="${1:-default}"
   local timeout_str="${DEFAULT_TIMEOUT}"
@@ -476,6 +515,16 @@ do_spawn() {
 
 do_stop() {
   local name="${1:-default}"
+
+  # Remove recurring supervision cron before stopping the process.
+  CRON_JOB_ID=""
+  if read_meta "$name" && [[ -n "${CRON_JOB_ID:-}" ]]; then
+    if remove_spawn_cron_job "$CRON_JOB_ID"; then
+      echo "[subturtle:${name}] cron job ${CRON_JOB_ID} removed"
+    else
+      echo "[subturtle:${name}] WARNING: failed to remove cron job ${CRON_JOB_ID}" >&2
+    fi
+  fi
 
   # Kill the watchdog first so it doesn't fire after manual stop
   WATCHDOG_PID=""

@@ -1,6 +1,6 @@
 # Current Task
 
-Extend `do_stop()` with cron cleanup (read CRON_JOB_ID from meta, remove from cron-jobs.json).
+Update usage() help text with spawn subcommand.
 
 # End Goal with Specs
 
@@ -89,8 +89,8 @@ Update the "Starting new work" section to use the new `ctl spawn` flow:
 - [x] Add `do_spawn()` function to `ctl` with state input (stdin/file), workspace setup, and start delegation
 - [x] Add cron auto-registration in `do_spawn()` using Python JSON manipulation
 - [x] Store CRON_JOB_ID in subturtle.meta after successful cron write
-- [ ] Extend `do_stop()` with cron cleanup (read CRON_JOB_ID from meta, remove from cron-jobs.json) <- current
-- [ ] Update usage() help text with spawn subcommand
+- [x] Extend `do_stop()` with cron cleanup (read CRON_JOB_ID from meta, remove from cron-jobs.json)
+- [ ] Update usage() help text with spawn subcommand <- current
 - [ ] Wire `spawn` into the case statement at bottom of ctl
 - [ ] Update META_SHARED.md with new spawn flow and auto-cron docs
 - [ ] Test: run `./super_turtle/subturtle/ctl spawn test-spawn --type yolo --timeout 5m --state-file -` with echo piped in, verify workspace + cron created, then stop and verify cron cleaned up
