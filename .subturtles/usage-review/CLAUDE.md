@@ -1,6 +1,6 @@
 # Current Task
 
-Write review findings to `.subturtles/usage-review/REVIEW.md`.
+Commit the review file.
 
 # End Goal with Specs
 
@@ -28,5 +28,5 @@ Write your review findings to `.subturtles/usage-review/REVIEW.md` with sections
 
 - [x] Read commands.ts — focus on handleUsage(), formatUnifiedUsage(), getCodexQuotaLines(), Codex JSON-RPC logic
 - [x] Read commands.usage.test.ts — check test coverage and quality
-- [ ] Write review findings to .subturtles/usage-review/REVIEW.md <- current
-- [ ] Commit the review file
+- [x] Write review findings to .subturtles/usage-review/REVIEW.md
+- [ ] Commit the review file <- current

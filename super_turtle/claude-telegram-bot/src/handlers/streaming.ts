@@ -18,7 +18,8 @@ import {
 } from "../config";
 import type { ClaudeSession } from "../session";
 import { bot } from "../bot";
-import { getUsageLines, getCommandLines, formatModelInfo } from "./commands";
+import { getUsageLines, getCommandLines, formatModelInfo, formatUnifiedUsage, getCodexQuotaLines } from "./commands";
+import { CODEX_ENABLED } from "../config";
 
 /**
  * Create inline keyboard for ask_user options.
@@ -199,11 +200,14 @@ async function executeBotControlAction(
 ): Promise<string> {
   switch (action) {
     case "usage": {
-      const lines = await getUsageLines();
-      if (lines.length === 0) return "Failed to fetch usage data.";
+      const [usageLines, codexLines] = await Promise.all([
+        getUsageLines(),
+        CODEX_ENABLED ? getCodexQuotaLines() : Promise.resolve<string[]>([]),
+      ]);
+      if (usageLines.length === 0) return "Failed to fetch usage data.";
+      const unified = formatUnifiedUsage(usageLines, codexLines, CODEX_ENABLED);
       // Strip HTML tags but keep the unicode bar characters intact.
-      // Wrap in a pre-formatted block so Claude passes it through verbatim.
-      const plain = lines.map((l) => l.replace(/<[^>]+>/g, "")).join("\n\n");
+      const plain = unified.replace(/<[^>]+>/g, "");
       return `USAGE DATA (show this to the user as-is, in a code block):\n\n${plain}`;
     }
 

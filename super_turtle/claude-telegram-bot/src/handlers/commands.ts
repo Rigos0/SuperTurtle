@@ -536,7 +536,7 @@ function getStatusEmoji(pct: number | null): string {
 /**
  * Format unified usage display combining Claude and Codex data.
  */
-function formatUnifiedUsage(
+export function formatUnifiedUsage(
   usageLines: string[],
   codexLines: string[],
   codexEnabled: boolean
@@ -684,7 +684,7 @@ type CodexQuotaData = {
  * Fetch and format Codex quota info via codex app-server JSON-RPC protocol.
  * Returns formatted lines with progress bars and reset times, or empty array on failure.
  */
-async function getCodexQuotaLines(): Promise<string[]> {
+export async function getCodexQuotaLines(): Promise<string[]> {
   try {
     // Spawn codex app-server process
     const proc = Bun.spawn(["/opt/homebrew/bin/codex", "app-server"], {
