@@ -2,6 +2,7 @@
 
 import { TypedTerminal } from '@/components/TypedTerminal';
 import { StickyNav } from '@/components/StickyNav';
+import { SectionDivider } from '@/components/SectionDivider';
 
 export default function Home() {
   const terminalLines = [
@@ -114,6 +115,9 @@ export default function Home() {
         </main>
       </section>
 
+      {/* Section Divider */}
+      <SectionDivider />
+
       {/* What it does Section */}
       <section id="what-it-does" className="relative w-full py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#faf8f5' }}>
         <div className="relative z-10 max-w-6xl mx-auto">
@@ -179,6 +183,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Section Divider */}
+      <SectionDivider />
 
       {/* How it works Section */}
       <section id="how-it-works" className="relative w-full py-20 px-6 overflow-hidden" style={{ backgroundColor: '#faf8f5' }}>
@@ -306,6 +313,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Section Divider */}
+      <SectionDivider />
 
       {/* Loop types Section */}
       <section id="loop-types" className="relative w-full py-20 px-6 overflow-hidden" style={{ backgroundColor: '#faf8f5' }}>
@@ -586,6 +596,9 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Section Divider */}
+      <SectionDivider />
+
       {/* Terminal Demo Section */}
       <section id="terminal-demo" className="relative w-full py-16 sm:py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#faf8f5' }}>
         <div className="relative z-10 max-w-6xl mx-auto">
@@ -687,6 +700,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Section Divider */}
+      <SectionDivider />
 
       {/* Getting Started Section */}
       <section id="getting-started" className="relative w-full py-16 sm:py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#faf8f5' }}>
@@ -806,6 +822,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Section Divider */}
+      <SectionDivider />
 
       {/* Footer */}
       <footer className="relative w-full py-8 sm:py-12 px-4 sm:px-6" style={{ backgroundColor: '#faf8f5', borderTop: '1px solid rgba(74, 95, 59, 0.2)' }}>
