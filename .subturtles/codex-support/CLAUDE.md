@@ -1,7 +1,7 @@
 # Codex Support Task - SubTurtle
 
 ## Current Task
-Create getCodexUsageLines() function in src/handlers/commands.ts
+Update /usage command handler to include Codex stats when enabled
 
 ## End Goal with Specs
 Implement full Codex support in Super Turtle's Telegram bot:
@@ -43,8 +43,8 @@ Implement full Codex support in Super Turtle's Telegram bot:
 - [x] Update .env.example to add CODEX_ENABLED=false option
 - [x] Update src/config.ts to parse and export CODEX_ENABLED boolean
 - [x] Research Codex API endpoint for usage stats (endpoint, auth, response format)
-- [ ] Create getCodexUsageLines() function in src/handlers/commands.ts <- current
-- [ ] Update /usage command handler to include Codex stats when enabled
+- [x] Create getCodexUsageLines() function in src/handlers/commands.ts
+- [ ] Update /usage command handler to include Codex stats when enabled <- current
 - [ ] Update README.md with CLOTH subscription explanation
 - [ ] Add Codex configuration section to README
 - [ ] Test config loading with both enabled/disabled states

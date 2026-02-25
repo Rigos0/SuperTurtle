@@ -391,6 +391,99 @@ export async function getUsageLines(): Promise<string[]> {
   }
 }
 
+type CodexUsageResult = {
+  input_tokens?: number;
+  output_tokens?: number;
+  input_cached_tokens?: number;
+  num_model_requests?: number;
+};
+
+type CodexUsageBucket = {
+  results?: CodexUsageResult[];
+};
+
+type CodexUsageResponse = {
+  data?: CodexUsageBucket[];
+  has_more?: boolean;
+  next_page?: string | null;
+};
+
+/**
+ * Fetch and format Codex usage info as HTML lines. Returns empty array on failure.
+ */
+export async function getCodexUsageLines(): Promise<string[]> {
+  try {
+    const adminKey = process.env.OPENAI_ADMIN_KEY?.trim();
+    if (!adminKey) return [];
+
+    const now = Math.floor(Date.now() / 1000);
+    const sevenDaysAgo = now - 7 * 24 * 60 * 60;
+
+    const params = new URLSearchParams({
+      start_time: String(sevenDaysAgo),
+      end_time: String(now),
+      bucket_width: "1d",
+      limit: "7",
+    });
+
+    let page: string | undefined;
+    let totalRequests = 0;
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    let totalCachedInputTokens = 0;
+    let bucketCount = 0;
+
+    do {
+      if (page) {
+        params.set("page", page);
+      } else {
+        params.delete("page");
+      }
+
+      const res = await fetch(
+        `https://api.openai.com/v1/organization/usage/completions?${params.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${adminKey}`,
+          },
+        }
+      );
+      if (!res.ok) return [];
+
+      const data = (await res.json()) as CodexUsageResponse;
+      const buckets = Array.isArray(data.data) ? data.data : [];
+
+      for (const bucket of buckets) {
+        const results = Array.isArray(bucket.results) ? bucket.results : [];
+        if (results.length === 0) continue;
+        bucketCount += 1;
+
+        for (const result of results) {
+          totalRequests += result.num_model_requests ?? 0;
+          totalInputTokens += result.input_tokens ?? 0;
+          totalOutputTokens += result.output_tokens ?? 0;
+          totalCachedInputTokens += result.input_cached_tokens ?? 0;
+        }
+      }
+
+      page = data.has_more && data.next_page ? data.next_page : undefined;
+    } while (page);
+
+    if (bucketCount === 0) {
+      return ["No Codex usage in last 7 days."];
+    }
+
+    return [
+      `Codex (last 7 days): <code>${totalRequests.toLocaleString()}</code> requests`,
+      `Input tokens: <code>${totalInputTokens.toLocaleString()}</code>`,
+      `Output tokens: <code>${totalOutputTokens.toLocaleString()}</code>`,
+      `Cached input tokens: <code>${totalCachedInputTokens.toLocaleString()}</code>`,
+    ];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * /usage - Show Claude subscription usage (rate limits).
  */
