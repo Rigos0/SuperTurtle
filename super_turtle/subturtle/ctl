@@ -28,11 +28,12 @@ usage() {
   echo "         Skills: repeatable --skill flags load Claude Code skills (e.g. --skill frontend --skill testing)"
   echo "  spawn [name] [--type TYPE] [--timeout DURATION] [--state-file PATH|-] [--cron-interval DURATION] [--skill NAME ...]"
   echo "         Create workspace, seed CLAUDE.md from --state-file/stdin, start SubTurtle, and auto-register cron"
-  echo "         Defaults: --type slow, --timeout ${DEFAULT_TIMEOUT}, --cron-interval 5m"
+  echo "         Defaults: --type slow, --timeout ${DEFAULT_TIMEOUT}, --cron-interval 10m"
   echo "  stop   [name]                        Stop a SubTurtle gracefully"
   echo "  status [name]                        Check if running + time remaining"
   echo "  logs   [name]                        Tail a SubTurtle's log"
   echo "  list                                 List all SubTurtles and their status"
+  echo "  reschedule-cron <name> <interval>   Update recurring cron interval (e.g. 1m, 5m)"
   echo ""
   echo "Timeout durations: 30m, 1h, 2h, 4h, etc. Default: ${DEFAULT_TIMEOUT}"
   echo "SubTurtles auto-terminate when their timeout expires."
@@ -445,11 +446,93 @@ cron_jobs_path.write_text(json.dumps(new_jobs, indent=2) + "\n", encoding="utf-8
 PY
 }
 
+do_reschedule_cron() {
+  local name="${1:-}"
+  local interval_str="${2:-}"
+
+  if [[ -z "$name" ]]; then
+    echo "ERROR: missing SubTurtle name" >&2
+    echo "Usage: ./super_turtle/subturtle/ctl reschedule-cron <name> <interval>" >&2
+    exit 1
+  fi
+
+  if [[ -z "$interval_str" ]]; then
+    echo "ERROR: missing interval" >&2
+    echo "Usage: ./super_turtle/subturtle/ctl reschedule-cron <name> <interval>" >&2
+    exit 1
+  fi
+
+  local interval_secs
+  interval_secs="$(parse_duration "$interval_str")" || exit 1
+  if (( interval_secs <= 0 )); then
+    echo "ERROR: interval must be greater than zero" >&2
+    exit 1
+  fi
+  local interval_ms=$(( interval_secs * 1000 ))
+
+  CRON_JOB_ID=""
+  if ! read_meta "$name"; then
+    echo "ERROR: SubTurtle metadata not found for '${name}'" >&2
+    exit 1
+  fi
+  if [[ -z "${CRON_JOB_ID:-}" ]]; then
+    echo "ERROR: no CRON_JOB_ID found for SubTurtle '${name}'" >&2
+    exit 1
+  fi
+
+  local py_status=0
+  "$PYTHON" - "$CRON_JOBS_FILE" "$CRON_JOB_ID" "$interval_ms" <<'PY' || py_status=$?
+import datetime
+import json
+import sys
+from pathlib import Path
+
+cron_jobs_path = Path(sys.argv[1])
+cron_job_id = sys.argv[2]
+interval_ms = int(sys.argv[3])
+
+if not cron_jobs_path.exists():
+    raise FileNotFoundError(f"cron jobs file not found: {cron_jobs_path}")
+
+raw = cron_jobs_path.read_text(encoding="utf-8").strip()
+jobs = []
+if raw:
+    parsed = json.loads(raw)
+    if not isinstance(parsed, list):
+        raise ValueError("cron-jobs.json must contain a JSON array")
+    jobs = parsed
+
+now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
+updated = False
+for job in jobs:
+    if isinstance(job, dict) and str(job.get("id")) == cron_job_id:
+        job["interval_ms"] = interval_ms
+        job["fire_at"] = now_ms + interval_ms
+        updated = True
+        break
+
+if not updated:
+    sys.exit(42)
+
+cron_jobs_path.write_text(json.dumps(jobs, indent=2) + "\n", encoding="utf-8")
+PY
+  if (( py_status != 0 )); then
+    if (( py_status == 42 )); then
+      echo "ERROR: no cron job found for id '${CRON_JOB_ID}'" >&2
+    else
+      echo "ERROR: failed to update cron jobs in ${CRON_JOBS_FILE_REL}" >&2
+    fi
+    exit 1
+  fi
+
+  echo "[subturtle:${name}] cron job ${CRON_JOB_ID} rescheduled to every ${interval_str}"
+}
+
 do_spawn() {
   local name="${1:-default}"
   local timeout_str="${DEFAULT_TIMEOUT}"
   local loop_type="slow"
-  local cron_interval="5m"
+  local cron_interval="10m"
   local state_file=""
   local -a skills=()
 
@@ -745,5 +828,12 @@ case "$CMD" in
   status) do_status "${1:-default}" ;;
   logs)   do_logs "${1:-default}" ;;
   list)   do_list ;;
+  reschedule-cron)
+    if [[ $# -ne 2 ]]; then
+      echo "Usage: ./super_turtle/subturtle/ctl reschedule-cron <name> <interval>" >&2
+      exit 1
+    fi
+    do_reschedule_cron "$1" "$2"
+    ;;
   *)      usage ;;
 esac
