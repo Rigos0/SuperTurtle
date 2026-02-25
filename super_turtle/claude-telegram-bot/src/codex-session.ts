@@ -2,11 +2,12 @@
  * Session management for Codex using the official Codex TypeScript SDK.
  *
  * CodexSession class manages Codex sessions with thread persistence.
- * No streaming in Phase 1 (buffered responses only).
+ * Supports streaming responses with ThreadEvent processing.
  */
 
 import { readFileSync } from "fs";
 import { WORKING_DIR, META_PROMPT } from "./config";
+import type { StatusCallback } from "./types";
 
 // Prefs file for Codex (separate from Claude)
 const CODEX_PREFS_FILE = "/tmp/codex-telegram-prefs.json";
@@ -14,6 +15,8 @@ const CODEX_PREFS_FILE = "/tmp/codex-telegram-prefs.json";
 interface CodexPrefs {
   threadId?: string;
   createdAt?: string;
+  model?: string;
+  reasoningEffort?: string;
 }
 
 function loadCodexPrefs(): CodexPrefs {
@@ -33,21 +36,44 @@ function saveCodexPrefs(prefs: CodexPrefs): void {
   }
 }
 
+// Codex SDK types (from @openai/codex-sdk)
+type ThreadEvent =
+  | { type: "thread_started"; thread_id: string }
+  | { type: "turn_started" }
+  | { type: "turn_completed"; usage?: { input_tokens: number; output_tokens: number } }
+  | { type: "turn_failed"; error: string }
+  | { type: "item_started"; item_type: string }
+  | { type: "item_updated"; item: Record<string, unknown> }
+  | { type: "item_completed"; item: Record<string, unknown> }
+  | { type: "thread_error"; error: string };
+
+type StreamedTurn = {
+  events: AsyncGenerator<ThreadEvent>;
+};
+
 type CodexTurn = {
+  items?: Array<Record<string, unknown>>;
   finalResponse?: string;
+  usage?: { input_tokens: number; output_tokens: number };
 };
 
 type CodexThread = {
   id: string | null;
   run(message: string): Promise<CodexTurn>;
+  runStreamed(message: string, options?: { signal?: AbortSignal }): Promise<StreamedTurn>;
 };
 
 type CodexClient = {
   startThread(options?: {
-    workingDirectory: string;
+    workingDirectory?: string;
     skipGitRepoCheck?: boolean;
-  }): CodexThread;
-  resumeThread(threadId: string): CodexThread;
+    model?: string;
+    modelReasoningEffort?: string;
+  }): Promise<CodexThread>;
+  resumeThread(threadId: string, options?: {
+    model?: string;
+    modelReasoningEffort?: string;
+  }): Promise<CodexThread>;
 };
 
 type CodexCtor = new (options?: Record<string, unknown>) => CodexClient;
@@ -109,7 +135,7 @@ export class CodexSession {
   /**
    * Start a new Codex thread.
    */
-  async startNewThread(): Promise<void> {
+  async startNewThread(model?: string, reasoningEffort?: string): Promise<void> {
     await this.ensureInitialized();
 
     try {
@@ -117,10 +143,12 @@ export class CodexSession {
         throw new Error("Codex SDK client not initialized");
       }
 
-      // Create new thread with working directory
+      // Create new thread with working directory and model settings
       this.thread = await this.codex.startThread({
         workingDirectory: WORKING_DIR,
-        skipGitRepoCheck: true, // Allow non-git directories
+        skipGitRepoCheck: true,
+        ...(model && { model }),
+        ...(reasoningEffort && { modelReasoningEffort: reasoningEffort }),
       });
 
       // Capture thread ID
@@ -137,6 +165,8 @@ export class CodexSession {
       saveCodexPrefs({
         threadId: this.threadId || undefined,
         createdAt: new Date().toISOString(),
+        model,
+        reasoningEffort,
       });
     } catch (error) {
       console.error("Error starting Codex thread:", error);
@@ -149,7 +179,7 @@ export class CodexSession {
   /**
    * Resume a saved Codex thread by ID.
    */
-  async resumeThread(threadId: string): Promise<void> {
+  async resumeThread(threadId: string, model?: string, reasoningEffort?: string): Promise<void> {
     await this.ensureInitialized();
 
     try {
@@ -157,7 +187,10 @@ export class CodexSession {
         throw new Error("Codex SDK client not initialized");
       }
 
-      this.thread = await this.codex.resumeThread(threadId);
+      this.thread = await this.codex.resumeThread(threadId, {
+        ...(model && { model }),
+        ...(reasoningEffort && { modelReasoningEffort: reasoningEffort }),
+      });
       this.threadId = threadId;
       this.systemPromptPrepended = true; // Already sent in original thread
 
@@ -171,15 +204,21 @@ export class CodexSession {
   }
 
   /**
-   * Send a message to the current Codex thread.
+   * Send a message to the current Codex thread with streaming support.
    * Returns the final response text.
    *
    * On first message, prepends system prompt (META_SHARED.md content).
+   * Uses thread.runStreamed() to process events in real-time via statusCallback.
    */
-  async sendMessage(userMessage: string): Promise<string> {
+  async sendMessage(
+    userMessage: string,
+    statusCallback?: StatusCallback,
+    model?: string,
+    reasoningEffort?: string
+  ): Promise<string> {
     if (!this.thread) {
       // Create thread if not already created
-      await this.startNewThread();
+      await this.startNewThread(model, reasoningEffort);
       if (!this.thread) {
         throw new Error("Failed to create Codex thread");
       }
@@ -200,17 +239,136 @@ ${userMessage}`;
         this.systemPromptPrepended = true;
       }
 
-      // Run the message through Codex (buffered, not streamed)
-      const turn = await this.thread.run(messageToSend);
+      // Run with streaming
+      const streamedTurn = await this.thread.runStreamed(messageToSend);
 
-      // Extract response
-      const response = turn.finalResponse || "";
+      // Process the event stream
+      const responseParts: string[] = [];
+      let currentSegmentId = 0;
+      let currentSegmentText = "";
+      let lastTextUpdate = 0;
+
+      for await (const event of streamedTurn.events) {
+        // Handle different event types
+        if (event.type === "item_completed" && event.item) {
+          const item = event.item as Record<string, unknown>;
+          const itemType = item.type as string;
+
+          // AgentMessageItem - text response
+          if (itemType === "agent_message") {
+            const message = item.message as Record<string, unknown>;
+            const content = message.content as Array<Record<string, unknown>>;
+
+            if (Array.isArray(content)) {
+              for (const block of content) {
+                if (block.type === "text") {
+                  const text = String(block.text || "");
+                  responseParts.push(text);
+                  currentSegmentText += text;
+
+                  // Stream text updates (throttled)
+                  const now = Date.now();
+                  if (now - lastTextUpdate > 500 && currentSegmentText.length > 20) {
+                    if (statusCallback) {
+                      await statusCallback("text", currentSegmentText, currentSegmentId);
+                    }
+                    lastTextUpdate = now;
+                  }
+                }
+              }
+            }
+          }
+
+          // ReasoningItem - thinking block
+          if (itemType === "reasoning") {
+            const thinking = String(item.reasoning || "");
+            if (thinking && statusCallback) {
+              console.log(`THINKING: ${thinking.slice(0, 100)}...`);
+              await statusCallback("thinking", thinking);
+            }
+          }
+
+          // McpToolCallItem - MCP tool call
+          if (itemType === "mcp_tool_call") {
+            const toolName = String(item.name || "");
+            if (statusCallback) {
+              console.log(`TOOL: ${toolName}`);
+              // Don't show status for MCP tools - they handle their own output
+              if (
+                !toolName.startsWith("mcp__ask-user") &&
+                !toolName.startsWith("mcp__send-turtle") &&
+                !toolName.startsWith("mcp__bot-control")
+              ) {
+                await statusCallback("tool", toolName);
+              }
+            }
+          }
+
+          // CommandExecutionItem - bash command execution
+          if (itemType === "command_execution") {
+            const command = String(item.command || "").slice(0, 100);
+            if (statusCallback) {
+              console.log(`COMMAND: ${command}`);
+              await statusCallback("tool", `Bash: ${command}`);
+            }
+          }
+
+          // FileChangeItem - file modifications
+          if (itemType === "file_change") {
+            const path = String(item.path || "");
+            if (statusCallback && path) {
+              console.log(`FILE: ${path}`);
+              await statusCallback("tool", `File: ${path}`);
+            }
+          }
+
+          // WebSearchItem - web search
+          if (itemType === "web_search") {
+            const query = String(item.query || "");
+            if (statusCallback && query) {
+              console.log(`SEARCH: ${query}`);
+              await statusCallback("tool", `Search: ${query}`);
+            }
+          }
+
+          // ErrorItem - error occurred
+          if (itemType === "error") {
+            const error = String(item.error || "Unknown error");
+            if (statusCallback) {
+              console.log(`ERROR: ${error}`);
+              await statusCallback("tool", `Error: ${error}`);
+            }
+          }
+        }
+
+        // Handle turn completed
+        if (event.type === "turn_completed" && event.usage) {
+          console.log(
+            `Codex usage: in=${event.usage.input_tokens} out=${event.usage.output_tokens}`
+          );
+        }
+
+        // Handle errors
+        if (event.type === "turn_failed" || event.type === "thread_error") {
+          const errorMsg = (event as any).error || "Unknown error";
+          throw new Error(`Codex event error: ${errorMsg}`);
+        }
+      }
+
+      // Emit final segment
+      if (currentSegmentText && statusCallback) {
+        await statusCallback("segment_end", currentSegmentText, currentSegmentId);
+      }
+
+      if (statusCallback) {
+        await statusCallback("done", "");
+      }
 
       this.lastActivity = new Date();
       this.lastError = null;
       this.lastErrorTime = null;
 
-      return response;
+      return responseParts.join("") || "No response from Codex.";
     } catch (error) {
       console.error("Error sending message to Codex:", error);
       this.lastError = String(error).slice(0, 100);

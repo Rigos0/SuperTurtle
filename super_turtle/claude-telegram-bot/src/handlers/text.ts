@@ -114,39 +114,67 @@ export async function handleText(
   let response: string;
 
   if (session.activeDriver === "codex") {
-    // Codex path
-    try {
-      typing.stop();
+    // Codex path with streaming
+    const MAX_RETRIES = 1;
 
-      if (!statusCallback || typeof statusCallback !== "function") {
-        throw new Error("Status callback not available");
-      }
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        response = await codexSession.sendMessage(
+          message,
+          statusCallback,
+          undefined, // model - use Codex's saved preference
+          undefined  // reasoningEffort - use Codex's saved preference
+        );
 
-      await statusCallback("tool", "🟢 Sending to Codex...");
+        // 10. Audit log
+        await auditLog(userId, username, "TEXT_CODEX", message, response);
+        break; // Success - exit retry loop
+      } catch (error) {
+        const errorStr = String(error);
+        const isCodexCrash = errorStr.includes("crashed") || errorStr.includes("failed");
 
-      response = await codexSession.sendMessage(message);
+        // Clean up any partial messages from this attempt
+        for (const toolMsg of state.toolMessages) {
+          try {
+            await ctx.api.deleteMessage(toolMsg.chat.id, toolMsg.message_id);
+          } catch {
+            // Ignore cleanup errors
+          }
+        }
 
-      // 10. Audit log
-      await auditLog(userId, username, "TEXT_CODEX", message, response);
+        // Retry on Codex crash (not user cancellation)
+        if (isCodexCrash && attempt < MAX_RETRIES) {
+          console.log(
+            `Codex crashed, retrying (attempt ${attempt + 2}/${MAX_RETRIES + 1})...`
+          );
+          await codexSession.kill(); // Clear corrupted session
+          if (!silent) {
+            await ctx.reply(`⚠️ Codex crashed, retrying...`);
+          }
+          // Reset state for retry
+          state = new StreamingState();
+          statusCallback = silent
+            ? createSilentStatusCallback(ctx, state)
+            : createStatusCallback(ctx, state);
+          continue;
+        }
 
-      // Send response
-      if (!silent) {
-        // Split long responses
-        const TELEGRAM_MESSAGE_LIMIT = 4096;
-        if (response.length > TELEGRAM_MESSAGE_LIMIT) {
-          const chunks = response.match(new RegExp(`.{1,${TELEGRAM_MESSAGE_LIMIT}}`, "g")) || [];
-          for (const chunk of chunks) {
-            await ctx.reply(chunk);
+        // Final attempt failed or non-retryable error
+        console.error("Error processing message:", error);
+
+        // Check if it was a cancellation
+        if (errorStr.includes("abort") || errorStr.includes("cancel")) {
+          // Only show "Query stopped" if it was an explicit stop, not an interrupt from a new message
+          const wasInterrupt = session.consumeInterruptFlag();
+          if (!silent && !wasInterrupt) {
+            await ctx.reply("🛑 Query stopped.");
           }
         } else {
-          await ctx.reply(response);
+          if (!silent) {
+            await ctx.reply(`❌ Error: ${errorStr.slice(0, 200)}`);
+          }
         }
-      }
-    } catch (error) {
-      console.error("Codex error:", error);
-      const errorStr = String(error);
-      if (!silent) {
-        await ctx.reply(`❌ Codex error: ${errorStr.slice(0, 100)}`);
+        break; // Exit loop after handling error
       }
     }
   } else {
