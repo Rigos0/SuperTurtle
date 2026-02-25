@@ -716,6 +716,134 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Getting Started Section */}
+      <section id="getting-started" className="relative w-full bg-gradient-to-b from-black to-slate-950 py-20 px-6">
+        {/* Background grid pattern */}
+        <div
+          className="absolute inset-0 opacity-3"
+          style={{
+            backgroundImage: 'linear-gradient(0deg, transparent 24%, rgba(16, 185, 129, 0.03) 25%, rgba(16, 185, 129, 0.03) 26%, transparent 27%, transparent 74%, rgba(16, 185, 129, 0.03) 75%, rgba(16, 185, 129, 0.03) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(16, 185, 129, 0.03) 25%, rgba(16, 185, 129, 0.03) 26%, transparent 27%, transparent 74%, rgba(16, 185, 129, 0.03) 75%, rgba(16, 185, 129, 0.03) 76%, transparent 77%, transparent)',
+            backgroundSize: '50px 50px',
+          }}
+        />
+
+        {/* Subtle accent blur */}
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl opacity-30" />
+
+        <div className="relative z-10 max-w-6xl mx-auto">
+          {/* Section header */}
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 tracking-tight">
+              Get started
+            </h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+              Clone the repository, install dependencies, and spawn your first SubTurtle in minutes.
+            </p>
+          </div>
+
+          {/* Installation steps */}
+          <div className="space-y-8">
+            {/* Step 1: Clone */}
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
+                  <span className="text-emerald-400 font-bold text-sm">1</span>
+                </div>
+                <h3 className="text-xl font-semibold text-white">Clone the repository</h3>
+              </div>
+              <div className="ml-11 bg-slate-900/50 rounded-lg border border-emerald-500/20 p-4 font-mono text-sm">
+                <div className="text-gray-300">
+                  <div><span className="text-emerald-400">$</span> git clone https://github.com/yourusername/agentic</div>
+                  <div><span className="text-emerald-400">$</span> cd agentic</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 2: Install */}
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
+                  <span className="text-emerald-400 font-bold text-sm">2</span>
+                </div>
+                <h3 className="text-xl font-semibold text-white">Install dependencies</h3>
+              </div>
+              <div className="ml-11 bg-slate-900/50 rounded-lg border border-emerald-500/20 p-4 font-mono text-sm">
+                <div className="text-gray-300">
+                  <div><span className="text-emerald-400">$</span> npm install</div>
+                  <div className="text-gray-500 text-xs mt-2"># or yarn, pnpm, bun</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 3: Spawn */}
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
+                  <span className="text-emerald-400 font-bold text-sm">3</span>
+                </div>
+                <h3 className="text-xl font-semibold text-white">Spawn your first SubTurtle</h3>
+              </div>
+              <div className="ml-11 bg-slate-900/50 rounded-lg border border-emerald-500/20 p-4 font-mono text-sm">
+                <div className="text-gray-300">
+                  <div><span className="text-emerald-400">$</span> ./super_turtle/subturtle/ctl spawn my-task \</div>
+                  <div className="ml-4">--type yolo --timeout 1h</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 4: Monitor */}
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
+                  <span className="text-emerald-400 font-bold text-sm">4</span>
+                </div>
+                <h3 className="text-xl font-semibold text-white">Monitor progress</h3>
+              </div>
+              <div className="ml-11 bg-slate-900/50 rounded-lg border border-emerald-500/20 p-4 font-mono text-sm">
+                <div className="text-gray-300">
+                  <div><span className="text-emerald-400">$</span> tail -f .subturtles/my-task/subturtle.log</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Additional options */}
+          <div className="mt-16 p-8 rounded-xl border border-cyan-500/20 bg-slate-900/30 backdrop-blur-sm">
+            <h3 className="text-lg font-semibold text-white mb-4">Available loop types</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-sm">
+              <div>
+                <p className="text-cyan-400 font-semibold mb-2">--type slow</p>
+                <p className="text-gray-400">Thorough planning and execution. Best for complex tasks.</p>
+              </div>
+              <div>
+                <p className="text-cyan-400 font-semibold mb-2">--type yolo</p>
+                <p className="text-gray-400">Fast, direct execution. Perfect for quick fixes and simple tasks.</p>
+              </div>
+              <div>
+                <p className="text-cyan-400 font-semibold mb-2">--type yolo-codex</p>
+                <p className="text-gray-400">Cost-optimized using Codex. Great for batch operations.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* CTA */}
+          <div className="mt-12 text-center">
+            <p className="text-gray-400 mb-6">Ready to automate your workflow?</p>
+            <a
+              href="https://github.com/yourusername/agentic"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg transition-colors duration-200"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v 3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+              </svg>
+              View on GitHub
+            </a>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
