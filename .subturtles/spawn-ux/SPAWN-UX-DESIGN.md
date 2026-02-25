@@ -45,4 +45,108 @@ Design the end-to-end flow from "user asks to build X" to "SubTurtle is running 
 
 ---
 
-Remaining sections (`ctl spawn` CLI details, Telegram button policy, cron cleanup rules, META_SHARED.md changes) are intentionally deferred to subsequent backlog items.
+## 2. `ctl spawn` Command
+
+### Command shape
+
+```bash
+./super_turtle/subturtle/ctl spawn <name> [options]
+```
+
+`spawn` is the high-level "one-shot" entry point. It replaces manual mkdir/write/link/start/cron-edit steps with one command.
+
+### Flags and defaults
+
+| Flag | Meaning | Default |
+| --- | --- | --- |
+| `--type <slow|yolo|yolo-codex>` | SubTurtle loop type | `slow` |
+| `--timeout <duration>` | Runtime timeout (`30m`, `1h`, `2h`, etc.) | `1h` |
+| `--skill <name>` (repeatable) | Skills passed through to runtime | none |
+| `--state-file <path>` | Read CLAUDE.md content from file (`-` means stdin) | unset |
+| `--state-stdin` | Force state read from stdin | unset |
+| `--cron-interval <duration>` | Recurring supervision interval | `5m` |
+| `--cron-jobs-file <path>` | Cron store path | `super_turtle/claude-telegram-bot/cron-jobs.json` |
+| `--cron-prompt-template <text>` | Prompt template with `{name}` placeholder | built-in template |
+| `--json` | Emit machine-readable JSON summary | `false` |
+
+### State input (stdin/file) behavior
+
+`ctl spawn` must always receive CLAUDE.md content from either stdin or a file.
+
+1. If `--state-file <path>` is set (and not `-`), read that file.
+2. If `--state-file -` or `--state-stdin` is set, read stdin.
+3. If no state flag is set but stdin is piped, read stdin automatically.
+4. If no state source is available, fail with a clear error.
+5. If both `--state-file <path>` and `--state-stdin` are passed, fail as ambiguous.
+6. Empty state content fails validation.
+
+### Spawn behavior (single command contract)
+
+On success, `ctl spawn` does all of this:
+
+1. Creates `.subturtles/<name>/` if missing.
+2. Writes `.subturtles/<name>/CLAUDE.md` from input content.
+3. Creates/refreshes `.subturtles/<name>/AGENTS.md -> CLAUDE.md` symlink.
+4. Starts the SubTurtle process (equivalent runtime semantics to current `ctl start`).
+5. Appends a recurring supervision job to `cron-jobs.json`.
+6. Prints a summary (human or JSON).
+
+Failure handling is atomic from the caller's perspective:
+
+- If start fails, no cron job is written.
+- If cron registration fails after start, `ctl spawn` stops the just-started SubTurtle and returns error.
+- Workspace files may remain for debugging, but there is no "running without cron" success state.
+
+### Output format
+
+Default human output:
+
+```text
+[subturtle:spawn-ux] spawned as yolo-codex (PID 12345)
+[subturtle:spawn-ux] workspace: .subturtles/spawn-ux
+[subturtle:spawn-ux] timeout: 1h
+[subturtle:spawn-ux] cron: recurring every 5m (job e7f8a9)
+```
+
+`--json` output:
+
+```json
+{
+  "ok": true,
+  "name": "spawn-ux",
+  "type": "yolo-codex",
+  "timeout": "1h",
+  "timeout_seconds": 3600,
+  "skills": [],
+  "workspace": ".subturtles/spawn-ux",
+  "state_file": ".subturtles/spawn-ux/CLAUDE.md",
+  "agents_file": ".subturtles/spawn-ux/AGENTS.md",
+  "pid": 12345,
+  "log_file": ".subturtles/spawn-ux/subturtle.log",
+  "cron": {
+    "id": "e7f8a9",
+    "interval_ms": 300000,
+    "jobs_file": "super_turtle/claude-telegram-bot/cron-jobs.json"
+  }
+}
+```
+
+On failure with `--json`, return `{ "ok": false, "stage": "<validate|start|cron>", "error": "..." }` and non-zero exit code.
+
+### Example invocations
+
+Pipe state from meta agent:
+
+```bash
+cat /tmp/new-task.md | ./super_turtle/subturtle/ctl spawn spawn-ux --type yolo-codex --timeout 2h
+```
+
+Read state file directly:
+
+```bash
+./super_turtle/subturtle/ctl spawn spawn-ux --state-file /tmp/new-task.md --type slow --cron-interval 10m --json
+```
+
+---
+
+Remaining sections (Telegram button policy, cron cleanup rules, META_SHARED.md changes) are intentionally deferred to subsequent backlog items.
