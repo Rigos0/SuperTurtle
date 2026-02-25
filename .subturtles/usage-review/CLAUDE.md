@@ -1,6 +1,6 @@
 # Current Task
 
-Read `commands.usage.test.ts` and evaluate test coverage/quality for the `/usage` implementation.
+Write review findings to `.subturtles/usage-review/REVIEW.md`.
 
 # End Goal with Specs
 
@@ -27,6 +27,6 @@ Write your review findings to `.subturtles/usage-review/REVIEW.md` with sections
 # Backlog
 
 - [x] Read commands.ts — focus on handleUsage(), formatUnifiedUsage(), getCodexQuotaLines(), Codex JSON-RPC logic
-- [ ] Read commands.usage.test.ts — check test coverage and quality <- current
-- [ ] Write review findings to .subturtles/usage-review/REVIEW.md
+- [x] Read commands.usage.test.ts — check test coverage and quality
+- [ ] Write review findings to .subturtles/usage-review/REVIEW.md <- current
 - [ ] Commit the review file
