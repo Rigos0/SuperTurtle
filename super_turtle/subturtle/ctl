@@ -326,6 +326,66 @@ METAEOF
   echo "[subturtle:${name}] watchdog armed (${timeout_str}, PID ${watchdog_pid})"
 }
 
+do_spawn() {
+  local name="${1:-default}"
+  local timeout_str="${DEFAULT_TIMEOUT}"
+  local loop_type="slow"
+  local cron_interval="5m"
+  local state_file=""
+  local -a skills=()
+
+  shift || true
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --timeout) timeout_str="${2:?missing timeout value}"; shift 2 ;;
+      --type)    loop_type="${2:?missing type value}"; shift 2 ;;
+      --state-file) state_file="${2:?missing state file path}"; shift 2 ;;
+      --cron-interval) cron_interval="${2:?missing cron interval}"; shift 2 ;;
+      --skill)   skills+=("${2:?missing skill name}"); shift 2 ;;
+      *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  local ws
+  ws="$(workspace_dir "$name")"
+  mkdir -p "$ws"
+
+  if [[ -n "$state_file" ]]; then
+    if [[ "$state_file" == "-" ]]; then
+      if ! cat > "$ws/CLAUDE.md"; then
+        echo "[subturtle:${name}] ERROR: failed reading state from stdin" >&2
+        exit 1
+      fi
+    else
+      if [[ ! -f "$state_file" ]]; then
+        echo "[subturtle:${name}] ERROR: state file not found: ${state_file}" >&2
+        exit 1
+      fi
+      cp "$state_file" "$ws/CLAUDE.md"
+    fi
+  elif [[ ! -t 0 ]]; then
+    if ! cat > "$ws/CLAUDE.md"; then
+      echo "[subturtle:${name}] ERROR: failed reading state from stdin" >&2
+      exit 1
+    fi
+  else
+    echo "[subturtle:${name}] ERROR: missing state input (use --state-file PATH or pipe stdin)" >&2
+    exit 1
+  fi
+
+  ln -sf CLAUDE.md "$ws/AGENTS.md"
+
+  # Reserved for upcoming cron registration in spawn flow.
+  : "$cron_interval"
+
+  local -a start_args=("$name" --type "$loop_type" --timeout "$timeout_str")
+  local skill
+  for skill in "${skills[@]}"; do
+    start_args+=(--skill "$skill")
+  done
+  do_start "${start_args[@]}"
+}
+
 do_stop() {
   local name="${1:-default}"
 
