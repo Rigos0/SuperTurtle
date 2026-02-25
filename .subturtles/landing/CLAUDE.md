@@ -1,6 +1,6 @@
 ## Current Task
 
-Build sticky nav header component (turtle logo + "agentic" + GitHub CTA, appears on scroll). This will be needed before rewriting page sections.
+Rewrite Hero section: mobile-first, left-aligned text, big bold headline, turtle logo, GitHub CTA. This establishes the visual foundation for the landing page on mobile devices.
 
 ## End Goal with Specs
 
@@ -45,8 +45,8 @@ A landing page that looks GREAT on mobile (iPhone-sized screens first), then sca
 ## Backlog
 
 - [x] Rewrite globals.css: clean CSS variables, add utility classes (@apply patterns), remove unused styles
-- [ ] Build sticky nav header component (turtle logo + "agentic" + GitHub CTA, appears on scroll) <- current
-- [ ] Rewrite Hero section: mobile-first, left-aligned text, big bold headline, turtle logo, GitHub CTA
+- [x] Build sticky nav header component (turtle logo + "agentic" + GitHub CTA, appears on scroll)
+- [ ] Rewrite Hero section: mobile-first, left-aligned text, big bold headline, turtle logo, GitHub CTA <- current
 - [ ] Rewrite "What it does" cards: left accent bar design, clean single-column mobile stack
 - [ ] Rewrite "How it works": replace SVG diagram with vertical step-flow (mobile-friendly), keep desktop 2-col
 - [ ] Rewrite "Loop types": stacked cards mobile, comparison as stacked blocks (not table) on mobile

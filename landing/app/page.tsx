@@ -1,6 +1,7 @@
 'use client';
 
 import { TypedTerminal } from '@/components/TypedTerminal';
+import { StickyNav } from '@/components/StickyNav';
 
 export default function Home() {
   const terminalLines = [
@@ -19,6 +20,7 @@ export default function Home() {
 
   return (
     <div className="w-full text-[#2d2a26] font-sans" style={{ backgroundColor: '#faf8f5' }}>
+      <StickyNav />
       {/* Hero Section */}
       <section id="hero" className="relative min-h-screen w-full overflow-hidden" style={{ backgroundColor: '#faf8f5' }}>
         {/* Content */}
