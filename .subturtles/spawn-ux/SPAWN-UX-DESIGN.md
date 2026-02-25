@@ -221,4 +221,100 @@ Quick spawn is an explicit optimization mode, not the default behavior.
 
 ---
 
-Remaining sections (cron cleanup rules, META_SHARED.md changes) are intentionally deferred to subsequent backlog items.
+## 4. Cron Auto-Registration and Cleanup
+
+### Goal
+
+`ctl spawn` must make supervision automatic and safe by ensuring:
+
+1. A recurring check-in job is created as part of spawn success.
+2. The created job is traceable to the SubTurtle.
+3. `ctl stop` removes that recurring job so stale wake-ups do not accumulate.
+
+### Cron job payload written by `ctl spawn`
+
+`ctl spawn` appends one recurring job object to `super_turtle/claude-telegram-bot/cron-jobs.json`:
+
+```json
+{
+  "id": "e7f8a9",
+  "prompt": "Check SubTurtle spawn-ux: run `./super_turtle/subturtle/ctl status spawn-ux`, inspect `.subturtles/spawn-ux/CLAUDE.md`, and review `git log --oneline -10`. If backlog is complete, stop SubTurtle spawn-ux and report shipped work. If stuck/off-track, stop it, diagnose, and restart with corrected state. If progressing, let it run.",
+  "type": "recurring",
+  "fire_at": 1772014983135,
+  "interval_ms": 300000,
+  "created_at": "2026-02-25T10:00:00Z"
+}
+```
+
+Notes:
+
+- `chat_id` is omitted; bot runtime defaults it at fire time.
+- `id` uses 6 lowercase hex chars for parity with existing manual workflow.
+- `fire_at` is computed as `now + interval_ms`.
+
+### Prompt template
+
+Default template (internal constant in `ctl`), parameterized by `{name}`:
+
+```text
+Check SubTurtle {name}: run `./super_turtle/subturtle/ctl status {name}`, inspect `.subturtles/{name}/CLAUDE.md`, and review `git log --oneline -10`. If backlog is complete, stop SubTurtle {name} and report shipped work. If stuck/off-track, stop it, diagnose, and restart with corrected state. If progressing, let it run.
+```
+
+`--cron-prompt-template` allows override, with required `{name}` token. If missing, `ctl spawn` fails validation to avoid ambiguous prompts.
+
+### Interval defaults and overrides
+
+- Default interval: `5m` (`300000` ms).
+- Override via `--cron-interval <duration>` (same duration parser as timeout flags).
+- Validation rules:
+  - minimum `1m`
+  - maximum `24h`
+  - non-recurring intervals are rejected (spawn supervision is always recurring)
+
+### State linkage for cleanup
+
+After writing cron job successfully, `ctl spawn` stores linkage in `.subturtles/<name>/subturtle.meta`:
+
+```text
+CRON_JOB_ID=e7f8a9
+CRON_INTERVAL_MS=300000
+CRON_JOBS_FILE=super_turtle/claude-telegram-bot/cron-jobs.json
+```
+
+This gives `ctl stop` deterministic cleanup without fuzzy matching.
+
+### Cleanup behavior in `ctl stop`
+
+`ctl stop <name>` is extended to:
+
+1. Read `CRON_JOB_ID` from meta.
+2. Remove that job from cron store if present.
+3. Continue stop flow even if cron removal fails (process stop is higher priority), but print warning.
+
+Idempotency rules:
+
+- If job is already missing, stop still succeeds.
+- Repeated `ctl stop` calls remain safe.
+
+### Timeout and crash cleanup
+
+Primary cleanup path is `ctl stop`, but watchdog timeouts can bypass manual stops. To prevent orphan recurring jobs:
+
+- Add `ctl cron-cleanup <name>` helper (non-interactive; removes `CRON_JOB_ID` job if present).
+- Watchdog timeout path calls `ctl cron-cleanup <name>` before deleting meta/PID files.
+
+If watchdog cannot run cleanup (rare hard kill), next meta-agent check-in sees dead SubTurtle and invokes `ctl stop <name>` once, which performs the same cron cleanup.
+
+### Duplicate and conflict handling
+
+Before appending a job, `ctl spawn` checks for an existing recurring job linked to the same SubTurtle:
+
+- match by `CRON_JOB_ID` if meta exists
+- fallback match by canonical prompt prefix: `Check SubTurtle <name>:`
+
+Behavior:
+
+- If existing job is found, `ctl spawn` updates its `interval_ms`, `fire_at`, and `prompt` instead of creating a duplicate.
+- If no job exists, create new one.
+
+This avoids duplicate supervision loops across restart cycles.
