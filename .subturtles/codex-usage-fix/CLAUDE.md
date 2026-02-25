@@ -1,5 +1,5 @@
 ## Current Task
-Current backlog is complete. Waiting for next task assignment.
+Current backlog is complete. Verified again on February 25, 2026. Waiting for next task assignment.
 
 ## End Goal with Specs
 The `/usage` Telegram command should display real Codex quota data using `codex app-server` JSON-RPC. The implementation is ALREADY WRITTEN in `commands.ts` — it just needs testing, possible fixes, and a clean commit.
@@ -32,3 +32,4 @@ The `/usage` Telegram command should display real Codex quota data using `codex 
 - Focus on: test, fix if needed, commit
 - The commit message should be: "feat(usage): replace pexpect Codex quota with app-server JSON-RPC"
 - Verification on February 25, 2026: `bun test src/handlers/commands.usage.test.ts` and `bun build src/handlers/commands.ts --no-bundle` both pass.
+- Re-verification on February 25, 2026: same commands pass after state restore check.
