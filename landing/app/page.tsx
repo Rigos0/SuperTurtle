@@ -488,7 +488,69 @@ export default function Home() {
           {/* Comparison table */}
           <div className="rounded-xl border p-8" style={{ backgroundColor: '#ffffff', borderColor: 'rgba(90, 114, 71, 0.2)' }}>
             <h3 className="text-lg font-semibold mb-6" style={{ color: '#2d2a26' }}>Quick Comparison</h3>
-            <div className="overflow-x-auto">
+
+            {/* Mobile: Stacked blocks layout */}
+            <div className="md:hidden space-y-8">
+              {/* Thoroughness */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-base" style={{ color: '#6b6460' }}>Thoroughness</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center py-2" style={{ borderBottomColor: 'rgba(90, 114, 71, 0.1)', borderBottomWidth: '1px' }}>
+                    <span className="text-sm" style={{ color: '#5a7247' }}>Slow</span>
+                    <span className="font-semibold text-sm" style={{ color: '#5a7247' }}>★★★★★</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2" style={{ borderBottomColor: 'rgba(90, 114, 71, 0.1)', borderBottomWidth: '1px' }}>
+                    <span className="text-sm" style={{ color: '#c07a56' }}>Yolo</span>
+                    <span className="font-semibold text-sm" style={{ color: '#c07a56' }}>★★★☆☆</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-sm" style={{ color: '#8fa87e' }}>Yolo-Codex</span>
+                    <span className="font-semibold text-sm" style={{ color: '#8fa87e' }}>★★☆☆☆</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Speed */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-base" style={{ color: '#6b6460' }}>Speed</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center py-2" style={{ borderBottomColor: 'rgba(90, 114, 71, 0.1)', borderBottomWidth: '1px' }}>
+                    <span className="text-sm" style={{ color: '#5a7247' }}>Slow</span>
+                    <span className="font-semibold text-sm" style={{ color: '#5a7247' }}>★★☆☆☆</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2" style={{ borderBottomColor: 'rgba(90, 114, 71, 0.1)', borderBottomWidth: '1px' }}>
+                    <span className="text-sm" style={{ color: '#c07a56' }}>Yolo</span>
+                    <span className="font-semibold text-sm" style={{ color: '#c07a56' }}>★★★★★</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-sm" style={{ color: '#8fa87e' }}>Yolo-Codex</span>
+                    <span className="font-semibold text-sm" style={{ color: '#8fa87e' }}>★★★★☆</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cost */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-base" style={{ color: '#6b6460' }}>Cost</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center py-2" style={{ borderBottomColor: 'rgba(90, 114, 71, 0.1)', borderBottomWidth: '1px' }}>
+                    <span className="text-sm" style={{ color: '#5a7247' }}>Slow</span>
+                    <span className="font-semibold text-sm" style={{ color: '#5a7247' }}>Higher</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2" style={{ borderBottomColor: 'rgba(90, 114, 71, 0.1)', borderBottomWidth: '1px' }}>
+                    <span className="text-sm" style={{ color: '#c07a56' }}>Yolo</span>
+                    <span className="font-semibold text-sm" style={{ color: '#c07a56' }}>Standard</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-sm" style={{ color: '#8fa87e' }}>Yolo-Codex</span>
+                    <span className="font-semibold text-sm" style={{ color: '#8fa87e' }}>Lower</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Desktop: Table layout */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ borderBottomColor: 'rgba(90, 114, 71, 0.15)', borderBottomWidth: '1px' }}>

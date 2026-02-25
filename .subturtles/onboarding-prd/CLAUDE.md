@@ -1,6 +1,6 @@
 ## Current Task
 
-Gather feedback on PRD from stakeholders. PRD document available at `docs/PRD-onboarding.md`
+Implement onboarding wizard in root CLAUDE.md. This is the first-time setup detection and interactive flow that guides users through Telegram bot + SubTurtle setup.
 
 ## End Goal with Specs
 
@@ -74,8 +74,8 @@ The main entry point is GitHub. User clones the repo, opens it in Claude Code (r
 - [x] Draft PRD section: Configuration Architecture
 - [x] Draft PRD section: Success Criteria and Open Questions
 - [x] Write complete PRD to docs/PRD-onboarding.md
-- [ ] Review PRD with stakeholders and gather feedback <- current
-- [ ] Implement onboarding wizard in root CLAUDE.md
+- [x] Review PRD with stakeholders and gather feedback (identified gaps: config location ambiguity, brownfield detection details, bot verification mechanism, validation timing, stakeholder questions need answers)
+- [ ] Implement onboarding wizard in root CLAUDE.md <- current
 - [ ] Implement .env creation and validation
 - [ ] Add Telegram bot connectivity check
 - [ ] Add SubTurtle spawn integration
