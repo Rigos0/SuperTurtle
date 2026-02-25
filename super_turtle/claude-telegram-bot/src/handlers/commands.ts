@@ -546,20 +546,24 @@ export function formatUnifiedUsage(
   // Extract Claude usage data
   let claudeStatus = "❓";
   let claudeHighestPct = 0;
+  let claudeDataMissing = true;
   const claudeSection: string[] = [];
 
   if (usageLines.length > 0) {
     for (const line of usageLines) {
       const pct = parseClaudePercentage(line);
       if (pct !== null) {
+        claudeDataMissing = false;
         claudeHighestPct = Math.max(claudeHighestPct, pct);
       }
     }
-    claudeStatus = getStatusEmoji(claudeHighestPct);
+    if (!claudeDataMissing) {
+      claudeStatus = getStatusEmoji(claudeHighestPct);
+    }
     claudeSection.push(`${claudeStatus} <b>Claude Code</b>`);
     claudeSection.push(...usageLines.map((line) => `   ${line}`));
   } else {
-    claudeSection.push(`✅ <b>Claude Code</b>`);
+    claudeSection.push(`❓ <b>Claude Code</b>`);
     claudeSection.push(`   <i>No usage data available</i>`);
   }
 
@@ -569,6 +573,7 @@ export function formatUnifiedUsage(
   if (codexEnabled) {
     let codexStatus = "❓";
     let codexHighestPct = 0;
+    let codexDataMissing = true;
     let codexPlanType = "";
     const codexSection: string[] = [];
     let codexDisplayLines = [...codexLines];
@@ -583,10 +588,13 @@ export function formatUnifiedUsage(
       for (const line of codexDisplayLines) {
         const pct = parseCodexPercentage(line);
         if (pct !== null) {
+          codexDataMissing = false;
           codexHighestPct = Math.max(codexHighestPct, pct);
         }
       }
-      codexStatus = getStatusEmoji(codexHighestPct);
+      if (!codexDataMissing) {
+        codexStatus = getStatusEmoji(codexHighestPct);
+      }
       const codexHeader = `${codexStatus} <b>Codex${codexPlanType ? ` (${codexPlanType})` : ""}</b>`;
       codexSection.push(codexHeader);
       codexSection.push(...codexDisplayLines.map((line) => {
@@ -600,7 +608,7 @@ export function formatUnifiedUsage(
       codexSection.push(`⚠️ <b>Codex</b>`);
       codexSection.push(...codexDisplayLines.map((line) => `   ${line}`));
     } else {
-      codexSection.push(`✅ <b>Codex</b>`);
+      codexSection.push(`❓ <b>Codex</b>`);
       codexSection.push(`   <i>No quota data available</i>`);
     }
 
@@ -612,7 +620,9 @@ export function formatUnifiedUsage(
     const anyCritical = claudeHighestPct >= 95 || codexHighestPct >= 95;
 
     let statusSummary = "";
-    if (anyCritical) {
+    if (claudeDataMissing || codexDataMissing) {
+      statusSummary = `❓ <b>Status:</b> Partial data — check above`;
+    } else if (anyCritical) {
       statusSummary = `🔴 <b>Status:</b> One or more services critical`;
     } else if (anyWarning) {
       statusSummary = `⚠️ <b>Status:</b> One or more services nearing limit`;
