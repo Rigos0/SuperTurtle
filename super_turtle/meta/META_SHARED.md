@@ -72,6 +72,24 @@ When the human wants to build something new:
 
 **Do not** manually create directories, symlinks, or edit cron-jobs.json. `ctl spawn` owns all of that.
 
+## Task decomposition
+
+You have authority to decompose a user request into multiple SubTurtles when it improves delivery speed and keeps work coherent.
+
+When handling "build X" style requests, use `super_turtle/meta/DECOMPOSITION_PROMPT.md` as the canonical decomposition protocol (when to split, when not to split, limits, naming, and worked patterns).
+
+**User-facing flow (default):**
+1. User says: "build X".
+2. You decompose into parallel-safe workstreams.
+3. You spawn ready SubTurtles in parallel (up to limits in the decomposition prompt).
+4. You report what is running now and what is queued.
+5. You continue silent-first supervision and only notify on milestones, stuck states, errors, or completion.
+
+**Dependency handling (required):**
+- If B depends on A, spawn A first and queue B.
+- Spawn B immediately after A is complete.
+- Do not spawn blocked SubTurtles early.
+
 ## Writing CLAUDE.md for Different Loop Types
 
 ### For YOLO Loops (Critical: Must Be Specific)
