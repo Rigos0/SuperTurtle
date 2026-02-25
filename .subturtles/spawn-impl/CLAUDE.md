@@ -1,6 +1,6 @@
 # Current Task
 
-Commit all changes.
+Backlog complete. Waiting for next task.
 
 # End Goal with Specs
 
@@ -94,4 +94,4 @@ Update the "Starting new work" section to use the new `ctl spawn` flow:
 - [x] Wire `spawn` into the case statement at bottom of ctl
 - [x] Update META_SHARED.md with new spawn flow and auto-cron docs
 - [x] Test: run `./super_turtle/subturtle/ctl spawn test-spawn --type yolo --timeout 5m --state-file -` with echo piped in, verify workspace + cron created, then stop and verify cron cleaned up
-- [ ] Commit all changes <- current
+- [x] Commit all changes
