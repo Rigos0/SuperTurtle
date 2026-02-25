@@ -48,39 +48,28 @@ async function probeUsage(codexEnabled: "true" | "false"): Promise<UsageProbeRes
         };
       }
 
-      if (Array.isArray(cmd) && cmd[0] === "codex") {
-        // Mock codex exec /stats command to fail, forcing fallback to history file
+      if (Array.isArray(cmd) && cmd[0] === "python3") {
+        // Mock python3 call for Codex quota extractor - use lower percentages so status is ✅
         codexFetchCalls += 1;
         return {
-          stdout: Buffer.from(""),
-          stderr: Buffer.from("error"),
-          success: false,
-          exitCode: 1,
+          stdout: Buffer.from(JSON.stringify({
+            timestamp: "2026-02-25T10:30:00Z",
+            messages_remaining: 15,
+            window_5h_pct: 70,
+            weekly_limit_pct: 60,
+            reset_times: {
+              window_reset: "in 1h 30m",
+              weekly_reset: "in 2d 3h",
+            },
+          })),
+          stderr: Buffer.from(""),
+          success: true,
+          exitCode: 0,
         };
       }
 
       // Fallback to original if not mocked
       return originalSpawnSync(cmd, opts);
-    };
-
-    const originalFile = Bun.file;
-    Bun.file = (path) => {
-      // Handle all types of paths (string, BunFile, etc.)
-      const pathStr = typeof path === "string" ? path : String(path);
-      if (pathStr && pathStr.includes(".codex/history.jsonl")) {
-        // Return mock history file with recent entries (within 7 days)
-        const now = Math.floor(Date.now() / 1000);
-        const mockHistory = [
-          JSON.stringify({ session_id: "sess-1", ts: now - 100000, text: "Hello world test" }),
-          JSON.stringify({ session_id: "sess-1", ts: now - 50000, text: "Another test message with more words" }),
-          JSON.stringify({ session_id: "sess-2", ts: now - 1000, text: "Third session test" }),
-        ].join("\\n");
-
-        return {
-          text: async () => mockHistory,
-        };
-      }
-      return originalFile(path);
     };
 
     globalThis.fetch = async (input) => {
@@ -152,22 +141,27 @@ describe("/usage command with CODEX_ENABLED variations", () => {
     expect(result.payload).not.toBeNull();
     expect(result.payload?.replyCount).toBe(1);
     expect(result.payload?.parseMode).toBe("HTML");
-    expect(result.payload?.replyText).toContain("<b>Usage</b>");
-    expect(result.payload?.replyText).toContain("<b>Claude usage</b>");
-    expect(result.payload?.replyText).not.toContain("<b>Codex usage</b>");
+    expect(result.payload?.replyText).toContain("📊 <b>Usage & Quotas</b>");
+    expect(result.payload?.replyText).toContain("<b>Claude Code</b>");
+    expect(result.payload?.replyText).not.toContain("<b>Codex</b>");
+    expect(result.payload?.replyText).toContain("✅ <b>Status:</b> Claude Code operating normally");
     expect(result.payload?.codexFetchCalls).toBe(0);
   });
 
-  it("returns Claude and Codex sections when CODEX_ENABLED=true", async () => {
+  it("returns Claude and Codex sections with status indicators when CODEX_ENABLED=true", async () => {
     const result = await probeUsage("true");
     expect(result.exitCode).toBe(0);
     expect(result.payload).not.toBeNull();
     expect(result.payload?.replyCount).toBe(1);
     expect(result.payload?.parseMode).toBe("HTML");
-    expect(result.payload?.replyText).toContain("<b>Usage</b>");
-    expect(result.payload?.replyText).toContain("<b>Claude usage</b>");
-    expect(result.payload?.replyText).toContain("<b>Codex usage</b>");
-    expect(result.payload?.replyText).toContain("Codex (last 7 days)");
+    expect(result.payload?.replyText).toContain("📊 <b>Usage & Quotas</b>");
+    expect(result.payload?.replyText).toContain("<b>Claude Code</b>");
+    expect(result.payload?.replyText).toContain("<b>Codex</b>");
+    // Status can be ✅ (all OK) or ⚠️ (warning) depending on percentages
+    const hasStatusIndicator = result.payload?.replyText.includes("✅ <b>Status:</b>") ||
+                                result.payload?.replyText.includes("⚠️ <b>Status:</b>") ||
+                                result.payload?.replyText.includes("🔴 <b>Status:</b>");
+    expect(hasStatusIndicator).toBe(true);
     expect(result.payload?.codexFetchCalls).toBeGreaterThan(0);
   });
 });

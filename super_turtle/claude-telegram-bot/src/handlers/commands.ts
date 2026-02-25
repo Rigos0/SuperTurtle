@@ -507,7 +507,130 @@ export async function getCodexUsageLines(): Promise<string[]> {
 }
 
 /**
- * /usage - Show Claude subscription usage (rate limits).
+ * Parse percentage from Claude usage bar line (e.g., "▓▓░░░░ 45% Session")
+ */
+function parseClaudePercentage(line: string): number | null {
+  const match = line.match(/(\d+)%/);
+  return match?.[1] ? parseInt(match[1], 10) : null;
+}
+
+/**
+ * Parse percentage from Codex quota lines (e.g., "   • `85%` used")
+ */
+function parseCodexPercentage(line: string): number | null {
+  const match = line.match(/`(\d+)%`/);
+  return match?.[1] ? parseInt(match[1], 10) : null;
+}
+
+/**
+ * Get status emoji based on usage percentage.
+ * ✅ Good (<80%), ⚠️ Warning (80-94%), 🔴 Critical (≥95%)
+ */
+function getStatusEmoji(pct: number | null): string {
+  if (pct === null) return "❓";
+  if (pct < 80) return "✅";
+  if (pct < 95) return "⚠️";
+  return "🔴";
+}
+
+/**
+ * Format unified usage display combining Claude and Codex data.
+ */
+function formatUnifiedUsage(
+  usageLines: string[],
+  codexLines: string[],
+  codexEnabled: boolean
+): string {
+  const sections: string[] = ["📊 <b>Usage & Quotas</b>\n"];
+
+  // Extract Claude usage data
+  let claudeStatus = "❓";
+  let claudeHighestPct = 0;
+  const claudeSection: string[] = [];
+
+  if (usageLines.length > 0) {
+    for (const line of usageLines) {
+      const pct = parseClaudePercentage(line);
+      if (pct !== null) {
+        claudeHighestPct = Math.max(claudeHighestPct, pct);
+      }
+    }
+    claudeStatus = getStatusEmoji(claudeHighestPct);
+    claudeSection.push(`${claudeStatus} <b>Claude Code</b>`);
+    claudeSection.push(...usageLines.map((line) => `   ${line}`));
+  } else {
+    claudeSection.push(`✅ <b>Claude Code</b>`);
+    claudeSection.push(`   <i>No usage data available</i>`);
+  }
+
+  sections.push(claudeSection.join("\n"));
+
+  // Extract Codex quota data
+  if (codexEnabled) {
+    let codexStatus = "❓";
+    let codexHighestPct = 0;
+    const codexSection: string[] = [];
+
+    if (codexLines.length > 0 && !codexLines[0]?.includes("Failed to fetch")) {
+      for (const line of codexLines) {
+        const pct = parseCodexPercentage(line);
+        if (pct !== null) {
+          codexHighestPct = Math.max(codexHighestPct, pct);
+        }
+      }
+      codexStatus = getStatusEmoji(codexHighestPct);
+      codexSection.push(`${codexStatus} <b>Codex</b>`);
+      codexSection.push(...codexLines.map((line) => {
+        // Indent lines that aren't already formatted section headers
+        if (line.startsWith("<b>")) {
+          return `   ${line}`;
+        }
+        return `   ${line}`;
+      }));
+    } else if (codexLines.length > 0) {
+      codexSection.push(`⚠️ <b>Codex</b>`);
+      codexSection.push(...codexLines.map((line) => `   ${line}`));
+    } else {
+      codexSection.push(`✅ <b>Codex</b>`);
+      codexSection.push(`   <i>No quota data available</i>`);
+    }
+
+    sections.push(codexSection.join("\n"));
+
+    // Add summary line
+    const bothOk = claudeHighestPct < 80 && codexHighestPct < 80;
+    const anyWarning = claudeHighestPct >= 80 || codexHighestPct >= 80;
+    const anyCritical = claudeHighestPct >= 95 || codexHighestPct >= 95;
+
+    let statusSummary = "";
+    if (anyCritical) {
+      statusSummary = `🔴 <b>Status:</b> One or more services critical`;
+    } else if (anyWarning) {
+      statusSummary = `⚠️ <b>Status:</b> One or more services nearing limit`;
+    } else if (bothOk) {
+      statusSummary = `✅ <b>Status:</b> All services operating normally`;
+    } else {
+      statusSummary = `❓ <b>Status:</b> Check data above`;
+    }
+    sections.push(statusSummary);
+  } else {
+    // Just show Claude status
+    let statusSummary = "";
+    if (claudeHighestPct >= 95) {
+      statusSummary = `🔴 <b>Status:</b> Claude Code critical`;
+    } else if (claudeHighestPct >= 80) {
+      statusSummary = `⚠️ <b>Status:</b> Claude Code nearing limit`;
+    } else {
+      statusSummary = `✅ <b>Status:</b> Claude Code operating normally`;
+    }
+    sections.push(statusSummary);
+  }
+
+  return sections.join("\n\n");
+}
+
+/**
+ * /usage - Show Claude subscription usage and Codex quota in unified display.
  */
 export async function handleUsage(ctx: Context): Promise<void> {
   const userId = ctx.from?.id;
@@ -517,35 +640,23 @@ export async function handleUsage(ctx: Context): Promise<void> {
     return;
   }
 
-  const [usageLines, codexUsageLines] = await Promise.all([
+  const [usageLines, codexQuotaLines] = await Promise.all([
     getUsageLines(),
-    CODEX_ENABLED ? getCodexUsageLines() : Promise.resolve<string[]>([]),
+    CODEX_ENABLED ? getCodexQuotaLines() : Promise.resolve<string[]>([]),
   ]);
 
-  const sections: string[] = [];
-
-  if (usageLines.length > 0) {
-    sections.push(`<b>Claude usage</b>\n${usageLines.join("\n")}`);
-  } else {
-    sections.push(`<b>Claude usage</b>\nUnavailable right now.`);
-  }
-
-  if (CODEX_ENABLED) {
-    if (codexUsageLines.length > 0) {
-      sections.push(`<b>Codex usage</b>\n${codexUsageLines.join("\n")}`);
-    } else {
-      sections.push(`<b>Codex usage</b>\nUnavailable right now.`);
-    }
-  }
-
   const hasClaudeData = usageLines.length > 0;
-  const hasCodexData = !CODEX_ENABLED || codexUsageLines.length > 0;
+  const hasCodexData = !CODEX_ENABLED || codexQuotaLines.length > 0;
+
   if (!hasClaudeData && !hasCodexData) {
-    await ctx.reply("Failed to fetch usage.");
+    await ctx.reply("❌ <b>Failed to fetch usage data</b>\n\nCould not retrieve Claude or Codex quota information.", {
+      parse_mode: "HTML",
+    });
     return;
   }
 
-  await ctx.reply(`<b>Usage</b>\n\n${sections.join("\n\n")}`, {
+  const unifiedOutput = formatUnifiedUsage(usageLines, codexQuotaLines, CODEX_ENABLED);
+  await ctx.reply(unifiedOutput, {
     parse_mode: "HTML",
   });
 }
