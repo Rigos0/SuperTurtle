@@ -1,6 +1,80 @@
 # Current task
 
-Project infrastructure verified operational. Awaiting next project work direction.
+When user opens this repo for the first time: detect if `.env` is missing or `TELEGRAM_BOT_TOKEN` is not set. If so, run the onboarding wizard to guide them through setup.
+
+## Onboarding Wizard (Step-by-Step Implementation Guide)
+
+**When to trigger:** On first Claude Code open, if `.env` doesn't exist or `TELEGRAM_BOT_TOKEN` not set.
+
+**What to do:**
+
+1. **Welcome** — Show friendly intro explaining Super Turtle and setup (~5 min)
+
+2. **Ask setup preference:**
+   - Personal bot (just me)
+   - Team bot (multiple users)
+   - Skip for now
+
+3. **Collect Telegram bot token:**
+   - Guide user to @BotFather → /newbot
+   - Validate format: `^\d+:[A-Za-z0-9_-]+$`
+   - Retry up to 3 times, then allow skip
+
+4. **Collect user ID:**
+   - Guide user to @userinfobot
+   - Validate: must be digits only
+   - Retry up to 3 times
+
+5. **Ask for OpenAI key (optional):**
+   - For voice transcription
+   - Link to https://platform.openai.com/api/keys
+   - Can skip and add later
+
+6. **Show summary & confirm:**
+   - Display masked token and collected settings
+   - Get user confirmation before proceeding
+
+7. **Create .env file:**
+   - Write to: `super_turtle/claude-telegram-bot/.env`
+   - Format: `KEY=value` pairs (see .env.example)
+   - Ensure it's in .gitignore
+
+8. **Install dependencies:**
+   - Run: `cd super_turtle/claude-telegram-bot && bun install`
+   - Show progress
+   - Handle bun not found error gracefully
+
+9. **Start the bot:**
+   - Run: `bun run src/index.ts`
+   - Wait for "Bot started: @botname" in logs
+
+10. **Verify bot works:**
+    - Ask user to test with /start command
+    - Wait for confirmation (5 min timeout)
+    - Show troubleshooting if no response
+
+11. **Offer SubTurtle spawn:**
+    - Ask if user wants to create first project
+    - Get project description and name
+    - Spawn with: `./super_turtle/subturtle/ctl spawn <name>`
+
+12. **Success message:**
+    - Celebrate! Show what's running
+    - Explain next steps and commands
+
+**Key implementation details:**
+- Use Claude Code's AskUserQuestion for multi-choice prompts
+- Validate all user input before using
+- Handle errors gracefully with helpful recovery steps
+- Never expose secrets in messages (mask tokens)
+- Save state incrementally so user can resume if interrupted
+- Make each step feel conversational, not robotic
+
+**Files to create/modify:**
+- `super_turtle/claude-telegram-bot/.env` (created during setup)
+- Ensure `.gitignore` has `super_turtle/claude-telegram-bot/.env`
+
+**See docs/PRD-onboarding.md for full requirements and spec.**
 
 # End goal with specs
 

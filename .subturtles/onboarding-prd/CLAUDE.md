@@ -1,6 +1,6 @@
 ## Current Task
 
-Implement onboarding wizard in root CLAUDE.md. This is the first-time setup detection and interactive flow that guides users through Telegram bot + SubTurtle setup.
+Implement .env creation and validation logic. Create helper functions/scripts that Claude Code can use to safely create and validate the .env file with user-provided secrets.
 
 ## End Goal with Specs
 
@@ -75,8 +75,8 @@ The main entry point is GitHub. User clones the repo, opens it in Claude Code (r
 - [x] Draft PRD section: Success Criteria and Open Questions
 - [x] Write complete PRD to docs/PRD-onboarding.md
 - [x] Review PRD with stakeholders and gather feedback (identified gaps: config location ambiguity, brownfield detection details, bot verification mechanism, validation timing, stakeholder questions need answers)
-- [ ] Implement onboarding wizard in root CLAUDE.md <- current
-- [ ] Implement .env creation and validation
+- [x] Implement onboarding wizard in root CLAUDE.md (guides user through setup prompts with validation)
+- [ ] Implement .env creation and validation <- current
 - [ ] Add Telegram bot connectivity check
 - [ ] Add SubTurtle spawn integration
 - [ ] Test greenfield scenario (fresh clone)
