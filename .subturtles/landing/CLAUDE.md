@@ -1,6 +1,6 @@
 ## Current Task
 
-Rewrite Hero section: mobile-first, left-aligned text, big bold headline, turtle logo, GitHub CTA. This establishes the visual foundation for the landing page on mobile devices.
+Rewrite "What it does" cards: implement left accent bar design, clean single-column mobile stack with proper spacing and responsive grid layout for tablet/desktop.
 
 ## End Goal with Specs
 
@@ -46,8 +46,8 @@ A landing page that looks GREAT on mobile (iPhone-sized screens first), then sca
 
 - [x] Rewrite globals.css: clean CSS variables, add utility classes (@apply patterns), remove unused styles
 - [x] Build sticky nav header component (turtle logo + "agentic" + GitHub CTA, appears on scroll)
-- [ ] Rewrite Hero section: mobile-first, left-aligned text, big bold headline, turtle logo, GitHub CTA <- current
-- [ ] Rewrite "What it does" cards: left accent bar design, clean single-column mobile stack
+- [x] Rewrite Hero section: mobile-first, left-aligned text, big bold headline, turtle logo, GitHub CTA
+- [ ] Rewrite "What it does" cards: left accent bar design, clean single-column mobile stack <- current
 - [ ] Rewrite "How it works": replace SVG diagram with vertical step-flow (mobile-friendly), keep desktop 2-col
 - [ ] Rewrite "Loop types": stacked cards mobile, comparison as stacked blocks (not table) on mobile
 - [ ] Rewrite terminal demo + getting started: mobile-readable code blocks, proper overflow handling
