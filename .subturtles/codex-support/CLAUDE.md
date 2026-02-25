@@ -1,7 +1,7 @@
 # Codex Support Task - SubTurtle
 
 ## Current Task
-Test config loading with both enabled/disabled states
+Test /usage command with and without Codex enabled
 
 ## End Goal with Specs
 Implement full Codex support in Super Turtle's Telegram bot:
@@ -47,8 +47,8 @@ Implement full Codex support in Super Turtle's Telegram bot:
 - [x] Update /usage command handler to include Codex stats when enabled
 - [x] Update README.md with CLOTH subscription explanation
 - [x] Add Codex configuration section to README
-- [ ] Test config loading with both enabled/disabled states <- current
-- [ ] Test /usage command with and without Codex enabled
+- [x] Test config loading with both enabled/disabled states
+- [ ] Test /usage command with and without Codex enabled <- current
 - [ ] Final review and commit
 
 ## Notes
