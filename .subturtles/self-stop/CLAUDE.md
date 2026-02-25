@@ -1,5 +1,5 @@
 ## Current Task
-Rewrite the `## Key design concept: SubTurtles cannot stop themselves` section in `super_turtle/meta/META_SHARED.md` to document the new self-stop mechanism.
+All backlog items complete.
 
 ## End Goal with Specs
 SubTurtles can signal completion by writing a STOP directive to their CLAUDE.md. The Python loop checks for this after each iteration and breaks cleanly. Works for all 3 loop types.
@@ -16,8 +16,8 @@ SubTurtles can signal completion by writing a STOP directive to their CLAUDE.md.
 - [x] Wire `_should_stop()` into all 3 loop functions: `run_slow_loop`, `run_yolo_loop`, `run_yolo_codex_loop`. Add `if _should_stop(state_file, name): break` after the try/except block in each loop. Fix the `_state_file` variable name in yolo and yolo-codex to `state_file` (remove underscore prefix) so it's accessible.
 - [x] Update `REVIEWER_PROMPT` — add step 5 telling the reviewer to append `## Loop Control\nSTOP` to the state file when ALL backlog items are `[x]`.
 - [x] Update `YOLO_PROMPT` — add step 6 telling the agent to append `## Loop Control\nSTOP` to the state file after committing when ALL backlog items are `[x]`, then amend the commit.
-- [ ] Rewrite the `## Key design concept: SubTurtles cannot stop themselves` section in `super_turtle/meta/META_SHARED.md` (around line 209) to document the new self-stop mechanism. Rename it to `## Key design concept: SubTurtle self-completion`. Explain: agent writes `## Loop Control\nSTOP` to CLAUDE.md, loop checks after each iteration, process exits cleanly. Watchdog and cron still exist as fallbacks. <- current
-- [ ] Commit all changes
+- [x] Rewrite the `## Key design concept: SubTurtles cannot stop themselves` section in `super_turtle/meta/META_SHARED.md` (around line 209) to document the new self-stop mechanism. Rename it to `## Key design concept: SubTurtle self-completion`. Explain: agent writes `## Loop Control\nSTOP` to CLAUDE.md, loop checks after each iteration, process exits cleanly. Watchdog and cron still exist as fallbacks.
+- [x] Commit all changes
 
 ## Notes
 - File: `super_turtle/subturtle/__main__.py` — all loop logic and prompts live here

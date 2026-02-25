@@ -206,16 +206,24 @@ When the full roadmap is complete, stop the last SubTurtle with `ctl stop` (cron
 
 Summarize for the human: what shipped, what's in flight, any blockers.
 
-## Key design concept: SubTurtles cannot stop themselves
+## Key design concept: SubTurtle self-completion
 
-SubTurtles are dumb workers. They **cannot stop, pause, or terminate themselves**. They have no awareness of their own lifecycle — they just keep looping until killed externally.
+SubTurtles can now signal that their work is done. When a SubTurtle finishes all backlog items, it should append this directive to its state file (`CLAUDE.md`):
 
-All lifecycle control lives in `./super_turtle/subturtle/ctl` and the meta agent:
-- **Starting** — the meta agent should use `./super_turtle/subturtle/ctl spawn` (or `ctl start` only for low-level/manual cases).
-- **Stopping** — the meta agent kills them via `./super_turtle/subturtle/ctl stop` (which also removes the SubTurtle's cron job), or the **watchdog timer** kills them automatically when their timeout expires.
-- **No self-exit** — the SubTurtle loop has no break condition, no iteration limit, no self-termination logic. This is intentional.
+```
+## Loop Control
+STOP
+```
 
-This means: if you spawn a SubTurtle, **you are responsible for it**. Every SubTurtle has a timeout (default: 1 hour) after which the watchdog auto-kills it. Use `./super_turtle/subturtle/ctl status` or `./super_turtle/subturtle/ctl list` to monitor time remaining.
+The Python loop checks for this directive after each iteration. If present, it logs the stop event and exits cleanly.
+
+Lifecycle control is now shared between self-completion and external safeguards:
+- **Start** — the meta agent should use `./super_turtle/subturtle/ctl spawn` (or `ctl start` only for low-level/manual cases).
+- **Normal completion** — the SubTurtle writes `## Loop Control` + `STOP`, and the loop exits on the next check.
+- **External stop** — the meta agent can still stop it via `./super_turtle/subturtle/ctl stop` (which also removes the SubTurtle's cron job).
+- **Timeout fallback** — the watchdog still enforces timeout and kills overdue processes.
+
+This keeps completion autonomous while preserving watchdog and cron supervision as fallbacks.
 
 ## SubTurtle commands (internal — don't expose these to the human)
 
