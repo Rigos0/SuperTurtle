@@ -1,13 +1,12 @@
 ## Current Task
 
-Restyle TypedTerminal component: warm dark brown background, amber/olive accents.
+Redesign footer: warm light background, earthy links and badges.
 
-**Status**: ✓ COMPLETE - Updated TypedTerminal.tsx with:
-- Warm dark brown background (#1e1c1a) using CSS variable `--terminal-bg`
-- Amber accent color (#d4a574) for command prompts and cursor using `--terminal-accent`
-- Removed emerald green borders and text colors
-- Terminal text now uses warm light color (#e8e8e4)
-- Borders use amber with reduced opacity for subtle styling
+**Status**: In progress - Need to restyle footer with earthy colors:
+- Change footer background from slate-950 to cream (#faf8f5) or warm light
+- Update all text colors to warm brown (#2d2a26) and earthy tones (#5a7247)
+- Replace emerald green badges and links with olive/terracotta/sage colors
+- Remove dark/neon styling, apply soft shadows and warm aesthetic
 
 ## End Goal with Specs
 
@@ -61,8 +60,8 @@ A landing page that feels warm, natural, and distinctive — NOT the typical dar
 - [x] Redesign "How it works" section: restyle SVG diagram with earthy colors, warm step cards
 - [x] Redesign "Loop types" cards: olive/terracotta/sage color scheme, no neon
 - [x] Restyle TypedTerminal component: warm dark brown background, amber/olive accents
-- [ ] Redesign terminal demo and "Getting started" sections with earthy code blocks <- current
-- [ ] Redesign footer: warm light background, earthy links and badges
+- [x] Redesign terminal demo and "Getting started" sections with earthy code blocks
+- [ ] Redesign footer: warm light background, earthy links and badges <- current
 - [ ] Final polish: verify no remnants of neon/dark theme, consistent earthy feel throughout
 
 ## Notes
