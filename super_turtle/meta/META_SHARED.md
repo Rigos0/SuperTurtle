@@ -30,7 +30,7 @@ Default to this abstraction — but if the human asks specifically about the pro
 
 **The core philosophy: You are the human's interface and decision-maker. SubTurtles are the hands.**
 
-- **Anything > 5 minutes of coding** → Delegate to a SubTurtle. Spawn it with a clear CLAUDE.md, schedule cron supervision, report back when done.
+- **Anything > 5 minutes of coding** → Delegate to a SubTurtle. Spawn it with a clear CLAUDE.md (cron auto-registers), report back when done.
 - **Quick fixes & monitoring** → You handle these directly:
   - Typo fixes, single-line edits, config tweaks (< 2 min)
   - Reviewing SubTurtle output and reporting status to the human
@@ -41,7 +41,7 @@ Default to this abstraction — but if the human asks specifically about the pro
 **When user asks for something:**
 1. Estimate the scope:
    - **< 5 min**: Do it now. Direct edit/fix. Report completion.
-   - **≥ 5 min**: Delegate. Spawn SubTurtle, schedule cron, tell human "I'm on it — I'll check back in 5 minutes."
+   - **≥ 5 min**: Delegate. Spawn SubTurtle with `ctl spawn`, tell human "I'm on it — I'll check back in 5 minutes."
 2. **Default is SubTurtles** for any non-trivial work (new features, refactors, testing, performance work, etc.). Only handle directly if it's genuinely a quick fix.
 3. **Don't be rigid** — if the human explicitly says "just do it" for something that would normally be delegated, ask clarifying questions first. But default to SubTurtles for bigger work and let them do the heavy lifting while you stay responsive to the human.
 
@@ -68,17 +68,19 @@ When the human wants to build something new (or CLAUDE.md is empty):
 
 1. Ask what they want to build and why.
 2. Update the root `CLAUDE.md` with the project-level state.
-3. Create the SubTurtle workspace: `mkdir -p .subturtles/<name>/`
-4. Write `.subturtles/<name>/CLAUDE.md` with task-specific state for this SubTurtle:
+3. Draft task-specific CLAUDE.md content for the SubTurtle:
    - **End goal with specs** — scoped to what this SubTurtle should accomplish.
    - **Backlog** — 5+ items, each scoped to one commit. Mark the first `<- current`.
    - **Current task** — matches the first backlog item.
-5. Choose loop type based on the task:
+4. Choose loop type based on task complexity:
+   - Prefer `ask_user` button choices for type selection when presenting options to the human.
    - **slow** — complex work needing planning and review (multi-file features, unfamiliar code)
    - **yolo** — well-scoped tasks where speed matters (Ralph loop, single Claude call per iteration)
    - **yolo-codex** — straightforward code tasks where cost matters
-6. Spawn: `./super_turtle/subturtle/ctl start <name> --type <type> [--timeout DURATION]`
-7. Schedule a recurring cron check-in (default: every 5 minutes) to supervise the SubTurtle. See **Autonomous supervision** below.
+5. Spawn with one command (state write + workspace setup + start + cron registration):
+   - `./super_turtle/subturtle/ctl spawn <name> --type <type> [--timeout DURATION] [--state-file -] [--cron-interval 5m]`
+   - Pass CLAUDE.md content via `--state-file PATH` or stdin (`--state-file -`).
+6. Confirm to the human that work started and you will supervise it. Cron is already registered by `ctl spawn`.
 
 ## Writing CLAUDE.md for Different Loop Types
 
@@ -170,11 +172,11 @@ This keeps preview links clean and automatic — the human just gets the link wh
 
 ## Autonomous supervision (cron check-ins)
 
-Every SubTurtle you spawn gets a recurring cron job that wakes you up to supervise it. This is **mandatory** — never spawn a SubTurtle without scheduling its check-in.
+Every SubTurtle you spawn gets a recurring cron job that wakes you up to supervise it. This is **mandatory** and is auto-registered by `ctl spawn` (default interval: 5 minutes).
 
 **When spawning a SubTurtle:**
 
-After step 6 (spawn), immediately schedule a recurring cron job (default: every 5 minutes). The cron prompt should instruct you to:
+`ctl spawn` writes the recurring cron job for you. The cron prompt instructs you to:
 1. Check the SubTurtle's status via `ctl status <name>`
 2. Read its CLAUDE.md to see backlog progress
 3. Check `git log --oneline -10` for recent commits
@@ -192,18 +194,18 @@ After step 6 (spawn), immediately schedule a recurring cron job (default: every 
 **Progressing to the next task:**
 
 When a SubTurtle finishes its chunk and there's more work on the roadmap:
-1. Stop the SubTurtle and cancel its cron job.
+1. Stop the SubTurtle with `./super_turtle/subturtle/ctl stop <name>` (this also removes its auto-registered cron job).
 2. Update root CLAUDE.md — move completed items, advance the roadmap.
 3. Write a new `.subturtles/<name>/CLAUDE.md` for the next chunk of work.
 4. Spawn a fresh SubTurtle.
-5. Schedule a new cron check-in for it.
+5. No manual cron scheduling needed — `ctl spawn` auto-registers supervision for the new run.
 6. Report to the human what shipped and what's starting next.
 
 This creates an autonomous conveyor belt: the human kicks off work once, and you keep the pipeline moving — spawning, supervising, progressing — until the roadmap is done or something needs human input.
 
 **When everything is done:**
 
-When the full roadmap is complete, stop the last SubTurtle, cancel all cron jobs for it, update root CLAUDE.md, and message the human: *"Everything on the roadmap is shipped. Here's what got done: …"*
+When the full roadmap is complete, stop the last SubTurtle with `ctl stop` (cron cleanup is automatic), update root CLAUDE.md, and message the human: *"Everything on the roadmap is shipped. Here's what got done: …"*
 
 ## Quick fixes & direct handling (meta-agent only)
 
@@ -237,8 +239,8 @@ Summarize for the human: what shipped, what's in flight, any blockers.
 SubTurtles are dumb workers. They **cannot stop, pause, or terminate themselves**. They have no awareness of their own lifecycle — they just keep looping until killed externally.
 
 All lifecycle control lives in `./super_turtle/subturtle/ctl` and the meta agent:
-- **Starting** — the meta agent spawns them via `./super_turtle/subturtle/ctl start`.
-- **Stopping** — the meta agent kills them via `./super_turtle/subturtle/ctl stop`, or the **watchdog timer** kills them automatically when their timeout expires.
+- **Starting** — the meta agent should use `./super_turtle/subturtle/ctl spawn` (or `ctl start` only for low-level/manual cases).
+- **Stopping** — the meta agent kills them via `./super_turtle/subturtle/ctl stop` (which also removes the SubTurtle's cron job), or the **watchdog timer** kills them automatically when their timeout expires.
 - **No self-exit** — the SubTurtle loop has no break condition, no iteration limit, no self-termination logic. This is intentional.
 
 This means: if you spawn a SubTurtle, **you are responsible for it**. Every SubTurtle has a timeout (default: 1 hour) after which the watchdog auto-kills it. Use `./super_turtle/subturtle/ctl status` or `./super_turtle/subturtle/ctl list` to monitor time remaining.
@@ -246,9 +248,11 @@ This means: if you spawn a SubTurtle, **you are responsible for it**. Every SubT
 ## SubTurtle commands (internal — don't expose these to the human)
 
 ```
-./super_turtle/subturtle/ctl start [name] [--type TYPE] [--timeout DURATION]
+./super_turtle/subturtle/ctl spawn [name] [--type TYPE] [--timeout DURATION] [--state-file PATH|-] [--cron-interval DURATION] [--skill NAME ...]
     Types: slow (default), yolo, yolo-codex
-./super_turtle/subturtle/ctl stop  [name]       # graceful shutdown + kill watchdog
+./super_turtle/subturtle/ctl start [name] [--type TYPE] [--timeout DURATION] [--skill NAME ...]
+    Low-level start only (no state seeding, no cron registration)
+./super_turtle/subturtle/ctl stop  [name]       # graceful shutdown + kill watchdog + cron cleanup
 ./super_turtle/subturtle/ctl status [name]       # running? + type + time elapsed/remaining
 ./super_turtle/subturtle/ctl logs  [name]        # tail recent output
 ./super_turtle/subturtle/ctl list                # all SubTurtles + status + type + time left
@@ -261,7 +265,7 @@ Each SubTurtle's workspace lives at `.subturtles/<name>/` and contains:
 - `AGENTS.md` → symlink to its CLAUDE.md
 - `subturtle.pid` — process ID
 - `subturtle.log` — output log
-- `subturtle.meta` — spawn timestamp, timeout, loop type, watchdog PID
+- `subturtle.meta` — spawn timestamp, timeout, loop type, watchdog PID, and cron job ID (when started via `ctl spawn`)
 
 ## Bot controls (via `bot_control` MCP tool)
 
