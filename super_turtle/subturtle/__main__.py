@@ -15,6 +15,10 @@ Usage:
 """
 
 import argparse
+import datetime
+import json
+import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -191,6 +195,90 @@ def _resolve_state_ref(state_dir: Path, name: str) -> tuple[Path, str]:
         state_ref = str(state_file)
 
     return state_file, state_ref
+
+
+def _write_completion_notification(state_dir: Path, name: str, project_dir: Path) -> None:
+    """Queue a one-shot BOT_MESSAGE_ONLY cron job with completed Backlog items."""
+    state_file = state_dir / "CLAUDE.md"
+    cron_jobs_path = project_dir / "super_turtle/claude-telegram-bot/cron-jobs.json"
+
+    try:
+        state_text = state_file.read_text(encoding="utf-8")
+    except OSError as error:
+        print(
+            f"[subturtle:{name}] WARNING: could not read {state_file} for completion notification: {error}",
+            file=sys.stderr,
+        )
+        return
+
+    in_backlog = False
+    completed_items: list[str] = []
+    for line in state_text.splitlines():
+        stripped = line.strip()
+        if not in_backlog:
+            if stripped.lower() == "# backlog":
+                in_backlog = True
+            continue
+
+        if stripped.startswith("#"):
+            break
+
+        match = re.match(r"^\s*-\s*\[x\]\s+(.*\S)\s*$", line, flags=re.IGNORECASE)
+        if not match:
+            continue
+        item = re.sub(r"\s*<-\s*current\s*$", "", match.group(1)).strip()
+        if item:
+            completed_items.append(item)
+
+    message_lines = [f"🎉 Finished: {name}"]
+    message_lines.extend(f"✓ {item}" for item in completed_items)
+    prompt = f"BOT_MESSAGE_ONLY:{'\n'.join(message_lines)}"
+
+    try:
+        jobs: list[dict] = []
+        if cron_jobs_path.exists():
+            raw = cron_jobs_path.read_text(encoding="utf-8").strip()
+            if raw:
+                parsed = json.loads(raw)
+                if not isinstance(parsed, list):
+                    raise ValueError("cron-jobs.json must contain a JSON array")
+                jobs = parsed
+
+        existing_ids = {
+            str(job.get("id")) for job in jobs if isinstance(job, dict) and "id" in job
+        }
+
+        job_id = ""
+        for _ in range(32):
+            candidate = secrets.token_hex(3)
+            if candidate not in existing_ids:
+                job_id = candidate
+                break
+        if not job_id:
+            raise RuntimeError("failed to generate unique cron job id")
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        now_ms = int(now.timestamp() * 1000)
+        jobs.append(
+            {
+                "id": job_id,
+                "prompt": prompt,
+                "type": "one-shot",
+                "fire_at": now_ms + 5000,
+                "interval_ms": None,
+                "created_at": now.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            }
+        )
+
+        cron_jobs_path.write_text(json.dumps(jobs, indent=2) + "\n", encoding="utf-8")
+    except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as error:
+        print(
+            f"[subturtle:{name}] WARNING: failed to queue completion notification: {error}",
+            file=sys.stderr,
+        )
+        return
+
+    print(f"[subturtle:{name}] queued completion notification job {job_id}")
 
 
 # ---------------------------------------------------------------------------
