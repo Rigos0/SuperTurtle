@@ -85,7 +85,7 @@ async function probeUsage(codexEnabled: "true" | "false"): Promise<UsageProbeRes
         });
 
         const encoder = new TextEncoder();
-        const fullOutput = encoder.encode(initResponse + "\n" + rateLimitsResponse + "\n");
+        const fullOutput = encoder.encode(initResponse + "\\n" + rateLimitsResponse + "\\n");
 
         let dataReturned = false;
 
@@ -152,7 +152,7 @@ async function probeUsage(codexEnabled: "true" | "false"): Promise<UsageProbeRes
   `;
 
   const proc = Bun.spawn({
-    cmd: ["bun", "-e", script],
+    cmd: ["bun", "--no-env-file", "-e", script],
     env,
     stdout: "pipe",
     stderr: "pipe",
@@ -179,7 +179,9 @@ async function probeUsage(codexEnabled: "true" | "false"): Promise<UsageProbeRes
 describe("/usage command with CODEX_ENABLED variations", () => {
   it("returns Claude section only when CODEX_ENABLED=false", async () => {
     const result = await probeUsage("false");
-    expect(result.exitCode).toBe(0);
+    if (result.exitCode !== 0) {
+      throw new Error(`Probe failed (CODEX_ENABLED=false):\n${result.stderr || result.stdout}`);
+    }
     expect(result.payload).not.toBeNull();
     expect(result.payload?.replyCount).toBe(1);
     expect(result.payload?.parseMode).toBe("HTML");
@@ -192,14 +194,18 @@ describe("/usage command with CODEX_ENABLED variations", () => {
 
   it("returns Claude and Codex sections with status indicators when CODEX_ENABLED=true", async () => {
     const result = await probeUsage("true");
-    expect(result.exitCode).toBe(0);
+    if (result.exitCode !== 0) {
+      throw new Error(`Probe failed (CODEX_ENABLED=true):\n${result.stderr || result.stdout}`);
+    }
     expect(result.payload).not.toBeNull();
     expect(result.payload?.replyCount).toBe(1);
     expect(result.payload?.parseMode).toBe("HTML");
     expect(result.payload?.replyText).toContain("📊 <b>Usage & Quotas</b>");
     expect(result.payload?.replyText).toContain("<b>Claude Code</b>");
-    expect(result.payload?.replyText).toContain("<b>Codex</b>");
-    // Status can be ✅ (all OK) or ⚠️ (warning) depending on percentages
+    expect(result.payload?.replyText).toContain("<b>Codex (pro)</b>");
+    expect(result.payload?.replyText).toMatch(/\d+%.*window/);
+    expect(result.payload?.replyText).toContain("Resets");
+
     const hasStatusIndicator = result.payload?.replyText.includes("✅ <b>Status:</b>") ||
                                 result.payload?.replyText.includes("⚠️ <b>Status:</b>") ||
                                 result.payload?.replyText.includes("🔴 <b>Status:</b>");

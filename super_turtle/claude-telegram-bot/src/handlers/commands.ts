@@ -569,27 +569,36 @@ function formatUnifiedUsage(
   if (codexEnabled) {
     let codexStatus = "❓";
     let codexHighestPct = 0;
+    let codexPlanType = "";
     const codexSection: string[] = [];
+    let codexDisplayLines = [...codexLines];
 
-    if (codexLines.length > 0 && !codexLines[0]?.includes("Failed to fetch")) {
-      for (const line of codexLines) {
+    // Extract plan type from special marker (first line)
+    if (codexDisplayLines.length > 0 && codexDisplayLines[0]?.startsWith("__CODEX_PLAN_TYPE__")) {
+      codexPlanType = codexDisplayLines[0].replace("__CODEX_PLAN_TYPE__", "");
+      codexDisplayLines = codexDisplayLines.slice(1);
+    }
+
+    if (codexDisplayLines.length > 0 && !codexDisplayLines[0]?.includes("Failed to fetch")) {
+      for (const line of codexDisplayLines) {
         const pct = parseCodexPercentage(line);
         if (pct !== null) {
           codexHighestPct = Math.max(codexHighestPct, pct);
         }
       }
       codexStatus = getStatusEmoji(codexHighestPct);
-      codexSection.push(`${codexStatus} <b>Codex</b>`);
-      codexSection.push(...codexLines.map((line) => {
+      const codexHeader = `${codexStatus} <b>Codex${codexPlanType ? ` (${codexPlanType})` : ""}</b>`;
+      codexSection.push(codexHeader);
+      codexSection.push(...codexDisplayLines.map((line) => {
         // Indent lines that aren't already formatted section headers
         if (line.startsWith("<b>")) {
           return `   ${line}`;
         }
         return `   ${line}`;
       }));
-    } else if (codexLines.length > 0) {
+    } else if (codexDisplayLines.length > 0) {
       codexSection.push(`⚠️ <b>Codex</b>`);
-      codexSection.push(...codexLines.map((line) => `   ${line}`));
+      codexSection.push(...codexDisplayLines.map((line) => `   ${line}`));
     } else {
       codexSection.push(`✅ <b>Codex</b>`);
       codexSection.push(`   <i>No quota data available</i>`);
@@ -870,6 +879,12 @@ async function getCodexQuotaLines(): Promise<string[]> {
       if (resetTime) {
         lines.push(`Resets ${resetTime} (${tz})`);
       }
+    }
+
+    // Include plan type as a special marker (first element)
+    const planType = rateLimits.planType || "";
+    if (planType) {
+      lines.unshift(`__CODEX_PLAN_TYPE__${planType}`);
     }
 
     return lines;
