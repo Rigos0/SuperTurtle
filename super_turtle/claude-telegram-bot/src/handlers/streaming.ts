@@ -318,6 +318,14 @@ export class StreamingState {
   toolMessages: Message[] = []; // ephemeral tool status messages
   lastEditTimes = new Map<number, number>(); // segment_id -> last edit time
   lastContent = new Map<number, string>(); // segment_id -> last sent content
+  silentSegments = new Map<number, string>(); // segment_id -> captured text for silent mode
+
+  getSilentCapturedText(): string {
+    return [...this.silentSegments.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([, text]) => text)
+      .join("");
+  }
 }
 
 /**
@@ -502,6 +510,28 @@ export function createStatusCallback(
       }
     } catch (error) {
       console.error("Status callback error:", error);
+    }
+  };
+}
+
+/**
+ * Create a silent status callback for background runs.
+ * Captures streamed text by segment, but never sends Telegram messages.
+ */
+export function createSilentStatusCallback(
+  _ctx: Context,
+  state: StreamingState
+): StatusCallback {
+  return async (statusType: string, content: string, segmentId?: number) => {
+    try {
+      if (
+        (statusType === "text" || statusType === "segment_end") &&
+        segmentId !== undefined
+      ) {
+        state.silentSegments.set(segmentId, content);
+      }
+    } catch (error) {
+      console.error("Silent status callback error:", error);
     }
   };
 }
