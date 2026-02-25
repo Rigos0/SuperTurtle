@@ -175,6 +175,186 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* How it works Section */}
+      <section id="how-it-works" className="relative w-full bg-black py-20 px-6">
+        {/* Background grid pattern */}
+        <div
+          className="absolute inset-0 opacity-3"
+          style={{
+            backgroundImage: 'linear-gradient(0deg, transparent 24%, rgba(16, 185, 129, 0.03) 25%, rgba(16, 185, 129, 0.03) 26%, transparent 27%, transparent 74%, rgba(16, 185, 129, 0.03) 75%, rgba(16, 185, 129, 0.03) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(16, 185, 129, 0.03) 25%, rgba(16, 185, 129, 0.03) 26%, transparent 27%, transparent 74%, rgba(16, 185, 129, 0.03) 75%, rgba(16, 185, 129, 0.03) 76%, transparent 77%, transparent)',
+            backgroundSize: '50px 50px',
+          }}
+        />
+
+        {/* Subtle accent blur */}
+        <div className="absolute top-0 left-1/4 w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl opacity-30" />
+        <div className="absolute bottom-1/4 right-1/3 w-96 h-96 bg-teal-500/5 rounded-full blur-3xl opacity-20" />
+
+        <div className="relative z-10 max-w-6xl mx-auto">
+          {/* Section header */}
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 tracking-tight">
+              How it works
+            </h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+              Coordinate autonomous agents through a simple command-driven interface.
+            </p>
+          </div>
+
+          {/* Architecture diagram */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            {/* Left: Flow diagram */}
+            <div className="flex justify-center">
+              <svg viewBox="0 0 400 600" className="w-full max-w-md" xmlns="http://www.w3.org/2000/svg">
+                {/* Define gradients */}
+                <defs>
+                  <linearGradient id="humanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style={{ stopColor: '#10b981', stopOpacity: 1 }} />
+                    <stop offset="100%" style={{ stopColor: '#14b8a6', stopOpacity: 1 }} />
+                  </linearGradient>
+                  <linearGradient id="metaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style={{ stopColor: '#06b6d4', stopOpacity: 1 }} />
+                    <stop offset="100%" style={{ stopColor: '#0891b2', stopOpacity: 1 }} />
+                  </linearGradient>
+                </defs>
+
+                {/* Title */}
+                <text x="200" y="30" fontSize="18" fontWeight="bold" fill="#ffffff" textAnchor="middle">
+                  Agent Coordination Flow
+                </text>
+
+                {/* Step 1: Human/Developer */}
+                <rect x="100" y="60" width="200" height="70" rx="8" fill="url(#humanGrad)" fillOpacity="0.1" stroke="#10b981" strokeWidth="2" />
+                <circle cx="150" cy="95" r="6" fill="#10b981" />
+                <text x="160" y="100" fontSize="14" fontWeight="bold" fill="#ffffff">You (Developer)</text>
+                <circle cx="250" cy="95" r="6" fill="#10b981" />
+                <text x="170" y="115" fontSize="12" fill="#cbd5e1">Telegram / CLI command</text>
+
+                {/* Arrow 1 */}
+                <line x1="200" y1="130" x2="200" y2="160" stroke="#10b981" strokeWidth="2" />
+                <polygon points="200,160 195,150 205,150" fill="#10b981" />
+
+                {/* Step 2: Meta Agent */}
+                <rect x="80" y="160" width="240" height="70" rx="8" fill="url(#metaGrad)" fillOpacity="0.1" stroke="#06b6d4" strokeWidth="2" />
+                <circle cx="120" cy="195" r="6" fill="#06b6d4" />
+                <text x="130" y="200" fontSize="14" fontWeight="bold" fill="#ffffff">Meta Agent</text>
+                <circle cx="310" cy="195" r="6" fill="#06b6d4" />
+                <text x="145" y="220" fontSize="12" fill="#cbd5e1">Spawns SubTurtles with scoped tasks</text>
+
+                {/* Arrow 2 */}
+                <line x1="200" y1="230" x2="200" y2="260" stroke="#10b981" strokeWidth="2" />
+                <polygon points="200,260 195,250 205,250" fill="#10b981" />
+
+                {/* Step 3: SubTurtles (multiple) */}
+                {/* SubTurtle 1 */}
+                <rect x="20" y="260" width="110" height="100" rx="8" fill="#10b981" fillOpacity="0.05" stroke="#10b981" strokeWidth="1.5" />
+                <text x="75" y="285" fontSize="12" fontWeight="bold" fill="#a7f3d0" textAnchor="middle">SubTurtle 1</text>
+                <text x="75" y="310" fontSize="10" fill="#d1fae5" textAnchor="middle">Read State</text>
+                <text x="75" y="330" fontSize="10" fill="#d1fae5" textAnchor="middle">↓ Plan</text>
+                <text x="75" y="350" fontSize="10" fill="#d1fae5" textAnchor="middle">↓ Execute ↓ Commit</text>
+
+                {/* SubTurtle 2 */}
+                <rect x="145" y="260" width="110" height="100" rx="8" fill="#10b981" fillOpacity="0.05" stroke="#10b981" strokeWidth="1.5" />
+                <text x="200" y="285" fontSize="12" fontWeight="bold" fill="#a7f3d0" textAnchor="middle">SubTurtle 2</text>
+                <text x="200" y="310" fontSize="10" fill="#d1fae5" textAnchor="middle">Read State</text>
+                <text x="200" y="330" fontSize="10" fill="#d1fae5" textAnchor="middle">↓ Plan</text>
+                <text x="200" y="350" fontSize="10" fill="#d1fae5" textAnchor="middle">↓ Execute ↓ Commit</text>
+
+                {/* SubTurtle N */}
+                <rect x="270" y="260" width="110" height="100" rx="8" fill="#10b981" fillOpacity="0.05" stroke="#10b981" strokeWidth="1.5" />
+                <text x="325" y="285" fontSize="12" fontWeight="bold" fill="#a7f3d0" textAnchor="middle">SubTurtle N</text>
+                <text x="325" y="310" fontSize="10" fill="#d1fae5" textAnchor="middle">Read State</text>
+                <text x="325" y="330" fontSize="10" fill="#d1fae5" textAnchor="middle">↓ Plan</text>
+                <text x="325" y="350" fontSize="10" fill="#d1fae5" textAnchor="middle">↓ Execute ↓ Commit</text>
+
+                {/* Arrow 3 */}
+                <line x1="200" y1="360" x2="200" y2="390" stroke="#10b981" strokeWidth="2" />
+                <polygon points="200,390 195,380 205,380" fill="#10b981" />
+
+                {/* Step 4: Codebase & Meta Supervision */}
+                <rect x="60" y="390" width="280" height="80" rx="8" fill="#06b6d4" fillOpacity="0.1" stroke="#06b6d4" strokeWidth="2" />
+                <circle cx="100" cy="420" r="6" fill="#06b6d4" />
+                <text x="110" y="425" fontSize="13" fontWeight="bold" fill="#ffffff">Codebase Modified</text>
+                <circle cx="310" cy="430" r="6" fill="#06b6d4" />
+                <text x="110" y="450" fontSize="11" fill="#cbd5e1">Git commits, state files, artifacts</text>
+                <text x="110" y="470" fontSize="11" fill="#cbd5e1">Meta Agent supervises, progresses tasks</text>
+
+                {/* Feedback arrow back to Meta Agent */}
+                <path d="M 360 420 Q 380 300 240 200" stroke="#14b8a6" strokeWidth="2" fill="none" strokeDasharray="5,5" />
+                <polygon points="240,200 245,210 235,210" fill="#14b8a6" />
+              </svg>
+            </div>
+
+            {/* Right: Description */}
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <h3 className="text-2xl font-semibold text-white">Step-by-step coordination</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  The Meta Agent orchestrates autonomous SubTurtles to tackle complex tasks across your codebase.
+                </p>
+              </div>
+
+              {/* Step descriptions */}
+              <div className="space-y-4">
+                {/* Step 1 */}
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                    <span className="text-emerald-400 font-bold text-sm">1</span>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white mb-1">Initiate via CLI or Telegram</h4>
+                    <p className="text-sm text-gray-400">Send a command to spawn a SubTurtle with a specific task and loop type.</p>
+                  </div>
+                </div>
+
+                {/* Step 2 */}
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
+                    <span className="text-cyan-400 font-bold text-sm">2</span>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white mb-1">Meta Agent spawns SubTurtles</h4>
+                    <p className="text-sm text-gray-400">Each SubTurtle gets its own workspace, CLAUDE.md state file, and execution environment.</p>
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                    <span className="text-emerald-400 font-bold text-sm">3</span>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white mb-1">SubTurtle executes its loop</h4>
+                    <p className="text-sm text-gray-400">Read state → Plan → Execute → Commit. Runs autonomously based on loop type selection.</p>
+                  </div>
+                </div>
+
+                {/* Step 4 */}
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
+                    <span className="text-cyan-400 font-bold text-sm">4</span>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white mb-1">Meta Agent supervises & progresses</h4>
+                    <p className="text-sm text-gray-400">Monitors progress via cron check-ins, course-corrects if needed, and advances to the next task.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Visual emphasis */}
+              <div className="pt-4 border-t border-emerald-500/20">
+                <p className="text-sm text-emerald-300 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                  </svg>
+                  Everything is version-controlled and auditable
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
