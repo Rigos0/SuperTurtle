@@ -49,6 +49,114 @@ export function formatModelInfo(model: string, effort: string): { modelName: str
   return { modelName, effortStr };
 }
 
+type ListedSubTurtle = {
+  name: string;
+  status: string;
+  type: string;
+  pid: string;
+  timeRemaining: string;
+  task: string;
+  tunnelUrl: string;
+};
+
+function parseCtlListOutput(output: string): ListedSubTurtle[] {
+  const turtles: ListedSubTurtle[] = [];
+  let lastTurtle: ListedSubTurtle | null = null;
+
+  for (const rawLine of output.split("\n")) {
+    const line = rawLine.trim();
+    if (!line || line === "No SubTurtles found.") continue;
+
+    // Tunnel lines are emitted as: "→ https://..."
+    if (line.startsWith("→")) {
+      if (lastTurtle) {
+        lastTurtle.tunnelUrl = line.replace(/^→\s*/, "");
+      }
+      continue;
+    }
+
+    const baseMatch = line.match(/^(\S+)\s+(\S+)\s*(.*)$/);
+    if (!baseMatch) continue;
+
+    const name = baseMatch[1] ?? "";
+    const status = baseMatch[2] ?? "";
+    let remainder = baseMatch[3] ?? "";
+    let type = "";
+    let pid = "";
+    let timeRemaining = "";
+
+    if (status === "running") {
+      const typeMatch = remainder.match(/^(slow|yolo|yolo-codex)\b\s*(.*)$/);
+      if (typeMatch) {
+        type = typeMatch[1]!;
+        remainder = typeMatch[2] || "";
+      }
+
+      const pidMatch = remainder.match(/^\(PID\s+(\d+)\)\s*(.*)$/);
+      if (pidMatch) {
+        pid = pidMatch[1]!;
+        remainder = pidMatch[2] || "";
+      }
+
+      const overdueMatch = remainder.match(/^OVERDUE\b\s*(.*)$/);
+      if (overdueMatch) {
+        timeRemaining = "OVERDUE";
+        remainder = overdueMatch[1] || "";
+      } else {
+        const noTimeoutMatch = remainder.match(/^no timeout\b\s*(.*)$/);
+        if (noTimeoutMatch) {
+          timeRemaining = "no timeout";
+          remainder = noTimeoutMatch[1] || "";
+        } else {
+          const leftMatch = remainder.match(/^(.+?)\s+left\b\s*(.*)$/);
+          if (leftMatch) {
+            timeRemaining = leftMatch[1]!.trim();
+            remainder = leftMatch[2] || "";
+          }
+        }
+      }
+    }
+
+    const task = remainder.replace(/\s+\[skills:\s+.*\]$/, "").trim();
+    const turtle: ListedSubTurtle = {
+      name,
+      status,
+      type,
+      pid,
+      timeRemaining,
+      task,
+      tunnelUrl: "",
+    };
+    turtles.push(turtle);
+    lastTurtle = turtle;
+  }
+
+  return turtles;
+}
+
+async function getSubTurtleElapsed(name: string): Promise<string> {
+  try {
+    const metaPath = `${WORKING_DIR}/.subturtles/${name}/subturtle.meta`;
+    const metaText = await Bun.file(metaPath).text();
+    const spawnedAtMatch = metaText.match(/^SPAWNED_AT=(\d+)$/m);
+    if (!spawnedAtMatch?.[1]) return "unknown";
+
+    const spawnedAt = Number.parseInt(spawnedAtMatch[1], 10);
+    if (!Number.isFinite(spawnedAt)) return "unknown";
+    const elapsedSeconds = Math.max(0, Math.floor(Date.now() / 1000) - spawnedAt);
+
+    const hours = Math.floor(elapsedSeconds / 3600);
+    const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+    const seconds = elapsedSeconds % 60;
+
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    if (minutes > 0) return `${minutes}m ${seconds}s`;
+    return `${seconds}s`;
+  } catch {
+    return "unknown";
+  }
+}
+
 /**
  * /start - Show welcome message and status.
  */
@@ -219,6 +327,66 @@ export async function handleStatus(ctx: Context): Promise<void> {
 
   // Working directory
   lines.push(`\n📁 Working dir: <code>${WORKING_DIR}</code>`);
+
+  // SubTurtle status from ctl list
+  lines.push(`\n🐢 <b>SubTurtles</b>`);
+  try {
+    const ctlPath = `${WORKING_DIR}/super_turtle/subturtle/ctl`;
+    const proc = Bun.spawnSync([ctlPath, "list"], { cwd: WORKING_DIR });
+    const output = proc.stdout.toString().trim();
+    const allTurtles = parseCtlListOutput(output);
+    const runningTurtles = allTurtles.filter((turtle) => turtle.status === "running");
+
+    if (runningTurtles.length === 0) {
+      lines.push(`   None running`);
+    } else {
+      const elapsedEntries = await Promise.all(
+        runningTurtles.map(async (turtle) => [turtle.name, await getSubTurtleElapsed(turtle.name)] as const)
+      );
+      const elapsedByName = new Map(elapsedEntries);
+
+      for (const turtle of runningTurtles) {
+        const type = turtle.type || "unknown";
+        const elapsed = elapsedByName.get(turtle.name) || "unknown";
+        const remaining = turtle.timeRemaining || "unknown";
+        lines.push(`🟢 <b>${escapeHtml(turtle.name)}</b> <code>${escapeHtml(type)}</code>`);
+        lines.push(`   ⏱️ elapsed: ${escapeHtml(elapsed)} • remaining: ${escapeHtml(remaining)}`);
+        if (turtle.task) {
+          lines.push(`   📌 ${escapeHtml(turtle.task)}`);
+        }
+        if (turtle.tunnelUrl) {
+          const safeUrl = escapeHtml(turtle.tunnelUrl);
+          lines.push(`   🔗 <a href="${safeUrl}">${safeUrl}</a>`);
+        }
+      }
+    }
+  } catch {
+    lines.push(`   <i>Unavailable (ctl list failed)</i>`);
+  }
+
+  // Last 3 git commits
+  lines.push(`\n🧾 <b>Recent Commits</b>`);
+  try {
+    const gitProc = Bun.spawnSync(["git", "log", "--oneline", "-3"], { cwd: WORKING_DIR });
+    const gitOutput = gitProc.stdout.toString().trim();
+    if (!gitOutput) {
+      lines.push(`   <i>No commits found</i>`);
+    } else {
+      for (const commitLine of gitOutput.split("\n")) {
+        if (!commitLine.trim()) continue;
+        lines.push(`   <code>${escapeHtml(commitLine)}</code>`);
+      }
+    }
+  } catch {
+    lines.push(`   <i>Unavailable</i>`);
+  }
+
+  // Usage and quota summary
+  const [usageLines, codexQuotaLines] = await Promise.all([
+    getUsageLines(),
+    CODEX_ENABLED ? getCodexQuotaLines() : Promise.resolve<string[]>([]),
+  ]);
+  lines.push(`\n${formatUnifiedUsage(usageLines, codexQuotaLines, CODEX_ENABLED)}`);
 
   await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
 }
