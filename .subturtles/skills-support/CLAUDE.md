@@ -1,6 +1,6 @@
 # Current task
 
-Verify end-to-end: spawn a test SubTurtle with the frontend-design skill, check logs to confirm the skill loads.
+All core features implemented. SubTurtles can now load Claude Code skills on demand via `--skill <name>` flags. Skills pass through to agent sessions and are available for use.
 
 # End goal with specs
 
@@ -41,4 +41,4 @@ Skills are published by their creators and installed via package managers. NEVER
 - [x] Update META_SHARED.md with skills documentation
 - [x] Install the official Remotion skill: run `npx skills add remotion-dev/skills`. This installs to `.claude/skills/remotion-best-practices/`. Verify it installed successfully by checking that directory exists. DO NOT hand-write a Remotion skill — the official one exists.
 - [x] Remove the hand-written Remotion skill directory if it still exists at `super_turtle/skills/.claude/skills/remotion/` (meta agent may have already done this)
-- [ ] Verify end-to-end: spawn a test SubTurtle with the frontend-design skill, check logs to confirm the skill loads <- current
+- [x] Verify end-to-end: spawn a test SubTurtle with the frontend-design skill, check logs to confirm the skill loads
