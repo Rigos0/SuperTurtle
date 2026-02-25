@@ -1,6 +1,6 @@
 ## Current Task
 
-Rewrite "What it does" cards: implement left accent bar design, clean single-column mobile stack with proper spacing and responsive grid layout for tablet/desktop.
+Rewrite "How it works": replace SVG architecture diagram with vertical step-flow (mobile-friendly), keep desktop 2-col layout.
 
 ## End Goal with Specs
 
@@ -47,8 +47,8 @@ A landing page that looks GREAT on mobile (iPhone-sized screens first), then sca
 - [x] Rewrite globals.css: clean CSS variables, add utility classes (@apply patterns), remove unused styles
 - [x] Build sticky nav header component (turtle logo + "agentic" + GitHub CTA, appears on scroll)
 - [x] Rewrite Hero section: mobile-first, left-aligned text, big bold headline, turtle logo, GitHub CTA
-- [ ] Rewrite "What it does" cards: left accent bar design, clean single-column mobile stack <- current
-- [ ] Rewrite "How it works": replace SVG diagram with vertical step-flow (mobile-friendly), keep desktop 2-col
+- [x] Rewrite "What it does" cards: left accent bar design, clean single-column mobile stack
+- [ ] Rewrite "How it works": replace SVG diagram with vertical step-flow (mobile-friendly), keep desktop 2-col <- current
 - [ ] Rewrite "Loop types": stacked cards mobile, comparison as stacked blocks (not table) on mobile
 - [ ] Rewrite terminal demo + getting started: mobile-readable code blocks, proper overflow handling
 - [ ] Rewrite footer: compact mobile layout, earthy warm
