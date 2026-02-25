@@ -6,7 +6,13 @@
 
 import type { Context } from "grammy";
 import { session, getAvailableModels, EFFORT_DISPLAY, type EffortLevel } from "../session";
-import { WORKING_DIR, ALLOWED_USERS, RESTART_FILE, TELEGRAM_SAFE_LIMIT } from "../config";
+import {
+  WORKING_DIR,
+  ALLOWED_USERS,
+  RESTART_FILE,
+  TELEGRAM_SAFE_LIMIT,
+  CODEX_ENABLED,
+} from "../config";
 import { getContextReport } from "../context-command";
 import { isAuthorized } from "../security";
 import { escapeHtml } from "../formatting";
@@ -495,13 +501,37 @@ export async function handleUsage(ctx: Context): Promise<void> {
     return;
   }
 
-  const usageLines = await getUsageLines();
-  if (usageLines.length === 0) {
+  const [usageLines, codexUsageLines] = await Promise.all([
+    getUsageLines(),
+    CODEX_ENABLED ? getCodexUsageLines() : Promise.resolve<string[]>([]),
+  ]);
+
+  const sections: string[] = [];
+
+  if (usageLines.length > 0) {
+    sections.push(`<b>Claude usage</b>\n${usageLines.join("\n")}`);
+  } else {
+    sections.push(`<b>Claude usage</b>\nUnavailable right now.`);
+  }
+
+  if (CODEX_ENABLED) {
+    if (codexUsageLines.length > 0) {
+      sections.push(`<b>Codex usage</b>\n${codexUsageLines.join("\n")}`);
+    } else {
+      sections.push(`<b>Codex usage</b>\nUnavailable right now.`);
+    }
+  }
+
+  const hasClaudeData = usageLines.length > 0;
+  const hasCodexData = !CODEX_ENABLED || codexUsageLines.length > 0;
+  if (!hasClaudeData && !hasCodexData) {
     await ctx.reply("Failed to fetch usage.");
     return;
   }
 
-  await ctx.reply(`<b>Usage</b>\n\n${usageLines.join("\n")}`, { parse_mode: "HTML" });
+  await ctx.reply(`<b>Usage</b>\n\n${sections.join("\n\n")}`, {
+    parse_mode: "HTML",
+  });
 }
 
 function chunkText(text: string, chunkSize = TELEGRAM_SAFE_LIMIT): string[] {
