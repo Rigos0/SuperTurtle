@@ -790,6 +790,56 @@ do_gc() {
 }
 
 do_list() {
+  local show_archived=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --archived)
+        show_archived=1
+        shift
+        ;;
+      *)
+        echo "ERROR: unknown option for list: $1" >&2
+        echo "Usage: ./super_turtle/subturtle/ctl list [--archived]" >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  if (( show_archived == 1 )); then
+    local archive_root
+    archive_root="${SUBTURTLES_DIR}/.archive"
+    if [[ ! -d "$archive_root" ]]; then
+      echo "No archived SubTurtles found."
+      return
+    fi
+
+    local archived_found=0
+    local ws name archived_epoch archived_at
+    for ws in "$archive_root"/*/; do
+      [[ -d "$ws" ]] || continue
+      name="$(basename "$ws")"
+      archived_found=1
+
+      if ! archived_epoch="$(stat -f '%c' "$ws" 2>/dev/null)"; then
+        archived_epoch="$(stat -c '%Z' "$ws" 2>/dev/null || true)"
+      fi
+
+      archived_at="unknown"
+      if [[ -n "$archived_epoch" ]]; then
+        if ! archived_at="$(date -r "$archived_epoch" '+%Y-%m-%d %H:%M:%S' 2>/dev/null)"; then
+          archived_at="$(date -d "@$archived_epoch" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "unknown")"
+        fi
+      fi
+
+      printf "  %-15s %s\n" "$name" "$archived_at"
+    done
+
+    if [[ $archived_found -eq 0 ]]; then
+      echo "No archived SubTurtles found."
+    fi
+    return
+  fi
+
   if [[ ! -d "$SUBTURTLES_DIR" ]]; then
     echo "No SubTurtles found."
     return
@@ -800,6 +850,7 @@ do_list() {
     [[ -d "$ws" ]] || continue
     local name
     name="$(basename "$ws")"
+    [[ "$name" == ".archive" ]] && continue
     found=1
 
     local status_str="stopped"
