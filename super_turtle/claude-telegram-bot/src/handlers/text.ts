@@ -4,7 +4,7 @@
 
 import type { Context, NextFunction } from "grammy";
 import { session } from "../session";
-import { codexSession } from "../codex-session";
+import { codexSession, mapThinkingToReasoningEffort } from "../codex-session";
 import { ALLOWED_USERS } from "../config";
 import { isAuthorized, rateLimiter } from "../security";
 import {
@@ -122,11 +122,14 @@ export async function handleText(
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
+        // Map thinking keywords to reasoning effort
+        const reasoningEffort = mapThinkingToReasoningEffort(message);
+
         response = await codexSession.sendMessage(
           message,
           statusCallback,
-          undefined, // model - use Codex's saved preference
-          undefined  // reasoningEffort - use Codex's saved preference
+          undefined,         // model - use Codex's saved preference
+          reasoningEffort     // reasoningEffort - mapped from keywords
         );
 
         // Check for pending MCP requests (ask-user buttons, send-turtle stickers, bot-control responses)

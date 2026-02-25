@@ -452,6 +452,7 @@ export async function handleResume(ctx: Context): Promise<void> {
 
 /**
  * /model - Show current model and let user switch model/effort.
+ * Routes to Claude or Codex model selection based on activeDriver.
  */
 export async function handleModel(ctx: Context): Promise<void> {
   const userId = ctx.from?.id;
@@ -461,6 +462,12 @@ export async function handleModel(ctx: Context): Promise<void> {
     return;
   }
 
+  // Route based on active driver
+  if (session.activeDriver === "codex") {
+    return handleCodexModel(ctx);
+  }
+
+  // Claude model selection
   const models = getAvailableModels();
   const currentModel = models.find((m) => m.value === session.model);
   const currentEffort = EFFORT_DISPLAY[session.effort];
@@ -489,6 +496,52 @@ export async function handleModel(ctx: Context): Promise<void> {
     `<b>Model:</b> ${modelName}${modelDesc}\n` +
       `<b>Effort:</b> ${currentEffort}\n\n` +
       `Select model or effort level:`,
+    {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [...modelButtons, ...effortButtons],
+      },
+    }
+  );
+}
+
+/**
+ * Codex model selection (for /model when on Codex driver).
+ */
+async function handleCodexModel(ctx: Context): Promise<void> {
+  const { getAvailableCodexModels } = await import("../codex-session");
+
+  const models = getAvailableCodexModels();
+  const currentModel = models.find((m) => m.value === codexSession.model);
+  const currentEffort = codexSession.reasoningEffort;
+
+  // Model buttons — one per row
+  const modelButtons = models.map((m) => [{
+    text: `${m.value === codexSession.model ? "✔ " : ""}${m.displayName}`,
+    callback_data: `codex_model:${m.value}`,
+  }]);
+
+  // Reasoning effort buttons for Codex
+  const effortLevels: Array<[string, string]> = [
+    ["minimal", "Minimal"],
+    ["low", "Low"],
+    ["medium", "Medium (default)"],
+    ["high", "High"],
+    ["xhigh", "X-High (deepest)"],
+  ];
+
+  const effortButtons = [effortLevels.map(([level, label]) => ({
+    text: `${level === currentEffort ? "✔ " : ""}${label}`,
+    callback_data: `codex_effort:${level}`,
+  }))];
+
+  const modelName = currentModel?.displayName || codexSession.model;
+  const modelDesc = currentModel?.description ? ` — ${currentModel.description}` : "";
+
+  await ctx.reply(
+    `<b>Codex Model:</b> ${modelName}${modelDesc}\n` +
+      `<b>Reasoning Effort:</b> ${currentEffort}\n\n` +
+      `Select model or reasoning effort:`,
     {
       parse_mode: "HTML",
       reply_markup: {

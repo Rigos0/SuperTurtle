@@ -16,7 +16,7 @@ interface CodexPrefs {
   threadId?: string;
   createdAt?: string;
   model?: string;
-  reasoningEffort?: string;
+  reasoningEffort?: CodexEffortLevel;
 }
 
 function loadCodexPrefs(): CodexPrefs {
@@ -132,6 +132,51 @@ function buildCodexMcpConfig(): Record<string, unknown> {
 }
 
 /**
+ * Determine Codex reasoning effort based on message keywords.
+ * Maps thinking keywords to modelReasoningEffort levels.
+ */
+function mapThinkingToReasoningEffort(message: string): CodexEffortLevel {
+  const msgLower = message.toLowerCase();
+
+  // Check for "ultrathink" or "think hard" — deepest reasoning
+  if (msgLower.includes("ultrathink") || msgLower.includes("think hard")) {
+    return "xhigh";
+  }
+
+  // Check for "pensa bene" (Italian) — deep reasoning
+  if (msgLower.includes("pensa bene")) {
+    return "high";
+  }
+
+  // Check for "think" or "pensa" or "ragiona" — normal reasoning
+  if (msgLower.includes("think") || msgLower.includes("pensa") || msgLower.includes("ragiona")) {
+    return "high";
+  }
+
+  // Default — medium effort
+  return "medium";
+}
+
+// Codex models available (as of Feb 2026)
+export type CodexEffortLevel = "minimal" | "low" | "medium" | "high" | "xhigh";
+
+export interface CodexModelInfo {
+  value: string;
+  displayName: string;
+  description: string;
+}
+
+const AVAILABLE_CODEX_MODELS: CodexModelInfo[] = [
+  { value: "gpt-5.3-codex", displayName: "GPT-5.3 Codex", description: "Most capable (recommended)" },
+  { value: "gpt-5.3-codex-spark", displayName: "GPT-5.3 Codex Spark", description: "Fast, real-time (Pro)" },
+  { value: "gpt-5.2-codex", displayName: "GPT-5.2 Codex", description: "Previous generation" },
+];
+
+export function getAvailableCodexModels(): CodexModelInfo[] {
+  return AVAILABLE_CODEX_MODELS;
+}
+
+/**
  * Manages Codex sessions using the official Codex SDK.
  */
 export class CodexSession {
@@ -139,19 +184,50 @@ export class CodexSession {
   private thread: CodexThread | null = null;
   private threadId: string | null = null;
   private systemPromptPrepended = false;
+  private _model: string;
+  private _reasoningEffort: CodexEffortLevel;
   lastActivity: Date | null = null;
   lastError: string | null = null;
   lastErrorTime: Date | null = null;
   lastMessage: string | null = null;
 
+  get model(): string { return this._model; }
+  set model(value: string) {
+    this._model = value;
+    saveCodexPrefs({
+      threadId: this.threadId || undefined,
+      model: this._model,
+      reasoningEffort: this._reasoningEffort,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  get reasoningEffort(): CodexEffortLevel { return this._reasoningEffort; }
+  set reasoningEffort(value: CodexEffortLevel) {
+    this._reasoningEffort = value;
+    saveCodexPrefs({
+      threadId: this.threadId || undefined,
+      model: this._model,
+      reasoningEffort: this._reasoningEffort,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
   constructor() {
-    // Try to load saved threadId
+    // Load preferences
     const prefs = loadCodexPrefs();
+    this._model = prefs.model || "gpt-5.3-codex";
+    this._reasoningEffort = (prefs.reasoningEffort as CodexEffortLevel) || "medium";
+
     if (prefs.threadId) {
       this.threadId = prefs.threadId;
       console.log(
         `Loaded saved Codex thread: ${this.threadId.slice(0, 8)}...`
       );
+    }
+
+    if (prefs.model || prefs.reasoningEffort) {
+      console.log(`Codex preferences: model=${this._model}, reasoningEffort=${this._reasoningEffort}`);
     }
   }
 
@@ -188,7 +264,7 @@ export class CodexSession {
   /**
    * Start a new Codex thread.
    */
-  async startNewThread(model?: string, reasoningEffort?: string): Promise<void> {
+  async startNewThread(model?: string, reasoningEffort?: CodexEffortLevel): Promise<void> {
     await this.ensureInitialized();
 
     try {
@@ -196,12 +272,16 @@ export class CodexSession {
         throw new Error("Codex SDK client not initialized");
       }
 
+      // Use provided model/effort or instance defaults
+      const threadModel = model || this._model;
+      const threadEffort = reasoningEffort || this._reasoningEffort;
+
       // Create new thread with working directory and model settings
       this.thread = await this.codex.startThread({
         workingDirectory: WORKING_DIR,
         skipGitRepoCheck: true,
-        ...(model && { model }),
-        ...(reasoningEffort && { modelReasoningEffort: reasoningEffort }),
+        model: threadModel,
+        modelReasoningEffort: threadEffort,
       });
 
       // Capture thread ID
@@ -232,7 +312,7 @@ export class CodexSession {
   /**
    * Resume a saved Codex thread by ID.
    */
-  async resumeThread(threadId: string, model?: string, reasoningEffort?: string): Promise<void> {
+  async resumeThread(threadId: string, model?: string, reasoningEffort?: CodexEffortLevel): Promise<void> {
     await this.ensureInitialized();
 
     try {
@@ -240,9 +320,13 @@ export class CodexSession {
         throw new Error("Codex SDK client not initialized");
       }
 
+      // Use provided model/effort or instance defaults
+      const threadModel = model || this._model;
+      const threadEffort = reasoningEffort || this._reasoningEffort;
+
       this.thread = await this.codex.resumeThread(threadId, {
-        ...(model && { model }),
-        ...(reasoningEffort && { modelReasoningEffort: reasoningEffort }),
+        model: threadModel,
+        modelReasoningEffort: threadEffort,
       });
       this.threadId = threadId;
       this.systemPromptPrepended = true; // Already sent in original thread
@@ -267,7 +351,7 @@ export class CodexSession {
     userMessage: string,
     statusCallback?: StatusCallback,
     model?: string,
-    reasoningEffort?: string
+    reasoningEffort?: CodexEffortLevel
   ): Promise<string> {
     if (!this.thread) {
       // Create thread if not already created
@@ -467,3 +551,6 @@ ${userMessage}`;
 
 // Global Codex session instance
 export const codexSession = new CodexSession();
+
+// Export functions for external use
+export { mapThinkingToReasoningEffort };
