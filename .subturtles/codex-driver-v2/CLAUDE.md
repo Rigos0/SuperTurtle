@@ -1,6 +1,6 @@
 # Current Task
 
-Phase D: Session Management & Polish. Add multi-session history for Codex (save/resume up to 5 threads), AbortController support for /stop, token usage tracking and display in /usage command.
+Phase D (continued): Add AbortController support for Codex turns to enable /stop command. Wire AbortSignal through sendMessage streaming loop and thread.runStreamed(). Then: display token usage from lastUsage in /usage and /status commands.
 
 # End Goal with Specs
 
@@ -160,10 +160,10 @@ Alternatively, the MCP servers may already be configured in `~/.codex/config.tom
 - [ ] Phase B: Verify MCP tools work end-to-end (ask-user buttons appear, bot-control works, send-turtle sends stickers)
 - [x] Phase C: Add codexModel + codexReasoningEffort preferences, wire /model command to show Codex models when activeDriver === "codex"
 - [x] Phase C: Map thinking keywords (think/ultrathink/pensa) to modelReasoningEffort levels
-- [ ] Phase D: Multi-session history for Codex (save/resume up to 5 threads) <- current
-- [ ] Phase D: Add AbortController support (wire /stop and interrupt to Codex turns)
+- [x] Phase D: Multi-session history for Codex (save/resume up to 5 threads)
+- [ ] Phase D: Add AbortController support (wire /stop and interrupt to Codex turns) <- current
 - [x] Phase D: Add retry logic for Codex in text handler (match Claude's 1-retry pattern)
-- [ ] Phase D: Capture token usage from TurnCompletedEvent, display in /usage and /status
+- [ ] Phase D: Capture token usage from TurnCompletedEvent, display in /usage and /status (token tracking done, display pending)
 - [ ] Test everything works: /switch codex → send message → streaming response → MCP tools → /model switch → /stop → /resume
 - [ ] Commit all changes
 
