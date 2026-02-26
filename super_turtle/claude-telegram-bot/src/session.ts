@@ -178,7 +178,7 @@ export class ClaudeSession {
 
   constructor() {
     const prefs = loadPrefs();
-    this._model = prefs.model || "claude-sonnet-4-6";
+    this._model = prefs.model || "claude-opus-4-6";
     this._effort = prefs.effort || "high";
     this._activeDriver = prefs.activeDriver || "claude";
     if (prefs.model || prefs.effort || prefs.activeDriver) {
