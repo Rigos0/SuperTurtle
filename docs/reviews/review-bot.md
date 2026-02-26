@@ -933,3 +933,283 @@ While this works (drivers are singletons), it's fragile and could cause issues i
 ## Files to Review Next
 
 - [ ] MCP servers: `ask_user_mcp/`, `send_turtle_mcp/`, `bot_control_mcp/` <- current
+
+---
+
+# Code Review Phase 5: MCP Servers
+
+**Date**: 2026-02-27
+**Files**: ask_user_mcp/server.ts, bot_control_mcp/server.ts, send_turtle_mcp/server.ts
+
+---
+
+## Executive Summary
+
+The MCP servers are lightweight and focused, implementing a request/response file-based protocol well. However, **medium-severity issues** exist around error handling in file operations, race conditions in polling, and missing input validation.
+
+**Issues Found**: 9 total
+- **Critical**: 0
+- **Medium**: 4 (error handling, race conditions, validation)
+- **Low**: 5 (edge cases, assumptions, UUID generation)
+
+---
+
+## Medium Issues
+
+### 1. Unhandled File Write Errors in ask_user and send_turtle
+
+**File**: `ask_user_mcp/server.ts`, `send_turtle_mcp/server.ts`
+**Lines**: ask_user line 96, send_turtle line 180
+**Severity**: MEDIUM
+
+**Issue**:
+File write errors are not caught. If Bun.write fails, the tool returns success anyway.
+
+```typescript
+// ask_user_mcp
+const requestFile = `/tmp/ask-user-${requestUuid}.json`;
+await Bun.write(requestFile, JSON.stringify(requestData, null, 2));
+// No try/catch — if write fails, still returns success response
+```
+
+**Risk**: Tool claims success but request file never created → user never sees buttons.
+
+**Suggested Fix**:
+```typescript
+try {
+  await Bun.write(requestFile, JSON.stringify(requestData, null, 2));
+} catch (error) {
+  throw new Error(`Failed to write request file: ${error}`);
+}
+```
+
+---
+
+### 2. Race Condition in bot_control Polling and Cleanup
+
+**File**: `bot_control_mcp/server.ts`
+**Lines**: 83-115
+**Severity**: MEDIUM
+
+**Issue**:
+Between polling `data.status === "completed"` and calling `unlinkSync`, the bot or another process could delete/modify the file.
+
+```typescript
+if (data.status === "completed") {
+  // File could be deleted here by another process
+  try {
+    const { unlinkSync } = await import("fs");
+    unlinkSync(filepath);  // Could fail
+  } catch { /* best-effort cleanup */ }
+  return data.result || "Done (no result data).";
+}
+```
+
+**Risk**: File deletion fails silently, old request files accumulate in /tmp.
+
+**Suggested Fix**:
+Use atomic file operations or check file existence before deleting.
+
+---
+
+### 3. Missing Parameter Validation in bot_control
+
+**File**: `bot_control_mcp/server.ts`
+**Lines**: 123-133
+**Severity**: MEDIUM
+
+**Issue**:
+The `params` object is not validated for action-specific requirements.
+
+```typescript
+const args = request.params.arguments as {
+  action?: string;
+  params?: Record<string, string>;
+};
+
+const action = args.action as Action;
+if (!action || !VALID_ACTIONS.includes(action)) {
+  throw new Error(`Invalid action: ${action}. Valid: ${VALID_ACTIONS.join(", ")}`);
+}
+// params not validated for the chosen action
+```
+
+**Risk**: Calling `switch_model` without a `model` param could fail silently.
+
+**Suggested Fix**:
+```typescript
+if (action === "switch_model" && !args.params?.model) {
+  throw new Error("switch_model requires model parameter");
+}
+```
+
+---
+
+### 4. Complex Emoji Normalization Could Miss Edge Cases
+
+**File**: `send_turtle_mcp/server.ts`
+**Lines**: 36-59
+**Severity**: MEDIUM
+
+**Issue**:
+The `emojiToCodepoint` function handles multiple formats, but the logic is complex and could fail on edge cases.
+
+```typescript
+for (const char of trimmed) {
+  const cp = char.codePointAt(0);
+  if (cp) codepoints.push(cp.toString(16).toLowerCase());
+}
+```
+
+If `codePointAt(0)` returns `undefined`, it's silently skipped. For unusual emoji sequences, this could produce wrong codepoints.
+
+**Risk**: Some emoji could be silently converted to wrong codepoints, producing no match.
+
+**Suggested Fix**:
+```typescript
+for (const char of trimmed) {
+  const cp = char.codePointAt(0);
+  if (cp === undefined) {
+    throw new Error(`Cannot extract codepoint from "${char}"`);
+  }
+  codepoints.push(cp.toString(16).toLowerCase());
+}
+```
+
+---
+
+## Low Issues
+
+### 5. Weak UUID Generation: First 8 Characters Could Collide
+
+**File**: `ask_user_mcp/server.ts`, `bot_control_mcp/server.ts`, `send_turtle_mcp/server.ts`
+**Lines**: ask_user 82, bot_control 135, send_turtle 166
+**Severity**: LOW
+
+**Issue**:
+Request IDs truncate UUID to first 8 characters.
+
+```typescript
+const requestUuid = crypto.randomUUID().slice(0, 8);
+```
+
+While collision probability is very low, using the full UUID is safer.
+
+**Suggested Fix**:
+```typescript
+const requestUuid = crypto.randomUUID();
+```
+
+---
+
+### 6. Silent Cleanup Failure in bot_control
+
+**File**: `bot_control_mcp/server.ts`
+**Lines**: 93-96, 102-104
+**Severity**: LOW
+
+**Issue**:
+File cleanup errors are silently caught with `/* best-effort cleanup */` comments.
+
+**Risk**: /tmp could accumulate stale request files.
+
+---
+
+### 7. Hardcoded Timeout in bot_control
+
+**File**: `bot_control_mcp/server.ts`
+**Line**: 22
+**Severity**: LOW
+
+**Issue**:
+`POLL_TIMEOUT_MS = 10_000` (10 seconds) is hardcoded. On slow systems, this could timeout prematurely.
+
+**Suggested Fix**:
+```typescript
+const POLL_TIMEOUT_MS = Number(process.env.MCP_POLL_TIMEOUT_MS) || 10_000;
+```
+
+---
+
+### 8. Missing Fallback: No turtle combo found
+
+**File**: `send_turtle_mcp/server.ts`
+**Lines**: 154-162
+**Severity**: LOW
+
+**Issue**:
+If emoji lookup fails, the tool returns a message but doesn't attempt a fallback.
+
+**Suggested Fix**:
+Return turtle + turtle as fallback instead of failing.
+
+---
+
+### 9. Global Environment Variable Dependency
+
+**File**: All three MCP servers
+**Severity**: LOW
+
+**Issue**:
+All three servers rely on `process.env.TELEGRAM_CHAT_ID` being set by the handler layer.
+
+**Risk**: If environment variable isn't set, empty chatId is used.
+
+**Suggested Fix**:
+Validate and warn if TELEGRAM_CHAT_ID is missing:
+```typescript
+const chatId = process.env.TELEGRAM_CHAT_ID || "";
+if (!chatId) {
+  console.warn("TELEGRAM_CHAT_ID not set; requests may not reach correct chat");
+}
+```
+
+---
+
+## Summary by Category
+
+| Category | Count |
+|----------|-------|
+| **Error Handling** | 2 medium, 1 low |
+| **Race Conditions** | 1 medium, 1 low |
+| **Validation** | 1 medium, 1 low |
+| **Resource Management** | 1 low |
+| **Edge Cases** | 1 medium, 1 low |
+
+---
+
+## Recommended Fixes
+
+1. **HIGH**: Add try/catch around file write operations in ask_user and send_turtle
+2. **MEDIUM**: Validate action-specific parameters in bot_control
+3. **MEDIUM**: Use atomic file operations for request file cleanup
+4. **MEDIUM**: Improve emoji codepoint extraction with error handling
+5. **LOW**: Use full UUID instead of truncated version
+6. **LOW**: Make poll timeout configurable
+7. **LOW**: Add fallback for missing turtle combos
+
+---
+
+## Overall Telegram Bot Code Review Summary
+
+**Total Issues Found**: 45
+- **Critical**: 2 (race conditions in session persistence)
+- **Medium**: 19 (error handling, type safety, timing, validation)
+- **Low**: 24 (edge cases, efficiency, conventions)
+
+**Key Findings Across All Phases**:
+1. **Race Conditions**: Session/job file persistence lacks atomic operations
+2. **File Safety**: /tmp globbing lacks permission validation
+3. **Error Handling**: Many silent failures and swallowed errors
+4. **Type Safety**: Multiple type assertions and loose narrowing
+5. **Timing Assumptions**: Hardcoded delays and timeouts throughout
+
+**Architecture Assessment**: Solid foundation with good separation of concerns (drivers, handlers, sessions). Main issues are defensive programming and resource safety rather than fundamental design flaws.
+
+**Recommended Priority Fixes**:
+1. Implement file locking for session/job persistence
+2. Restrict /tmp file access to owned directory
+3. Add input validation throughout
+4. Replace hardcoded timeouts with exponential backoff
+5. Improve error classification heuristics
+
