@@ -1,14 +1,12 @@
 ## Current Task
-Write the full story in Markdown format.
+Write chapter1.md for "The Shellmarillion" — the creation song in a Tolkien-style mythic register, ~500 words.
 
 ## End Goal with Specs
-Create a complete short story (500-800 words) at `books/tolkien/the-shellmarillion.md`. Tolkien style: epic mythological prose, creation myths, invented names. The story tells the origin myth of the Great Turtles who shaped the digital realms.
+Create a short story file at `books/tolkien/chapter1.md`. Tolkien-style: mythic, archaic language, grand scope. ~500 words. The Ainur sing the world into being, but it's all turtles.
 
 ## Backlog
 - [x] Create `books/tolkien/` directory
-- [ ] Write the full story in Markdown format <- current
-- [ ] Add a brief author's note at the end
-- [ ] Commit the finished story
-
-## Loop Control Reminder
-When all backlog items are done, append `## Loop Control\nSTOP` to this file.
+- [ ] Write chapter1.md — the creation song (Ainur but turtles) <- current
+- [ ] Ensure Tolkien voice (archaic, elevated, mythic register)
+- [ ] Add a lineage or naming section
+- [ ] Write `## Loop Control\nSTOP` when done

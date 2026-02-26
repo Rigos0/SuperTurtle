@@ -1,14 +1,12 @@
 ## Current Task
-Write the full story in Markdown format at `books/austen/pride-and-process.md`.
+Write chapter1.md — introduce the Shellnet family.
 
 ## End Goal with Specs
-Create a complete short story (500-800 words) at `books/austen/pride-and-process.md`. Austen style: witty social commentary, ironic narration, romantic tension. The story follows two rival SubTurtles in a grand estate of microservices who must learn to collaborate.
+Create a short story file at `books/austen/chapter1.md`. Austen-style: witty social commentary, ironic narrator, marriage plot. ~500 words. A truth universally acknowledged: a single turtle in possession of a good shell must be in want of a mate.
 
 ## Backlog
 - [x] Create `books/austen/` directory
-- [ ] Write the full story in Markdown format <- current
-- [ ] Add a brief author's note at the end
-- [ ] Commit the finished story
-
-## Loop Control Reminder
-When all backlog items are done, append `## Loop Control\nSTOP` to this file.
+- [ ] Write chapter1.md — introduce the Shellnet family <- current
+- [ ] Ensure Austen voice (ironic narrator, social wit, Regency diction)
+- [ ] Include a memorable opening line
+- [ ] Write `## Loop Control\nSTOP` when done
