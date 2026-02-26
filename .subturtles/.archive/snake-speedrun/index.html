@@ -331,6 +331,7 @@
         player2Score: 0,
         isRunning: false,
         isGameOver: false,
+        countdown: null,
       };
 
       let player1Direction = { x: 1, y: 0 };
@@ -678,6 +679,40 @@
           context.font = "bold 20px ui-monospace, SFMono-Regular, Menlo, monospace";
           context.textAlign = "center";
           context.fillText("Waiting for players...", canvas.width / 2, canvas.height / 2);
+        }
+
+        if (gameState.countdown !== null && gameState.countdown > 0) {
+          context.fillStyle = "rgba(2, 8, 16, 0.72)";
+          context.fillRect(0, 40, canvas.width, canvas.height - 80);
+
+          context.save();
+          context.fillStyle = "#19f96b";
+          context.font = "bold 120px ui-monospace, SFMono-Regular, Menlo, monospace";
+          context.textAlign = "center";
+          context.textBaseline = "middle";
+          context.shadowColor = "rgba(25, 249, 107, 0.8)";
+          context.shadowBlur = 30;
+          context.shadowOffsetX = 0;
+          context.shadowOffsetY = 0;
+
+          context.fillText(gameState.countdown, canvas.width / 2, canvas.height / 2);
+          context.restore();
+        } else if (gameState.countdown === 0) {
+          context.fillStyle = "rgba(2, 8, 16, 0.72)";
+          context.fillRect(0, 40, canvas.width, canvas.height - 80);
+
+          context.save();
+          context.fillStyle = "#19f96b";
+          context.font = "bold 100px ui-monospace, SFMono-Regular, Menlo, monospace";
+          context.textAlign = "center";
+          context.textBaseline = "middle";
+          context.shadowColor = "rgba(25, 249, 107, 0.8)";
+          context.shadowBlur = 30;
+          context.shadowOffsetX = 0;
+          context.shadowOffsetY = 0;
+
+          context.fillText("GO!", canvas.width / 2, canvas.height / 2);
+          context.restore();
         }
 
         if (gameState.isGameOver) {
