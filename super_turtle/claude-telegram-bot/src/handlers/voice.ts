@@ -10,11 +10,19 @@ import { isAuthorized, rateLimiter } from "../security";
 import {
   auditLog,
   auditLogRateLimit,
+  isStopIntent,
   transcribeVoice,
   startTypingIndicator,
 } from "../utils";
-import { getDriverAuditType, isActiveDriverSessionActive, runMessageWithActiveDriver } from "./driver-routing";
+import {
+  getDriverAuditType,
+  isActiveDriverSessionActive,
+  isAnyDriverRunning,
+  runMessageWithActiveDriver,
+  stopActiveDriverQuery,
+} from "./driver-routing";
 import { StreamingState, createStatusCallback } from "./streaming";
+import { drainDeferredQueue, enqueueDeferredMessage } from "../deferred-queue";
 
 /**
  * Handle incoming voice messages.
@@ -100,18 +108,42 @@ export async function handleVoice(ctx: Context): Promise<void> {
       `🎤 "${displayTranscript}"`
     );
 
-    // 9. Set conversation title from transcript (if new session)
+    // 9. Voice stop intent should interrupt active runs immediately.
+    if (isStopIntent(transcript)) {
+      session.stopTyping();
+      await stopActiveDriverQuery();
+      await ctx.reply("🛑 Stopped.");
+      return;
+    }
+
+    // 10. If agent is already answering, queue transcript to run after completion.
+    if (isAnyDriverRunning()) {
+      const queueSize = enqueueDeferredMessage({
+        text: transcript,
+        userId,
+        username,
+        chatId,
+        source: "voice",
+        enqueuedAt: Date.now(),
+      });
+      await ctx.reply(
+        `📝 Queued (#${queueSize}). I will run this once the current answer finishes.`
+      );
+      return;
+    }
+
+    // 11. Set conversation title from transcript (if new session)
     if (!isActiveDriverSessionActive()) {
       const title =
         transcript.length > 50 ? transcript.slice(0, 47) + "..." : transcript;
       session.conversationTitle = title;
     }
 
-    // 10. Create streaming state and callback
+    // 12. Create streaming state and callback
     const state = new StreamingState();
     const statusCallback = createStatusCallback(ctx, state);
 
-    // 11. Send to active driver
+    // 13. Send to active driver
     const response = await runMessageWithActiveDriver({
       message: transcript,
       username,
@@ -121,7 +153,7 @@ export async function handleVoice(ctx: Context): Promise<void> {
       statusCallback,
     });
 
-    // 12. Audit log
+    // 14. Audit log
     await auditLog(userId, username, getDriverAuditType("VOICE"), transcript, response);
   } catch (error) {
     console.error("Error processing voice:", error);
@@ -138,6 +170,7 @@ export async function handleVoice(ctx: Context): Promise<void> {
   } finally {
     stopProcessing();
     typing.stop();
+    await drainDeferredQueue(ctx, chatId);
 
     // Clean up voice file
     if (voicePath) {

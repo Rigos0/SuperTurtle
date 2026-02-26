@@ -236,3 +236,17 @@ export async function checkInterrupt(text: string): Promise<string> {
 
   return strippedText;
 }
+
+export function isStopIntent(text: string): boolean {
+  const normalized = text
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized) {
+    return false;
+  }
+
+  return /^(please\s+)?(stop|halt|pause)\b/.test(normalized);
+}

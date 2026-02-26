@@ -30,13 +30,15 @@ import {
   handleVideo,
   handleCallback,
 } from "./handlers";
-import { getCommandLines, getSettingsOverviewLines, getUsageLines } from "./handlers/commands";
+import { buildSessionOverviewLines } from "./handlers/commands";
+import { resetAllDriverSessions } from "./handlers/commands";
 import { session } from "./session";
-import { getDueJobs, advanceRecurringJob, removeJob } from "./cron";
+import { getDueJobs, getJobs, advanceRecurringJob, removeJob } from "./cron";
 import { bot } from "./bot";
-import { isAnyDriverRunning, runMessageWithActiveDriver } from "./handlers/driver-routing";
-import { StreamingState, createSilentStatusCallback } from "./handlers/streaming";
+import { isAnyDriverRunning, isLikelyQuotaOrLimitError, runMessageWithDriver } from "./handlers/driver-routing";
+import { StreamingState, createSilentStatusCallback, createStatusCallback } from "./handlers/streaming";
 import { getSilentNotificationText } from "./silent-notifications";
+import type { DriverId } from "./drivers/types";
 
 // Re-export for any existing consumers
 export { bot };
@@ -55,15 +57,16 @@ function summarizeCronError(error: unknown): string {
   return message.length > 300 ? `${message.slice(0, 297)}...` : message;
 }
 
-function isLikelyQuotaOrLimitError(errorSummary: string): boolean {
-  const text = errorSummary.toLowerCase();
-  return (
-    text.includes("quota") ||
-    text.includes("usage") ||
-    text.includes("rate limit") ||
-    text.includes("limit reached") ||
-    text.includes("insufficient")
-  );
+function extractCheckedSubturtleName(prompt: string): string | null {
+  const match = prompt.match(/^\[SILENT CHECK-IN\]\s+Check SubTurtle\s+([a-zA-Z0-9._-]+):/m);
+  return match?.[1] || null;
+}
+
+function isSubturtleRunning(name: string): boolean {
+  const ctlPath = `${WORKING_DIR}/super_turtle/subturtle/ctl`;
+  const proc = Bun.spawnSync([ctlPath, "status", name], { cwd: WORKING_DIR });
+  const output = proc.stdout.toString();
+  return output.includes("running as");
 }
 
 // Sequentialize non-command messages per user (prevents race conditions)
@@ -80,6 +83,10 @@ bot.use(
     }
     // Messages starting with "stop" bypass queue (acts like /stop)
     if (ctx.message?.text?.toLowerCase().trimStart().startsWith("stop")) {
+      return undefined;
+    }
+    // Voice notes bypass queue so they can transcribe/interrupt while a turn is running
+    if (ctx.message?.voice) {
       return undefined;
     }
     // Callback queries (button clicks) are not sequentialized
@@ -247,22 +254,60 @@ const startCronTimer = () => {
             })();
 
             try {
+              const primaryDriver: DriverId = session.activeDriver;
+              const fallbackDriver: DriverId = primaryDriver === "codex" ? "claude" : "codex";
               const state = new StreamingState();
               const statusCallback = createSilentStatusCallback(cronCtx, state);
-              const response = await runMessageWithActiveDriver({
-                message: job.prompt,
-                username: "cron",
-                userId: resolvedUserId,
-                chatId: resolvedChatId,
-                ctx: cronCtx,
-                statusCallback,
-              });
-              const notificationText = getSilentNotificationText(
-                state.getSilentCapturedText(),
-                response
+
+              let response = "";
+              let driverUsed: DriverId = primaryDriver;
+              let fallbackAttempted = false;
+
+              try {
+                response = await runMessageWithDriver(primaryDriver, {
+                  message: job.prompt,
+                  username: "cron",
+                  userId: resolvedUserId,
+                  chatId: resolvedChatId,
+                  ctx: cronCtx,
+                  statusCallback,
+                });
+              } catch (error) {
+                if (!isLikelyQuotaOrLimitError(error)) {
+                  throw error;
+                }
+                fallbackAttempted = true;
+                response = await runMessageWithDriver(fallbackDriver, {
+                  message: job.prompt,
+                  username: "cron",
+                  userId: resolvedUserId,
+                  chatId: resolvedChatId,
+                  ctx: cronCtx,
+                  statusCallback,
+                });
+                driverUsed = fallbackDriver;
+              }
+
+              console.log(
+                `[cron:${job.id}] primary_driver=${primaryDriver} fallback_attempted=${fallbackAttempted} driver_used=${driverUsed}`
               );
+
+              const notificationText = getSilentNotificationText(state.getSilentCapturedText(), response);
               if (notificationText) {
                 await bot.api.sendMessage(resolvedChatId, notificationText);
+              }
+
+              const subturtleName = extractCheckedSubturtleName(job.prompt);
+              if (subturtleName && job.type === "recurring") {
+                const running = isSubturtleRunning(subturtleName);
+                const recurringStillExists = getJobs().some((j) => j.id === job.id);
+                if (!running && recurringStillExists) {
+                  removeJob(job.id);
+                  await bot.api.sendMessage(
+                    resolvedChatId,
+                    `⚠️ SubTurtle ${subturtleName} is not running but cron ${job.id} was still active. I removed that recurring cron to prevent repeat loops.`
+                  );
+                }
               }
             } finally {
               typingController.stop();
@@ -274,8 +319,33 @@ const startCronTimer = () => {
             // Append instruction so the agent opens its reply with a scheduled notice
             const injectedPrompt = `${job.prompt}\n\n(This is a scheduled message. Start your response with "🔔 Scheduled:" on its own line before anything else.)`;
             const cronCtx = createCronContext(injectedPrompt);
-            // Route through handleText — same path as a real user message
-            await handleText(cronCtx);
+            const primaryDriver: DriverId = session.activeDriver;
+            const fallbackDriver: DriverId = primaryDriver === "codex" ? "claude" : "codex";
+            const state = new StreamingState();
+            const statusCallback = createStatusCallback(cronCtx, state);
+
+            try {
+              await runMessageWithDriver(primaryDriver, {
+                message: injectedPrompt,
+                username: "cron",
+                userId: resolvedUserId,
+                chatId: resolvedChatId,
+                ctx: cronCtx,
+                statusCallback,
+              });
+            } catch (error) {
+              if (!isLikelyQuotaOrLimitError(error)) {
+                throw error;
+              }
+              await runMessageWithDriver(fallbackDriver, {
+                message: injectedPrompt,
+                username: "cron",
+                userId: resolvedUserId,
+                chatId: resolvedChatId,
+                ctx: cronCtx,
+                statusCallback,
+              });
+            }
           }
         } catch (error) {
           // No retries — report failure and continue with future jobs
@@ -285,7 +355,7 @@ const startCronTimer = () => {
           if (chatId) {
             try {
               const quotaHint = isLikelyQuotaOrLimitError(errorSummary)
-                ? "\nLikely cause: Claude usage/quota limit reached."
+                ? "\nLikely cause: selected meta-agent driver hit a usage/quota limit."
                 : "";
               await bot.api.sendMessage(
                 chatId,
@@ -340,17 +410,10 @@ if (existsSync(RESTART_FILE)) {
         "✅ Bot restarted"
       );
 
-      // Send startup message with persisted settings, usage, and commands
-      const lines: string[] = [
-        `<b>Bot restarted</b>\n`,
-        ...getSettingsOverviewLines(),
-        "",
-      ];
-      const usageLines = await getUsageLines();
-      if (usageLines.length > 0) {
-        lines.push(...usageLines, "");
-      }
-      lines.push(`<b>Commands:</b>`, ...getCommandLines());
+      await resetAllDriverSessions();
+
+      // Send startup message with the same standardized overview format.
+      const lines = await buildSessionOverviewLines("Bot restarted");
       await bot.api.sendMessage(data.chat_id, lines.join("\n"), { parse_mode: "HTML" });
     }
     unlinkSync(RESTART_FILE);

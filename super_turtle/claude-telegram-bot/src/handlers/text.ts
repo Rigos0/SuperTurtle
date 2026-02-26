@@ -12,8 +12,10 @@ import {
   auditLog,
   auditLogRateLimit,
   checkInterrupt,
+  isStopIntent,
   startTypingIndicator,
 } from "../utils";
+import { drainDeferredQueue } from "../deferred-queue";
 import {
   StreamingState,
   createSilentStatusCallback,
@@ -84,7 +86,7 @@ export async function handleText(
   }
 
   // 1.5. Bare "stop" — intercept and abort (acts like /stop)
-  if (message.toLowerCase().trimStart().startsWith("stop")) {
+  if (isStopIntent(message)) {
     // Kill typing indicator immediately so the bot stops showing "typing..."
     session.stopTyping();
 
@@ -399,4 +401,5 @@ export async function handleText(
   stopProcessing();
   typing.stop();
   session.typingController = null;
+  await drainDeferredQueue(ctx, chatId);
 }
