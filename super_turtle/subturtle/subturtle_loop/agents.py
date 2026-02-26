@@ -89,14 +89,22 @@ class Claude:
 class Codex:
     """Codex agent -- execution mode."""
 
-    def __init__(self, cwd: str | Path = ".", add_dirs: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        cwd: str | Path = ".",
+        add_dirs: list[str] | None = None,
+        model: str | None = None,
+    ) -> None:
         self.cwd = Path(cwd).resolve()
         self.add_dirs = add_dirs or []
+        self.model = model
 
     def execute(self, prompt: str) -> str:
         """Execute a prompt with full auto-approval. Returns agent output."""
         print(f"[codex] executing in {self.cwd} ...")
         cmd = ["codex", "exec", "--yolo", "--cd", str(self.cwd)]
+        if self.model:
+            cmd.extend(["--model", self.model])
         for add_dir in self.add_dirs:
             cmd.extend(["--add-dir", add_dir])
         cmd.append(prompt)

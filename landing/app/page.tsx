@@ -1,89 +1,311 @@
-const agenda = [
-  { time: '18:30', title: 'Doors Open + Networking', detail: 'Meet builders, founders, and growth teams over coffee.' },
-  { time: '19:00', title: 'Welcome: Why Product Analytics Matters', detail: 'Quick kickoff on measurable product bets in 2026.' },
-  { time: '19:20', title: 'Apify x PostHog Session', detail: 'How event instrumentation and autonomous agents work together.' },
-  { time: '20:00', title: 'Lightning Demos', detail: 'Three 7-minute demos from local teams shipping fast.' },
-  { time: '20:45', title: 'Q&A + Open Hangout', detail: 'Bring your stack questions and architecture tradeoffs.' },
-];
+ "use client";
 
-const highlights = [
-  'Happening today: Thursday, February 26, 2026',
-  'Mobile-friendly agenda and practical sessions',
-  'Real-world setup: Apify automation + PostHog analytics',
-];
+import { useEffect, useMemo, useState } from 'react';
+
+type Direction = "up" | "down" | "left" | "right";
+type Point = { x: number; y: number };
+
+type GameState = {
+  snake: Point[];
+  food: Point;
+  direction: Direction;
+  nextDirection: Direction;
+  score: number;
+  running: boolean;
+  gameOver: boolean;
+};
+
+const GRID_SIZE = 16;
+const TICK_MS = 130;
+const COLORS = {
+  head: "#ff2f2f",
+  headGoggle: "#ffdfe6",
+  headGoggleRing: "#ffe5c9",
+  body: "#ff6a5d",
+  tail: "#c92f25",
+  food: "#ffbe73",
+};
+
+function getRandomPoint(): Point {
+  return {
+    x: Math.floor(Math.random() * GRID_SIZE),
+    y: Math.floor(Math.random() * GRID_SIZE),
+  };
+}
+
+function generateFood(snake: Point[]): Point {
+  const occupied = new Set(snake.map((segment) => `${segment.x},${segment.y}`));
+
+  let food = getRandomPoint();
+  while (occupied.has(`${food.x},${food.y}`)) {
+    food = getRandomPoint();
+  }
+  return food;
+}
+
+function initialSnake(): Point[] {
+  return [
+    { x: 7, y: 8 },
+    { x: 6, y: 8 },
+    { x: 5, y: 8 },
+  ];
+}
+
+function initialState(): GameState {
+  const snake = initialSnake();
+  return {
+    snake,
+    food: generateFood(snake),
+    direction: "right",
+    nextDirection: "right",
+    score: 0,
+    running: true,
+    gameOver: false,
+  };
+}
+
+function moveOne(step: Direction, point: Point): Point {
+  switch (step) {
+    case "up":
+      return { ...point, y: point.y - 1 };
+    case "down":
+      return { ...point, y: point.y + 1 };
+    case "left":
+      return { ...point, x: point.x - 1 };
+    case "right":
+      return { ...point, x: point.x + 1 };
+  }
+}
+
+function isOpposite(a: Direction, b: Direction) {
+  return (
+    (a === "up" && b === "down") ||
+    (a === "down" && b === "up") ||
+    (a === "left" && b === "right") ||
+    (a === "right" && b === "left")
+  );
+}
+
+function collide(point: Point, snake: Point[]) {
+  const hitWall = point.x < 0 || point.x >= GRID_SIZE || point.y < 0 || point.y >= GRID_SIZE;
+  const hitSelf = snake.some((segment) => segment.x === point.x && segment.y === point.y);
+  return hitWall || hitSelf;
+}
 
 export default function Home() {
+  const [state, setState] = useState<GameState>(() => initialState());
+
+  const head = state.snake[0];
+  const tail = state.snake[state.snake.length - 1];
+  const snakeBody = useMemo(
+    () => new Set(state.snake.map((segment) => `${segment.x},${segment.y}`)),
+    [state.snake],
+  );
+
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => {
+      const directionMap: Record<string, Direction> = {
+        ArrowUp: "up",
+        ArrowDown: "down",
+        ArrowLeft: "left",
+        ArrowRight: "right",
+        w: "up",
+        W: "up",
+        s: "down",
+        S: "down",
+        a: "left",
+        A: "left",
+        d: "right",
+        D: "right",
+      };
+
+      const direction = directionMap[event.key];
+      if (!direction) return;
+
+      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
+        event.preventDefault();
+      }
+
+      setState((prev) => {
+        if (prev.gameOver) return prev;
+        if (isOpposite(prev.direction, direction)) return prev;
+        return { ...prev, nextDirection: direction };
+      });
+    };
+
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
+
+  useEffect(() => {
+    if (!state.running || state.gameOver) return;
+    const interval = window.setInterval(() => {
+      setState((prev) => {
+        if (!prev.running || prev.gameOver) return prev;
+
+        const direction = prev.nextDirection;
+        const nextHead = moveOne(direction, prev.snake[0]);
+
+        if (collide(nextHead, prev.snake)) {
+          return { ...prev, running: false, gameOver: true };
+        }
+
+        const eatsFood = nextHead.x === prev.food.x && nextHead.y === prev.food.y;
+        const nextSnake = [nextHead, ...prev.snake];
+        if (!eatsFood) {
+          nextSnake.pop();
+        }
+
+        return {
+          ...prev,
+          snake: nextSnake,
+          food: eatsFood ? generateFood(nextSnake) : prev.food,
+          direction,
+          score: prev.score + (eatsFood ? 1 : 0),
+        };
+      });
+    }, TICK_MS);
+
+    return () => window.clearInterval(interval);
+  }, [state.running, state.gameOver]);
+
+  const toggleRun = () => {
+    setState((prev) => {
+      if (prev.gameOver) {
+        return initialState();
+      }
+
+      return { ...prev, running: !prev.running };
+    });
+  };
+
+  const statusText = state.gameOver ? "Restart" : state.running ? "Stop" : "Resume";
+
   return (
     <main className="meetup-page">
       <div className="background-grid" aria-hidden="true" />
 
       <section className="hero-card">
-        <p className="eyebrow">Prague Product Community</p>
-        <h1>Apify Meetup with PostHog</h1>
-        <p className="hero-lead">Today only. One evening focused on product analytics, growth loops, and agentic workflows.</p>
-
+        <p className="eyebrow">Epify Puzlo</p>
+        <h1>Snake Sprint</h1>
         <div className="hero-badge-row">
-          <span className="hero-badge">Epify Puzlo Edition</span>
-          <span className="hero-badge hero-badge--soft">Red-forward Design</span>
+          <span className="hero-badge">Red-forward</span>
+          <span className="hero-badge hero-badge--soft">Score only</span>
         </div>
 
-        <div className="status-row">
-          <span className="live-dot" />
-          <p>Live today, Thu Feb 26, 2026</p>
-        </div>
+        <p className="status-row" style={{ color: "#ffdfd9", marginTop: "0.9rem", marginBottom: "0.9rem", justifyContent: "space-between" }}>
+          <span style={{ fontSize: "1.2rem", fontWeight: 700 }}>Score: {state.score}</span>
+          <button
+            type="button"
+            onClick={toggleRun}
+            className="cta-secondary"
+            style={{ padding: "0.55rem 0.9rem", fontWeight: 800 }}
+          >
+            {statusText}
+          </button>
+        </p>
 
-        <div className="cta-row">
-          <a className="cta-primary" href="#agenda">View Agenda</a>
-          <a className="cta-secondary" href="#venue">Get Directions</a>
-        </div>
-      </section>
+        <div
+          aria-label="Snake game board"
+          className="panel"
+          style={{
+            marginTop: "0.9rem",
+            display: "grid",
+            gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`,
+            gap: "3px",
+            padding: "0.7rem",
+            backgroundColor: "rgba(22, 8, 12, 0.84)",
+            borderColor: "rgba(255, 132, 116, 0.45)",
+            maxWidth: "min(92vw, 420px)",
+            marginLeft: "auto",
+            marginRight: "auto",
+          }}
+        >
+          {Array.from({ length: GRID_SIZE * GRID_SIZE }).map((_, index) => {
+            const x = index % GRID_SIZE;
+            const y = Math.floor(index / GRID_SIZE);
+            const isFood = state.food.x === x && state.food.y === y;
+            const isHead = head.x === x && head.y === y;
+            const isTail = tail.x === x && tail.y === y && !isHead;
+            const isBody = snakeBody.has(`${x},${y}`);
 
-      <section className="panel">
-        <h2>Why show up</h2>
-        <ul className="highlight-list">
-          {highlights.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      </section>
+            const cellClass = isHead
+              ? "snake-head"
+              : isTail
+                ? "snake-tail"
+                : isBody
+                  ? "snake-body"
+                  : "snake-empty";
 
-      <section id="agenda" className="panel">
-        <div className="section-head">
-          <h2>Tonight&apos;s agenda</h2>
-          <p>Compact timeline built for mobile scanning.</p>
-        </div>
-        <div className="agenda-stack">
-          {agenda.map((item) => (
-            <article key={`${item.time}-${item.title}`} className="agenda-item">
-              <p className="agenda-time">{item.time}</p>
-              <div>
-                <h3>{item.title}</h3>
-                <p>{item.detail}</p>
+            return (
+              <div
+                key={`${x}-${y}`}
+                className={cellClass}
+                style={{
+                  aspectRatio: "1 / 1",
+                  borderRadius: isHead || isTail || isBody ? "0.4rem" : "0.2rem",
+                  position: "relative",
+                  backgroundColor: isHead
+                    ? COLORS.head
+                    : isTail
+                      ? COLORS.tail
+                      : isBody
+                        ? COLORS.body
+                        : isFood
+                          ? COLORS.food
+                          : "rgba(24, 10, 14, 0.9)",
+                  boxShadow: isHead || isBody || isTail
+                    ? "inset 0 -3px 0 rgba(0,0,0,0.24)"
+                    : isFood
+                      ? "0 0 0 1px rgba(255, 190, 115, 0.46) inset"
+                      : "none",
+                }}
+              >
+                {isHead && (
+                  <>
+                    <span
+                      style={{
+                        position: "absolute",
+                        width: "0.34rem",
+                        height: "0.34rem",
+                        borderRadius: "9999px",
+                        left: "0.3rem",
+                        top: "0.33rem",
+                        background: COLORS.headGoggleRing,
+                        boxShadow: `inset 0 0 0 2px ${COLORS.headGoggle}`,
+                      }}
+                      aria-hidden="true"
+                    />
+                    <span
+                      style={{
+                        position: "absolute",
+                        width: "0.34rem",
+                        height: "0.34rem",
+                        borderRadius: "9999px",
+                        right: "0.3rem",
+                        top: "0.33rem",
+                        background: COLORS.headGoggleRing,
+                        boxShadow: `inset 0 0 0 2px ${COLORS.headGoggle}`,
+                      }}
+                      aria-hidden="true"
+                    />
+                  </>
+                )}
+                {isFood && !isBody && !isHead && !isTail && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      inset: "28%",
+                      borderRadius: "9999px",
+                      background: "#ffebd8",
+                      boxShadow: "0 0 8px rgba(255, 190, 115, 0.65)",
+                    }}
+                    aria-hidden="true"
+                  />
+                  )}
               </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel dual">
-        <article className="info-tile apify">
-          <p className="tile-label">Host</p>
-          <h3>Apify</h3>
-          <p>Automation and web data workflows for teams moving from idea to production quickly.</p>
-        </article>
-        <article className="info-tile posthog">
-          <p className="tile-label">Featured</p>
-          <h3>PostHog</h3>
-          <p>Product analytics, feature flags, and experiments that close the loop from usage to decisions.</p>
-        </article>
-      </section>
-
-      <section id="venue" className="panel venue">
-        <h2>Venue and access</h2>
-        <p>Apify HQ, Prague. Doors open at 18:30. Metro + tram friendly. Bring your phone for live demos.</p>
-        <div className="cta-row">
-          <a className="cta-primary" href="https://maps.google.com" target="_blank" rel="noopener noreferrer">Open Maps</a>
-          <a className="cta-secondary" href="https://calendar.google.com" target="_blank" rel="noopener noreferrer">Add to Calendar</a>
+            );
+          })}
         </div>
       </section>
     </main>

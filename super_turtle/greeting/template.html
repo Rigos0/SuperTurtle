@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hey {{NAME}}!</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+  :root {
+    --bg: #17090b;
+    --bg-soft: #2a1114;
+    --text: #fff2ef;
+    --muted: #e4b4ae;
+    --line: rgba(255, 128, 112, 0.28);
+    --card: rgba(48, 18, 22, 0.8);
+    --card-strong: rgba(57, 20, 25, 0.95);
+    --red: #ff5b4f;
+    --red-strong: #ff3b2f;
+    --rose: #ff8e7f;
+    --amber: #ffc587;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  /* Animated background */
+  .bg-glow {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+  }
+
+  .bg-glow::before {
+    content: '';
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, var(--red-strong) 0%, transparent 70%);
+    opacity: 0.15;
+    animation: pulse-glow 4s ease-in-out infinite;
+  }
+
+  .bg-glow::after {
+    content: '';
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    top: 30%;
+    left: 60%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, var(--rose) 0%, transparent 70%);
+    opacity: 0.08;
+    animation: pulse-glow 6s ease-in-out infinite reverse;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.15; }
+    50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.25; }
+  }
+
+  /* Grid overlay */
+  .grid-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 60px 60px;
+    opacity: 0.15;
+    mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, black 30%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, black 30%, transparent 100%);
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 10;
+    max-width: 540px;
+    width: 90vw;
+    padding: 3rem 2.5rem;
+    background: var(--card-strong);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    text-align: center;
+    box-shadow: 0 40px 80px -20px rgba(0, 0, 0, 0.6);
+    animation: card-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes card-in {
+    from { opacity: 0; transform: translateY(30px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .wave {
+    font-size: 3.5rem;
+    display: block;
+    margin-bottom: 1rem;
+    animation: wave-hand 1.5s ease-in-out infinite;
+    transform-origin: 70% 70%;
+  }
+
+  @keyframes wave-hand {
+    0%, 100% { transform: rotate(0deg); }
+    15% { transform: rotate(14deg); }
+    30% { transform: rotate(-8deg); }
+    45% { transform: rotate(14deg); }
+    60% { transform: rotate(-4deg); }
+    75% { transform: rotate(10deg); }
+  }
+
+  .eyebrow {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--rose);
+    margin-bottom: 0.75rem;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 6vw, 3.2rem);
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 0.5rem;
+  }
+
+  h1 .name {
+    background: linear-gradient(135deg, var(--red) 0%, var(--rose) 50%, var(--amber) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .subtitle {
+    font-size: 1.1rem;
+    color: var(--muted);
+    line-height: 1.5;
+    margin-top: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 0.35rem 1rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border: 1px solid var(--line);
+    border-radius: 100px;
+    color: var(--rose);
+    background: rgba(255, 91, 79, 0.08);
+  }
+
+  .turtle {
+    margin-top: 2rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    opacity: 0.6;
+  }
+
+  .turtle span {
+    font-size: 1rem;
+  }
+
+  /* Floating particles */
+  .particle {
+    position: fixed;
+    z-index: 2;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--red);
+    opacity: 0;
+    animation: float-up linear infinite;
+  }
+
+  .particle:nth-child(1) { left: 15%; animation-duration: 8s; animation-delay: 0s; }
+  .particle:nth-child(2) { left: 35%; animation-duration: 10s; animation-delay: 2s; }
+  .particle:nth-child(3) { left: 55%; animation-duration: 7s; animation-delay: 4s; }
+  .particle:nth-child(4) { left: 75%; animation-duration: 9s; animation-delay: 1s; }
+  .particle:nth-child(5) { left: 90%; animation-duration: 11s; animation-delay: 3s; }
+
+  @keyframes float-up {
+    0% { bottom: -5%; opacity: 0; transform: translateX(0); }
+    10% { opacity: 0.4; }
+    90% { opacity: 0.4; }
+    100% { bottom: 105%; opacity: 0; transform: translateX(30px); }
+  }
+
+  @media (max-width: 480px) {
+    .card { padding: 2rem 1.5rem; }
+    .wave { font-size: 2.5rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wave, .particle, .bg-glow::before, .bg-glow::after { animation: none; }
+    .card { animation: none; }
+    .particle { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="bg-glow"></div>
+  <div class="grid-overlay"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+
+  <div class="card">
+    <span class="wave">👋</span>
+    <p class="eyebrow">A message for you</p>
+    <h1>Hey, <span class="name">{{NAME}}</span>!</h1>
+    <p class="subtitle">{{MESSAGE}}</p>
+    <span class="badge">Made with 🐢</span>
+    <p class="turtle"><span>🐢</span> Powered by Super Turtle</p>
+  </div>
+</body>
+</html>

@@ -54,7 +54,7 @@ An autonomous coding system you talk to on Telegram. You describe what you want 
 
 # Current task
 
-Commit dangling changes in the repo.
+Refresh the `landing/` page visual palette to align with Epify Puzlo branding (red-forward), while preserving polished responsive UX.
 
 # End goal with specs
 
@@ -91,6 +91,9 @@ Agentic repository — autonomous agent coordination system (SubTurtles). Core i
 - ✓ UX Phase 5: Enhanced `/status` command (SubTurtle info, git log, usage in one view)
 - ✓ UX Phase 6: Usage-aware resource management (quota decision matrix in META_SHARED.md)
 - ✓ Default loop type changed to yolo-codex
+- ✓ Always route through driver abstraction (remove config toggle)
+- ✓ Codex: inject current date/time at session start
+- ✓ Fix scheduled turtle duplicates + ensure scheduled notice ordering
 
 # Roadmap (Upcoming)
 
@@ -102,22 +105,11 @@ Agentic repository — autonomous agent coordination system (SubTurtles). Core i
 
 # Backlog
 
-- [ ] Commit dangling changes <- current
-- [x] Plan silent check-in architecture
-- [x] Implement silent check-in mechanism in bot + cron system
-- [x] Update META_SHARED.md supervision section for silent behavior
-- [x] Update `ctl spawn` cron prompt generation
-- [x] Test silent check-ins
-- [x] Code quality audit
-- [x] UX Phase 2: Structured message templates
-- [x] UX Phase 3: Task decomposition protocol
-- [x] UX Phase 4: ctl reschedule-cron command
-- [x] UX Phase 5: Enhanced /status command
-- [x] UX Phase 6: Usage-aware resource management
-- [x] Change ctl default to yolo-codex
-- [ ] Build Codex-vs-Claude parity checklist from current code/tests
+- [ ] Update landing page palette to Epify Puzlo red-forward brand direction and verify mobile/desktop contrast/accessibility <- current
+- [x] Fix `/restart` command (self-re-exec instead of bare process.exit)
+- [x] Build a polished landing page for `landing/app/page.tsx` and `landing/app/globals.css`
 - [ ] Investigate iOS Telegram inline button disappearance (ask_user + command buttons)
+- [ ] Build Codex-vs-Claude parity checklist from current code/tests
 - [ ] Implement Codex parity fixes in driver/session/handlers
-- [ ] Add/expand tests for `/usage`, `/restart`, `/resume`, MCP, and bot-control flows on Codex
 - [ ] Run integration pass (Codex mode + Claude mode) and verify no regressions
 - [ ] Update docs with completion status and known gaps

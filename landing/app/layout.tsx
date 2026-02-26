@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Super Turtle – Autonomous Agent Coordination",
-  description: "Autonomous agent coordination for Claude Code. Spawn SubTurtles to handle complex tasks autonomously with supervision.",
+  title: "Apify Meetup with PostHog — Today",
+  description: "Mobile-first landing page for today's Apify Meetup featuring PostHog sessions, agenda, and venue details.",
 };
 
 export default function RootLayout({

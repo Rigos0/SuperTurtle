@@ -8,6 +8,7 @@ Loop types:
   slow       — Plan -> Groom -> Execute -> Review (4 agent calls/iteration)
   yolo       — Single Claude call per iteration (Ralph loop style)
   yolo-codex — Single Codex call per iteration (Ralph loop style)
+  yolo-codex-spark — Single Codex Spark call per iteration (faster Codex loop)
 
 Usage:
   python -m super_turtle.subturtle --state-dir .subturtles/default --name default
@@ -199,7 +200,7 @@ def _resolve_state_ref(state_dir: Path, name: str) -> tuple[Path, str]:
 
 
 def _write_completion_notification(state_dir: Path, name: str, project_dir: Path) -> None:
-    """Queue a one-shot BOT_MESSAGE_ONLY cron job with completed Backlog items."""
+    """Queue completion handoff: immediate UX ping + meta-agent follow-up check."""
     state_file = state_dir / "CLAUDE.md"
     cron_jobs_path = project_dir / "super_turtle/claude-telegram-bot/cron-jobs.json"
 
@@ -233,7 +234,22 @@ def _write_completion_notification(state_dir: Path, name: str, project_dir: Path
 
     message_lines = [f"🎉 Finished: {name}"]
     message_lines.extend(f"✓ {item}" for item in completed_items)
-    prompt = f"BOT_MESSAGE_ONLY:{'\n'.join(message_lines)}"
+    summary_text = "\n".join(message_lines)
+    checking_prompt = (
+        "BOT_MESSAGE_ONLY:"
+        f"{summary_text}\n\n"
+        "🔄 Meta agent checking in the background now to verify cleanup and report next steps."
+    )
+    followup_prompt = (
+        f"[AUTO-COMPLETION HANDOFF] SubTurtle {name} reported completion.\n"
+        f"Summary from SubTurtle:\n{summary_text}\n\n"
+        f"Now perform meta-agent completion handling for {name}:\n"
+        f"1. Run `./super_turtle/subturtle/ctl status {name}`.\n"
+        f"2. Run `./super_turtle/subturtle/ctl stop {name}` to ensure recurring cron/meta cleanup and archiving are complete.\n"
+        f"3. Confirm whether any cron for {name} remains (if yes, remove it).\n"
+        f"4. Send the user one concise completion update with what shipped and what starts next (or that roadmap is complete).\n"
+        "If everything is already clean, still send the completion update."
+    )
 
     try:
         jobs: list[dict] = []
@@ -263,9 +279,27 @@ def _write_completion_notification(state_dir: Path, name: str, project_dir: Path
         jobs.append(
             {
                 "id": job_id,
-                "prompt": prompt,
+                "prompt": checking_prompt,
                 "type": "one-shot",
-                "fire_at": now_ms + 5000,
+                "fire_at": now_ms + 1000,
+                "interval_ms": None,
+                "created_at": now.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            }
+        )
+        followup_job_id = ""
+        for _ in range(32):
+            candidate = secrets.token_hex(3)
+            if candidate not in existing_ids and candidate != job_id:
+                followup_job_id = candidate
+                break
+        if not followup_job_id:
+            raise RuntimeError("failed to generate unique follow-up cron job id")
+        jobs.append(
+            {
+                "id": followup_job_id,
+                "prompt": followup_prompt,
+                "type": "one-shot",
+                "fire_at": now_ms + 3000,
                 "interval_ms": None,
                 "created_at": now.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
             }
@@ -279,7 +313,9 @@ def _write_completion_notification(state_dir: Path, name: str, project_dir: Path
         )
         return
 
-    print(f"[subturtle:{name}] queued completion notification job {job_id}")
+    print(
+        f"[subturtle:{name}] queued completion notification jobs {job_id}, {followup_job_id}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -496,6 +532,48 @@ def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = N
         _archive_workspace(state_dir, name)
 
 
+def run_yolo_codex_spark_loop(
+    state_dir: Path, name: str, skills: list[str] | None = None
+) -> None:
+    """Yolo-codex-spark loop: single Codex Spark call per iteration."""
+    if skills is None:
+        skills = []
+    _require_cli(name, "codex")
+
+    state_file, state_ref = _resolve_state_ref(state_dir, name)
+    prompt = YOLO_PROMPT.format(state_file=state_ref)
+
+    print(f"[subturtle:{name}] 🐢 spawned (yolo-codex-spark loop: codex spark)")
+    print(f"[subturtle:{name}] state file: {state_ref}")
+    if skills:
+        print(f"[subturtle:{name}] skills: {', '.join(skills)}")
+
+    add_dirs = ["super_turtle/skills"] if skills else []
+    codex = Codex(add_dirs=add_dirs, model="gpt-5.3-codex-spark")
+    iteration = 0
+    stopped_by_directive = False
+
+    while True:
+        if _should_stop(state_file, name):
+            stopped_by_directive = True
+            break
+        iteration += 1
+        print(f"[subturtle:{name}] === yolo-codex-spark iteration {iteration} ===")
+        try:
+            codex.execute(prompt)
+        except (subprocess.CalledProcessError, OSError) as e:
+            _log_retry(name, e)
+
+        if _should_stop(state_file, name):
+            stopped_by_directive = True
+            break
+
+    if stopped_by_directive:
+        if iteration > 0:
+            _write_completion_notification(state_dir, name, Path.cwd())
+        _archive_workspace(state_dir, name)
+
+
 # ---------------------------------------------------------------------------
 # Dispatch
 # ---------------------------------------------------------------------------
@@ -504,6 +582,7 @@ LOOP_TYPES = {
     "slow": run_slow_loop,
     "yolo": run_yolo_loop,
     "yolo-codex": run_yolo_codex_loop,
+    "yolo-codex-spark": run_yolo_codex_spark_loop,
 }
 
 
@@ -537,7 +616,10 @@ def main() -> None:
         "--type",
         default="slow",
         choices=list(LOOP_TYPES.keys()),
-        help="Loop type: slow (plan/groom/execute/review), yolo (single Claude call), yolo-codex (single Codex call)",
+        help=(
+            "Loop type: slow (plan/groom/execute/review), yolo (single Claude call), "
+            "yolo-codex (single Codex call), yolo-codex-spark (single Codex Spark call)"
+        ),
     )
     parser.add_argument(
         "--skills",

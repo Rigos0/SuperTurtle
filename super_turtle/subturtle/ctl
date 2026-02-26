@@ -21,10 +21,11 @@ usage() {
   echo "Commands:"
   echo "  start  [name] [--type TYPE] [--timeout DURATION] [--skill NAME ...]"
   echo "         Spawn a SubTurtle (default timeout: ${DEFAULT_TIMEOUT})"
-  echo "         Types: slow, yolo, yolo-codex (default)"
+  echo "         Types: slow, yolo, yolo-codex (default), yolo-codex-spark"
   echo "           slow       — Plan -> Groom -> Execute -> Review (4 calls/iter)"
   echo "           yolo       — Single Claude call per iteration (Ralph loop)"
   echo "           yolo-codex — Single Codex call per iteration (Ralph loop)"
+  echo "           yolo-codex-spark — Single Codex Spark call per iteration (Ralph loop)"
   echo "         Skills: repeatable --skill flags load Claude Code skills (e.g. --skill frontend --skill testing)"
   echo "  spawn [name] [--type TYPE] [--timeout DURATION] [--state-file PATH|-] [--cron-interval DURATION] [--skill NAME ...]"
   echo "         Create workspace, seed CLAUDE.md from --state-file/stdin, start SubTurtle, and auto-register cron"
@@ -212,8 +213,8 @@ do_start() {
 
   # Validate loop type
   case "$loop_type" in
-    slow|yolo|yolo-codex) ;;
-    *) echo "ERROR: unknown SubTurtle type '${loop_type}' (must be: slow, yolo, yolo-codex)" >&2; exit 1 ;;
+    slow|yolo|yolo-codex|yolo-codex-spark) ;;
+    *) echo "ERROR: unknown SubTurtle type '${loop_type}' (must be: slow, yolo, yolo-codex, yolo-codex-spark)" >&2; exit 1 ;;
   esac
 
   local timeout_secs

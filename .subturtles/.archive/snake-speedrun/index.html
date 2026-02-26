@@ -106,8 +106,8 @@
         margin-bottom: 0.8rem;
       }
       canvas {
-        width: min(90vw, 560px);
-        height: min(90vw, 560px);
+        width: min(75vw, 420px);
+        height: min(75vw, 420px);
         border-radius: 8px;
         border: 1px dashed rgba(var(--accent-rgb), 0.35);
         background: rgba(4, 10, 22, 0.9);
@@ -291,7 +291,7 @@
     <main class="wrap">
       <section class="card">
         <h1 class="title">Snake Speedrun</h1>
-        <div class="score-display" id="score-display">Score: 0</div>
+        <div class="score-display" id="score-display">P1: 0 | P2: 0</div>
         <div class="stage">
           <canvas id="board" width="480" height="480" aria-label="Snake game board placeholder"></canvas>
         </div>
@@ -321,34 +321,55 @@
 
       const CELL_COUNT = 24;
       const CELL_SIZE = canvas.width / CELL_COUNT;
-      const TICK_MS = 120;
 
-      let gameLoop = null;
-      let snake = [];
-      let direction = { x: 1, y: 0 };
-      let nextDirection = { x: 1, y: 0 };
-      let food = { x: 10, y: 10 };
-      let score = 0;
-      let isRunning = false;
-      let isGameOver = false;
-      let tongueOut = false;
+      let ws = null;
+      let gameState = {
+        player1Snake: [],
+        player2Snake: [],
+        food: { x: 10, y: 10 },
+        player1Score: 0,
+        player2Score: 0,
+        isRunning: false,
+        isGameOver: false,
+      };
 
-      function startGame() {
-        clearInterval(gameLoop);
-        snake = [
-          { x: 12, y: 12 },
-          { x: 11, y: 12 },
-          { x: 10, y: 12 },
-        ];
-        direction = { x: 1, y: 0 };
-        nextDirection = { x: 1, y: 0 };
-        food = randomFood();
-        score = 0;
-        isRunning = true;
-        isGameOver = false;
-        updateHud();
-        render();
-        gameLoop = setInterval(step, TICK_MS);
+      let player1Direction = { x: 1, y: 0 };
+      let tongueOutP1 = false;
+      let tongueOutP2 = false;
+
+      function connectWebSocket() {
+        const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+        ws = new WebSocket(`${protocol}//${location.host}`);
+
+        ws.onopen = () => {
+          console.log("Connected to server");
+          render();
+        };
+
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          if (data.spectator) {
+            console.log("You are a spectator");
+            return;
+          }
+          gameState = data;
+          render();
+        };
+
+        ws.onerror = (error) => {
+          console.error("WebSocket error:", error);
+        };
+
+        ws.onclose = () => {
+          console.log("Disconnected from server");
+          setTimeout(connectWebSocket, 3000);
+        };
+      }
+
+      function sendDirection(dx, dy) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "direction", dx, dy }));
+        }
       }
 
       function isTouchDevice() {
@@ -358,78 +379,6 @@
             navigator.msMaxTouchPoints > 0 ||
             window.matchMedia?.("(hover: none)").matches)
         );
-      }
-
-      function gameOver() {
-        isRunning = false;
-        isGameOver = true;
-        clearInterval(gameLoop);
-        render();
-      }
-
-      function randomFood() {
-        let candidate;
-        do {
-          candidate = {
-            x: Math.floor(Math.random() * CELL_COUNT),
-            y: Math.floor(Math.random() * CELL_COUNT),
-          };
-        } while (isOnSnake(candidate));
-        return candidate;
-      }
-
-      function isOnSnake(cell) {
-        return snake.some((segment) => segment.x === cell.x && segment.y === cell.y);
-      }
-
-      function setDirection(dx, dy) {
-        if (!isRunning) {
-          direction = { x: dx, y: dy };
-          nextDirection = { x: dx, y: dy };
-          return;
-        }
-
-        if (dx === -direction.x && dy === -direction.y) {
-          return;
-        }
-
-        nextDirection = { x: dx, y: dy };
-      }
-
-      function step() {
-        const head = snake[0];
-        const next = {
-          x: head.x + nextDirection.x,
-          y: head.y + nextDirection.y,
-        };
-
-        direction = nextDirection;
-        next.x = (next.x + CELL_COUNT) % CELL_COUNT;
-        next.y = (next.y + CELL_COUNT) % CELL_COUNT;
-
-        const willGrow = next.x === food.x && next.y === food.y;
-        const isColliding = snake.some((segment, index) => {
-          if (!willGrow && index === snake.length - 1) {
-            return false;
-          }
-          return segment.x === next.x && segment.y === next.y;
-        });
-        if (isColliding) {
-          gameOver();
-          return;
-        }
-
-        snake.unshift(next);
-
-        if (willGrow) {
-          score += 1;
-          food = randomFood();
-        } else {
-          snake.pop();
-        }
-
-        scoreDisplay.textContent = `Score: ${score}`;
-        render();
       }
 
       function drawCell(x, y, color, border) {
@@ -470,20 +419,31 @@
 
       function roundedRectPath(left, top, size, radius) {
         const r = Math.min(radius, size / 2);
+        const right = left + size;
+        const bottom = top + size;
         context.beginPath();
         context.moveTo(left + r, top);
-        context.lineTo(left + size - r, top);
-        context.quadraticCurveTo(left + size, top, left + size, top + r);
-        context.lineTo(left + size, top + size - r);
-        context.quadraticCurveTo(left + size, top + size, left + size - r, top + size);
-        context.lineTo(left + r, top + size);
-        context.quadraticCurveTo(left, top + size, left, top + size - r);
+        context.lineTo(right - r, top);
+        context.arc(right - r, top + r, r, -Math.PI / 2, 0);
+        context.lineTo(right, bottom - r);
+        context.arc(right - r, bottom - r, r, 0, Math.PI / 2);
+        context.lineTo(left + r, bottom);
+        context.arc(left + r, bottom - r, r, Math.PI / 2, Math.PI);
         context.lineTo(left, top + r);
-        context.quadraticCurveTo(left, top, left + r, top);
+        context.arc(left + r, top + r, r, Math.PI, (Math.PI * 3) / 2);
         context.closePath();
       }
 
-      function drawSnakeSegment(segment, index, totalSegments) {
+      function hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+          r: parseInt(result[1], 16),
+          g: parseInt(result[2], 16),
+          b: parseInt(result[3], 16),
+        } : { r: 0, g: 0, b: 0 };
+      }
+
+      function drawSnakeSegment(segment, index, totalSegments, colorHex) {
         const left = segment.x * CELL_SIZE;
         const top = segment.y * CELL_SIZE;
         const inset = CELL_SIZE * 0.08;
@@ -492,8 +452,8 @@
         const t = totalSegments <= 1 ? 0 : index / (totalSegments - 1);
         const eased = t * t * (3 - 2 * t);
 
-        const headColor = { r: 184, g: 255, b: 74 };
-        const tailColor = { r: 26, g: 152, b: 82 };
+        const headColor = hexToRgb(colorHex);
+        const tailColor = shiftColor(headColor, -50);
         const baseColor = mixColor(headColor, tailColor, eased);
         const lightColor = shiftColor(baseColor, 24);
         const darkColor = shiftColor(baseColor, -28);
@@ -535,12 +495,147 @@
         context.restore();
       }
 
+      function drawFood(now) {
+        const left = gameState.food.x * CELL_SIZE;
+        const top = gameState.food.y * CELL_SIZE;
+        const centerX = left + CELL_SIZE / 2;
+        const centerY = top + CELL_SIZE / 2;
+        const pulse = (Math.sin(now * 0.01) + 1) / 2;
+        const scale = 0.82 + pulse * 0.24;
+        const size = CELL_SIZE * scale;
+        const half = size / 2;
+        const glowAlpha = 0.3 + pulse * 0.45;
+        const borderAlpha = 0.25 + pulse * 0.2;
+        const wobble = Math.sin(now * 0.005) * 0.07;
+
+        context.save();
+        context.translate(centerX, centerY);
+        context.rotate(wobble);
+
+        context.shadowColor = `rgba(255, 72, 108, ${glowAlpha})`;
+        context.shadowBlur = CELL_SIZE * (0.6 + pulse * 0.5);
+        context.shadowOffsetX = 0;
+        context.shadowOffsetY = 0;
+
+        context.fillStyle = "#ff3b5c";
+        context.fillRect(-half, -half, size, size);
+
+        context.shadowBlur = 0;
+        context.strokeStyle = `rgba(255, 255, 255, ${borderAlpha})`;
+        context.lineWidth = 1;
+        context.strokeRect(-half + 0.5, -half + 0.5, size - 1, size - 1);
+
+        const highlightSize = size * 0.34;
+        context.fillStyle = `rgba(255, 220, 228, ${0.22 + pulse * 0.22})`;
+        context.fillRect(
+          -half + size * 0.16,
+          -half + size * 0.16,
+          highlightSize,
+          highlightSize
+        );
+
+        context.restore();
+      }
+
+      function getSnakeDirection(snake) {
+        if (snake.length < 2) return { x: 0, y: 0 };
+        const head = snake[0];
+        const next = snake[1];
+        return {
+          x: head.x - next.x,
+          y: head.y - next.y,
+        };
+      }
+
+      function drawSnakeEyes(snake, colorHex) {
+        if (snake.length === 0) return;
+        const direction = getSnakeDirection(snake);
+        const head = snake[0];
+        const headLeft = head.x * CELL_SIZE;
+        const headTop = head.y * CELL_SIZE;
+        const headCenterX = headLeft + CELL_SIZE / 2;
+        const headCenterY = headTop + CELL_SIZE / 2;
+        const eyeSocketRadius = CELL_SIZE * 0.15;
+        const pupilRadius = CELL_SIZE * 0.095;
+        const pupilShift = CELL_SIZE * 0.09;
+        const eyeSpread = CELL_SIZE * 0.18;
+        const forwardOffset = CELL_SIZE * 0.12;
+        const dirX = direction.x || 0;
+        const dirY = direction.y || 0;
+
+        const eyePairCenterX = headCenterX + dirX * forwardOffset;
+        const eyePairCenterY = headCenterY + dirY * forwardOffset;
+
+        let eyeOne = { x: eyePairCenterX, y: eyePairCenterY - eyeSpread };
+        let eyeTwo = { x: eyePairCenterX, y: eyePairCenterY + eyeSpread };
+        if (dirY !== 0) {
+          eyeOne = { x: eyePairCenterX - eyeSpread, y: eyePairCenterY };
+          eyeTwo = { x: eyePairCenterX + eyeSpread, y: eyePairCenterY };
+        }
+
+        context.fillStyle = "rgba(20, 95, 50, 0.7)";
+        context.beginPath();
+        context.arc(eyeOne.x, eyeOne.y, eyeSocketRadius, 0, Math.PI * 2);
+        context.arc(eyeTwo.x, eyeTwo.y, eyeSocketRadius, 0, Math.PI * 2);
+        context.fill();
+
+        context.fillStyle = "#061016";
+        context.beginPath();
+        context.arc(eyeOne.x + dirX * pupilShift, eyeOne.y + dirY * pupilShift, pupilRadius, 0, Math.PI * 2);
+        context.arc(eyeTwo.x + dirX * pupilShift, eyeTwo.y + dirY * pupilShift, pupilRadius, 0, Math.PI * 2);
+        context.fill();
+      }
+
+      function drawTongue(snake, tongueOut) {
+        if (!tongueOut || snake.length === 0) return;
+        const direction = getSnakeDirection(snake);
+        const head = snake[0];
+        const headLeft = head.x * CELL_SIZE;
+        const headTop = head.y * CELL_SIZE;
+        const headCenterX = headLeft + CELL_SIZE / 2;
+        const headCenterY = headTop + CELL_SIZE / 2;
+        const dirX = direction.x || 0;
+        const dirY = direction.y || 0;
+
+        const tongueBaseX = headCenterX + dirX * (CELL_SIZE * 0.5);
+        const tongueBaseY = headCenterY + dirY * (CELL_SIZE * 0.5);
+        const tongueLen = CELL_SIZE * 0.4;
+        const tongueTipX = tongueBaseX + dirX * tongueLen;
+        const tongueTipY = tongueBaseY + dirY * tongueLen;
+        const perpX = -dirY;
+        const perpY = dirX;
+        const forkLen = CELL_SIZE * 0.15;
+        const forkSpread = CELL_SIZE * 0.12;
+
+        context.strokeStyle = "#ff3b5c";
+        context.lineWidth = Math.max(2, CELL_SIZE * 0.08);
+        context.lineCap = "round";
+        context.beginPath();
+        context.moveTo(tongueBaseX, tongueBaseY);
+        context.lineTo(tongueTipX, tongueTipY);
+        context.moveTo(tongueTipX, tongueTipY);
+        context.lineTo(
+          tongueTipX + dirX * forkLen + perpX * forkSpread,
+          tongueTipY + dirY * forkLen + perpY * forkSpread
+        );
+        context.moveTo(tongueTipX, tongueTipY);
+        context.lineTo(
+          tongueTipX + dirX * forkLen - perpX * forkSpread,
+          tongueTipY + dirY * forkLen - perpY * forkSpread
+        );
+        context.stroke();
+      }
+
       function render() {
+        const now = Date.now();
         context.clearRect(0, 0, canvas.width, canvas.height);
         context.fillStyle = "rgba(4, 11, 20, 0.95)";
         context.fillRect(0, 0, canvas.width, canvas.height);
-        tongueOut = isRunning && Date.now() % 600 < 300;
 
+        tongueOutP1 = gameState.isRunning && now % 600 < 300;
+        tongueOutP2 = gameState.isRunning && now % 600 < 300;
+
+        // Draw grid
         for (let y = 0; y <= CELL_COUNT; y++) {
           const p = y * CELL_SIZE;
           context.strokeStyle = "rgba(25, 249, 107, 0.08)";
@@ -558,119 +653,62 @@
           context.stroke();
         }
 
-        drawCell(food.x, food.y, "#ff3b5c", "rgba(255, 255, 255, 0.25)");
+        // Draw food
+        drawFood(now);
 
-        snake.forEach((segment, index) => {
-          drawSnakeSegment(segment, index, snake.length);
+        // Draw player 1 snake (green)
+        gameState.player1Snake.forEach((segment, index) => {
+          drawSnakeSegment(segment, index, gameState.player1Snake.length, "#19f96b");
         });
 
-        if (snake.length > 0) {
-          const head = snake[0];
-          const headLeft = head.x * CELL_SIZE;
-          const headTop = head.y * CELL_SIZE;
-          const headCenterX = headLeft + CELL_SIZE / 2;
-          const headCenterY = headTop + CELL_SIZE / 2;
-          const eyeRadius = CELL_SIZE * 0.155;
-          const pupilRadius = CELL_SIZE * 0.095;
-          const pupilShift = CELL_SIZE * 0.09;
-          const eyeHighlightRadius = CELL_SIZE * 0.032;
-          const eyeSpread = CELL_SIZE * 0.18;
-          const forwardOffset = CELL_SIZE * 0.12;
-          const dirX = direction.x;
-          const dirY = direction.y;
+        // Draw player 2 snake (cyan)
+        gameState.player2Snake.forEach((segment, index) => {
+          drawSnakeSegment(segment, index, gameState.player2Snake.length, "#19d4f9");
+        });
 
-          const eyePairCenterX = headCenterX + dirX * forwardOffset;
-          const eyePairCenterY = headCenterY + dirY * forwardOffset;
+        // Draw eyes and tongue for both snakes
+        drawSnakeEyes(gameState.player1Snake, "#19f96b");
+        drawTongue(gameState.player1Snake, tongueOutP1);
+        drawSnakeEyes(gameState.player2Snake, "#19d4f9");
+        drawTongue(gameState.player2Snake, tongueOutP2);
 
-          let eyeOne = { x: eyePairCenterX, y: eyePairCenterY - eyeSpread };
-          let eyeTwo = { x: eyePairCenterX, y: eyePairCenterY + eyeSpread };
-          if (dirY !== 0) {
-            eyeOne = { x: eyePairCenterX - eyeSpread, y: eyePairCenterY };
-            eyeTwo = { x: eyePairCenterX + eyeSpread, y: eyePairCenterY };
-          }
-
-          context.fillStyle = "rgba(212, 255, 224, 0.96)";
-          context.beginPath();
-          context.arc(eyeOne.x, eyeOne.y, eyeRadius, 0, Math.PI * 2);
-          context.arc(eyeTwo.x, eyeTwo.y, eyeRadius, 0, Math.PI * 2);
-          context.fill();
-
-          context.fillStyle = "#061016";
-          context.beginPath();
-          context.arc(eyeOne.x + dirX * pupilShift, eyeOne.y + dirY * pupilShift, pupilRadius, 0, Math.PI * 2);
-          context.arc(eyeTwo.x + dirX * pupilShift, eyeTwo.y + dirY * pupilShift, pupilRadius, 0, Math.PI * 2);
-          context.fill();
-
-          const highlightOffset = eyeRadius * 0.42;
-          context.fillStyle = "rgba(242, 255, 248, 0.95)";
-          context.beginPath();
-          context.arc(eyeOne.x - highlightOffset, eyeOne.y - highlightOffset, eyeHighlightRadius, 0, Math.PI * 2);
-          context.arc(eyeTwo.x - highlightOffset, eyeTwo.y - highlightOffset, eyeHighlightRadius, 0, Math.PI * 2);
-          context.fill();
-
-          if (tongueOut) {
-            const tongueBaseX = headCenterX + dirX * (CELL_SIZE * 0.5);
-            const tongueBaseY = headCenterY + dirY * (CELL_SIZE * 0.5);
-            const tongueLen = CELL_SIZE * 0.4;
-            const tongueTipX = tongueBaseX + dirX * tongueLen;
-            const tongueTipY = tongueBaseY + dirY * tongueLen;
-            const perpX = -dirY;
-            const perpY = dirX;
-            const forkLen = CELL_SIZE * 0.15;
-            const forkSpread = CELL_SIZE * 0.12;
-
-            context.strokeStyle = "#ff3b5c";
-            context.lineWidth = Math.max(2, CELL_SIZE * 0.08);
-            context.lineCap = "round";
-            context.beginPath();
-            context.moveTo(tongueBaseX, tongueBaseY);
-            context.lineTo(tongueTipX, tongueTipY);
-            context.moveTo(tongueTipX, tongueTipY);
-            context.lineTo(
-              tongueTipX + dirX * forkLen + perpX * forkSpread,
-              tongueTipY + dirY * forkLen + perpY * forkSpread
-            );
-            context.moveTo(tongueTipX, tongueTipY);
-            context.lineTo(
-              tongueTipX + dirX * forkLen - perpX * forkSpread,
-              tongueTipY + dirY * forkLen - perpY * forkSpread
-            );
-            context.stroke();
-          }
-        }
-
-        if (!isRunning && snake.length > 0 && !isGameOver) {
+        // Draw status messages
+        if (!gameState.isRunning && gameState.player1Snake.length > 0 && !gameState.isGameOver) {
           context.fillStyle = "rgba(233, 239, 255, 0.92)";
           context.font = "bold 20px ui-monospace, SFMono-Regular, Menlo, monospace";
           context.textAlign = "center";
-          context.fillText("Press Space/Enter to start", canvas.width / 2, canvas.height / 2);
+          context.fillText("Waiting for players...", canvas.width / 2, canvas.height / 2);
         }
 
-        if (isGameOver) {
+        if (gameState.isGameOver) {
           context.fillStyle = "rgba(2, 8, 16, 0.72)";
           context.fillRect(0, 40, canvas.width, canvas.height - 80);
 
           context.fillStyle = "#ff6d7b";
           context.font = "bold 32px ui-monospace, SFMono-Regular, Menlo, monospace";
           context.textAlign = "center";
-          context.fillText("Game Over", canvas.width / 2, canvas.height / 2 - 8);
+
+          let message = "Game Over";
+          if (gameState.player1Score > gameState.player2Score) {
+            message = "Player 1 Wins!";
+          } else if (gameState.player2Score > gameState.player1Score) {
+            message = "Player 2 Wins!";
+          } else {
+            message = "Draw!";
+          }
+
+          context.fillText(message, canvas.width / 2, canvas.height / 2 - 8);
           context.fillStyle = "#e6efff";
           context.font = "20px ui-monospace, SFMono-Regular, Menlo, monospace";
-          context.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 + 24);
+          context.fillText(`P1: ${gameState.player1Score} | P2: ${gameState.player2Score}`, canvas.width / 2, canvas.height / 2 + 24);
         }
-      }
 
-      function updateHud() {
-        scoreDisplay.textContent = `Score: ${score}`;
+        // Update score display
+        scoreDisplay.textContent = `P1: ${gameState.player1Score} | P2: ${gameState.player2Score}`;
       }
 
       function handleDpadClick(dx, dy) {
-        if (!isRunning || isGameOver) {
-          startGame();
-          setDirection(dx, dy);
-          return;
-        }
-        setDirection(dx, dy);
+        sendDirection(dx, dy);
       }
 
       function onCanvasTouchStart(event) {
@@ -690,9 +728,6 @@
         const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
         if (distance < 30) {
-          if (!isRunning || isGameOver) {
-            startGame();
-          }
           return;
         }
 
@@ -721,15 +756,7 @@
 
         if (move) {
           event.preventDefault();
-          setDirection(move[0], move[1]);
-          return;
-        }
-
-        if (key === " " || key === "Enter" || key === "r" || key === "R") {
-          event.preventDefault();
-          if (!isRunning || isGameOver) {
-            startGame();
-          }
+          handleDpadClick(move[0], move[1]);
           return;
         }
       }
@@ -744,8 +771,7 @@
       canvas.addEventListener("touchstart", onCanvasTouchStart, { passive: true });
       canvas.addEventListener("touchend", onCanvasTouchEnd, { passive: true });
 
-      food = randomFood();
-      updateHud();
+      connectWebSocket();
       render();
     </script>
   </body>
