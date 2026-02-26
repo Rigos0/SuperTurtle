@@ -105,10 +105,6 @@ function isOnAnySnake(cell) {
   return bothSnakes.some((segment) => segment.x === cell.x && segment.y === cell.y);
 }
 
-function isOnSnake(cell, player) {
-  return player.snake.some((segment) => segment.x === cell.x && segment.y === cell.y);
-}
-
 function setDirection(playerId, dx, dy) {
   const player = playerId === "player1" ? gameState.player1 : gameState.player2;
   if (!gameState.isRunning) {
@@ -310,8 +306,6 @@ wss.on("connection", (ws) => {
     ws.send(JSON.stringify({ spectator: true }));
   }
 
-  console.log(`Player ${playerId} connected`);
-
   // Send player assignment to the client
   if (playerId) {
     ws.send(JSON.stringify({ type: "assigned", playerId }));
@@ -343,10 +337,7 @@ wss.on("connection", (ws) => {
       gameState.isRunning = false;
       clearInterval(gameLoop);
     }
-    console.log(`Player ${playerId} disconnected`);
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`snake-speedrun server running at http://localhost:${PORT}`);
-});
+server.listen(PORT);

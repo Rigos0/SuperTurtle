@@ -1,5 +1,5 @@
 ## Current Task
-Identify dead code, unused variables, console logs, and TODOs in the Snake game files.
+Fix inconsistent naming or style patterns in the Snake game files.
 
 ## End Goal with Specs
 Review all recent Snake game changes for code quality issues — dead code, TODOs, inconsistent style, unused variables, overly complex logic, missing error handling. Fix anything found and commit clean.
@@ -10,9 +10,9 @@ Files to review:
 
 ## Backlog
 - [x] Read index.html and server.js thoroughly
-- [ ] Identify dead code, unused variables, console.logs left behind, TODOs <- current
-  - Progress: Removed unused client/server code paths (`player1Direction`, `isTouchDevice`, `drawCell`, unused `drawSnakeEyes` arg, server `clients` map, unused player `color` fields).
-- [ ] Fix inconsistent naming or style patterns
+- [x] Identify dead code, unused variables, console.logs left behind, TODOs
+  - Progress: Removed unused `isOnSnake` helper and stripped non-essential client/server `console.log` calls.
+- [ ] Fix inconsistent naming or style patterns <- current
 - [ ] Simplify overly complex functions (especially collision logic, rendering)
 - [ ] Remove any debug/temp code
 - [ ] Ensure error handling is solid (WebSocket disconnect, edge cases)
