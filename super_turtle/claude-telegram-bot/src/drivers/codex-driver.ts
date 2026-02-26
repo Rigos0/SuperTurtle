@@ -116,10 +116,16 @@ export class CodexDriver implements ChatDriver {
     }
 
     // Final flush for late writes near turn completion.
-    await wait(100);
-    await checkPendingAskUserRequests(input.ctx, input.chatId);
-    await checkPendingSendTurtleRequests(input.ctx, input.chatId);
-    await checkPendingBotControlRequests(codexSession, input.chatId);
+    // Wait longer (300ms) and retry multiple times in case MCP server is still writing.
+    await wait(300);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await checkPendingAskUserRequests(input.ctx, input.chatId);
+      await checkPendingSendTurtleRequests(input.ctx, input.chatId);
+      await checkPendingBotControlRequests(codexSession, input.chatId);
+      if (attempt < 2) {
+        await wait(100);
+      }
+    }
 
     return response;
   }
