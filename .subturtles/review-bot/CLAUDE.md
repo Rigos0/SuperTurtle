@@ -24,11 +24,11 @@ All TypeScript source files under `super_turtle/claude-telegram-bot/src/`:
 ## Backlog
 - [x] Read and review core files: index.ts, bot.ts, session.ts, codex-session.ts
 - [x] Read and review cron system: cron.ts, cron-supervision-queue.ts, silent-notifications.ts
-- [ ] Read and review all handlers in src/handlers/ <- current
-- [ ] Read and review driver layer: drivers/registry.ts, types.ts, claude-driver.ts, codex-driver.ts
+- [x] Read and review all handlers in src/handlers/
+- [ ] Read and review driver layer: drivers/registry.ts, types.ts, claude-driver.ts, codex-driver.ts <- current
 - [ ] Read and review MCP servers (ask_user, send_turtle, bot_control)
-- [ ] Finalize and commit review report
-- [ ] Summarize findings in META_SHARED.md (optional)
+- [ ] Finalize review report and commit
+- [ ] Optional: Summarize critical findings
 
 ## Notes
 - This is a READ-ONLY review. Do NOT modify any source files.

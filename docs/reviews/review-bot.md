@@ -489,3 +489,213 @@ If `loadJobs()` fails to parse the job file, the error is logged but the existin
 - [ ] Handlers: `handlers/` (all files)
 - [ ] Drivers: `drivers/` (registry, types, claude-driver, codex-driver)
 - [ ] MCP servers: `ask_user_mcp/`, `send_turtle_mcp/`, `bot_control_mcp/`
+
+---
+
+# Code Review Phase 3: Handler Layer
+
+**Date**: 2026-02-27
+**Files**: index.ts, text.ts, commands.ts, streaming.ts, driver-routing.ts, callback.ts
+
+---
+
+## Executive Summary
+
+The handler layer is well-structured with good authorization patterns, rate limiting, and error handling. However, several **medium-severity issues** exist around file operation safety in MCP request handling, command parsing fragility, and potential security gaps in /tmp file access.
+
+**Issues Found**: 8 total
+- **Critical**: 0
+- **Medium**: 4 (file safety, parsing fragility, auth gaps)
+- **Low**: 4 (error suppression, edge cases)
+
+---
+
+## Medium Issues
+
+### 1. File Operation Security: Unsanitized /tmp File Access
+
+**File**: `src/handlers/streaming.ts`
+**Lines**: 66-100, 110-149
+**Severity**: MEDIUM
+
+**Issue**:
+Code scans `/tmp/ask-user-*.json` and `/tmp/send-turtle-*.json` without validating file ownership. An attacker with /tmp access could inject malicious options or URLs.
+
+```typescript
+const glob = new Bun.Glob("ask-user-*.json");
+for await (const filename of glob.scan({ cwd: "/tmp", absolute: false })) {
+  const filepath = `/tmp/${filename}`;
+  const data = JSON.parse(await Bun.file(filepath).text());
+  // No validation that file was created by MCP server
+```
+
+**Risk**: Malicious /tmp files could add fake options, replace URLs, or cause DOS.
+
+**Suggested Fix**:
+- Use restricted directory: `/tmp/.claude-telegram-bot-${process.pid}/`
+- Or validate file ownership/permissions
+
+---
+
+### 2. Command Parsing: Fragile Regex for ctl List Output
+
+**File**: `src/handlers/commands.ts`
+**Lines**: 85-150
+**Severity**: MEDIUM
+
+**Issue**:
+The `parseCtlListOutput` function uses multiple nested regex patterns. If ctl output format changes, parsing fails silently without warning.
+
+```typescript
+const baseMatch = line.match(/^(\S+)\s+(\S+)\s*(.*)$/);
+const typeMatch = remainder.match(/^(yolo-codex-spark|yolo-codex|slow|yolo)\b/);
+const pidMatch = remainder.match(/^\(PID\s+(\d+)\)\s*(.*)$/);
+// ... more nested patterns
+```
+
+**Risk**: UI displays corrupted SubTurtle info if format changes.
+
+**Suggested Fix**:
+- Add format validation with warnings on mismatch
+- Or export ctl output as JSON instead of text
+
+---
+
+### 3. Model Selection: Doesn't Clear Pending ask_user Requests
+
+**File**: `src/handlers/callback.ts`
+**Lines**: 77-96
+**Severity**: MEDIUM
+
+**Issue**:
+Switching Codex models starts a fresh thread but doesn't clear pending ask_user requests from the previous session.
+
+**Risk**: Old ask_user options shown after model switch, confusing user.
+
+**Suggested Fix**:
+Clear request files before starting new thread:
+```typescript
+const glob = new Bun.Glob("ask-user-*.json");
+for await (const filename of glob.scan({ cwd: "/tmp" })) {
+  try { unlinkSync(`/tmp/${filename}`); } catch {}
+}
+```
+
+---
+
+### 4. Error Handling: Silent Failure in Photo Download Fallback
+
+**File**: `src/handlers/streaming.ts`
+**Lines**: 128-139
+**Severity**: MEDIUM
+
+**Issue**:
+Photo download fails → fallback to link. But if link send also fails, error is swallowed and marked as "sent".
+
+```typescript
+try {
+  // Download and send as sticker
+} catch (photoError) {
+  await ctx.reply(`🐢 ${url}`);  // Could also fail
+}
+photoSent = true;  // Marked sent regardless
+```
+
+**Risk**: File status marked "sent" even when both attempts failed.
+
+**Suggested Fix**:
+Wrap fallback in try/catch and set status based on actual result.
+
+---
+
+## Low Issues
+
+### 5. Error Suppression: Corrupt Request Files Retried Infinitely
+
+**File**: `src/handlers/streaming.ts`
+**Lines**: 95-96, 146-147
+**Severity**: LOW
+
+**Issue**:
+Corrupt request files cause errors but are never cleaned up, causing infinite retries.
+
+```typescript
+} catch (error) {
+  console.warn(`Failed to process ask-user file ${filepath}:`, error);
+}
+// File never deleted, will be retried next check
+```
+
+**Suggested Fix**:
+Delete corrupt files instead of retrying.
+
+---
+
+### 6. Type Safety: Effort Level Cast Without Validation
+
+**File**: `src/handlers/callback.ts`
+**Line**: 63
+**Severity**: LOW
+
+**Issue**:
+Effort level cast before validation:
+```typescript
+const effort = callbackData.replace("effort:", "") as EffortLevel;
+if (effort in EFFORT_DISPLAY) {  // Checked after
+```
+
+---
+
+### 7. Chat ID Comparison: Type Coercion Issue
+
+**File**: `src/handlers/streaming.ts`
+**Lines**: 78, 122
+**Severity**: LOW
+
+**Issue**:
+```typescript
+if (data.chat_id && String(data.chat_id) !== String(chatId)) continue;
+```
+Unnecessary string conversion; could fail if chatId is undefined.
+
+---
+
+### 8. Unused Import: resetAllDriverSessions
+
+**File**: `src/handlers/callback.ts`
+**Line**: 19
+**Severity**: LOW
+
+**Issue**:
+The `resetAllDriverSessions` is imported but never used. Suggests incomplete refactoring.
+
+---
+
+## Summary by Category
+
+| Category | Count |
+|----------|-------|
+| **Security** | 1 medium |
+| **Parsing** | 1 medium |
+| **State Management** | 1 medium |
+| **Error Handling** | 1 medium, 2 low |
+| **Type Safety** | 1 low |
+| **Code Quality** | 1 low |
+
+---
+
+## Recommended Fixes
+
+1. **HIGH**: Restrict /tmp file access to process-owned directory or validate ownership
+2. **HIGH**: Add validation to ctl parsing with warnings on format mismatches
+3. **MEDIUM**: Clear pending requests when switching models
+4. **MEDIUM**: Implement proper error handling in photo fallback
+5. **LOW**: Delete corrupt request files instead of retrying
+6. **LOW**: Remove unused imports
+
+---
+
+## Files to Review Next
+
+- [ ] Drivers: `drivers/registry.ts`, `types.ts`, `claude-driver.ts`, `codex-driver.ts`
+- [ ] MCP servers: `ask_user_mcp/`, `send_turtle_mcp/`, `bot_control_mcp/`
