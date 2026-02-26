@@ -18,4 +18,12 @@ describe("buildCronScheduledPrompt", () => {
     const input = `reminder\n\n${SCHEDULED_PROMPT_INSTRUCTION}`;
     expect(buildCronScheduledPrompt(input)).toBe(input);
   });
+
+  it("never duplicates the scheduled instruction", () => {
+    const input = `🔔 Scheduled:\nDo the thing.\n\n${SCHEDULED_PROMPT_INSTRUCTION}`;
+    const output = buildCronScheduledPrompt(input);
+
+    expect(output).toBe(input);
+    expect(output.split(SCHEDULED_PROMPT_INSTRUCTION)).toHaveLength(2);
+  });
 });

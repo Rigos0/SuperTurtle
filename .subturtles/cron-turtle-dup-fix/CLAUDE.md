@@ -1,5 +1,5 @@
 ## Current Task
-Add/adjust test or logging to prevent regressions.
+All backlog items complete.
 
 ## End Goal with Specs
 - A scheduled turtle job produces exactly one sticker and one "you’re doing great" message.
@@ -10,8 +10,8 @@ Add/adjust test or logging to prevent regressions.
 - [x] Reproduce/trace how scheduled prompts are injected and executed
 - [x] Implement guard so cron runs do not double-trigger when prompt already contains scheduled notice
 - [x] Ensure only one turtle sticker is sent per job (no extra manual echo)
-- [ ] Add/adjust test or logging to prevent regressions <- current
-- [ ] Commit changes
+- [x] Add/adjust test or logging to prevent regressions
+- [x] Commit changes
 
 ## Notes
 Files likely involved:
@@ -22,3 +22,6 @@ Files likely involved:
 Behavior to preserve:
 - Non-silent cron should auto-inject "🔔 Scheduled:" unless the prompt already contains it.
 - Scheduled notice should appear before actual content.
+
+## Loop Control
+STOP
