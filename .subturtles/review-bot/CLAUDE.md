@@ -1,7 +1,7 @@
 # Code Review: Telegram Bot Core
 
 ## Current Task
-Read and review cron system files: `cron.ts`, `cron-supervision-queue.ts`, and `silent-notifications.ts`.
+Review the Telegram bot codebase for code quality issues: bugs, race conditions, error handling gaps, dead code, inconsistencies, and potential improvements.
 
 ## End Goal with Specs
 Produce a structured code review report committed to `docs/reviews/review-bot.md`. The report should cover:
@@ -27,7 +27,7 @@ All TypeScript source files under `super_turtle/claude-telegram-bot/src/`:
 - [ ] Read and review all handlers in src/handlers/
 - [ ] Read and review driver layer: drivers/registry.ts, types.ts, claude-driver.ts, codex-driver.ts
 - [ ] Read and review MCP servers (ask_user, send_turtle, bot_control)
-- [ ] Write structured review report to docs/reviews/review-bot.md
+- [ ] Finalize review report in docs/reviews/review-bot.md
 - [ ] Commit the review report
 
 ## Notes
