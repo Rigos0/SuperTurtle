@@ -76,7 +76,7 @@ export async function checkPendingAskUserRequests(
 
       // Only process pending requests for this chat
       if (data.status !== "pending") continue;
-      if (String(data.chat_id) !== String(chatId)) continue;
+      if (data.chat_id && String(data.chat_id) !== String(chatId)) continue;
 
       const question = data.question || "Please choose:";
       const options = data.options || [];
@@ -120,7 +120,7 @@ export async function checkPendingSendTurtleRequests(
 
       // Only process pending requests for this chat
       if (data.status !== "pending") continue;
-      if (String(data.chat_id) !== String(chatId)) continue;
+      if (data.chat_id && String(data.chat_id) !== String(chatId)) continue;
 
       const url = data.url || "";
       const caption = data.caption || undefined;
@@ -177,7 +177,7 @@ export async function checkPendingBotControlRequests(
 
       // Only process pending requests for this chat
       if (data.status !== "pending") continue;
-      if (String(data.chat_id) !== String(chatId)) continue;
+      if (data.chat_id && String(data.chat_id) !== String(chatId)) continue;
 
       const action: string = data.action;
       const params: Record<string, string> = data.params || {};

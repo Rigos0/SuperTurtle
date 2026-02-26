@@ -16,6 +16,7 @@ import {
   transcribeVoice,
   startTypingIndicator,
 } from "../utils";
+import { getDriverAuditType, isActiveDriverSessionActive, runMessageWithActiveDriver } from "./driver-routing";
 import { StreamingState, createStatusCallback } from "./streaming";
 
 // Supported audio file extensions
@@ -97,7 +98,7 @@ export async function processAudioFile(
       : transcript;
 
     // Set conversation title (if new session)
-    if (!session.isActive) {
+    if (!isActiveDriverSessionActive()) {
       const title =
         transcript.length > 50
           ? transcript.slice(0, 47) + "..."
@@ -109,18 +110,18 @@ export async function processAudioFile(
     const state = new StreamingState();
     const statusCallback = createStatusCallback(ctx, state);
 
-    // Send to Claude
-    const claudeResponse = await session.sendMessageStreaming(
-      prompt,
+    // Send to active driver
+    const response = await runMessageWithActiveDriver({
+      message: prompt,
       username,
       userId,
-      statusCallback,
       chatId,
-      ctx
-    );
+      ctx,
+      statusCallback,
+    });
 
     // Audit log
-    await auditLog(userId, username, "AUDIO", transcript, claudeResponse);
+    await auditLog(userId, username, getDriverAuditType("AUDIO"), transcript, response);
   } catch (error) {
     console.error("Error processing audio:", error);
 

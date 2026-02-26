@@ -34,6 +34,7 @@ import { getCommandLines, formatModelInfo, getUsageLines } from "./handlers/comm
 import { session } from "./session";
 import { getDueJobs, advanceRecurringJob, removeJob } from "./cron";
 import { bot } from "./bot";
+import { isAnyDriverRunning, runMessageWithActiveDriver } from "./handlers/driver-routing";
 import { StreamingState, createSilentStatusCallback } from "./handlers/streaming";
 import { getSilentNotificationText } from "./silent-notifications";
 
@@ -155,7 +156,7 @@ const startCronTimer = () => {
   setInterval(async () => {
     try {
       // Skip if a query is already running
-      if (session.isRunning) {
+      if (isAnyDriverRunning()) {
         return;
       }
 
@@ -166,7 +167,7 @@ const startCronTimer = () => {
 
       for (const job of dueJobs) {
         // Re-check session before each job — the previous job may have started it
-        if (session.isRunning) {
+        if (isAnyDriverRunning()) {
           break;
         }
 
@@ -248,14 +249,14 @@ const startCronTimer = () => {
             try {
               const state = new StreamingState();
               const statusCallback = createSilentStatusCallback(cronCtx, state);
-              const response = await session.sendMessageStreaming(
-                job.prompt,
-                "cron",
-                resolvedUserId,
+              const response = await runMessageWithActiveDriver({
+                message: job.prompt,
+                username: "cron",
+                userId: resolvedUserId,
+                chatId: resolvedChatId,
+                ctx: cronCtx,
                 statusCallback,
-                resolvedChatId,
-                cronCtx
-              );
+              });
               const notificationText = getSilentNotificationText(
                 state.getSilentCapturedText(),
                 response

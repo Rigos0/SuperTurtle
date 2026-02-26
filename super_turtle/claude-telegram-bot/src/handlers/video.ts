@@ -9,6 +9,7 @@ import { session } from "../session";
 import { ALLOWED_USERS, TEMP_DIR } from "../config";
 import { isAuthorized, rateLimiter } from "../security";
 import { auditLog, auditLogRateLimit, startTypingIndicator } from "../utils";
+import { getDriverAuditType, isActiveDriverSessionActive, runMessageWithActiveDriver } from "./driver-routing";
 import { StreamingState, createStatusCallback } from "./streaming";
 import { handleProcessingError } from "./media-group";
 
@@ -115,7 +116,7 @@ export async function handleVideo(ctx: Context): Promise<void> {
       : `I've received a video file at path: ${videoPath}\n\nPlease transcribe it for me.`;
 
     // Set conversation title (if new session)
-    if (!session.isActive) {
+    if (!isActiveDriverSessionActive()) {
       const rawTitle = caption || "[Video]";
       const title =
         rawTitle.length > 50 ? rawTitle.slice(0, 47) + "..." : rawTitle;
@@ -126,16 +127,22 @@ export async function handleVideo(ctx: Context): Promise<void> {
     const state = new StreamingState();
     const statusCallback = createStatusCallback(ctx, state);
 
-    const response = await session.sendMessageStreaming(
-      prompt,
+    const response = await runMessageWithActiveDriver({
+      message: prompt,
       username,
       userId,
-      statusCallback,
       chatId,
-      ctx
-    );
+      ctx,
+      statusCallback,
+    });
 
-    await auditLog(userId, username, "VIDEO", caption || "[video]", response);
+    await auditLog(
+      userId,
+      username,
+      getDriverAuditType("VIDEO"),
+      caption || "[video]",
+      response
+    );
 
     // Delete status message
     try {

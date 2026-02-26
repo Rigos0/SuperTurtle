@@ -9,6 +9,7 @@ import { session } from "../session";
 import { ALLOWED_USERS, TEMP_DIR } from "../config";
 import { isAuthorized, rateLimiter } from "../security";
 import { auditLog, auditLogRateLimit, startTypingIndicator } from "../utils";
+import { getDriverAuditType, isActiveDriverSessionActive, runMessageWithActiveDriver } from "./driver-routing";
 import { StreamingState, createStatusCallback } from "./streaming";
 import { createMediaGroupBuffer, handleProcessingError } from "./media-group";
 
@@ -73,7 +74,7 @@ async function processPhotos(
   }
 
   // Set conversation title (if new session)
-  if (!session.isActive) {
+  if (!isActiveDriverSessionActive()) {
     const rawTitle = caption || "[Foto]";
     const title =
       rawTitle.length > 50 ? rawTitle.slice(0, 47) + "..." : rawTitle;
@@ -88,16 +89,16 @@ async function processPhotos(
   const statusCallback = createStatusCallback(ctx, state);
 
   try {
-    const response = await session.sendMessageStreaming(
-      prompt,
+    const response = await runMessageWithActiveDriver({
+      message: prompt,
       username,
       userId,
-      statusCallback,
       chatId,
-      ctx
-    );
+      ctx,
+      statusCallback,
+    });
 
-    await auditLog(userId, username, "PHOTO", prompt, response);
+    await auditLog(userId, username, getDriverAuditType("PHOTO"), prompt, response);
   } catch (error) {
     await handleProcessingError(ctx, error, state.toolMessages);
   } finally {

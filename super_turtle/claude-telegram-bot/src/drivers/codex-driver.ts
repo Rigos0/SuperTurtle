@@ -19,11 +19,14 @@ export class CodexDriver implements ChatDriver {
     } = await import("../handlers/streaming");
 
     const reasoningEffort = mapThinkingToReasoningEffort(input.message);
+    process.env.TELEGRAM_CHAT_ID = String(input.chatId);
 
     // MCP completion callback: fires when an mcp_tool_call completes
     const mcpCompletionCallback: McpCompletionCallback = async (server, tool) => {
+      const normalizedTool = tool.replace(/-/g, "_");
+
       // Detect ask-user tool and handle inline
-      if (tool === "ask-user") {
+      if (normalizedTool === "ask_user") {
         console.log("Ask-user tool completed, checking for pending requests");
         // Small delay to let MCP server write the file
         await new Promise((resolve) => setTimeout(resolve, 200));
@@ -45,7 +48,7 @@ export class CodexDriver implements ChatDriver {
       }
 
       // Detect send-turtle tool and handle inline
-      if (tool === "send-turtle") {
+      if (normalizedTool === "send_turtle") {
         console.log("Send-turtle tool completed, checking for pending requests");
         // Small delay to let MCP server write the file
         await new Promise((resolve) => setTimeout(resolve, 200));
@@ -64,7 +67,7 @@ export class CodexDriver implements ChatDriver {
       }
 
       // Detect bot-control tool and handle inline
-      if (tool === "bot-control") {
+      if (normalizedTool === "bot_control") {
         console.log("Bot-control tool completed, checking for pending requests");
         // Small delay to let MCP server write the file
         await new Promise((resolve) => setTimeout(resolve, 200));

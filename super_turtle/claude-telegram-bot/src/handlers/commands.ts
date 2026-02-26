@@ -19,6 +19,7 @@ import { getContextReport } from "../context-command";
 import { isAuthorized } from "../security";
 import { escapeHtml } from "../formatting";
 import { getJobs } from "../cron";
+import { isActiveDriverSessionActive, isAnyDriverRunning, stopActiveDriverQuery } from "./driver-routing";
 
 /**
  * Shared command list for display in /start, /new, and new_session bot-control.
@@ -89,7 +90,7 @@ function parseCtlListOutput(output: string): ListedSubTurtle[] {
     let timeRemaining = "";
 
     if (status === "running") {
-      const typeMatch = remainder.match(/^(slow|yolo|yolo-codex)\b\s*(.*)$/);
+      const typeMatch = remainder.match(/^(yolo-codex|slow|yolo)\b\s*(.*)$/);
       if (typeMatch) {
         type = typeMatch[1]!;
         remainder = typeMatch[2] || "";
@@ -172,12 +173,14 @@ export async function handleStart(ctx: Context): Promise<void> {
     return;
   }
 
-  const status = session.isActive ? "Active session" : "No active session";
+  const status = isActiveDriverSessionActive() ? "Active session" : "No active session";
+  const driverLabel = session.activeDriver === "codex" ? "Codex 🟢" : "Claude 🔵";
   const workDir = WORKING_DIR;
 
   const commandBlock = getCommandLines().join("\n");
   await ctx.reply(
-    `🤖 <b>Claude Telegram Bot</b>\n\n` +
+      `🤖 <b>Claude Telegram Bot</b>\n\n` +
+      `Driver: ${driverLabel}\n` +
       `Status: ${status}\n` +
       `Working directory: <code>${workDir}</code>\n\n` +
       `<b>Commands:</b>\n` +
@@ -203,26 +206,38 @@ export async function handleNew(ctx: Context): Promise<void> {
 
   // Stop any running query
   session.stopTyping();
-  if (session.isRunning) {
-    const result = await session.stop();
+  if (isAnyDriverRunning()) {
+    const result = await stopActiveDriverQuery();
     if (result) {
       await Bun.sleep(100);
       session.clearStopRequested();
     }
   }
 
-  // Clear session
+  // Clear sessions for both drivers
   await session.kill();
-
-  // Get model info
-  const { modelName, effortStr } = formatModelInfo(session.model, session.effort);
+  await codexSession.kill();
 
   // Build message
-  const lines: string[] = [
-    `<b>New session</b>\n`,
-    `<b>Model:</b> ${modelName}${effortStr}`,
-    `<b>Dir:</b> <code>${WORKING_DIR}</code>\n`,
-  ];
+  const lines: string[] = [`<b>New session</b>\n`];
+  if (session.activeDriver === "codex") {
+    const { getAvailableCodexModelsLive } = await import("../codex-session");
+    const codexModels = await getAvailableCodexModelsLive();
+    const codexModel = codexModels.find((m) => m.value === codexSession.model);
+    lines.push(
+      `<b>Driver:</b> Codex 🟢`,
+      `<b>Model:</b> ${codexModel?.displayName || codexSession.model}`,
+      `<b>Reasoning Effort:</b> ${codexSession.reasoningEffort}`,
+      `<b>Dir:</b> <code>${WORKING_DIR}</code>\n`
+    );
+  } else {
+    const { modelName, effortStr } = formatModelInfo(session.model, session.effort);
+    lines.push(
+      `<b>Driver:</b> Claude 🔵`,
+      `<b>Model:</b> ${modelName}${effortStr}`,
+      `<b>Dir:</b> <code>${WORKING_DIR}</code>\n`
+    );
+  }
 
   // Fetch usage (non-blocking — show what we can)
   const usageLines = await getUsageLines();
@@ -320,13 +335,20 @@ export async function handleStatus(ctx: Context): Promise<void> {
   }
 
   // Query status
-  if (session.isRunning) {
-    const elapsed = session.queryStarted
-      ? Math.floor((Date.now() - session.queryStarted.getTime()) / 1000)
-      : 0;
-    lines.push(`🔄 Query: Running (${elapsed}s)`);
-    if (session.currentTool) {
-      lines.push(`   └─ ${session.currentTool}`);
+  if (isAnyDriverRunning()) {
+    if (session.activeDriver === "codex" && codexSession.isRunning) {
+      const elapsed = codexSession.runningSince
+        ? Math.floor((Date.now() - codexSession.runningSince.getTime()) / 1000)
+        : 0;
+      lines.push(`🔄 Query: Running (${elapsed}s)`);
+    } else {
+      const elapsed = session.queryStarted
+        ? Math.floor((Date.now() - session.queryStarted.getTime()) / 1000)
+        : 0;
+      lines.push(`🔄 Query: Running (${elapsed}s)`);
+      if (session.currentTool) {
+        lines.push(`   └─ ${session.currentTool}`);
+      }
     }
   } else {
     lines.push("⚪ Query: Idle");
@@ -473,11 +495,19 @@ export async function handleResume(ctx: Context): Promise<void> {
   }
 
   // Get sessions based on active driver
-  let sessions;
+  let sessions: Array<{
+    session_id: string;
+    saved_at: string;
+    working_dir: string;
+    title: string;
+  }>;
   let driverName: string;
 
   if (session.activeDriver === "codex") {
-    sessions = codexSession.getSessionList();
+    sessions = await codexSession.getSessionListLive();
+    if (sessions.length === 0) {
+      sessions = codexSession.getSessionList();
+    }
     driverName = "Codex";
   } else {
     sessions = session.getSessionList();
@@ -493,6 +523,7 @@ export async function handleResume(ctx: Context): Promise<void> {
     await ctx.reply(`❌ No saved ${driverName} sessions.`);
     return;
   }
+  sessions = sessions.slice(0, 20);
 
   // Build inline keyboard with session list
   const buttons = sessions.map((s) => {
@@ -587,9 +618,9 @@ export async function handleModel(ctx: Context): Promise<void> {
  * Codex model selection (for /model when on Codex driver).
  */
 async function handleCodexModel(ctx: Context): Promise<void> {
-  const { getAvailableCodexModels } = await import("../codex-session");
+  const { getAvailableCodexModelsLive } = await import("../codex-session");
 
-  const models = getAvailableCodexModels();
+  const models = await getAvailableCodexModelsLive();
   const currentModel = models.find((m) => m.value === codexSession.model);
   const currentEffort = codexSession.reasoningEffort;
 
@@ -1487,6 +1518,11 @@ export async function handleContext(ctx: Context): Promise<void> {
     return;
   }
 
+  if (session.activeDriver === "codex") {
+    await ctx.reply("ℹ️ /context is currently available only for Claude sessions.");
+    return;
+  }
+
   if (!session.isActive || !session.sessionId) {
     await ctx.reply("❌ No active session. Send a message or use /resume first.");
     return;
@@ -1576,19 +1612,19 @@ export async function handleRetry(ctx: Context): Promise<void> {
     return;
   }
 
-  // Check if there's a message to retry
-  if (!session.lastMessage) {
+  const message =
+    session.activeDriver === "codex" ? codexSession.lastMessage : session.lastMessage;
+  if (!message) {
     await ctx.reply("❌ No message to retry.");
     return;
   }
 
   // Check if something is already running
-  if (session.isRunning) {
+  if (isAnyDriverRunning()) {
     await ctx.reply("⏳ A query is already running. Use /stop first.");
     return;
   }
 
-  const message = session.lastMessage;
   await ctx.reply(`🔄 Retrying: "${message.slice(0, 50)}${message.length > 50 ? "..." : ""}"`);
 
   // Simulate sending the message again by emitting a fake text message event
@@ -1628,72 +1664,7 @@ export async function handleSubturtle(ctx: Context): Promise<void> {
     return;
   }
 
-  // Parse the output into structured data
-  interface SubTurtle {
-    name: string;
-    status: string;
-    type: string;
-    pid?: string;
-    time?: string;
-    task: string;
-  }
-
-  const turtles: SubTurtle[] = [];
-  const lines = output.split("\n");
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-
-    // Parse columnar output: name status type pid time task
-    // Format from ctl list uses variable widths, so we need to be flexible
-    const parts = line.trim().split(/\s+/);
-    if (parts.length < 2) continue;
-
-    let idx = 0;
-    const name = parts[idx++]!;
-    const status = parts[idx++]!;
-
-    let type = "";
-    let pid = "";
-    let time = "";
-    let task = "";
-
-    // Status can be "running" or "stopped"
-    if (status === "running") {
-      // After running, next could be type (slow, yolo, yolo-codex)
-      if (["slow", "yolo", "yolo-codex"].includes(parts[idx]!)) {
-        type = parts[idx++]!;
-      }
-
-      // Then comes (PID nnn)
-      if (parts[idx] === "(PID") {
-        pid = parts[++idx]!.replace(")", "");
-        idx++;
-      }
-
-      // Then comes time like "45m left", "1h 23m left", "no timeout", or "OVERDUE"
-      // Find "left" marker and capture everything before it as time
-      const leftIdx = parts.indexOf("left", idx);
-      if (leftIdx > idx) {
-        time = parts.slice(idx, leftIdx).join(" ");
-        idx = leftIdx + 1; // skip past "left"
-      } else if (idx < parts.length && parts[idx] === "no" && idx + 1 < parts.length && parts[idx + 1] === "timeout") {
-        // Handle "no timeout" case
-        time = "no timeout";
-        idx += 2;
-      } else if (idx < parts.length && parts[idx] === "OVERDUE") {
-        time = "OVERDUE";
-        idx++;
-      }
-    }
-
-    // Remaining is task (join with spaces)
-    if (idx < parts.length) {
-      task = parts.slice(idx).join(" ");
-    }
-
-    turtles.push({ name, status, type, pid, time, task });
-  }
+  const turtles = parseCtlListOutput(output);
 
   if (turtles.length === 0) {
     await ctx.reply("📋 <b>SubTurtles</b>\n\nNo SubTurtles found", { parse_mode: "HTML" });
@@ -1709,7 +1680,13 @@ export async function handleSubturtle(ctx: Context): Promise<void> {
     // Format the turtle info line
     let statusEmoji = turtle.status === "running" ? "🟢" : "⚫";
     let typeStr = turtle.type ? ` <code>${escapeHtml(turtle.type)}</code>` : "";
-    let timeStr = turtle.time ? ` • ${escapeHtml(turtle.time)} left` : "";
+    let timeStr = "";
+    if (turtle.timeRemaining) {
+      const suffix = turtle.timeRemaining === "OVERDUE" || turtle.timeRemaining === "no timeout"
+        ? ""
+        : " left";
+      timeStr = ` • ${escapeHtml(turtle.timeRemaining)}${suffix}`;
+    }
     let taskStr = turtle.task ? ` • ${escapeHtml(turtle.task)}` : "";
 
     messageLines.push(
@@ -1728,6 +1705,9 @@ export async function handleSubturtle(ctx: Context): Promise<void> {
           callback_data: `subturtle_stop:${turtle.name}`,
         },
       ]);
+    }
+    if (turtle.tunnelUrl) {
+      messageLines.push(`   🔗 ${escapeHtml(turtle.tunnelUrl)}`);
     }
   }
 

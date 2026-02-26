@@ -11,6 +11,7 @@ type CodexFlowPayload = {
   stopCalled: boolean;
   resumeUsesCodexCallbacks: boolean;
   usageCaptured: boolean;
+  chatIdPropagatedToMcp: boolean;
 };
 
 type CodexFlowResult = {
@@ -128,7 +129,36 @@ async function probeCodexFlow(): Promise<CodexFlowResult> {
       this.systemPromptPrepended = true;
     };
 
-    codexSession.sendMessage = async (_message, statusCallback) => {
+    let chatIdPropagatedToMcp = false;
+
+    codexSession.sendMessage = async (_message, statusCallback, _model, _reasoning, mcpCompletionCallback) => {
+      const chatIdFromEnv = process.env.TELEGRAM_CHAT_ID || "";
+      chatIdPropagatedToMcp = chatIdFromEnv === "123";
+
+      await Bun.write(
+        askUserFile,
+        JSON.stringify({
+          request_id: "codex-flow",
+          question: "Pick one",
+          options: ["A", "B"],
+          status: "pending",
+          chat_id: chatIdFromEnv,
+        })
+      );
+      await Bun.write(
+        botControlFile,
+        JSON.stringify({
+          request_id: "codex-bot-control-flow",
+          action: "usage",
+          params: {},
+          status: "pending",
+          chat_id: chatIdFromEnv,
+        })
+      );
+
+      await mcpCompletionCallback?.("ask-user", "ask_user");
+      await mcpCompletionCallback?.("bot-control", "bot_control");
+
       await statusCallback?.("text", "Streaming Codex reply", 0);
       await statusCallback?.("segment_end", "Streaming Codex reply", 0);
       await statusCallback?.("done", "");
@@ -163,27 +193,7 @@ async function probeCodexFlow(): Promise<CodexFlowResult> {
       // /switch codex
       await handleSwitch(mkCtx("/switch codex"));
 
-      // send message with streaming
-      await Bun.write(
-        askUserFile,
-        JSON.stringify({
-          request_id: "codex-flow",
-          question: "Pick one",
-          options: ["A", "B"],
-          status: "pending",
-          chat_id: 123,
-        })
-      );
-      await Bun.write(
-        botControlFile,
-        JSON.stringify({
-          request_id: "codex-bot-control-flow",
-          action: "usage",
-          params: {},
-          status: "pending",
-          chat_id: 123,
-        })
-      );
+      // send message with streaming + MCP side effects
       await handleText(mkCtx("build integration test"));
 
       let botControlRequestCompleted = false;
@@ -219,6 +229,7 @@ async function probeCodexFlow(): Promise<CodexFlowResult> {
         stopCalled: stopCalls >= 1,
         resumeUsesCodexCallbacks: keyboardCallbacks.some((c) => c.startsWith("codex_resume:")),
         usageCaptured: codexSession.lastUsage?.input_tokens === 33 && codexSession.lastUsage?.output_tokens === 21,
+        chatIdPropagatedToMcp,
       };
 
       console.log(marker + JSON.stringify(payload));
@@ -275,5 +286,6 @@ describe("Codex flow integration", () => {
     expect(result.payload?.stopCalled).toBe(true);
     expect(result.payload?.resumeUsesCodexCallbacks).toBe(true);
     expect(result.payload?.usageCaptured).toBe(true);
+    expect(result.payload?.chatIdPropagatedToMcp).toBe(true);
   }, 15000);
 });

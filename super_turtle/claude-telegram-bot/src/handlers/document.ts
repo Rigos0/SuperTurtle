@@ -10,6 +10,7 @@ import { session } from "../session";
 import { ALLOWED_USERS, TEMP_DIR } from "../config";
 import { isAuthorized, rateLimiter } from "../security";
 import { auditLog, auditLogRateLimit, startTypingIndicator } from "../utils";
+import { getDriverAuditType, isActiveDriverSessionActive, runMessageWithActiveDriver } from "./driver-routing";
 import { StreamingState, createStatusCallback } from "./streaming";
 import { createMediaGroupBuffer, handleProcessingError } from "./media-group";
 import { isAudioFile, processAudioFile } from "./audio";
@@ -252,7 +253,7 @@ async function processArchive(
       : `Please analyze this archive (${fileName}):\n\nFile tree (${tree.length} files):\n${treeStr}\n\nExtracted contents:\n${contentsStr}`;
 
     // Set conversation title (if new session)
-    if (!session.isActive) {
+    if (!isActiveDriverSessionActive()) {
       const rawTitle = caption || `[Archivio: ${fileName}]`;
       const title =
         rawTitle.length > 50 ? rawTitle.slice(0, 47) + "..." : rawTitle;
@@ -263,19 +264,19 @@ async function processArchive(
     const state = new StreamingState();
     const statusCallback = createStatusCallback(ctx, state);
 
-    const response = await session.sendMessageStreaming(
-      prompt,
+    const response = await runMessageWithActiveDriver({
+      message: prompt,
       username,
       userId,
-      statusCallback,
       chatId,
-      ctx
-    );
+      ctx,
+      statusCallback,
+    });
 
     await auditLog(
       userId,
       username,
-      "ARCHIVE",
+      getDriverAuditType("ARCHIVE"),
       `[${fileName}] ${caption || ""}`,
       response
     );
@@ -337,7 +338,7 @@ async function processDocuments(
   }
 
   // Set conversation title (if new session)
-  if (!session.isActive) {
+  if (!isActiveDriverSessionActive()) {
     const docName = documents[0]?.name || "[Documento]";
     const rawTitle = caption || `[Documento: ${docName}]`;
     const title =
@@ -353,19 +354,19 @@ async function processDocuments(
   const statusCallback = createStatusCallback(ctx, state);
 
   try {
-    const response = await session.sendMessageStreaming(
-      prompt,
+    const response = await runMessageWithActiveDriver({
+      message: prompt,
       username,
       userId,
-      statusCallback,
       chatId,
-      ctx
-    );
+      ctx,
+      statusCallback,
+    });
 
     await auditLog(
       userId,
       username,
-      "DOCUMENT",
+      getDriverAuditType("DOCUMENT"),
       `[${documents.length} docs] ${caption || ""}`,
       response
     );

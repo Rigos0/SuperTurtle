@@ -13,6 +13,7 @@ import {
   transcribeVoice,
   startTypingIndicator,
 } from "../utils";
+import { getDriverAuditType, isActiveDriverSessionActive, runMessageWithActiveDriver } from "./driver-routing";
 import { StreamingState, createStatusCallback } from "./streaming";
 
 /**
@@ -100,7 +101,7 @@ export async function handleVoice(ctx: Context): Promise<void> {
     );
 
     // 9. Set conversation title from transcript (if new session)
-    if (!session.isActive) {
+    if (!isActiveDriverSessionActive()) {
       const title =
         transcript.length > 50 ? transcript.slice(0, 47) + "..." : transcript;
       session.conversationTitle = title;
@@ -110,18 +111,18 @@ export async function handleVoice(ctx: Context): Promise<void> {
     const state = new StreamingState();
     const statusCallback = createStatusCallback(ctx, state);
 
-    // 11. Send to Claude
-    const claudeResponse = await session.sendMessageStreaming(
-      transcript,
+    // 11. Send to active driver
+    const response = await runMessageWithActiveDriver({
+      message: transcript,
       username,
       userId,
-      statusCallback,
       chatId,
-      ctx
-    );
+      ctx,
+      statusCallback,
+    });
 
     // 12. Audit log
-    await auditLog(userId, username, "VOICE", transcript, claudeResponse);
+    await auditLog(userId, username, getDriverAuditType("VOICE"), transcript, response);
   } catch (error) {
     console.error("Error processing voice:", error);
 
