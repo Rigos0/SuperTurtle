@@ -150,6 +150,11 @@ export class CodexDriver implements ChatDriver {
     return errorStr.includes("crashed") || errorStr.includes("failed");
   }
 
+  isStallError(error: unknown): boolean {
+    const errorStr = String(error).toLowerCase();
+    return errorStr.includes("stream stalled") || errorStr.includes("event stream stalled");
+  }
+
   isCancellationError(error: unknown): boolean {
     const errorStr = String(error).toLowerCase();
     return errorStr.includes("abort") || errorStr.includes("cancel");

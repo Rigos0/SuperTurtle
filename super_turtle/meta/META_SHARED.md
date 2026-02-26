@@ -114,6 +114,21 @@ When the human wants to build something new:
 
 **Do not** manually create directories, symlinks, or edit cron-jobs.json. `ctl spawn` owns all of that.
 
+### Multi-SubTurtle spawn reliability (required)
+
+When spawning **2+ SubTurtles** for one request, use this reliability protocol:
+
+1. Prefer **Bash + stdin** over file-write tools for state seeding:
+   - `cat <<'EOF' | ./super_turtle/subturtle/ctl spawn <name> --state-file - ...`
+   - This avoids partial failures from temp-file write tools.
+2. Spawn all planned SubTurtles, then immediately run:
+   - `./super_turtle/subturtle/ctl list`
+3. Report exact outcome to the user:
+   - running names
+   - any skipped/failed spawns and why
+
+If a stream stalls mid-spawn, resume by first checking `ctl list` and only spawning missing ones. Never blindly repeat already-successful spawn commands.
+
 ## Task decomposition
 
 You have authority to decompose a user request into multiple SubTurtles when it improves delivery speed and keeps work coherent.

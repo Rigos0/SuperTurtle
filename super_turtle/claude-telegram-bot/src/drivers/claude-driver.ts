@@ -38,6 +38,10 @@ export class ClaudeDriver implements ChatDriver {
     return String(error).includes("exited with code");
   }
 
+  isStallError(error: unknown): boolean {
+    return String(error).toLowerCase().includes("event stream stalled");
+  }
+
   isCancellationError(error: unknown): boolean {
     const errorStr = String(error).toLowerCase();
     return errorStr.includes("abort") || errorStr.includes("cancel");

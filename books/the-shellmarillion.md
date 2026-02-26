@@ -118,3 +118,53 @@ Each city returned with greater care: gates reopened, measures restored, and bel
 The kingdoms spent one more age in uneasy truce, strengthening walls and teaching children both the old songs and a new lesson: the deep breaks first those who break one another.
 
 No kingdom fell. Yet the deep did not heal. It waited, and watched.
+
+## Chapter 3: The Sundering
+
+When the Accord still hung and the kingdoms still rang their evening bells, the Deep beneath began a strange breath. It was no storm, nor fire from the vents, nor the old violence of quake. It was a long holding of water, as if the sea itself had learned to keep still.
+
+Across the kingdoms, the old alarms sounded late and thin, as if the sea itself refused to answer.
+
+The elders met and sent for Chelónatar. He came with the patience of deep basalt. Without speaking, he stood at the edge of the Nine Steps and placed no hand upon stone. He only looked toward the trenches and said,
+
+> You have kept your walls. You have not kept the seam between you.
+
+At dusk the seam split open. From the trench rose shapes that no map had ever named: serpent-bodies broad as wrecked vessels, scales like old moon-metal, crowns of black vent-crust. They did not rush, for force was not their need. They searched for the hidden chords that held the kingdoms together.
+
+Their first touch was on Selenrata’s ward-stones. One by one, the runes failed. Auralis sent bell-chains across the trench, but song alone could not stand where trust was already cracked. Ilyssar’s ledgers, once proud with routes and vows, blurred into one another and vanished in the tide.
+
+In Kheledath they held through three turns of nightfall and returned to find western ridges split, and streets of copper-sand where bells had sung. The city did not fall in one blow. It broke by intervals, like ribs bent in old age.
+
+Then came what the old singers call the Sundering.
+
+Not one kingdom ruined at once, but every kingdom severed from every other. Gates remained, but no longer answered one another. Paths once walked in peace now led to empty currents. The old signs of trade and treaty survived as symbols without doors behind them. A turtle could stand at one city gate and no longer know the road to the next.
+
+There were calls for law, for fire, for vengeance, for retreat. Chelónatar raised no command. He asked for Mareseth, youngest recorder of the Accord, seldom called to command but known for never forgetting the old songs after hearing them twice.
+
+Mareseth went where none wished to follow, to the oldest rift-mouth. Around her the Serpents coiled and tested her voice with silence. She did not strike. She remembered what the Elder had once taught in the first dark years: the world does not endure by strength alone.
+
+> Hold what cannot be forged. Carry what cannot be remade.
+
+She lifted the shell-book she had kept from hatchling years and sang the first note of Breath, then the second of Measure, then the third of Mercy. The water stilled at each change. The pressure eased. The Serpents lowered their heads as if listening to a forgotten name.
+
+Chelónatar rose beside her and gave no blessing of triumph.
+
+“Memory is not a weapon,” he said. “It is a vessel.”
+
+“That vessel is cracked,” Mareseth answered.
+
+“Then you must carry it anyway.”
+
+She gave one last tone the kingdoms had not heard since the first cities were raised: the note of Bearing, where sorrow is not weakness but direction. In that note the Serpents withdrew—not defeated, but denied. They sank out of sight to the blind places below and left the kingdoms to their grief.
+
+The vents cooled by a thread. The bells returned one by one. The old routes were marked again, though some roads in every city would forever lead nowhere.
+
+Mareseth returned with no spoils. She returned with a living book in her back: a memory-thread all could share.
+
+So the kingdoms were remade, not as one house but as many, held together by that burden.
+
+In every hall now the children learn the same line before first watch:
+
+> Power can build a wall. Memory keeps it from becoming a prison.
+
+Thus is the Sundering remembered: not for what all was lost in one night, but for what one turtle carried forward when all else broke.

@@ -271,6 +271,7 @@ export async function handleCallback(ctx: Context): Promise<void> {
 
   // Start typing
   const typing = startTypingIndicator(ctx);
+  session.typingController = typing;
 
   // Create streaming state
   const state = new StreamingState();
@@ -310,6 +311,7 @@ export async function handleCallback(ctx: Context): Promise<void> {
     }
   } finally {
     typing.stop();
+    session.typingController = null;
   }
 }
 
@@ -456,6 +458,7 @@ async function handleResumeCallback(
     "Please write a very concise recap of where we are in this conversation, to refresh my memory. Max 2-3 sentences.";
 
   const typing = startTypingIndicator(ctx);
+  session.typingController = typing;
   const state = new StreamingState();
   const statusCallback = createStatusCallback(ctx, state);
 
@@ -475,6 +478,7 @@ async function handleResumeCallback(
     // Don't show error to user - session is still resumed, recap just failed
   } finally {
     typing.stop();
+    session.typingController = null;
   }
 }
 
@@ -522,6 +526,7 @@ async function handleCodexResumeCallback(
     "Please write a very concise recap of where we are in this conversation, to refresh my memory. Max 2-3 sentences.";
 
   const typing = startTypingIndicator(ctx);
+  session.typingController = typing;
   const state = new StreamingState();
   const statusCallback = createStatusCallback(ctx, state);
 
@@ -541,6 +546,7 @@ async function handleCodexResumeCallback(
     // Don't show error to user - session is still resumed, recap just failed
   } finally {
     typing.stop();
+    session.typingController = null;
   }
 }
 

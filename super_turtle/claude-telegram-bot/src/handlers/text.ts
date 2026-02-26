@@ -40,6 +40,16 @@ function summarizeErrorMessage(error: unknown, maxLength = 240): string {
     : compact;
 }
 
+function buildStallRecoveryPrompt(originalMessage: string): string {
+  return `The previous response stream stalled before completion while handling this request.
+Continue from current repository/runtime state and finish the task safely.
+Before making changes, verify what already happened (for example existing files, running processes, or prior command effects).
+Do not blindly repeat side-effecting operations that may have already succeeded.
+
+Original request:
+${originalMessage}`;
+}
+
 /**
  * Handle incoming text messages.
  */
@@ -149,7 +159,33 @@ export async function handleText(
         }
       }
 
-      if (driver.isCrashError(error) && attempt < MAX_RETRIES) {
+      if (driver.isStallError(error) && attempt < MAX_RETRIES) {
+        console.warn(
+          `${driver.displayName} stream stalled, running one continuation attempt (attempt ${attempt + 2}/${MAX_RETRIES + 1})`
+        );
+
+        if (!silent) {
+          await ctx.reply(
+            state.sawToolUse
+              ? `⚠️ ${driver.displayName} stream stalled mid-task, resuming from current state...`
+              : `⚠️ ${driver.displayName} stream stalled, retrying...`
+          );
+        }
+
+        if (!state.sawToolUse) {
+          await driver.kill();
+        } else {
+          message = buildStallRecoveryPrompt(message);
+        }
+
+        state = new StreamingState();
+        statusCallback = silent
+          ? createSilentStatusCallback(ctx, state)
+          : createStatusCallback(ctx, state);
+        continue;
+      }
+
+      if (driver.isCrashError(error) && attempt < MAX_RETRIES && !state.sawToolUse) {
         console.log(
           `${driver.displayName} crashed, retrying (attempt ${attempt + 2}/${MAX_RETRIES + 1})...`
         );
@@ -163,6 +199,12 @@ export async function handleText(
           ? createSilentStatusCallback(ctx, state)
           : createStatusCallback(ctx, state);
         continue;
+      }
+
+      if (driver.isCrashError(error) && state.sawToolUse) {
+        console.warn(
+          `${driver.displayName} crashed after tool execution; skipping automatic retry to avoid replaying side effects`
+        );
       }
 
       // Final attempt failed or non-retryable error

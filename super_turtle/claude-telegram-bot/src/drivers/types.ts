@@ -38,6 +38,7 @@ export interface ChatDriver {
   stop(): Promise<DriverStopResult>;
   kill(): Promise<void>;
   isCrashError(error: unknown): boolean;
+  isStallError(error: unknown): boolean;
   isCancellationError(error: unknown): boolean;
   getStatusSnapshot(): DriverStatusSnapshot;
 }

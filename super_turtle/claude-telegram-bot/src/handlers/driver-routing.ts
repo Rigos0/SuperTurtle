@@ -2,6 +2,7 @@ import type { Context } from "grammy";
 import { getCurrentDriver, getDriver } from "../drivers/registry";
 import type { DriverId } from "../drivers/types";
 import { session } from "../session";
+import { codexSession } from "../codex-session";
 import type { StatusCallback } from "../types";
 
 export interface DriverMessageInput {
@@ -46,9 +47,16 @@ export function getDriverAuditType(baseType: string): string {
 }
 
 export function isAnyDriverRunning(): boolean {
-  return session.isRunning;
+  return session.isRunning || codexSession.isRunning;
 }
 
 export async function stopActiveDriverQuery(): Promise<"stopped" | "pending" | false> {
-  return getCurrentDriver().stop();
+  const current = getCurrentDriver();
+  const currentResult = await current.stop();
+  if (currentResult) {
+    return currentResult;
+  }
+
+  const fallbackDriverId: DriverId = session.activeDriver === "codex" ? "claude" : "codex";
+  return getDriver(fallbackDriverId).stop();
 }

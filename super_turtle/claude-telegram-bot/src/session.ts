@@ -86,7 +86,12 @@ function normalizeQueryError(error: unknown): Error {
  */
 // Maximum number of sessions to keep in history
 const MAX_SESSIONS = 5;
-const EVENT_STREAM_STALL_TIMEOUT_MS = 30_000;
+const EVENT_STREAM_STALL_TIMEOUT_MS = (() => {
+  const raw = process.env.CLAUDE_EVENT_STREAM_STALL_TIMEOUT_MS;
+  if (!raw) return 120_000;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed >= 1_000 ? parsed : 120_000;
+})();
 
 // Model configuration
 export type EffortLevel = "low" | "medium" | "high";
@@ -629,7 +634,7 @@ export class ClaudeSession {
       const isCleanupError =
         errorStr.includes("cancel") || errorStr.includes("abort");
       const isPostCompletionError = queryCompleted || askUserTriggered;
-      const isStallAbort = stalled && responseParts.length > 0;
+      const isStallAbort = stalled;
 
       // Claude CLI may exit non-zero after emitting a completed "result" event.
       // Treat that as success to avoid duplicate retries/errors.
@@ -653,6 +658,18 @@ export class ClaudeSession {
       this.abortController = null;
       this.queryStarted = null;
       this.currentTool = null;
+    }
+
+    // If we hit stall timeout without a completed result, surface it to caller.
+    // The caller can then run an explicit continuation pass instead of returning
+    // a potentially partial/ambiguous outcome as if it were complete.
+    if (stalled && !queryCompleted && !askUserTriggered) {
+      const stallError = new Error(
+        `Event stream stalled for ${EVENT_STREAM_STALL_TIMEOUT_MS}ms before completion`
+      );
+      this.lastError = stallError.message.slice(0, 100);
+      this.lastErrorTime = new Date();
+      throw stallError;
     }
 
     this.lastActivity = new Date();

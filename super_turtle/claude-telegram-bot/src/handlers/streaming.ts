@@ -19,7 +19,7 @@ import {
 import type { ClaudeSession } from "../session";
 import type { CodexSession } from "../codex-session";
 import { bot } from "../bot";
-import { getUsageLines, getCommandLines, getSettingsOverviewLines, formatUnifiedUsage, getCodexQuotaLines } from "./commands";
+import { buildSessionOverviewLines, getUsageLines, formatUnifiedUsage, getCodexQuotaLines } from "./commands";
 
 // Union type for bot control to work with both Claude and Codex sessions
 type BotControlSession = ClaudeSession | CodexSession;
@@ -303,22 +303,9 @@ async function executeBotControlAction(
       await sessionObj.stop();
       await sessionObj.kill();
 
-      // Send command overview to the chat (same as /new)
       if (chatId) {
         try {
-          const lines: string[] = [
-            `<b>New session</b>\n`,
-            ...getSettingsOverviewLines(),
-            "",
-          ];
-
-          const usageLines = await getUsageLines();
-          if (usageLines.length > 0) {
-            lines.push(...usageLines, "");
-          }
-
-          lines.push(`<b>Commands:</b>`, ...getCommandLines());
-
+          const lines = await buildSessionOverviewLines("New session");
           await bot.api.sendMessage(chatId, lines.join("\n"), { parse_mode: "HTML" });
         } catch (err) {
           console.warn("Failed to send new session overview:", err);
@@ -384,6 +371,7 @@ export class StreamingState {
   lastEditTimes = new Map<number, number>(); // segment_id -> last edit time
   lastContent = new Map<number, string>(); // segment_id -> last sent content
   silentSegments = new Map<number, string>(); // segment_id -> captured text for silent mode
+  sawToolUse = false; // used to avoid replaying side-effectful tool runs on retries
 
   getSilentCapturedText(): string {
     return [...this.silentSegments.entries()]
@@ -457,9 +445,11 @@ export function createStatusCallback(
         });
         state.toolMessages.push(thinkingMsg);
       } else if (statusType === "tool") {
-        const escaped = escapeHtml(content);
+        state.sawToolUse = true;
+        // Tool status content is pre-formatted HTML (from formatToolStatus
+        // or formatCodexToolStatus) — do NOT double-escape.
         try {
-          const toolMsg = await ctx.reply(escaped, { parse_mode: "HTML" });
+          const toolMsg = await ctx.reply(content, { parse_mode: "HTML" });
           state.toolMessages.push(toolMsg);
         } catch (htmlError) {
           // HTML parse failed (unexpected entity edge case) - try plain text
@@ -467,7 +457,7 @@ export function createStatusCallback(
             "HTML tool status failed, using plain text:",
             htmlError
           );
-          const toolMsg = await ctx.reply(content);
+          const toolMsg = await ctx.reply(escapeHtml(content));
           state.toolMessages.push(toolMsg);
         }
       } else if (statusType === "text" && segmentId !== undefined) {
@@ -603,6 +593,9 @@ export function createSilentStatusCallback(
 ): StatusCallback {
   return async (statusType: string, content: string, segmentId?: number) => {
     try {
+      if (statusType === "tool") {
+        state.sawToolUse = true;
+      }
       if (
         (statusType === "text" || statusType === "segment_end") &&
         segmentId !== undefined
