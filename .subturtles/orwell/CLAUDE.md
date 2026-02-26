@@ -1,12 +1,14 @@
 ## Current Task
-Final polish and commit
+Write the full story in Markdown format.
 
 ## End Goal with Specs
-A 3-chapter political satire (~2000 words) at `books/animal-reef.md`. Orwellian — power corrupts, commandments get rewritten, "All sea creatures are equal, but some shells are more equal than others."
+Create a complete short story (500-800 words) at `books/orwell/nineteen-eighty-fork.md`. Orwell style: stark political allegory, surveillance themes, controlled language. The story depicts a dystopian repository where Big Merge watches every commit and thought-diffs are forbidden.
 
 ## Backlog
-- [x] Create `books/animal-reef.md` with title page
-- [x] Write Chapter 1: "The Revolution" — turtles rally against dolphin rule
-- [x] Write Chapter 2: "The Commandments" — the new turtle council rewrites the reef's laws
-- [x] Write Chapter 3: "The Banquet" — turtles and dolphins become indistinguishable
-- [ ] Final polish and commit <- current
+- [x] Create `books/orwell/` directory
+- [ ] Write the full story in Markdown format <- current
+- [ ] Add a brief author's note at the end
+- [ ] Commit the finished story
+
+## Loop Control Reminder
+When all backlog items are done, append `## Loop Control\nSTOP` to this file.
