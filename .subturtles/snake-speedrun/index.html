@@ -6,20 +6,18 @@
     <title>Snake Speedrun</title>
     <style>
       :root {
-        --bg: #0b1020;
-        --panel: rgba(18, 28, 52, 0.86);
-        --text: #e9efff;
-        --accent: #35d0ff;
-        --accent-soft: rgba(53, 208, 255, 0.28);
+        --bg: #050812;
+        --panel: rgba(7, 16, 34, 0.9);
+        --text: #e8f4ff;
+        --accent: #14ff8b;
+        --accent-soft: rgba(20, 255, 139, 0.2);
+        --canvas: #050f1f;
       }
       html,
       body {
         margin: 0;
         min-height: 100%;
-        background:
-          radial-gradient(circle at top left, #1d2a55 0, transparent 40%),
-          radial-gradient(circle at 85% 5%, #0b4e88 0, transparent 35%),
-          var(--bg);
+        background: radial-gradient(circle at top left, #1a3558 0, transparent 45%), var(--bg);
         color: var(--text);
         font-family:
           Inter,
@@ -58,17 +56,20 @@
         aspect-ratio: 1 / 1;
         max-height: 72vh;
         border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        background: linear-gradient(160deg, #071021, #080f21);
+        border: 1px solid rgba(20, 255, 139, 0.2);
+        background: linear-gradient(160deg, #030a17, var(--canvas));
         display: grid;
         place-items: center;
+        position: relative;
       }
       canvas {
         width: min(90vw, 600px);
         height: min(90vw, 600px);
         border-radius: 8px;
-        border: 1px dashed rgba(255, 255, 255, 0.2);
-        background: rgba(4, 6, 14, 0.74);
+        border: 1px dashed rgba(20, 255, 139, 0.25);
+        background: rgba(4, 10, 22, 0.9);
+        image-rendering: pixelated;
+        box-shadow: inset 0 0 0 1px rgba(20, 255, 139, 0.12);
       }
       .hud {
         margin-top: 0.9rem;
@@ -77,13 +78,26 @@
         gap: 0.75rem;
         flex-wrap: wrap;
         color: rgba(233, 239, 255, 0.9);
+        align-items: center;
       }
       .pill {
-        border: 1px solid rgba(53, 208, 255, 0.35);
+        border: 1px solid rgba(20, 255, 139, 0.35);
         background: var(--accent-soft);
         border-radius: 999px;
         padding: 0.35rem 0.8rem;
         font-size: 0.9rem;
+      }
+      .button {
+        border: 1px solid rgba(20, 255, 139, 0.5);
+        background: rgba(20, 255, 139, 0.12);
+        color: var(--text);
+        cursor: pointer;
+        border-radius: 999px;
+        padding: 0.45rem 0.95rem;
+        font-size: 0.9rem;
+      }
+      .button:hover {
+        background: rgba(20, 255, 139, 0.2);
       }
     </style>
   </head>
@@ -92,28 +106,244 @@
       <section class="card">
         <h1 class="title">Snake Speedrun</h1>
         <p class="description">
-          Minimal shell for a browser snake game. The playable core lands in the next step of the backlog:
-          game logic, movement, scoring, and restart flow.
+          Playable snake core with grid movement, food collection, collisions, scoring, and
+          restart flow.
         </p>
         <div class="stage">
           <canvas id="board" width="480" height="480" aria-label="Snake game board placeholder"></canvas>
         </div>
         <div class="hud">
-          <span class="pill">Press space/enter to start when logic lands</span>
-          <span class="pill">Ready for mobile/desktop controls</span>
+          <span class="pill" id="status-pill">Press Space/Enter to start</span>
+          <span class="pill" id="score-pill">Score: 0</span>
+          <button class="button" id="restart-btn">Restart</button>
         </div>
       </section>
     </main>
     <script>
       const canvas = document.getElementById("board");
       const context = canvas.getContext("2d");
-      context.fillStyle = "#0e162f";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.fillStyle = "#7da7ff";
-      context.font = "18px ui-monospace, SFMono-Regular, Menlo, monospace";
-      context.textAlign = "center";
-      context.fillText("Snake game shell placeholder", canvas.width / 2, canvas.height / 2);
-      context.fillText("Next task: implement movement + collisions", canvas.width / 2, canvas.height / 2 + 24);
+      const statusPill = document.getElementById("status-pill");
+      const scorePill = document.getElementById("score-pill");
+      const restartButton = document.getElementById("restart-btn");
+
+      const CELL_COUNT = 24;
+      const CELL_SIZE = canvas.width / CELL_COUNT;
+      const TICK_MS = 120;
+
+      let gameLoop = null;
+      let snake = [];
+      let direction = { x: 1, y: 0 };
+      let nextDirection = { x: 1, y: 0 };
+      let food = { x: 10, y: 10 };
+      let score = 0;
+      let isRunning = false;
+      let isGameOver = false;
+
+      function startGame() {
+        clearInterval(gameLoop);
+        snake = [
+          { x: 12, y: 12 },
+          { x: 11, y: 12 },
+          { x: 10, y: 12 },
+        ];
+        direction = { x: 1, y: 0 };
+        nextDirection = { x: 1, y: 0 };
+        food = randomFood();
+        score = 0;
+        isRunning = true;
+        isGameOver = false;
+        updateHud();
+        render();
+        gameLoop = setInterval(step, TICK_MS);
+        statusPill.textContent = "Arrow keys to steer";
+      }
+
+      function gameOver() {
+        isRunning = false;
+        isGameOver = true;
+        clearInterval(gameLoop);
+        statusPill.textContent = "Game over — press Space/Enter/R to restart";
+        render();
+      }
+
+      function randomFood() {
+        let candidate;
+        do {
+          candidate = {
+            x: Math.floor(Math.random() * CELL_COUNT),
+            y: Math.floor(Math.random() * CELL_COUNT),
+          };
+        } while (isOnSnake(candidate));
+        return candidate;
+      }
+
+      function isOnSnake(cell) {
+        return snake.some((segment) => segment.x === cell.x && segment.y === cell.y);
+      }
+
+      function setDirection(dx, dy) {
+        if (!isRunning) {
+          direction = { x: dx, y: dy };
+          nextDirection = { x: dx, y: dy };
+          return;
+        }
+
+        if (dx === -direction.x && dy === -direction.y) {
+          return;
+        }
+
+        nextDirection = { x: dx, y: dy };
+      }
+
+      function step() {
+        const head = snake[0];
+        const next = {
+          x: head.x + nextDirection.x,
+          y: head.y + nextDirection.y,
+        };
+
+        direction = nextDirection;
+
+        const hitWall =
+          next.x < 0 || next.x >= CELL_COUNT || next.y < 0 || next.y >= CELL_COUNT;
+        if (hitWall) {
+          gameOver();
+          return;
+        }
+
+        const willGrow = next.x === food.x && next.y === food.y;
+        const isColliding = snake.some((segment, index) => {
+          if (!willGrow && index === snake.length - 1) {
+            return false;
+          }
+          return segment.x === next.x && segment.y === next.y;
+        });
+        if (isColliding) {
+          gameOver();
+          return;
+        }
+
+        snake.unshift(next);
+
+        if (willGrow) {
+          score += 1;
+          food = randomFood();
+        } else {
+          snake.pop();
+        }
+
+        scorePill.textContent = `Score: ${score}`;
+        render();
+      }
+
+      function drawCell(x, y, color, border) {
+        const left = x * CELL_SIZE;
+        const top = y * CELL_SIZE;
+        context.fillStyle = color;
+        context.fillRect(left, top, CELL_SIZE, CELL_SIZE);
+        if (border) {
+          context.strokeStyle = border;
+          context.lineWidth = 1;
+          context.strokeRect(left + 0.5, top + 0.5, CELL_SIZE - 1, CELL_SIZE - 1);
+        }
+      }
+
+      function render() {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = "rgba(4, 11, 20, 0.95)";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        for (let y = 0; y <= CELL_COUNT; y++) {
+          const p = y * CELL_SIZE;
+          context.strokeStyle = "rgba(20, 255, 139, 0.08)";
+          context.beginPath();
+          context.moveTo(0, p);
+          context.lineTo(canvas.width, p);
+          context.stroke();
+        }
+        for (let x = 0; x <= CELL_COUNT; x++) {
+          const p = x * CELL_SIZE;
+          context.strokeStyle = "rgba(20, 255, 139, 0.08)";
+          context.beginPath();
+          context.moveTo(p, 0);
+          context.lineTo(p, canvas.height);
+          context.stroke();
+        }
+
+        drawCell(food.x, food.y, "#ff3b5c", "rgba(255, 255, 255, 0.25)");
+
+        snake.forEach((segment, index) => {
+          const glow = Math.max(0.25, 1 - index * 0.03);
+          const body = `rgba(20, 255, 139, ${glow})`;
+          drawCell(segment.x, segment.y, index === 0 ? "#d4ff4c" : body, "rgba(14, 255, 170, 0.3)");
+        });
+
+        if (!isRunning && snake.length > 0 && !isGameOver) {
+          context.fillStyle = "rgba(233, 239, 255, 0.92)";
+          context.font = "bold 20px ui-monospace, SFMono-Regular, Menlo, monospace";
+          context.textAlign = "center";
+          context.fillText("Press Space/Enter to start", canvas.width / 2, canvas.height / 2);
+        }
+
+        if (isGameOver) {
+          context.fillStyle = "rgba(2, 8, 16, 0.72)";
+          context.fillRect(0, 40, canvas.width, canvas.height - 80);
+
+          context.fillStyle = "#ff6d7b";
+          context.font = "bold 32px ui-monospace, SFMono-Regular, Menlo, monospace";
+          context.textAlign = "center";
+          context.fillText("Game Over", canvas.width / 2, canvas.height / 2 - 8);
+          context.fillStyle = "#e6efff";
+          context.font = "20px ui-monospace, SFMono-Regular, Menlo, monospace";
+          context.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 + 24);
+        }
+      }
+
+      function updateHud() {
+        scorePill.textContent = `Score: ${score}`;
+      }
+
+      function handleStartOrRestart() {
+        startGame();
+      }
+
+      function onKeyDown(event) {
+        const key = event.key;
+        const move = {
+          ArrowUp: [0, -1],
+          ArrowDown: [0, 1],
+          ArrowLeft: [-1, 0],
+          ArrowRight: [1, 0],
+          w: [0, -1],
+          s: [0, 1],
+          a: [-1, 0],
+          d: [1, 0],
+        }[key];
+
+        if (move) {
+          event.preventDefault();
+          setDirection(move[0], move[1]);
+          if (!isRunning) {
+            statusPill.textContent = "Arrow keys to steer";
+          }
+          return;
+        }
+
+        if (key === " " || key === "Enter" || key === "r" || key === "R") {
+          event.preventDefault();
+          if (!isRunning || isGameOver) {
+            startGame();
+          }
+          return;
+        }
+      }
+
+      restartButton.addEventListener("click", handleStartOrRestart);
+      window.addEventListener("keydown", onKeyDown);
+
+      food = randomFood();
+      updateHud();
+      render();
     </script>
   </body>
 </html>
