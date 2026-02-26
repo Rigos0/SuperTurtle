@@ -6,70 +6,111 @@
     <title>Snake Speedrun</title>
     <style>
       :root {
-        --bg: #050812;
-        --panel: rgba(7, 16, 34, 0.9);
-        --text: #e8f4ff;
-        --accent: #14ff8b;
-        --accent-soft: rgba(20, 255, 139, 0.2);
-        --canvas: #050f1f;
+        --bg: #06090f;
+        --panel: #0a1222;
+        --text: #e6f2ff;
+        --accent: #19f96b;
+        --accent-soft: rgba(25, 249, 107, 0.2);
+        --accent-rgb: 25, 249, 107;
+        --canvas: #050d18;
+        --scan: rgba(255, 255, 255, 0.08);
       }
       html,
       body {
         margin: 0;
         min-height: 100%;
-        background: radial-gradient(circle at top left, #1a3558 0, transparent 45%), var(--bg);
+        background:
+          repeating-linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.03) 0,
+            rgba(255, 255, 255, 0.03) 1px,
+            transparent 1px,
+            transparent 3px
+          ),
+          radial-gradient(circle at top left, #1a2f50 0, transparent 45%),
+          var(--bg);
         color: var(--text);
         font-family:
-          Inter,
-          "Segoe UI",
-          system-ui,
-          -apple-system,
-          sans-serif;
+          "Share Tech Mono",
+          "VT323",
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        line-height: 1.25;
       }
       .wrap {
         min-height: 100vh;
         display: grid;
         place-items: center;
-        padding: 1.5rem;
+        padding: clamp(0.8rem, 2.2vw, 1.5rem);
         box-sizing: border-box;
       }
       .card {
-        width: min(900px, 100%);
-        border: 1px solid rgba(255, 255, 255, 0.15);
+        width: min(880px, 100%);
+        border: 1px solid rgba(var(--accent-rgb), 0.35);
         border-radius: 16px;
-        background: linear-gradient(160deg, var(--panel), #111a34);
-        box-shadow: 0 24px 80px rgba(2, 4, 18, 0.45);
-        padding: 1.25rem;
+        position: relative;
+        background:
+          linear-gradient(160deg, rgba(10, 18, 34, 0.95), rgba(8, 15, 31, 0.92)),
+          linear-gradient(rgba(var(--accent-rgb), 0.12), rgba(var(--accent-rgb), 0) 40%);
+        box-shadow:
+          0 28px 80px rgba(2, 6, 18, 0.55),
+          inset 0 0 0 1px rgba(var(--accent-rgb), 0.28),
+          0 0 24px rgba(var(--accent-rgb), 0.16);
+        padding: clamp(0.85rem, 2vw, 1.35rem);
+      }
+      .card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 16px;
+        background: linear-gradient(
+          transparent 0,
+          rgba(255, 255, 255, 0.02) 50%,
+          transparent 100%
+        );
+        pointer-events: none;
       }
       .title {
         margin: 0 0 0.6rem;
-        font-size: clamp(1.4rem, 3.4vw, 2.1rem);
-        letter-spacing: 0.02em;
+        font-size: clamp(1.5rem, 3.6vw, 2.2rem);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        text-shadow: 0 0 12px rgba(var(--accent-rgb), 0.45);
       }
       .description {
         margin: 0 0 1rem;
-        color: rgba(233, 239, 255, 0.78);
+        color: rgba(230, 240, 255, 0.82);
         line-height: 1.45;
+        max-width: 60ch;
       }
       .stage {
         width: 100%;
         aspect-ratio: 1 / 1;
-        max-height: 72vh;
+        max-height: 70vh;
         border-radius: 12px;
-        border: 1px solid rgba(20, 255, 139, 0.2);
-        background: linear-gradient(160deg, #030a17, var(--canvas));
+        border: 1px solid rgba(var(--accent-rgb), 0.3);
+        background:
+          linear-gradient(180deg, rgba(8, 15, 32, 0.85), rgba(4, 9, 18, 0.94)),
+          var(--canvas);
         display: grid;
         place-items: center;
         position: relative;
+        padding: 0.5rem;
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+          0 12px 34px rgba(0, 0, 0, 0.35);
       }
       canvas {
-        width: min(90vw, 600px);
-        height: min(90vw, 600px);
+        width: min(90vw, 560px);
+        height: min(90vw, 560px);
         border-radius: 8px;
-        border: 1px dashed rgba(20, 255, 139, 0.25);
+        border: 1px dashed rgba(var(--accent-rgb), 0.35);
         background: rgba(4, 10, 22, 0.9);
         image-rendering: pixelated;
-        box-shadow: inset 0 0 0 1px rgba(20, 255, 139, 0.12);
+        box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.16);
+        max-width: 100%;
       }
       .hud {
         margin-top: 0.9rem;
@@ -81,23 +122,65 @@
         align-items: center;
       }
       .pill {
-        border: 1px solid rgba(20, 255, 139, 0.35);
+        border: 1px solid rgba(var(--accent-rgb), 0.4);
         background: var(--accent-soft);
-        border-radius: 999px;
-        padding: 0.35rem 0.8rem;
-        font-size: 0.9rem;
-      }
-      .button {
-        border: 1px solid rgba(20, 255, 139, 0.5);
-        background: rgba(20, 255, 139, 0.12);
-        color: var(--text);
-        cursor: pointer;
         border-radius: 999px;
         padding: 0.45rem 0.95rem;
         font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .button {
+        border: 1px solid rgba(var(--accent-rgb), 0.6);
+        background: linear-gradient(
+          180deg,
+          rgba(var(--accent-rgb), 0.22),
+          rgba(8, 17, 30, 0.8)
+        );
+        color: var(--text);
+        cursor: pointer;
+        border-radius: 999px;
+        padding: 0.55rem 1rem;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 700;
+      }
+      .button:active {
+        transform: translateY(1px);
       }
       .button:hover {
-        background: rgba(20, 255, 139, 0.2);
+        background: linear-gradient(
+          180deg,
+          rgba(var(--accent-rgb), 0.3),
+          rgba(12, 21, 40, 0.85)
+        );
+        box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.28);
+      }
+      @media (max-width: 520px) {
+        .hud {
+          gap: 0.45rem;
+        }
+        .pill,
+        .button {
+          min-height: 40px;
+          width: 100%;
+          justify-content: center;
+          text-align: center;
+        }
+        .hud .pill {
+          flex: 1 1 140px;
+        }
+        .button {
+          flex: 0 0 100%;
+        }
+        .title {
+          text-align: center;
+          font-size: 1.45rem;
+        }
+        .description {
+          text-align: center;
+        }
       }
     </style>
   </head>
@@ -255,7 +338,7 @@
 
         for (let y = 0; y <= CELL_COUNT; y++) {
           const p = y * CELL_SIZE;
-          context.strokeStyle = "rgba(20, 255, 139, 0.08)";
+          context.strokeStyle = "rgba(25, 249, 107, 0.08)";
           context.beginPath();
           context.moveTo(0, p);
           context.lineTo(canvas.width, p);
@@ -263,7 +346,7 @@
         }
         for (let x = 0; x <= CELL_COUNT; x++) {
           const p = x * CELL_SIZE;
-          context.strokeStyle = "rgba(20, 255, 139, 0.08)";
+          context.strokeStyle = "rgba(25, 249, 107, 0.08)";
           context.beginPath();
           context.moveTo(p, 0);
           context.lineTo(p, canvas.height);
@@ -274,8 +357,8 @@
 
         snake.forEach((segment, index) => {
           const glow = Math.max(0.25, 1 - index * 0.03);
-          const body = `rgba(20, 255, 139, ${glow})`;
-          drawCell(segment.x, segment.y, index === 0 ? "#d4ff4c" : body, "rgba(14, 255, 170, 0.3)");
+          const body = `rgba(25, 249, 107, ${glow})`;
+          drawCell(segment.x, segment.y, index === 0 ? "#b8ff4a" : body, "rgba(25, 249, 107, 0.3)");
         });
 
         if (!isRunning && snake.length > 0 && !isGameOver) {
