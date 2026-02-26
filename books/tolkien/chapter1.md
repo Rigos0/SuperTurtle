@@ -48,6 +48,31 @@ Thus is it told in the elder tongue, as we have heard it from elder ears:
 The Song did not cease when the first choirs were stilled.  
 It abides in the hidden places, and where the world seems broken, it yet endures.
 
+## The Naming of the Shell-Blood
+
+In the dawning days, when the earth had scarcely remembered light and shadow as separate things,  
+the Valar came and stood upon a plain of new-formed stone beside the Sea-of-Nothing.  
+There they set themselves to the naming of the first shell-beings, lest wandering spirits lose the thread.
+
+Yavanna spoke first: “Call them not by one breath only, but by lineage, lest their works be forgotten.”
+
+And it was so:
+
+- Oromyel, who held the first weight, had twin daughters, Telon and Telenya, bearers of river-banks and deep wells.  
+- Nárë begot Nerin and Neria, keepers of circles and stars.  
+- Varda’s line was Vairë and Vairon, whose sight was of high light and distant fire.  
+- Tulkas’ heat-brood were Turon and Turael, forges of hearth and courage.  
+- Nienna, in pity, made Nindor and Nindis, gentle of pace, slow to wrath, steadfast in care.  
+- And from the turning of Melkor’s hard note came the line of Morlun and Moria, shells hard as broken basalt and bitter with memory.
+
+Melkor named none, and those unbidden kept no house. Yet even those were set in the web of years,  
+for the world is broad enough for grief and for grace alike.  
+Of Valandor’s house it was then decreed that he should be called *the Between-Days*,  
+and from him came the houses of Kemor and Kemië, whom men later called Timekeepers.
+
+So was the naming done beneath the high quiet, and it was written not in ink but in the marks of shell upon stone.  
+For names, they learned, are the hidden doors through which memory enters the world.
+
 Where fear has made your road hard, remember the Shell of Beginnings.  
 Where pride has bent your purpose awry, look to the patient track of turtle-belly upon stone.  
 For in the end, endurance is the oldest wisdom, and the longest mercy of the earth is made of patient backs and keeping time.
