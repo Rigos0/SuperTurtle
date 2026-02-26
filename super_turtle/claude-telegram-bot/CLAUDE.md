@@ -5,8 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-bun run start      # Run the bot
-bun run start:live # Run with caffeinate (prevents sleep on AC power)
+bun run start      # Canonical start: tmux + caffeinate + run-loop (single visible terminal session)
 bun run dev        # Run with auto-reload (--watch)
 bun run typecheck  # Run TypeScript type checking
 bun install        # Install dependencies
@@ -80,7 +79,7 @@ MCP servers defined in `mcp-config.ts`.
 
 **Type checking**: Run `bun run typecheck` periodically while editing TypeScript files. Fix any type errors before committing.
 
-**After code changes**: Restart the bot so changes can be tested. Use `launchctl kickstart -k gui/$(id -u)/com.claude-telegram-ts` if running as a service, or `bun run start` for manual runs.
+**After code changes**: If running manually, use `bun run start` and keep that terminal as the canonical live view; re-running the command re-attaches to the same `tmux` session. `/restart` must stay in the same terminal session (run-loop respawn), not detached.
 
 ## Standalone Build
 

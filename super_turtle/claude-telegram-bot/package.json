@@ -4,8 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "bun run src/index.ts",
-    "start:live": "caffeinate -s ./run-loop.sh",
+    "start": "./live.sh",
     "dev": "bun --watch run src/index.ts",
     "typecheck": "bun run --bun tsc --noEmit"
   },

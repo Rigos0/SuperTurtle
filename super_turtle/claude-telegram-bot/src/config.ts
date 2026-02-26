@@ -193,7 +193,7 @@ export const BUTTON_LABEL_MAX_LENGTH = 30; // Max chars for inline button labels
 
 const rawDashboardPort = Number(process.env.DASHBOARD_PORT || "4173");
 export const DASHBOARD_ENABLED = (
-  process.env.DASHBOARD_ENABLED || "true"
+  process.env.DASHBOARD_ENABLED || "false"
 ).toLowerCase() === "true";
 export const DASHBOARD_PORT = Number.isFinite(rawDashboardPort) && rawDashboardPort > 0
   ? rawDashboardPort

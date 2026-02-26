@@ -119,3 +119,26 @@ For new project kickoff, use the template at `docs/NEXT_PROJECT_INTAKE_TEMPLATE.
 ### Next project kickoff runbook
 
 For a step-by-step intake-to-spawn checklist, use `docs/NEXT_PROJECT_KICKOFF_RUNBOOK.md`.
+
+## Bot Monitoring
+
+Canonical workflow: always run the bot through the live launcher, which keeps one visible terminal session and prevents duplicate starts.
+
+```bash
+# Start or re-attach (always the same tmux terminal session).
+# This IS the live log view (no second command needed).
+cd super_turtle/claude-telegram-bot
+bun run start
+
+# /restart from Telegram restarts in this same terminal session
+# (it does not detach into a hidden process)
+
+# Attach later from any terminal
+tmux attach -t superturtle-bot
+
+# Check if the session exists
+tmux has-session -t superturtle-bot && echo "running" || echo "stopped"
+
+# Stop completely
+tmux kill-session -t superturtle-bot
+```

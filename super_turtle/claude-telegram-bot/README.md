@@ -42,7 +42,7 @@ cp .env.example .env
 # Edit .env with your credentials
 
 bun install
-bun run src/index.ts
+bun run start
 ```
 
 ### Prerequisites
@@ -185,6 +185,25 @@ The bot will start automatically on login and restart if it crashes.
 ```bash
 tail -f /tmp/claude-telegram-bot-ts.log   # stdout
 tail -f /tmp/claude-telegram-bot-ts.err   # stderr
+```
+
+## Monitor Background Bot
+
+Use the live launcher so the bot always runs in one visible terminal (`tmux`) and multiple starts just re-attach.
+
+```bash
+# Start or re-attach the same terminal session
+bun run start
+# /restart keeps using this same tmux terminal session
+
+# Attach later from another terminal
+tmux attach -t superturtle-bot
+
+# Session status
+tmux has-session -t superturtle-bot && echo "running" || echo "stopped"
+
+# Stop bot completely
+tmux kill-session -t superturtle-bot
 ```
 
 **Shell aliases:** If running as a service, these aliases make it easy to manage the bot (add to `~/.zshrc` or `~/.bashrc`):

@@ -251,9 +251,9 @@ function renderDashboardHtml(): string {
         const sec = total % 60;
         const min = Math.floor(total / 60) % 60;
         const hr = Math.floor(total / 3600);
-        if (hr > 0) return `${hr}h ${min}m`;
-        if (min > 0) return `${min}m ${sec}s`;
-        return `${sec}s`;
+        if (hr > 0) return hr + "h " + min + "m";
+        if (min > 0) return min + "m " + sec + "s";
+        return sec + "s";
       }
 
       async function loadData() {
@@ -277,13 +277,12 @@ function renderDashboardHtml(): string {
               return a.name.localeCompare(b.name);
             })) {
               const tr = document.createElement("tr");
-              tr.innerHTML = `
-                <td>${dot(t.status)} ${t.name}</td>
-                <td>${t.type || "unknown"}</td>
-                <td>${t.status}</td>
-                <td>${t.elapsed}</td>
-                <td>${t.task || ""}</td>
-              `;
+              tr.innerHTML =
+                "<td>" + dot(t.status) + " " + t.name + "</td>" +
+                "<td>" + (t.type || "unknown") + "</td>" +
+                "<td>" + t.status + "</td>" +
+                "<td>" + t.elapsed + "</td>" +
+                "<td>" + (t.task || "") + "</td>";
               turtleRows.appendChild(tr);
             }
           }
@@ -294,16 +293,16 @@ function renderDashboardHtml(): string {
             cronRows.innerHTML = "";
             for (const j of data.cronJobs) {
               const tr = document.createElement("tr");
-              tr.innerHTML = `
-                <td>${j.type}</td>
-                <td>${humanMs(j.fireInMs)}</td>
-                <td>${j.promptPreview}</td>
-              `;
+              tr.innerHTML =
+                "<td>" + j.type + "</td>" +
+                "<td>" + humanMs(j.fireInMs) + "</td>" +
+                "<td>" + j.promptPreview + "</td>";
               cronRows.appendChild(tr);
             }
           }
 
-          statusLine.textContent = `Status: ${data.turtles.length} turtles, ${data.cronJobs.length} cron jobs`;
+          statusLine.textContent =
+            "Status: " + data.turtles.length + " turtles, " + data.cronJobs.length + " cron jobs";
         } catch (error) {
           statusLine.textContent = "Status: failed to fetch data";
         }
@@ -318,7 +317,6 @@ function renderDashboardHtml(): string {
 
 export function startDashboardServer(): void {
   if (!DASHBOARD_ENABLED) {
-    console.log("Dashboard disabled (set DASHBOARD_ENABLED=true to enable)");
     return;
   }
 

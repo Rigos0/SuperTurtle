@@ -1549,7 +1549,7 @@ export async function handleContext(ctx: Context): Promise<void> {
 export async function handleRestart(ctx: Context): Promise<void> {
   const userId = ctx.from?.id;
   const chatId = ctx.chat?.id;
-  const restartSelfMarker = `${WORKING_DIR}/super_turtle/claude-telegram-bot/.restart-self`;
+  const inRunLoop = process.env.SUPERTURTLE_RUN_LOOP === "1";
 
   if (!isAuthorized(userId, ALLOWED_USERS)) {
     await ctx.reply("Unauthorized.");
@@ -1574,25 +1574,22 @@ export async function handleRestart(ctx: Context): Promise<void> {
     }
   }
 
-  try {
-    await Bun.write(restartSelfMarker, `${Date.now()}\n`);
-  } catch (e) {
-    console.warn("Failed to write restart-self marker:", e);
-  }
-
   // Give time for the message to send
   await Bun.sleep(500);
 
-  // Re-exec this same command so /restart works even when launched directly.
-  const botDir = `${WORKING_DIR}/super_turtle/claude-telegram-bot`;
-  const child = Bun.spawn(process.argv, {
-    cwd: botDir,
-    stdin: "ignore",
-    stdout: "ignore",
-    stderr: "ignore",
-    detached: true,
-  });
-  child.unref();
+  // In run-loop mode, just exit; run-loop respawns in the same tmux terminal.
+  if (!inRunLoop) {
+    // Re-exec this same command so /restart works even when launched directly.
+    const botDir = `${WORKING_DIR}/super_turtle/claude-telegram-bot`;
+    const child = Bun.spawn(process.argv, {
+      cwd: botDir,
+      stdin: "ignore",
+      stdout: "ignore",
+      stderr: "ignore",
+      detached: true,
+    });
+    child.unref();
+  }
 
   // Exit current process after replacement is spawned.
   process.exit(0);

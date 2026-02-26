@@ -6,7 +6,7 @@
 
 import { run, sequentialize } from "@grammyjs/runner";
 import { WORKING_DIR, ALLOWED_USERS, RESTART_FILE } from "./config";
-import { unlinkSync, readFileSync, existsSync } from "fs";
+import { unlinkSync, readFileSync, existsSync, writeFileSync, openSync, closeSync } from "fs";
 import {
   handleStart,
   handleNew,
@@ -50,6 +50,62 @@ import { buildCronScheduledPrompt } from "./cron-scheduled-prompt";
 
 // Re-export for any existing consumers
 export { bot };
+
+const INSTANCE_LOCK_FILE = "/tmp/claude-telegram-bot.instance.lock";
+
+function acquireInstanceLockOrExit(): () => void {
+  const thisPid = process.pid;
+
+  const isPidAlive = (pid: number): boolean => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const writeLock = () => {
+    const fd = openSync(INSTANCE_LOCK_FILE, "wx");
+    writeFileSync(fd, String(thisPid));
+    closeSync(fd);
+  };
+
+  try {
+    writeLock();
+  } catch {
+    let holderPid = Number.NaN;
+    try {
+      holderPid = Number.parseInt(readFileSync(INSTANCE_LOCK_FILE, "utf-8").trim(), 10);
+    } catch {
+      // unreadable lockfile - retry with overwrite semantics below
+    }
+
+    if (Number.isFinite(holderPid) && holderPid > 0 && isPidAlive(holderPid)) {
+      console.error(
+        `[startup] Another bot instance is already running (PID ${holderPid}). Exiting to avoid Telegram getUpdates 409 conflict.`
+      );
+      process.exit(1);
+    }
+
+    // stale lock; replace it
+    try { unlinkSync(INSTANCE_LOCK_FILE); } catch {}
+    writeLock();
+  }
+
+  const release = () => {
+    try {
+      const holderPid = Number.parseInt(readFileSync(INSTANCE_LOCK_FILE, "utf-8").trim(), 10);
+      if (holderPid === thisPid) {
+        unlinkSync(INSTANCE_LOCK_FILE);
+      }
+    } catch {
+      // ignore cleanup failures
+    }
+  };
+
+  return release;
+}
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -599,6 +655,8 @@ console.log(`Working directory: ${WORKING_DIR}`);
 console.log(`Allowed users: ${ALLOWED_USERS.length}`);
 console.log("Starting bot...");
 
+const releaseInstanceLock = acquireInstanceLockOrExit();
+
 // Get bot info first
 const botInfo = await bot.api.getMe();
 console.log(`Bot started: @${botInfo.username}`);
@@ -661,6 +719,7 @@ const stopRunner = () => {
     console.log("Stopping bot...");
     runner.stop();
   }
+  releaseInstanceLock();
 };
 
 process.on("SIGINT", () => {
