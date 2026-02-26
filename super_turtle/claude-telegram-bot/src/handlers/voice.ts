@@ -61,13 +61,14 @@ export async function handleVoice(ctx: Context): Promise<void> {
     return;
   }
 
-  // 4. Mark processing started (allows /stop to work during transcription/classification)
-  const stopProcessing = session.startProcessing();
-
-  // 5. Start typing indicator for transcription
+  // 4. Start typing indicator for transcription
   const typing = startTypingIndicator(ctx);
 
+  // NOTE: startProcessing() is called AFTER the queue check (step 10) to avoid
+  // isAnyDriverRunning() seeing our own _isProcessing flag and always queueing.
+
   let voicePath: string | null = null;
+  let stopProcessing: (() => void) | null = null;
 
   try {
     // 6. Download voice file
@@ -92,7 +93,6 @@ export async function handleVoice(ctx: Context): Promise<void> {
         statusMsg.message_id,
         "❌ Transcription failed."
       );
-      stopProcessing();
       return;
     }
 
@@ -132,6 +132,10 @@ export async function handleVoice(ctx: Context): Promise<void> {
       return;
     }
 
+    // 10b. NOW mark processing started — after the queue check so our own flag
+    // doesn't cause isAnyDriverRunning() to always return true.
+    stopProcessing = session.startProcessing();
+
     // 11. Set conversation title from transcript (if new session)
     if (!isActiveDriverSessionActive()) {
       const title =
@@ -168,7 +172,7 @@ export async function handleVoice(ctx: Context): Promise<void> {
       await ctx.reply(`❌ Error: ${String(error).slice(0, 200)}`);
     }
   } finally {
-    stopProcessing();
+    stopProcessing?.();
     typing.stop();
     await drainDeferredQueue(ctx, chatId);
 
