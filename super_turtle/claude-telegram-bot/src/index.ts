@@ -39,6 +39,12 @@ import { isAnyDriverRunning, isLikelyQuotaOrLimitError, runMessageWithDriver } f
 import { StreamingState, createSilentStatusCallback, createStatusCallback } from "./handlers/streaming";
 import { getSilentNotificationText } from "./silent-notifications";
 import type { DriverId } from "./drivers/types";
+import {
+  dequeuePreparedSnapshot,
+  enqueuePreparedSnapshot,
+  getPreparedSnapshotCount,
+} from "./cron-supervision-queue";
+import { buildCronScheduledPrompt } from "./cron-scheduled-prompt";
 
 // Re-export for any existing consumers
 export { bot };
@@ -67,6 +73,197 @@ function isSubturtleRunning(name: string): boolean {
   const proc = Bun.spawnSync([ctlPath, "status", name], { cwd: WORKING_DIR });
   const output = proc.stdout.toString();
   return output.includes("running as");
+}
+
+function shouldPrepareSilentSubturtleSnapshot(job: {
+  prompt: string;
+  silent?: boolean;
+}): string | null {
+  if (!job.silent) return null;
+  return extractCheckedSubturtleName(job.prompt);
+}
+
+async function prepareSubturtleSnapshot(
+  jobId: string,
+  prompt: string,
+  chatId: number,
+  subturtleName: string
+) {
+  const prepErrors: string[] = [];
+
+  const ctlPath = `${WORKING_DIR}/super_turtle/subturtle/ctl`;
+  const statusProc = Bun.spawnSync([ctlPath, "status", subturtleName], {
+    cwd: WORKING_DIR,
+  });
+  const statusOutput = statusProc.stdout.toString().trim() || statusProc.stderr.toString().trim();
+  if (statusProc.exitCode !== 0) {
+    prepErrors.push(`ctl status exit=${statusProc.exitCode}`);
+  }
+
+  const statePath = `${WORKING_DIR}/.subturtles/${subturtleName}/CLAUDE.md`;
+  let stateExcerpt = "";
+  try {
+    const stateText = await Bun.file(statePath).text();
+    stateExcerpt = stateText.slice(0, 12_000);
+  } catch (error) {
+    prepErrors.push(`state read failed: ${String(error).slice(0, 160)}`);
+    stateExcerpt = "(failed to read state file)";
+  }
+
+  const gitProc = Bun.spawnSync(["git", "log", "--oneline", "-10"], {
+    cwd: WORKING_DIR,
+  });
+  const gitLog = gitProc.stdout.toString().trim() || gitProc.stderr.toString().trim();
+  if (gitProc.exitCode !== 0) {
+    prepErrors.push(`git log exit=${gitProc.exitCode}`);
+  }
+
+  const tunnelPath = `${WORKING_DIR}/.subturtles/${subturtleName}/.tunnel-url`;
+  let tunnelUrl: string | null = null;
+  try {
+    const txt = (await Bun.file(tunnelPath).text()).trim();
+    tunnelUrl = txt || null;
+  } catch {
+    tunnelUrl = null;
+  }
+
+  return enqueuePreparedSnapshot({
+    jobId,
+    subturtleName,
+    chatId,
+    sourcePrompt: prompt,
+    preparedAtMs: Date.now(),
+    statusOutput,
+    stateExcerpt,
+    gitLog,
+    tunnelUrl,
+    prepErrors,
+  });
+}
+
+function buildPreparedSnapshotPrompt(snapshot: {
+  subturtleName: string;
+  sourcePrompt: string;
+  preparedAtMs: number;
+  statusOutput: string;
+  stateExcerpt: string;
+  gitLog: string;
+  tunnelUrl: string | null;
+  prepErrors: string[];
+  snapshotSeq: number;
+}): string {
+  const preparedAt = new Date(snapshot.preparedAtMs).toISOString();
+  const prepErrors = snapshot.prepErrors.length > 0
+    ? snapshot.prepErrors.map((e) => `- ${e}`).join("\n")
+    : "- none";
+  const tunnelLine = snapshot.tunnelUrl ? snapshot.tunnelUrl : "(none)";
+
+  return [
+    `[SILENT CHECK-IN SNAPSHOT] SubTurtle ${snapshot.subturtleName}`,
+    `Snapshot seq: ${snapshot.snapshotSeq}`,
+    `Prepared at (UTC): ${preparedAt}`,
+    "",
+    "Original cron prompt:",
+    snapshot.sourcePrompt,
+    "",
+    "Prepared data:",
+    `<ctl_status>`,
+    snapshot.statusOutput || "(empty)",
+    `</ctl_status>`,
+    "",
+    `<state_excerpt>`,
+    snapshot.stateExcerpt || "(empty)",
+    `</state_excerpt>`,
+    "",
+    `<git_log>`,
+    snapshot.gitLog || "(empty)",
+    `</git_log>`,
+    "",
+    `<tunnel_url>`,
+    tunnelLine,
+    `</tunnel_url>`,
+    "",
+    "<prep_errors>",
+    prepErrors,
+    "</prep_errors>",
+    "",
+    "Decide if this is notable for the user.",
+    "If no notable event, respond exactly: [SILENT]",
+    "If notable, include one marker and concise update: 🎉 or ⚠️ or ❌ or 🚀 or 🔗.",
+  ].join("\n");
+}
+
+async function drainPreparedSnapshotsWhenIdle(): Promise<void> {
+  if (ALLOWED_USERS.length === 0) return;
+  if (isAnyDriverRunning()) return;
+  while (!isAnyDriverRunning()) {
+    const snapshot = dequeuePreparedSnapshot();
+    if (!snapshot) break;
+
+    const cronCtx = ({
+      from: { id: ALLOWED_USERS[0]!, username: "cron", is_bot: false, first_name: "Cron" },
+      chat: { id: snapshot.chatId, type: "private" },
+      message: {
+        text: "",
+        message_id: 0,
+        date: Math.floor(Date.now() / 1000),
+        chat: { id: snapshot.chatId, type: "private" },
+      },
+      reply: async (replyText: string, opts?: unknown) => {
+        return bot.api.sendMessage(snapshot.chatId, replyText, opts as Parameters<typeof bot.api.sendMessage>[2]);
+      },
+      replyWithChatAction: async (action: string) => {
+        await bot.api.sendChatAction(snapshot.chatId, action as Parameters<typeof bot.api.sendChatAction>[1]);
+      },
+      replyWithSticker: async (sticker: unknown) => {
+        // @ts-expect-error minimal shim for sticker sending
+        return bot.api.sendSticker(snapshot.chatId, sticker);
+      },
+      api: bot.api,
+    }) as unknown as import("grammy").Context;
+
+    const primaryDriver: DriverId = session.activeDriver;
+    const fallbackDriver: DriverId = primaryDriver === "codex" ? "claude" : "codex";
+    const state = new StreamingState();
+    const statusCallback = createSilentStatusCallback(cronCtx, state);
+    let response = "";
+
+    try {
+      try {
+        response = await runMessageWithDriver(primaryDriver, {
+          message: buildPreparedSnapshotPrompt(snapshot),
+          username: "cron",
+          userId: ALLOWED_USERS[0]!,
+          chatId: snapshot.chatId,
+          ctx: cronCtx,
+          statusCallback,
+        });
+      } catch (error) {
+        if (!isLikelyQuotaOrLimitError(error)) {
+          throw error;
+        }
+        response = await runMessageWithDriver(fallbackDriver, {
+          message: buildPreparedSnapshotPrompt(snapshot),
+          username: "cron",
+          userId: ALLOWED_USERS[0]!,
+          chatId: snapshot.chatId,
+          ctx: cronCtx,
+          statusCallback,
+        });
+      }
+
+      const notificationText = getSilentNotificationText(state.getSilentCapturedText(), response);
+      if (notificationText) {
+        await bot.api.sendMessage(snapshot.chatId, notificationText);
+      }
+    } catch (error) {
+      const errorSummary = summarizeCronError(error);
+      await bot.api.sendMessage(
+        snapshot.chatId,
+        `❌ Background check failed (${snapshot.jobId}).\n${errorSummary}`
+      );
+    }
+  }
 }
 
 // Sequentialize non-command messages per user (prevents race conditions)
@@ -162,20 +359,18 @@ const startCronTimer = () => {
 
   setInterval(async () => {
     try {
-      // Skip if a query is already running
-      if (isAnyDriverRunning()) {
-        return;
-      }
-
       const dueJobs = getDueJobs();
       if (dueJobs.length === 0) {
+        await drainPreparedSnapshotsWhenIdle();
         return;
       }
 
       for (const job of dueJobs) {
+        const subturtleNameForPrep = shouldPrepareSilentSubturtleSnapshot(job);
+
         // Re-check session before each job — the previous job may have started it
-        if (isAnyDriverRunning()) {
-          break;
+        if (isAnyDriverRunning() && !subturtleNameForPrep) {
+          continue;
         }
 
         // Remove/advance the job BEFORE executing so a crash doesn't cause retries
@@ -197,6 +392,20 @@ const startCronTimer = () => {
           const resolvedUserId = userId!;
           // Default chat_id to the first allowed user — single-chat bots never need to specify it
           const resolvedChatId: number = chatId!;
+
+          if (subturtleNameForPrep) {
+            const snapshot = await prepareSubturtleSnapshot(
+              job.id,
+              job.prompt,
+              resolvedChatId,
+              subturtleNameForPrep
+            );
+            await bot.api.sendMessage(
+              resolvedChatId,
+              `🔄 Background check prepared for ${subturtleNameForPrep} (snapshot #${snapshot.snapshotSeq}, queue=${getPreparedSnapshotCount()}). I will process it when the current reply is idle.`
+            );
+            continue;
+          }
 
           if (job.prompt.startsWith(BOT_MESSAGE_ONLY_PREFIX)) {
             const message = job.prompt.slice(BOT_MESSAGE_ONLY_PREFIX.length);
@@ -316,8 +525,9 @@ const startCronTimer = () => {
               session.typingController = null;
             }
           } else {
-            // Append instruction so the agent opens its reply with a scheduled notice
-            const injectedPrompt = `${job.prompt}\n\n(This is a scheduled message. Start your response with "🔔 Scheduled:" on its own line before anything else.)`;
+            // Append instruction so the agent opens its reply with a scheduled notice.
+            // Guard against double-injecting when the prompt already contains it.
+            const injectedPrompt = buildCronScheduledPrompt(job.prompt);
             const cronCtx = createCronContext(injectedPrompt);
             const primaryDriver: DriverId = session.activeDriver;
             const fallbackDriver: DriverId = primaryDriver === "codex" ? "claude" : "codex";
@@ -370,6 +580,7 @@ const startCronTimer = () => {
           }
         }
       }
+      await drainPreparedSnapshotsWhenIdle();
     } catch (error) {
       console.error("Cron timer loop error:", error);
     }
