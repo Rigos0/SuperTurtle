@@ -47,7 +47,7 @@ export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 export const CODEX_ENABLED =
   (process.env.CODEX_ENABLED || "false").toLowerCase() === "true";
 export const DRIVER_ABSTRACTION_V1 =
-  (process.env.DRIVER_ABSTRACTION_V1 || "false").toLowerCase() === "true";
+  (process.env.DRIVER_ABSTRACTION_V1 || "true").toLowerCase() === "true";
 
 // ============== Claude CLI Path ==============
 

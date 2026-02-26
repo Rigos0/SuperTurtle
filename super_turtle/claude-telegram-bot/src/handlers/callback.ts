@@ -456,14 +456,16 @@ async function handleResumeCallback(
   const statusCallback = createStatusCallback(ctx, state);
 
   try {
-    await session.sendMessageStreaming(
-      recapPrompt,
+    // Ensure we're using Claude driver for Claude session recap
+    session.activeDriver = "claude";
+    await runMessageWithActiveDriver({
+      message: recapPrompt,
       username,
       userId,
-      statusCallback,
       chatId,
-      ctx
-    );
+      ctx,
+      statusCallback,
+    });
   } catch (error) {
     console.error("Error getting recap:", error);
     // Don't show error to user - session is still resumed, recap just failed
@@ -520,7 +522,16 @@ async function handleCodexResumeCallback(
   const statusCallback = createStatusCallback(ctx, state);
 
   try {
-    await codexSession.sendMessage(recapPrompt, statusCallback);
+    // Ensure we're using Codex driver for Codex session recap
+    session.activeDriver = "codex";
+    await runMessageWithActiveDriver({
+      message: recapPrompt,
+      username,
+      userId,
+      chatId,
+      ctx,
+      statusCallback,
+    });
   } catch (error) {
     console.error("Error getting Codex recap:", error);
     // Don't show error to user - session is still resumed, recap just failed
