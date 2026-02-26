@@ -17,6 +17,7 @@ import {
   handleContext,
   handleModel,
   handleSwitch,
+  handleDashboard,
   handleResume,
   handleRestart,
   handleRetry,
@@ -35,6 +36,7 @@ import { resetAllDriverSessions } from "./handlers/commands";
 import { session } from "./session";
 import { getDueJobs, getJobs, advanceRecurringJob, removeJob } from "./cron";
 import { bot } from "./bot";
+import { startDashboardServer } from "./dashboard";
 import { isAnyDriverRunning, isLikelyQuotaOrLimitError, runMessageWithDriver } from "./handlers/driver-routing";
 import { StreamingState, createSilentStatusCallback, createStatusCallback } from "./handlers/streaming";
 import { getSilentNotificationText } from "./silent-notifications";
@@ -306,6 +308,7 @@ bot.command("codex-quota", handleCodexQuota);
 bot.command("context", handleContext);
 bot.command("model", handleModel);
 bot.command("switch", handleSwitch);
+bot.command("dashboard", handleDashboard);
 bot.command("resume", handleResume);
 bot.command("subturtle", handleSubturtle);
 bot.command("restart", handleRestart);
@@ -602,6 +605,7 @@ console.log(`Bot started: @${botInfo.username}`);
 
 // Start cron timer
 startCronTimer();
+startDashboardServer();
 
 // Drop any messages that arrived while the bot was offline
 await bot.api.deleteWebhook({ drop_pending_updates: true });
@@ -615,11 +619,18 @@ if (existsSync(RESTART_FILE)) {
     // Only update if restart was recent (within 30 seconds)
     if (age < 30000 && data.chat_id && data.message_id) {
       // Edit the "Restarting..." message to show completion
-      await bot.api.editMessageText(
-        data.chat_id,
-        data.message_id,
-        "✅ Bot restarted"
-      );
+      try {
+        await bot.api.editMessageText(
+          data.chat_id,
+          data.message_id,
+          "✅ Bot restarted"
+        );
+      } catch (error) {
+        const msg = String(error).toLowerCase();
+        if (!msg.includes("message is not modified")) {
+          throw error;
+        }
+      }
 
       await resetAllDriverSessions();
 

@@ -189,6 +189,19 @@ export const TELEGRAM_SAFE_LIMIT = 4000; // Safe limit with buffer for formattin
 export const STREAMING_THROTTLE_MS = 500; // Throttle streaming updates
 export const BUTTON_LABEL_MAX_LENGTH = 30; // Max chars for inline button labels
 
+// ============== Dashboard Configuration ==============
+
+const rawDashboardPort = Number(process.env.DASHBOARD_PORT || "4173");
+export const DASHBOARD_ENABLED = (
+  process.env.DASHBOARD_ENABLED || "true"
+).toLowerCase() === "true";
+export const DASHBOARD_PORT = Number.isFinite(rawDashboardPort) && rawDashboardPort > 0
+  ? rawDashboardPort
+  : 4173;
+export const DASHBOARD_BIND_ADDR = process.env.DASHBOARD_BIND_ADDR || "127.0.0.1";
+export const DASHBOARD_AUTH_TOKEN = process.env.DASHBOARD_AUTH_TOKEN || "";
+export const DASHBOARD_HOST = process.env.DASHBOARD_HOST || "http://localhost";
+
 // ============== Audit Logging ==============
 
 export const AUDIT_LOG_PATH =

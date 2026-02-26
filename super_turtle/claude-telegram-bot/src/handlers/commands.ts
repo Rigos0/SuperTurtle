@@ -14,12 +14,17 @@ import {
   TELEGRAM_SAFE_LIMIT,
   CODEX_ENABLED,
   META_PROMPT,
+  DASHBOARD_ENABLED,
+  DASHBOARD_HOST,
+  DASHBOARD_PORT,
+  DASHBOARD_AUTH_TOKEN,
 } from "../config";
 import { getContextReport } from "../context-command";
 import { isAuthorized } from "../security";
 import { escapeHtml } from "../formatting";
 import { getJobs } from "../cron";
 import { isActiveDriverSessionActive, isAnyDriverRunning, stopActiveDriverQuery } from "./driver-routing";
+import { clearPreparedSnapshots } from "../cron-supervision-queue";
 
 /**
  * Shared command list for display in /start, /new, and new_session bot-control.
@@ -29,6 +34,7 @@ export function getCommandLines(): string[] {
     `/new - Start fresh session`,
     `/model - Switch model/effort`,
     `/switch - Switch between Claude & Codex`,
+    `/dashboard - Open live turtle monitor`,
     `/usage - Subscription usage`,
     `/codex-quota - Codex quota status`,
     `/context - Show Claude context usage`,
@@ -83,7 +89,7 @@ export async function buildSessionOverviewLines(title: string): Promise<string[]
   return lines;
 }
 
-type ListedSubTurtle = {
+export type ListedSubTurtle = {
   name: string;
   status: string;
   type: string;
@@ -93,7 +99,7 @@ type ListedSubTurtle = {
   tunnelUrl: string;
 };
 
-function parseCtlListOutput(output: string): ListedSubTurtle[] {
+export function parseCtlListOutput(output: string): ListedSubTurtle[] {
   const turtles: ListedSubTurtle[] = [];
   let lastTurtle: ListedSubTurtle | null = null;
 
@@ -120,7 +126,7 @@ function parseCtlListOutput(output: string): ListedSubTurtle[] {
     let timeRemaining = "";
 
     if (status === "running") {
-      const typeMatch = remainder.match(/^(yolo-codex|slow|yolo)\b\s*(.*)$/);
+      const typeMatch = remainder.match(/^(yolo-codex-spark|yolo-codex|slow|yolo)\b\s*(.*)$/);
       if (typeMatch) {
         type = typeMatch[1]!;
         remainder = typeMatch[2] || "";
@@ -168,7 +174,7 @@ function parseCtlListOutput(output: string): ListedSubTurtle[] {
   return turtles;
 }
 
-async function getSubTurtleElapsed(name: string): Promise<string> {
+export async function getSubTurtleElapsed(name: string): Promise<string> {
   try {
     const metaPath = `${WORKING_DIR}/.subturtles/${name}/subturtle.meta`;
     const metaText = await Bun.file(metaPath).text();
@@ -189,6 +195,36 @@ async function getSubTurtleElapsed(name: string): Promise<string> {
   } catch {
     return "unknown";
   }
+}
+
+function getDashboardUrl(): string {
+  if (!DASHBOARD_ENABLED) {
+    return "Dashboard is currently disabled";
+  }
+
+  const base = `${DASHBOARD_HOST}:${DASHBOARD_PORT}`;
+  const hasToken = DASHBOARD_AUTH_TOKEN.length > 0;
+  const tokenSuffix = hasToken ? `?token=${encodeURIComponent(DASHBOARD_AUTH_TOKEN)}` : "";
+  return `${base}/dashboard${tokenSuffix}`;
+}
+
+/**
+ * /dashboard - Return local dashboard URL for live turtle monitoring.
+ */
+export async function handleDashboard(ctx: Context): Promise<void> {
+  const userId = ctx.from?.id;
+
+  if (!isAuthorized(userId, ALLOWED_USERS)) {
+    await ctx.reply("Unauthorized.");
+    return;
+  }
+
+  await ctx.reply(
+    `🗺️ Turtle monitor dashboard\n` +
+      `Open: <b>${getDashboardUrl()}</b>\n` +
+      `If running remotely, proxy 4173 to your host and open that URL.`,
+    { parse_mode: "HTML" }
+  );
 }
 
 /**
@@ -253,6 +289,7 @@ export async function resetAllDriverSessions(opts?: { stopRunning?: boolean }): 
 
   await session.kill();
   await codexSession.kill();
+  clearPreparedSnapshots();
 }
 
 /**

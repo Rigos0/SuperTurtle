@@ -12,6 +12,7 @@ export {
   handleContext,
   handleModel,
   handleSwitch,
+  handleDashboard,
   handleResume,
   handleRestart,
   handleRetry,
