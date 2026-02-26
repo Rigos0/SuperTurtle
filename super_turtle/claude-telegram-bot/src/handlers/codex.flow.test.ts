@@ -5,6 +5,7 @@ type CodexFlowPayload = {
   switchedToCodex: boolean;
   hasStreamingReply: boolean;
   askUserButtonsShown: boolean;
+  botControlRequestCompleted: boolean;
   modelPickerShowsCodexButtons: boolean;
   modelSelectionStartedFreshThread: boolean;
   stopCalled: boolean;
@@ -105,6 +106,7 @@ async function probeCodexFlow(): Promise<CodexFlowResult> {
     });
 
     const askUserFile = "/tmp/ask-user-codex-flow-test.json";
+    const botControlFile = "/tmp/bot-control-codex-flow-test.json";
 
     const originalStartNewThread = codexSession.startNewThread;
     const originalSendMessage = codexSession.sendMessage;
@@ -172,7 +174,27 @@ async function probeCodexFlow(): Promise<CodexFlowResult> {
           chat_id: 123,
         })
       );
+      await Bun.write(
+        botControlFile,
+        JSON.stringify({
+          request_id: "codex-bot-control-flow",
+          action: "usage",
+          params: {},
+          status: "pending",
+          chat_id: 123,
+        })
+      );
       await handleText(mkCtx("build integration test"));
+
+      let botControlRequestCompleted = false;
+      try {
+        const raw = await Bun.file(botControlFile).text();
+        const data = JSON.parse(raw);
+        botControlRequestCompleted =
+          data.status === "completed" &&
+          typeof data.result === "string" &&
+          data.result.length > 0;
+      } catch {}
 
       // /model and select a model callback
       await handleModel(mkCtx("/model"));
@@ -191,6 +213,7 @@ async function probeCodexFlow(): Promise<CodexFlowResult> {
         switchedToCodex: session.activeDriver === "codex",
         hasStreamingReply: replies.some((r) => r.includes("Streaming Codex reply")),
         askUserButtonsShown: replies.some((r) => r.includes("❓ Pick one")),
+        botControlRequestCompleted,
         modelPickerShowsCodexButtons: keyboardCallbacks.some((c) => c.startsWith("codex_model:")),
         modelSelectionStartedFreshThread: startThreadCalls >= 2,
         stopCalled: stopCalls >= 1,
@@ -201,6 +224,7 @@ async function probeCodexFlow(): Promise<CodexFlowResult> {
       console.log(marker + JSON.stringify(payload));
     } finally {
       try { await Bun.file(askUserFile).delete(); } catch {}
+      try { await Bun.file(botControlFile).delete(); } catch {}
       codexSession.startNewThread = originalStartNewThread;
       codexSession.sendMessage = originalSendMessage;
       codexSession.stop = originalStop;
@@ -245,10 +269,11 @@ describe("Codex flow integration", () => {
     expect(result.payload?.switchedToCodex).toBe(true);
     expect(result.payload?.hasStreamingReply).toBe(true);
     expect(result.payload?.askUserButtonsShown).toBe(true);
+    expect(result.payload?.botControlRequestCompleted).toBe(true);
     expect(result.payload?.modelPickerShowsCodexButtons).toBe(true);
     expect(result.payload?.modelSelectionStartedFreshThread).toBe(true);
     expect(result.payload?.stopCalled).toBe(true);
     expect(result.payload?.resumeUsesCodexCallbacks).toBe(true);
     expect(result.payload?.usageCaptured).toBe(true);
-  });
+  }, 15000);
 });

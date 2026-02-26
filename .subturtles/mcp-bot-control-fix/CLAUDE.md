@@ -1,5 +1,5 @@
 ## Current Task
-Add/adjust tests if feasible (formatting/test or unit tests for MCP handling).
+Manual verification notes in CLAUDE.md.
 
 ## End Goal with Specs
 - Codex meta agent can call bot-control without timing out.
@@ -11,13 +11,14 @@ Add/adjust tests if feasible (formatting/test or unit tests for MCP handling).
 - [x] Reproduce/trace: pending MCP request files in /tmp and Telegram output
 - [x] Fix logic so bot-control requests are processed for Codex driver
 - [x] Fix ask_user button message lifecycle so it is not deleted/overwritten
-- [ ] Add/adjust tests if feasible (formatting/test or unit tests for MCP handling) <- current
-- [ ] Manual verification notes in CLAUDE.md
+- [x] Add/adjust tests if feasible (formatting/test or unit tests for MCP handling)
+- [ ] Manual verification notes in CLAUDE.md <- current
 
 ## Notes
 User symptom: In Telegram, buttons appear briefly then disappear. Codex meta agent cannot use bot-control MCP (timeouts). Claude Code path works.
 
 Progress (2026-02-26): Codex driver now runs a concurrent MCP request pump during `sendMessage` so `/tmp/bot-control-*.json` requests are handled before MCP poll timeout. This removes the tool-call deadlock where requests were previously only processed after the turn completed.
+Progress (2026-02-26): Added Codex flow integration coverage to assert pending `bot-control` MCP requests are completed during a Codex turn, alongside existing ask_user/streaming checks.
 
 ## Files
 super_turtle/claude-telegram-bot/src/drivers/codex-driver.ts
