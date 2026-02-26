@@ -699,3 +699,237 @@ The `resetAllDriverSessions` is imported but never used. Suggests incomplete ref
 
 - [ ] Drivers: `drivers/registry.ts`, `types.ts`, `claude-driver.ts`, `codex-driver.ts`
 - [ ] MCP servers: `ask_user_mcp/`, `send_turtle_mcp/`, `bot_control_mcp/`
+
+---
+
+# Code Review Phase 4: Driver Layer
+
+**Date**: 2026-02-27
+**Files**: registry.ts, types.ts, claude-driver.ts, codex-driver.ts
+
+---
+
+## Executive Summary
+
+The driver layer is clean and simple, serving as an abstraction between handlers and session implementations. The architecture is sound, but **medium-severity issues** exist around error detection heuristics, timing assumptions, and resource cleanup patterns.
+
+**Issues Found**: 6 total
+- **Critical**: 0
+- **Medium**: 3 (error detection heuristics, timing assumptions, concurrency)
+- **Low**: 3 (code efficiency, conventions, type validation)
+
+---
+
+## Medium Issues
+
+### 1. Overly Broad Error Detection Heuristics
+
+**File**: `src/drivers/claude-driver.ts`, `src/drivers/codex-driver.ts`
+**Lines**: 38-47 (Claude), 148-160 (Codex)
+**Severity**: MEDIUM
+
+**Issue**:
+Error classification uses substring matching that could produce false positives.
+
+```typescript
+// claude-driver.ts
+isCrashError(error: unknown): boolean {
+  return String(error).includes("exited with code");  // Too specific for Claude
+}
+
+// codex-driver.ts
+isCrashError(error: unknown): boolean {
+  const errorStr = String(error).toLowerCase();
+  return errorStr.includes("crashed") || errorStr.includes("failed");  // Too broad
+}
+```
+
+**Risk**: Codex's "failed" match could catch validation errors, rate limit errors, etc. and misclassify them as crashes.
+
+**Suggested Fix**:
+```typescript
+isCrashError(error: unknown): boolean {
+  const msg = String(error).toLowerCase();
+  return msg.includes("crashed") || msg.includes("exited") || msg.includes("segmentation");
+}
+```
+
+---
+
+### 2. Tool Name Normalization Assumes Naming Convention
+
+**File**: `src/drivers/codex-driver.ts`
+**Line**: 26
+**Severity**: MEDIUM
+
+**Issue**:
+The driver normalizes tool names by replacing `-` with `_`, assuming a specific naming convention.
+
+```typescript
+const normalizedTool = tool.replace(/-/g, "_");
+
+if (normalizedTool === "ask_user") { ... }
+if (normalizedTool === "send_turtle") { ... }
+if (normalizedTool === "bot_control") { ... }
+```
+
+**Risk**: If MCP tool names change from kebab-case to camelCase or other formats, matching silently fails.
+
+**Suggested Fix**:
+```typescript
+const normalizedTool = tool.toLowerCase().replace(/[-_]/g, "_");
+console.log(`Processing MCP tool: ${tool} (normalized: ${normalizedTool})`);
+```
+
+---
+
+### 3. Timing Assumptions in MCP Polling
+
+**File**: `src/drivers/codex-driver.ts`
+**Lines**: 32, 54, 73, 123
+**Severity**: MEDIUM
+
+**Issue**:
+The driver uses hardcoded delays (200ms initial, 100ms retry, 300ms final) to wait for MCP server file writes. These are fragile timing assumptions.
+
+```typescript
+// Small delay to let MCP server write the file
+await new Promise((resolve) => setTimeout(resolve, 200));
+
+// Retry a few times in case of timing issues
+for (let attempt = 0; attempt < 3; attempt++) {
+  const buttonsSent = await checkPendingAskUserRequests(...);
+  if (buttonsSent) {
+    return true;  // Only breaks if successful
+  }
+  if (attempt < 2) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+```
+
+**Risk**: On slow systems, 200ms might not be enough; on fast systems, it's wasted time.
+
+**Suggested Fix**:
+- Use file existence/content change detection instead of fixed delays
+- Or make delays configurable via environment variables
+- Or implement exponential backoff
+
+---
+
+## Low Issues
+
+### 4. Code Duplication: Triple Pending Checks
+
+**File**: `src/drivers/codex-driver.ts`
+**Lines**: 92-105 (polling loop), 124-131 (final flush)
+**Severity**: LOW
+
+**Issue**:
+The same pending request checks are done three times:
+1. In the background polling loop (lines 95-97)
+2. After sendMessage (lines 125-127)
+3. In MCP completion callback (lines 25-89)
+
+This is intentional for robustness but creates maintenance burden.
+
+**Suggested Fix**:
+Extract the check sequence into a helper function:
+```typescript
+async function flushPendingMcpRequests() {
+  await checkPendingAskUserRequests(ctx, chatId);
+  await checkPendingSendTurtleRequests(ctx, chatId);
+  await checkPendingBotControlRequests(codexSession, chatId);
+}
+```
+
+---
+
+### 5. Missing Validation: lastUsage Property Access
+
+**File**: `src/drivers/claude-driver.ts`, `src/drivers/codex-driver.ts`
+**Lines**: 50-64, 163-177
+**Severity**: LOW
+
+**Issue**:
+The drivers access `lastUsage` properties without validating structure.
+
+```typescript
+lastUsage: session.lastUsage
+  ? {
+      inputTokens: session.lastUsage.input_tokens || 0,  // Assumes property exists
+      outputTokens: session.lastUsage.output_tokens || 0,
+      cacheReadInputTokens: session.lastUsage.cache_read_input_tokens,
+    }
+  : null,
+```
+
+**Risk**: If session.lastUsage has wrong structure, runtime error occurs.
+
+**Suggested Fix**:
+```typescript
+lastUsage: session.lastUsage && typeof session.lastUsage === "object"
+  ? {
+      inputTokens: Number(session.lastUsage.input_tokens) || 0,
+      outputTokens: Number(session.lastUsage.output_tokens) || 0,
+      cacheReadInputTokens: session.lastUsage.cache_read_input_tokens,
+    }
+  : null,
+```
+
+---
+
+### 6. Global State Mutation: Process.env TELEGRAM_CHAT_ID
+
+**File**: `src/drivers/codex-driver.ts`
+**Line**: 22
+**Severity**: LOW
+
+**Issue**:
+The driver mutates global process.env to pass context to MCP handlers.
+
+```typescript
+process.env.TELEGRAM_CHAT_ID = String(input.chatId);
+```
+
+While this works (drivers are singletons), it's fragile and could cause issues if drivers were ever instantiated multiple times.
+
+**Suggested Fix**:
+- Pass chatId through Context instead of global env
+- Or use AsyncLocalStorage for context isolation
+
+---
+
+## Summary by Category
+
+| Category | Count |
+|----------|-------|
+| **Error Handling** | 1 medium |
+| **Naming/Convention** | 1 medium |
+| **Timing** | 1 medium |
+| **Code Quality** | 1 low |
+| **Validation** | 1 low |
+| **Architecture** | 1 low |
+
+---
+
+## Recommended Fixes
+
+1. **MEDIUM**: Improve error detection heuristics with more specific patterns
+2. **MEDIUM**: Validate tool names more robustly, log unexpected tools
+3. **MEDIUM**: Replace hardcoded delays with file existence checks or backoff
+4. **LOW**: Extract repeated pending check sequences into helper function
+5. **LOW**: Validate lastUsage structure before accessing properties
+6. **LOW**: Consider alternative to global process.env for passing chatId context
+
+---
+
+## Overall Code Quality Assessment
+
+**Driver Layer Summary**: Clean abstraction with solid error handling patterns. The layer successfully isolates Claude and Codex differences, making the handler layer driver-agnostic. Main issues are cosmetic (duplication) and robustness (timing assumptions).
+
+---
+
+## Files to Review Next
+
+- [ ] MCP servers: `ask_user_mcp/`, `send_turtle_mcp/`, `bot_control_mcp/` <- current
