@@ -1,5 +1,5 @@
 ## Current Task
-Fix ask_user button message lifecycle so it is not deleted/overwritten.
+Add/adjust tests if feasible (formatting/test or unit tests for MCP handling).
 
 ## End Goal with Specs
 - Codex meta agent can call bot-control without timing out.
@@ -10,8 +10,8 @@ Fix ask_user button message lifecycle so it is not deleted/overwritten.
 - [x] Inspect Codex driver flow and MCP handling (files below)
 - [x] Reproduce/trace: pending MCP request files in /tmp and Telegram output
 - [x] Fix logic so bot-control requests are processed for Codex driver
-- [ ] Fix ask_user button message lifecycle so it is not deleted/overwritten <- current
-- [ ] Add/adjust tests if feasible (formatting/test or unit tests for MCP handling)
+- [x] Fix ask_user button message lifecycle so it is not deleted/overwritten
+- [ ] Add/adjust tests if feasible (formatting/test or unit tests for MCP handling) <- current
 - [ ] Manual verification notes in CLAUDE.md
 
 ## Notes

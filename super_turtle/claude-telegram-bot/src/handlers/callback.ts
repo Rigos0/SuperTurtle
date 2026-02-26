@@ -11,7 +11,8 @@ import { codexSession } from "../codex-session";
 import { ALLOWED_USERS, WORKING_DIR, TELEGRAM_SAFE_LIMIT } from "../config";
 import { isAuthorized } from "../security";
 import { auditLog, startTypingIndicator } from "../utils";
-import { StreamingState, createStatusCallback } from "./streaming";
+import { StreamingState, createStatusCallback, isAskUserPromptMessage } from "./streaming";
+import { isAnyDriverRunning, runMessageWithActiveDriver, stopActiveDriverQuery } from "./driver-routing";
 import { escapeHtml } from "../formatting";
 import { removeJob } from "../cron";
 
@@ -73,9 +74,9 @@ export async function handleCallback(ctx: Context): Promise<void> {
 
   // 3b. Handle Codex model selection: codex_model:{model_id}
   if (callbackData.startsWith("codex_model:")) {
-    const { getAvailableCodexModels } = await import("../codex-session");
+    const { getAvailableCodexModelsLive } = await import("../codex-session");
     const modelId = callbackData.replace("codex_model:", "");
-    const models = getAvailableCodexModels();
+    const models = await getAvailableCodexModelsLive();
     const model = models.find((m) => m.value === modelId);
 
     if (model) {
@@ -123,8 +124,8 @@ export async function handleCallback(ctx: Context): Promise<void> {
         }
       }
 
-      const { getAvailableCodexModels } = await import("../codex-session");
-      const models = getAvailableCodexModels();
+      const { getAvailableCodexModelsLive } = await import("../codex-session");
+      const models = await getAvailableCodexModelsLive();
       const model = models.find((m) => m.value === codexSession.model);
       const modelName = model?.displayName || codexSession.model;
       await ctx.editMessageText(`<b>Codex Model:</b> ${modelName}\n<b>Reasoning Effort:</b> ${effort}`, { parse_mode: "HTML" });
@@ -257,9 +258,9 @@ export async function handleCallback(ctx: Context): Promise<void> {
   const message = selectedOption;
 
   // Interrupt any running query - button responses are always immediate
-  if (session.isRunning) {
+  if (isAnyDriverRunning()) {
     console.log("Interrupting current query for button response");
-    await session.stop();
+    await stopActiveDriverQuery();
     // Small delay to ensure clean interruption
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
@@ -272,20 +273,21 @@ export async function handleCallback(ctx: Context): Promise<void> {
   const statusCallback = createStatusCallback(ctx, state);
 
   try {
-    const response = await session.sendMessageStreaming(
+    const response = await runMessageWithActiveDriver({
       message,
       username,
       userId,
-      statusCallback,
       chatId,
-      ctx
-    );
+      ctx,
+      statusCallback,
+    });
 
     await auditLog(userId, username, "CALLBACK", message, response);
   } catch (error) {
     console.error("Error processing callback:", error);
 
     for (const toolMsg of state.toolMessages) {
+      if (isAskUserPromptMessage(toolMsg)) continue;
       try {
         await ctx.api.deleteMessage(toolMsg.chat.id, toolMsg.message_id);
       } catch (error) {

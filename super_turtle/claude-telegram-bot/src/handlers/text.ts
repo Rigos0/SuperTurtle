@@ -21,6 +21,7 @@ import {
   checkPendingAskUserRequests,
   checkPendingSendTurtleRequests,
   checkPendingBotControlRequests,
+  isAskUserPromptMessage,
 } from "./streaming";
 
 export interface HandleTextOptions {
@@ -164,6 +165,7 @@ export async function handleText(
         const errorSummary = summarizeErrorMessage(error);
         // Clean up any partial messages from this attempt
         for (const toolMsg of state.toolMessages) {
+          if (isAskUserPromptMessage(toolMsg)) continue;
           try {
             await ctx.api.deleteMessage(toolMsg.chat.id, toolMsg.message_id);
           } catch {
@@ -266,6 +268,7 @@ export async function handleText(
 
           // Clean up any partial messages from this attempt
           for (const toolMsg of state.toolMessages) {
+            if (isAskUserPromptMessage(toolMsg)) continue;
             try {
               await ctx.api.deleteMessage(toolMsg.chat.id, toolMsg.message_id);
             } catch {
@@ -337,6 +340,7 @@ export async function handleText(
 
           // Clean up any partial messages from this attempt
           for (const toolMsg of state.toolMessages) {
+            if (isAskUserPromptMessage(toolMsg)) continue;
             try {
               await ctx.api.deleteMessage(toolMsg.chat.id, toolMsg.message_id);
             } catch {

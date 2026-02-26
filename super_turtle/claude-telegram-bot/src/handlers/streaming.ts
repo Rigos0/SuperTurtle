@@ -22,6 +22,17 @@ import { getUsageLines, getCommandLines, formatModelInfo, formatUnifiedUsage, ge
 import { CODEX_ENABLED } from "../config";
 
 /**
+ * Ask-user prompt messages use inline keyboards and must stay visible
+ * until the user taps an option.
+ */
+export function isAskUserPromptMessage(msg: Message): boolean {
+  const inlineKeyboard = (msg as Message & {
+    reply_markup?: { inline_keyboard?: unknown[] };
+  }).reply_markup?.inline_keyboard;
+  return Array.isArray(inlineKeyboard) && inlineKeyboard.length > 0;
+}
+
+/**
  * Create inline keyboard for ask_user options.
  */
 export function createAskUserKeyboard(
@@ -69,11 +80,13 @@ export async function checkPendingAskUserRequests(
 
       if (options.length > 0 && requestId) {
         const keyboard = createAskUserKeyboard(requestId, options);
-        await ctx.reply(`❓ ${question}`, { reply_markup: keyboard });
+        const sentMsg = await ctx.reply(`❓ ${question}`, { reply_markup: keyboard });
         buttonsSent = true;
 
         // Mark as sent
         data.status = "sent";
+        data.sent_message_id = sentMsg.message_id;
+        data.sent_at = new Date().toISOString();
         await Bun.write(filepath, JSON.stringify(data));
       }
     } catch (error) {
@@ -392,8 +405,19 @@ export function createStatusCallback(
         });
         state.toolMessages.push(thinkingMsg);
       } else if (statusType === "tool") {
-        const toolMsg = await ctx.reply(content, { parse_mode: "HTML" });
-        state.toolMessages.push(toolMsg);
+        const escaped = escapeHtml(content);
+        try {
+          const toolMsg = await ctx.reply(escaped, { parse_mode: "HTML" });
+          state.toolMessages.push(toolMsg);
+        } catch (htmlError) {
+          // HTML parse failed (unexpected entity edge case) - try plain text
+          console.debug(
+            "HTML tool status failed, using plain text:",
+            htmlError
+          );
+          const toolMsg = await ctx.reply(content);
+          state.toolMessages.push(toolMsg);
+        }
       } else if (statusType === "text" && segmentId !== undefined) {
         const now = Date.now();
         const lastEdit = state.lastEditTimes.get(segmentId) || 0;
@@ -501,6 +525,9 @@ export function createStatusCallback(
       } else if (statusType === "done") {
         // Delete tool messages - text messages stay
         for (const toolMsg of state.toolMessages) {
+          if (isAskUserPromptMessage(toolMsg)) {
+            continue;
+          }
           try {
             await ctx.api.deleteMessage(toolMsg.chat.id, toolMsg.message_id);
           } catch (error) {
