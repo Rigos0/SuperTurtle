@@ -1,5 +1,5 @@
 ## Current Task
-Write Chapter 3: "The Shore" — the turtle arrives at the nesting beach, alone but alive.
+Final read-through: fix inconsistencies, tighten prose, add an epigraph.
 
 ## End Goal with Specs
 A complete 3-chapter short novella (~2000 words total) in Markdown format at `books/the-old-turtle-and-the-sea.md`. Each chapter should be 500-700 words. Literary fiction style — sparse, muscular prose. The turtle is the protagonist navigating storms, predators, and solitude.
@@ -8,8 +8,8 @@ A complete 3-chapter short novella (~2000 words total) in Markdown format at `bo
 - [x] Create `books/` directory and `books/the-old-turtle-and-the-sea.md` with title page
 - [x] Write Chapter 1: "The Current" — the turtle begins a migration across the Pacific
 - [x] Write Chapter 2: "The Storm" — a typhoon separates the turtle from its group
-- [ ] Write Chapter 3: "The Shore" — the turtle arrives at the nesting beach, alone but alive <- current
-- [ ] Final read-through: fix inconsistencies, tighten prose, add an epigraph
+- [x] Write Chapter 3: "The Shore" — the turtle arrives at the nesting beach, alone but alive
+- [ ] Final read-through: fix inconsistencies, tighten prose, add an epigraph <- current
 - [ ] Commit the finished book
 
 ## Notes

@@ -59,3 +59,31 @@ His shell ached. His flipper did not work. The hunger was back, heavier now, com
 He did not know how long it would take now. Months, still, probably. Months of moving with three working flippers. Months of hunger and pain and solitude.
 
 He swam forward anyway. There was nothing else to do.
+
+## Chapter 3: The Shore
+
+The beach came to him in stages. First, the water changed color—from the deep black of the open ocean to a blue-green that meant the bottom was rising. Then came the smell, something green and alive and nothing like the salt and emptiness he had known for so long. The current shifted. The sand began to whisper beneath him.
+
+He had been swimming for four months. The numbers meant nothing to him, but his body knew. The missing flipper had cost him. The injured one, worse. He had learned to move through the water like a broken thing, all asymmetry and compromise, but it had been enough. The ocean had not killed him. This was enough.
+
+As the water shallowed, his damaged flippers touched bottom. He rested. He had not rested in months. The sensation of sand beneath his shell was strange, solid after the endless emptiness, and he did not know if he liked it. He did not know if he could move on land anymore. His left rear flipper was useless—bent wrong, the bone healed badly. But he had come this far. He had crossed the Pacific on three working limbs and will.
+
+The sand was warm. The sun was sinking toward the horizon, and the light had turned the water gold. He could see other turtles now, scattered along the slope of the beach, some already on the sand above the waterline. They had made it. Some of them, anyway. The ocean had sorted through them, and the survivors were here.
+
+He pushed forward, riding the small waves toward the shore. His flippers struck sand instead of water, and he clawed at it, dragging his weight forward with movements that were not quite swimming anymore. The beach rose beneath him. His shell was above the waterline now, exposed to air for the first time in months. It felt heavy.
+
+The crawl up the beach was agony. Each movement was a negotiation between what his body wanted and what it could do. He was eighty-four years old. He was old, and he was broken, and he had traveled further than he thought possible. But the knowledge that had sent him across the ocean was pulling him still. Not to the water's edge. Higher.
+
+Around him, other turtles worked through the same struggle. Some had made it. Some had not. He did not think about the ones that had not.
+
+The sand beneath him finally reached a place that felt right. It was above the highest tide mark, protected, firm. He began to dig. His flippers, the broken and the still-working, drove into the sand. It was exhausting work, and he was exhausted, but something in his blood knew how to do this. This was why he had come. This was why the ocean had kept him alive.
+
+He dug deeper. The sand was cool here, out of the sun. He laid his eggs in the darkness of the hole, one by one, each one a promise that the journey had meant something. When he was done, he filled the hole and covered it. No mark remained. To the eye of anything hunting, this stretch of beach was indistinguishable from any other.
+
+The sun was gone now. The stars were coming out, and they were the same stars he had seen from the open ocean, but different—sharper, closer, framed by the curve of the land. He did not move. His body would not move again for a long time. The journey was over.
+
+He had made it alone. The other turtles that had started with him—he did not know where they were, if they were alive, if any of them had made this beach. It did not matter. What mattered was this: he had survived the storm. He had crossed the distance. He had fulfilled the thing in his blood that told him who he was.
+
+The ocean was still there, just beyond the reach of the tide. It had tried to kill him, and it had not. That was a kind of victory.
+
+The old turtle rested on the beach, under stars, and in the morning, he would rest some more.
