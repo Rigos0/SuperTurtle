@@ -90,3 +90,31 @@ And so the histories later called him First Builder, and called also the Benevol
 > He did not make the world by command.
 >  
 > He gave it a song, and taught it the courage to keep singing itself into form.
+
+## Chapter 2: The Kingdoms
+
+When the first ages waned and the waters had learned the manners of tide, the turtle-clans descended to the floor below, where basalt fires cooled into dark mirrors and silence held memory as still water holds moon.
+
+There they found not emptiness but a patient realm. In patient circles came the houses, each bearing its name and burden. Cheloneth of the Glass-Waters led the first builders, and Selenrata rose from ringed basalt and coral-bone, its streets set to turning currents and its halls breathing warm fire from vents below.
+
+To the west, Auralis answered pressure itself. There, children of Cheloria tuned vast bells into the bones of the deep. Its streets were marked not by line but by pitch, and each quarter knew its way by song.
+
+In the southern ridges, Kheledath took a sterner path. The fierce blood of Chelónès taught stone to be both shield and oath. They forged shell into scales and kept no armies unless required, for they had seen what anger becomes where depth has no witness.
+
+Northward rose Ilyssar by Cheladri’s seed. Its scribes pressed pearl-dust into clay and traced currents for three generations ahead. For the first time, memory became record: births, tides, warnings, and the signs of old vents burning too long.
+
+For long centuries they traded in peace. A basin at the Nine Steps became their meeting-place, and an Accord was sworn: no city would starve another, no gate would close without counsel, no captain would turn a current to private war. Prosperity came, and with it a slower appetite for restraint.
+
+Then came the first soft fracture. Counselors of blood argued that law belonged to the oldest carapace, not the oldest vow. In Selenrata, some demanded greater rights for builders. In Kheledath, some argued for permanent watch and full levy. In Auralis, bell-masters asked why far cities should summon them in every need. In Ilyssar, some hid ledgers from those who could not pay.
+
+Trade diminished though no embargo was named. Envoys waited longer at outer gates. Gates that once opened with little ceremony now bore layered watch-signs. In the dark between visits, old songs were recited less for joy and more as proof. A small wound can be named at once; a small pride is harder to tend.
+
+The Accord remained, but thinner.
+
+Chelónatar rose once more from the abyss and set before them three gifts: a black pebble, a strip of pale shell, and a bowl of still water. He gave none speech. “Hold weight,” he said to Selenrata. “Hold song,” he said to Auralis. “Hold what the eye cannot yet see,” he said to Ilyssar.
+
+Each city returned with greater care: gates reopened, measures restored, and bells once more called across the wide trench-line. Yet beneath their work the deeps stirred. From old basalt seams arose black streams of flame-veined water and shapes no turtle yet named.
+
+The kingdoms spent one more age in uneasy truce, strengthening walls and teaching children both the old songs and a new lesson: the deep breaks first those who break one another.
+
+No kingdom fell. Yet the deep did not heal. It waited, and watched.
