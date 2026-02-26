@@ -1,5 +1,5 @@
 ## Current Task
-Test: run bot directly with `bun run src/index.ts`, send `/restart`, verify bot comes back.
+All backlog items complete.
 
 ## End Goal with Specs
 `/restart` must work regardless of how the bot was launched (directly via `bun run src/index.ts` OR via `run-loop.sh`). After restart, the bot should:
@@ -59,8 +59,8 @@ This way:
 - [x] Add `.restart-self` marker file write in `handleRestart()` before spawning
 - [x] Replace `process.exit(0)` with: spawn detached child using `process.argv`, then exit
 - [x] Update `run-loop.sh` to check for `.restart-self` marker and exit cleanly if found
-- [ ] Test: run bot directly with `bun run src/index.ts`, send `/restart`, verify bot comes back <- current
-- [ ] Commit with clear message
+- [x] Test: run bot directly with `bun run src/index.ts`, send `/restart`, verify bot comes back
+- [x] Commit with clear message
 
 ## Notes
 - File: `super_turtle/claude-telegram-bot/src/handlers/commands.ts` — function `handleRestart()` (line ~1512)
@@ -68,3 +68,6 @@ This way:
 - The RESTART_FILE (`.restart-pending.json`) logic for updating the "Restarting..." message should remain unchanged
 - `process.argv` in Bun gives the full command used to start, e.g. `["bun", "run", "src/index.ts"]`
 - Use `cwd` of the bot directory (resolve from `import.meta.dir`)
+
+## Loop Control
+STOP
