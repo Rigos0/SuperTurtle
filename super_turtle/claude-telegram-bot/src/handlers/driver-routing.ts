@@ -1,7 +1,8 @@
 import type { Context } from "grammy";
 import { DRIVER_ABSTRACTION_V1 } from "../config";
 import { codexSession, mapThinkingToReasoningEffort } from "../codex-session";
-import { getCurrentDriver } from "../drivers/registry";
+import { getCurrentDriver, getDriver } from "../drivers/registry";
+import type { DriverId } from "../drivers/types";
 import { session } from "../session";
 import type { StatusCallback } from "../types";
 import {
@@ -17,6 +18,17 @@ export interface DriverMessageInput {
   chatId: number;
   ctx: Context;
   statusCallback: StatusCallback;
+}
+
+export function isLikelyQuotaOrLimitError(error: unknown): boolean {
+  const text = String(error).toLowerCase();
+  return (
+    text.includes("quota") ||
+    text.includes("usage") ||
+    text.includes("rate limit") ||
+    text.includes("limit reached") ||
+    text.includes("insufficient")
+  );
 }
 
 async function flushCodexMcpRequests(ctx: Context, chatId: number): Promise<void> {
@@ -51,11 +63,18 @@ async function flushCodexMcpRequests(ctx: Context, chatId: number): Promise<void
 export async function runMessageWithActiveDriver(
   input: DriverMessageInput
 ): Promise<string> {
+  return runMessageWithDriver(session.activeDriver, input);
+}
+
+export async function runMessageWithDriver(
+  driverId: DriverId,
+  input: DriverMessageInput
+): Promise<string> {
   if (DRIVER_ABSTRACTION_V1) {
-    return getCurrentDriver().runMessage(input);
+    return getDriver(driverId).runMessage(input);
   }
 
-  if (session.activeDriver === "codex") {
+  if (driverId === "codex") {
     const reasoningEffort = mapThinkingToReasoningEffort(input.message);
     const response = await codexSession.sendMessage(
       input.message,

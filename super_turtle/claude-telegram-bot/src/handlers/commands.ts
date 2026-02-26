@@ -56,18 +56,32 @@ export function formatModelInfo(model: string, effort: string): { modelName: str
 
 export function getSettingsOverviewLines(): string[] {
   const { modelName, effortStr } = formatModelInfo(session.model, session.effort);
-  const driverLabel = session.activeDriver === "codex" ? "Codex 🟢" : "Claude 🔵";
+  const isCodex = session.activeDriver === "codex";
+  const driverLabel = isCodex ? "Codex 🟢" : "Claude 🔵";
   const metaPromptPath = `${WORKING_DIR}/super_turtle/meta/META_SHARED.md`;
+  const activeModelLine = isCodex
+    ? `<b>Meta agent model:</b> ${escapeHtml(codexSession.model)} | effort: ${escapeHtml(codexSession.reasoningEffort)}`
+    : `<b>Meta agent model:</b> ${modelName}${effortStr}`;
 
   return [
     `<b>Current Settings</b>`,
     `<b>Active driver:</b> ${driverLabel}`,
-    `<b>Claude model:</b> ${modelName}${effortStr}`,
-    `<b>Codex model:</b> ${escapeHtml(codexSession.model)} | effort: ${escapeHtml(codexSession.reasoningEffort)}`,
+    activeModelLine,
     `<b>Meta agent prompt:</b> ${META_PROMPT ? "loaded" : "missing"} (<code>${escapeHtml(metaPromptPath)}</code>)`,
     `<b>Driver routing:</b> ${DRIVER_ABSTRACTION_V1 ? "abstraction-v1" : "legacy"}`,
     `<b>Dir:</b> <code>${escapeHtml(WORKING_DIR)}</code>`,
   ];
+}
+
+export async function buildSessionOverviewLines(title: string): Promise<string[]> {
+  const lines: string[] = [`<b>${title}</b>\n`, ...getSettingsOverviewLines(), ""];
+  const [usageLines, codexQuotaLines] = await Promise.all([
+    getUsageLines(),
+    CODEX_ENABLED ? getCodexQuotaLines() : Promise.resolve<string[]>([]),
+  ]);
+  lines.push(formatUnifiedUsage(usageLines, codexQuotaLines, CODEX_ENABLED), "");
+  lines.push(`<b>Commands:</b>`, ...getCommandLines());
+  return lines;
 }
 
 type ListedSubTurtle = {
@@ -218,32 +232,28 @@ export async function handleNew(ctx: Context): Promise<void> {
     return;
   }
 
-  // Stop any running query
-  session.stopTyping();
-  if (isAnyDriverRunning()) {
-    const result = await stopActiveDriverQuery();
-    if (result) {
-      await Bun.sleep(100);
-      session.clearStopRequested();
+  await resetAllDriverSessions({ stopRunning: true });
+
+  // Build message
+  const lines = await buildSessionOverviewLines("New session");
+
+  await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
+}
+
+export async function resetAllDriverSessions(opts?: { stopRunning?: boolean }): Promise<void> {
+  if (opts?.stopRunning) {
+    session.stopTyping();
+    if (isAnyDriverRunning()) {
+      const result = await stopActiveDriverQuery();
+      if (result) {
+        await Bun.sleep(100);
+        session.clearStopRequested();
+      }
     }
   }
 
-  // Clear sessions for both drivers
   await session.kill();
   await codexSession.kill();
-
-  // Build message
-  const lines: string[] = [`<b>New session</b>\n`, ...getSettingsOverviewLines(), ""];
-
-  // Fetch usage (non-blocking — show what we can)
-  const usageLines = await getUsageLines();
-  if (usageLines.length > 0) {
-    lines.push(...usageLines, "");
-  }
-
-  lines.push(`<b>Commands:</b>`, ...getCommandLines());
-
-  await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
 }
 
 /**
@@ -680,54 +690,46 @@ export async function handleSwitch(ctx: Context): Promise<void> {
     // No argument — show options
     const currentDriver = session.activeDriver;
     const driverEmoji = currentDriver === "codex" ? "🟢" : "🔵";
-    await ctx.reply(
-      `${getSettingsOverviewLines().join("\n")}\n\n` +
-        `<b>Current driver:</b> ${currentDriver} ${driverEmoji}\n\n` +
-        `Switch to:`,
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: `${currentDriver === "claude" ? "✔ " : ""}Claude Code 🔵`,
-                callback_data: "switch:claude",
-              },
-            ],
-            [
-              {
-                text: `${currentDriver === "codex" ? "✔ " : ""}Codex 🟢`,
-                callback_data: "switch:codex",
-              },
-            ],
+    await ctx.reply(`<b>Current driver:</b> ${currentDriver} ${driverEmoji}\n\nSwitch to:`, {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: `${currentDriver === "claude" ? "✔ " : ""}Claude Code 🔵`,
+              callback_data: "switch:claude",
+            },
           ],
-        },
-      }
-    );
+          [
+            {
+              text: `${currentDriver === "codex" ? "✔ " : ""}Codex 🟢`,
+              callback_data: "switch:codex",
+            },
+          ],
+        ],
+      },
+    });
     return;
   }
 
   // Direct switch via argument
   if (target === "claude") {
+    await resetAllDriverSessions({ stopRunning: true });
     session.activeDriver = "claude";
-    await ctx.reply(`✅ Switched to Claude Code 🔵\n\n${getSettingsOverviewLines().join("\n")}`, {
-      parse_mode: "HTML",
-    });
+    const lines = await buildSessionOverviewLines("Switched to Claude Code 🔵");
+    await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
   } else if (target === "codex") {
-    session.activeDriver = "codex";
+    await resetAllDriverSessions({ stopRunning: true });
     try {
-      // Initialize Codex session if needed
-      if (!codexSession.isActive) {
-        await codexSession.startNewThread();
-      }
+      // Fail fast: ensure Codex is available after reset.
+      await codexSession.startNewThread();
+      session.activeDriver = "codex";
     } catch (error) {
-      session.activeDriver = "claude"; // Fallback on error
       await ctx.reply(`❌ Failed to switch to Codex: ${String(error).slice(0, 100)}`);
       return;
     }
-    await ctx.reply(`✅ Switched to Codex 🟢\n\n${getSettingsOverviewLines().join("\n")}`, {
-      parse_mode: "HTML",
-    });
+    const lines = await buildSessionOverviewLines("Switched to Codex 🟢");
+    await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
   } else {
     await ctx.reply(`❌ Unknown driver: ${target}. Use /switch claude or /switch codex`);
   }

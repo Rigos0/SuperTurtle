@@ -15,7 +15,8 @@ import { StreamingState, createStatusCallback, isAskUserPromptMessage } from "./
 import { isAnyDriverRunning, runMessageWithActiveDriver, stopActiveDriverQuery } from "./driver-routing";
 import { escapeHtml } from "../formatting";
 import { removeJob } from "../cron";
-import { getSettingsOverviewLines } from "./commands";
+import { buildSessionOverviewLines } from "./commands";
+import { resetAllDriverSessions } from "./commands";
 
 /**
  * Handle callback queries from inline keyboards.
@@ -145,16 +146,18 @@ export async function handleCallback(ctx: Context): Promise<void> {
   if (callbackData.startsWith("switch:")) {
     const driver = callbackData.replace("switch:", "") as "claude" | "codex";
     if (driver === "claude") {
+      await resetAllDriverSessions({ stopRunning: true });
       session.activeDriver = "claude";
-      await ctx.editMessageText(getSettingsOverviewLines().join("\n"), { parse_mode: "HTML" });
+      const lines = await buildSessionOverviewLines("Switched to Claude Code 🔵");
+      await ctx.editMessageText(lines.join("\n"), { parse_mode: "HTML" });
       await ctx.answerCallbackQuery({ text: "Switched to Claude Code" });
     } else if (driver === "codex") {
       try {
-        if (!codexSession.isActive) {
-          await codexSession.startNewThread();
-        }
+        await resetAllDriverSessions({ stopRunning: true });
+        await codexSession.startNewThread();
         session.activeDriver = "codex";
-        await ctx.editMessageText(getSettingsOverviewLines().join("\n"), { parse_mode: "HTML" });
+        const lines = await buildSessionOverviewLines("Switched to Codex 🟢");
+        await ctx.editMessageText(lines.join("\n"), { parse_mode: "HTML" });
         await ctx.answerCallbackQuery({ text: "Switched to Codex" });
       } catch (error) {
         await ctx.answerCallbackQuery({ text: `Codex error: ${String(error).slice(0, 50)}` });
