@@ -1,46 +1,53 @@
-# The Shellmarillion, Book I: The Song of the Hallowed Shell
+# The Shellmarillion, Book I: The Song of the First Shell
 
-In the age before age, before light sought witness in darkness, there was only the Still-Water, wide and listening.
-Above it stood the Timeless One whose mind was older than the first fire and swifter than the first dawn. He spoke once, and in that speaking was a summons:  
+In the age before first ages, ere thought had a face to bear, there lay only the Great Silence and the Wide Water beneath it, dark as dream and patient beyond reckoning.  
+There sat Ilúvatar above the deeps, and in His thought were more than stars; there was hunger for making, and it burned.
 
-“Let there be song.”
+And It came to pass that He spoke:  
 
-Then came forth the Ainur, bright spirits of the First Mind, and gathered as a ring in the silence above the deeps.
-From their choirs arose wind and tide, shade and ember, and form awoke.
+“Let us sing.”
 
-First sang Oromë, and at his bright cry leaped forth Oromíë, Turtle of Beginnings.
-Where her shell passed, stone remembered its burden and yielded valleys, ridges, and sleeping loams.
-Then Nánë sang in silver cadence, and pale shells rose from nowhere and drifted in ordered rings, becoming the first measure of heavens.
+And the Ainur were wakened from the silence, bright as flame and cold as moonfire. They took their stations in a ring above the dark, and their voices were as many streams descending one stone-choir.  
+Out of their song rose wind, and out of wind came tide; out of tide rose shadow, ember, and shape.
 
-Their song persisted, and each harmony birthed a world within a world.
-A note of Varda set pearl-lights to the dark, and they took stations as stars.
-Another note from Tulkas rang like laughter, and from that ringing came warm places for fire to gather.
-Thus by singing did the Choir weave a dwelling for futures not yet dreamed.
+And Oromë took his harp first, and made a keen music of awakening.  
+From his measure leapt forth Oromyel, Turtle of the First Burden, who bore the weight of valleys and the first memory of stone. Wherever her shell brushed the waiting deep, ridges rose and hollows accepted water, and mountains learned the stillness of being.
 
-Last among the proudest strode Melkor, lion-hearted and hard.
-He sought not only beauty but mastery, and he struck the deep with iron delight.
-From that wound arose a blackened ridge, and for a season the waters fled their appointed courses.
-Yet the Great One did not unmake him. He bent the roughness not by rage, but by a mercy long as winter stars.
-Thus was sorrow turned, not spared.
+Then Nárë, the silver-tongued, sang in a slender and patient cadence, and pale shells gathered from nowhere into circles within circles, as beads upon an unseen thread.  
+So were the first heavens measured, and their pathways set in quiet law.
 
-Then answered gentler minds, Tulkas in laughter and Nienor in clear waters.
-Their voices met as brook and bank.
-Discord was not cast away; it was given task.
+Then Varda sang once. The deep took light as if a veil had been torn from the face of night. Pearled fire came to the waters, and that fire stood steadfast as stars.  
+Then Tulkas laughed in joy, and where he touched, heat found hearth and flame found a place to stay.
 
-The world opened wider.
-Sea found coast; coast found river; wind found wings where mountain and marsh had no names.
-One vast Turtle rose from the dark, patient as epochs, and bore in shell the turning of seasons.
-In secret tongue the Choir named him Valandor, Wanderer Between Days, for by his revolving stride daylight and night were weighed and returned.
+So the Choir wrought out the world by will and song, and the world answered them in wonder.
 
-From the grinding of shelled backs against basalt and foam came the first gardens.
-In their mud stood the First Tree, and in its rings the song lay hidden like prophecy.
-By each ring the shell-memory learned that every joy casts a shadow, and every shadow teaches.
+Last came Melkor in pride. He came late, and came in might, and made his note a hard, bright wheel that tore at the borderlands of the making.  
+He struck the deep with wrath for dominion, and a long dark spine of ruin rose where calm seas had wandered.  
+Then the waters scattered, and many things were disordered.
 
-Long ages passed before the first peoples heard the old chorus.
-Yet those with patient listening caught a deeper rhythm beneath storm and tide.
+Yet not by unmaking was His will answered, but by mercy older than grief.  
+Ilúvatar heard the dissonance and wove it into the pattern, setting it hard as iron lest it be forgotten, and so the broken thing endured, that it might teach.
 
-So it is told to-watchful folk that the world is not yet ended, for the Song does not cease.
-It is sung by many voices, and beneath all is the turning of shelled choirs in hidden deep.
-When dread comes, remember the Shell of Beginnings.  
-When your road is broken, attend the patient tracks of the turtle beneath your feet.  
-For in the end, endurance is the highest victory, and the patient earth is stronger than proud thunder.
+Yavanna and Nienna answered with voices like moss and rain; their tones were soft, and no less potent for gentleness.  
+The Choir did not cast discord away. It bent it toward the edge of the great design, and from that turning came paths no proud heart had dreamed.
+
+Then the world grew broad beneath the song.  
+Sea found coast and coast found river; wind found wings where there had been no hills to raise them. Marsh and mountain and plain stood forth in succession, each accepting its own name in secret.
+
+And from the deep arose a single ancient turtle, vast as a darkened moon, who bore upon his shell the wheel of seasons.  
+The Choir named him Valandor, the Bearer-Between-Days.  
+By his patient going, daylight and darkness were weighed and returned in their seasons.
+
+From the grinding of shell and stone came the first gardens.  
+The mud of their making remembered and held the hymn in rings, and in that pattern rose the first Tree, whose bark was old as longing and whose leaves spoke the future as wind speaks the sea.
+
+Long were the years ere the Children of Later-Era heard that first song, and some heard it only as thunder, and some as comfort.  
+Yet the sharpest-heard among them knew another music beneath the noise of weather and sorrow: a turning, low and unyielding, as of shells beneath the sea.
+
+Thus is it told in the elder tongue, as we have heard it from elder ears:  
+The Song did not cease when the first choirs were stilled.  
+It abides in the hidden places, and where the world seems broken, it yet endures.
+
+Where fear has made your road hard, remember the Shell of Beginnings.  
+Where pride has bent your purpose awry, look to the patient track of turtle-belly upon stone.  
+For in the end, endurance is the oldest wisdom, and the longest mercy of the earth is made of patient backs and keeping time.
