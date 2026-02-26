@@ -1,5 +1,4 @@
 import { codexSession, mapThinkingToReasoningEffort } from "../codex-session";
-import { session } from "../session";
 import type { ChatDriver, DriverRunInput, DriverStatusSnapshot } from "./types";
 
 async function wait(ms: number): Promise<void> {
@@ -26,7 +25,7 @@ export class CodexDriver implements ChatDriver {
         try {
           await checkPendingAskUserRequests(input.ctx, input.chatId);
           await checkPendingSendTurtleRequests(input.ctx, input.chatId);
-          await checkPendingBotControlRequests(session, input.chatId);
+          await checkPendingBotControlRequests(codexSession, input.chatId);
         } catch (error) {
           console.warn("Failed to process pending Codex MCP request:", error);
         }
@@ -53,7 +52,7 @@ export class CodexDriver implements ChatDriver {
     await wait(100);
     await checkPendingAskUserRequests(input.ctx, input.chatId);
     await checkPendingSendTurtleRequests(input.ctx, input.chatId);
-    await checkPendingBotControlRequests(session, input.chatId);
+    await checkPendingBotControlRequests(codexSession, input.chatId);
 
     return response;
   }

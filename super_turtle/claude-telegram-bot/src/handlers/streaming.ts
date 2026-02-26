@@ -15,11 +15,15 @@ import {
   STREAMING_THROTTLE_MS,
   BUTTON_LABEL_MAX_LENGTH,
   WORKING_DIR,
+  CODEX_ENABLED,
 } from "../config";
 import type { ClaudeSession } from "../session";
+import type { CodexSession } from "../codex-session";
 import { bot } from "../bot";
 import { getUsageLines, getCommandLines, formatModelInfo, formatUnifiedUsage, getCodexQuotaLines } from "./commands";
-import { CODEX_ENABLED } from "../config";
+
+// Union type for bot control to work with both Claude and Codex sessions
+type BotControlSession = ClaudeSession | CodexSession;
 
 /**
  * Ask-user prompt messages use inline keyboards and must stay visible
@@ -158,7 +162,7 @@ export async function checkPendingSendTurtleRequests(
  * after receiving the tool result.
  */
 export async function checkPendingBotControlRequests(
-  sessionObj: ClaudeSession,
+  sessionObj: BotControlSession,
   chatId: number,
 ): Promise<boolean> {
   const glob = new Bun.Glob("bot-control-*.json");
@@ -206,7 +210,7 @@ export async function checkPendingBotControlRequests(
  * Execute a single bot-control action and return a text result.
  */
 async function executeBotControlAction(
-  sessionObj: ClaudeSession,
+  sessionObj: BotControlSession,
   action: string,
   params: Record<string, string>,
   chatId?: number,
@@ -225,39 +229,94 @@ async function executeBotControlAction(
     }
 
     case "switch_model": {
-      const { getAvailableModels } = await import("../session");
-      const models = getAvailableModels();
+      // Determine if this is a Codex or Claude session
+      const isCodexSession = "reasoningEffort" in sessionObj;
 
       if (params.model) {
         const requestedModel = params.model;
-        const match = models.find(
-          (m) =>
-            m.value === requestedModel ||
-            m.displayName.toLowerCase() === requestedModel.toLowerCase(),
-        );
-        if (!match) {
-          const valid = models.map((m) => `${m.displayName} (${m.value})`).join(", ");
-          return `Unknown model "${requestedModel}". Available: ${valid}`;
+
+        if (isCodexSession) {
+          // For Codex: get available Codex models
+          const { getAvailableCodexModels } = await import("../codex-session");
+          const codexModels = getAvailableCodexModels();
+          const match = codexModels.find(
+            (m) =>
+              m.value === requestedModel ||
+              m.displayName.toLowerCase() === requestedModel.toLowerCase(),
+          );
+          if (!match) {
+            const valid = codexModels.map((m) => `${m.displayName} (${m.value})`).join(", ");
+            return `Unknown Codex model "${requestedModel}". Available: ${valid}`;
+          }
+          (sessionObj as CodexSession).model = match.value;
+        } else {
+          // For Claude: get available Claude models
+          const { getAvailableModels } = await import("../session");
+          const models = getAvailableModels();
+          const match = models.find(
+            (m) =>
+              m.value === requestedModel ||
+              m.displayName.toLowerCase() === requestedModel.toLowerCase(),
+          );
+          if (!match) {
+            const valid = models.map((m) => `${m.displayName} (${m.value})`).join(", ");
+            return `Unknown model "${requestedModel}". Available: ${valid}`;
+          }
+          (sessionObj as ClaudeSession).model = match.value;
         }
-        sessionObj.model = match.value;
       }
 
       if (params.effort) {
         const effort = params.effort.toLowerCase();
-        if (!["low", "medium", "high"].includes(effort)) {
-          return `Invalid effort "${params.effort}". Use: low, medium, high`;
+
+        if (isCodexSession) {
+          // Codex uses: minimal, low, medium, high, xhigh
+          if (!["minimal", "low", "medium", "high", "xhigh"].includes(effort)) {
+            return `Invalid Codex effort "${params.effort}". Use: minimal, low, medium, high, xhigh`;
+          }
+          (sessionObj as CodexSession).reasoningEffort = effort as any;
+          const model = (sessionObj as CodexSession).model;
+          return `Model switched. Now using: ${model}, reasoning effort: ${effort}`;
+        } else {
+          // Claude uses: low, medium, high
+          if (!["low", "medium", "high"].includes(effort)) {
+            return `Invalid effort "${params.effort}". Use: low, medium, high`;
+          }
+          (sessionObj as ClaudeSession).effort = effort as "low" | "medium" | "high";
+          const { getAvailableModels } = await import("../session");
+          const models = getAvailableModels();
+          const currentModel = models.find((m) => m.value === (sessionObj as ClaudeSession).model);
+          const displayName = currentModel?.displayName || (sessionObj as ClaudeSession).model;
+          return `Model switched. Now using: ${displayName}, effort: ${effort}`;
         }
-        sessionObj.effort = effort as "low" | "medium" | "high";
       }
 
-      const currentModel = models.find((m) => m.value === sessionObj.model);
-      const displayName = currentModel?.displayName || sessionObj.model;
-      return `Model switched. Now using: ${displayName}, effort: ${sessionObj.effort}`;
+      if (isCodexSession) {
+        return `Codex model: ${(sessionObj as CodexSession).model}, reasoning effort: ${(sessionObj as CodexSession).reasoningEffort}`;
+      } else {
+        const { getAvailableModels } = await import("../session");
+        const models = getAvailableModels();
+        const currentModel = models.find((m) => m.value === (sessionObj as ClaudeSession).model);
+        const displayName = currentModel?.displayName || (sessionObj as ClaudeSession).model;
+        return `Model: ${displayName}, effort: ${(sessionObj as ClaudeSession).effort}`;
+      }
     }
 
     case "new_session": {
-      // Capture model info before kill (kill only clears sessionId, but be safe)
-      const { modelName, effortStr } = formatModelInfo(sessionObj.model, sessionObj.effort);
+      const isCodexSession = "reasoningEffort" in sessionObj;
+      let modelName = sessionObj.model;
+      let effortStr = "";
+
+      if (isCodexSession) {
+        const codexSession = sessionObj as CodexSession;
+        modelName = codexSession.model;
+        effortStr = ` | ${codexSession.reasoningEffort}`;
+      } else {
+        const claudeSession = sessionObj as ClaudeSession;
+        const { modelName: name, effortStr: effort } = formatModelInfo(claudeSession.model, claudeSession.effort);
+        modelName = name;
+        effortStr = effort;
+      }
 
       await sessionObj.stop();
       await sessionObj.kill();
@@ -314,7 +373,18 @@ async function executeBotControlAction(
       );
       if (!match) return `No session found matching "${sessionId}".`;
 
-      const [success, message] = sessionObj.resumeSession(match.session_id);
+      const isCodexSession = "reasoningEffort" in sessionObj;
+      let result: [success: boolean, message: string];
+
+      if (isCodexSession) {
+        // Codex resumeSession is async
+        result = await (sessionObj as CodexSession).resumeSession(match.session_id);
+      } else {
+        // Claude resumeSession is synchronous
+        result = (sessionObj as ClaudeSession).resumeSession(match.session_id);
+      }
+
+      const [success, message] = result;
       return success ? `Resumed: "${match.title}"` : `Failed: ${message}`;
     }
 
