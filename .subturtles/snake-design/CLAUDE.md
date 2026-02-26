@@ -1,5 +1,5 @@
 ## Current Task
-Improve snake body rendering: smoother gradient, subtle glow/shadow per segment, rounded look.
+Animate food: pulsing glow effect using sin wave on render.
 
 ## End Goal with Specs
 The snake game should feel alive and polished, not like a bare-bones prototype. Key fixes:
@@ -42,8 +42,8 @@ The snake game should feel alive and polished, not like a bare-bones prototype. 
 
 ## Backlog
 - [x] Fix snake eyes: softer color (light mint/pale green), add highlight dot, make pupils more expressive
-- [ ] Improve snake body rendering: smoother gradient, subtle glow/shadow per segment, rounded look <- current
-- [ ] Animate food: pulsing glow effect using sin wave on render
+- [x] Improve snake body rendering: smoother gradient, subtle glow/shadow per segment, rounded look
+- [ ] Animate food: pulsing glow effect using sin wave on render <- current
 - [ ] Add canvas vignette effect (radial gradient overlay, darker edges)
 - [ ] Animate score: flash/scale on score change (CSS animation triggered by JS)
 - [ ] Improve game over: fade-in overlay, text glow/pulse, optional screen shake

@@ -444,6 +444,97 @@
         }
       }
 
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function mixColor(start, end, t) {
+        return {
+          r: Math.round(start.r + (end.r - start.r) * t),
+          g: Math.round(start.g + (end.g - start.g) * t),
+          b: Math.round(start.b + (end.b - start.b) * t),
+        };
+      }
+
+      function shiftColor(color, delta) {
+        return {
+          r: clamp(color.r + delta, 0, 255),
+          g: clamp(color.g + delta, 0, 255),
+          b: clamp(color.b + delta, 0, 255),
+        };
+      }
+
+      function colorToRgba(color, alpha) {
+        return `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`;
+      }
+
+      function roundedRectPath(left, top, size, radius) {
+        const r = Math.min(radius, size / 2);
+        context.beginPath();
+        context.moveTo(left + r, top);
+        context.lineTo(left + size - r, top);
+        context.quadraticCurveTo(left + size, top, left + size, top + r);
+        context.lineTo(left + size, top + size - r);
+        context.quadraticCurveTo(left + size, top + size, left + size - r, top + size);
+        context.lineTo(left + r, top + size);
+        context.quadraticCurveTo(left, top + size, left, top + size - r);
+        context.lineTo(left, top + r);
+        context.quadraticCurveTo(left, top, left + r, top);
+        context.closePath();
+      }
+
+      function drawSnakeSegment(segment, index, totalSegments) {
+        const left = segment.x * CELL_SIZE;
+        const top = segment.y * CELL_SIZE;
+        const inset = CELL_SIZE * 0.08;
+        const size = CELL_SIZE - inset * 2;
+        const radius = CELL_SIZE * 0.28;
+        const t = totalSegments <= 1 ? 0 : index / (totalSegments - 1);
+        const eased = t * t * (3 - 2 * t);
+
+        const headColor = { r: 184, g: 255, b: 74 };
+        const tailColor = { r: 26, g: 152, b: 82 };
+        const baseColor = mixColor(headColor, tailColor, eased);
+        const lightColor = shiftColor(baseColor, 24);
+        const darkColor = shiftColor(baseColor, -28);
+        const glowAlpha = 0.45 - eased * 0.18;
+
+        context.save();
+        context.shadowColor = colorToRgba(shiftColor(baseColor, 16), glowAlpha);
+        context.shadowBlur = CELL_SIZE * (0.68 - eased * 0.18);
+        context.shadowOffsetX = 0;
+        context.shadowOffsetY = 0;
+
+        const fill = context.createLinearGradient(
+          left + inset,
+          top + inset,
+          left + inset + size,
+          top + inset + size
+        );
+        fill.addColorStop(0, colorToRgba(lightColor, 0.98));
+        fill.addColorStop(0.55, colorToRgba(baseColor, 0.96));
+        fill.addColorStop(1, colorToRgba(darkColor, 0.94));
+
+        roundedRectPath(left + inset, top + inset, size, radius);
+        context.fillStyle = fill;
+        context.fill();
+
+        context.shadowBlur = 0;
+        context.strokeStyle = colorToRgba(shiftColor(baseColor, -52), 0.38);
+        context.lineWidth = 1;
+        roundedRectPath(left + inset, top + inset, size, radius);
+        context.stroke();
+
+        const shineInset = inset + CELL_SIZE * 0.12;
+        const shineSize = CELL_SIZE * 0.23;
+        const shineAlpha = 0.22 - eased * 0.08;
+        roundedRectPath(left + shineInset, top + shineInset, shineSize, CELL_SIZE * 0.12);
+        context.fillStyle = `rgba(236, 255, 206, ${shineAlpha})`;
+        context.fill();
+
+        context.restore();
+      }
+
       function render() {
         context.clearRect(0, 0, canvas.width, canvas.height);
         context.fillStyle = "rgba(4, 11, 20, 0.95)";
@@ -470,9 +561,7 @@
         drawCell(food.x, food.y, "#ff3b5c", "rgba(255, 255, 255, 0.25)");
 
         snake.forEach((segment, index) => {
-          const glow = Math.max(0.25, 1 - index * 0.03);
-          const body = `rgba(25, 249, 107, ${glow})`;
-          drawCell(segment.x, segment.y, index === 0 ? "#b8ff4a" : body, "rgba(25, 249, 107, 0.3)");
+          drawSnakeSegment(segment, index, snake.length);
         });
 
         if (snake.length > 0) {
