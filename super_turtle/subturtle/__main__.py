@@ -17,6 +17,7 @@ Usage:
 import argparse
 import datetime
 import json
+import os
 import re
 import secrets
 import shutil
@@ -333,6 +334,38 @@ def _log_retry(name: str, error: subprocess.CalledProcessError | OSError) -> Non
     time.sleep(RETRY_DELAY)
 
 
+def _archive_workspace(state_dir: Path, name: str) -> None:
+    """Archive a stopped SubTurtle workspace via ctl."""
+    ctl_path = Path(__file__).resolve().with_name("ctl")
+    pid_file = state_dir / "subturtle.pid"
+    meta_file = state_dir / "subturtle.meta"
+
+    # Self-stop runs inside the SubTurtle process. Clear our own pid/meta markers
+    # first so `ctl archive` does not treat this workspace as still running.
+    try:
+        if pid_file.exists():
+            pid_text = pid_file.read_text(encoding="utf-8").strip()
+            if pid_text and int(pid_text) == os.getpid():
+                pid_file.unlink(missing_ok=True)
+                meta_file.unlink(missing_ok=True)
+    except (OSError, ValueError):
+        pass
+
+    try:
+        subprocess.run(
+            [str(ctl_path), "archive", name],
+            cwd=Path.cwd(),
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, OSError) as error:
+        print(
+            f"[subturtle:{name}] WARNING: failed to archive workspace {state_dir}: {error}",
+            file=sys.stderr,
+        )
+
+
 def run_slow_loop(state_dir: Path, name: str, skills: list[str] | None = None) -> None:
     """Slow loop: Plan -> Groom -> Execute -> Review. 4 agent calls per iteration."""
     if skills is None:
@@ -379,7 +412,9 @@ def run_slow_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
             break
 
     if stopped_by_directive:
-        _write_completion_notification(state_dir, name, Path.cwd())
+        if iteration > 0:
+            _write_completion_notification(state_dir, name, Path.cwd())
+        _archive_workspace(state_dir, name)
 
 
 def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -> None:
@@ -417,7 +452,9 @@ def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
             break
 
     if stopped_by_directive:
-        _write_completion_notification(state_dir, name, Path.cwd())
+        if iteration > 0:
+            _write_completion_notification(state_dir, name, Path.cwd())
+        _archive_workspace(state_dir, name)
 
 
 def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = None) -> None:
@@ -455,7 +492,9 @@ def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = N
             break
 
     if stopped_by_directive:
-        _write_completion_notification(state_dir, name, Path.cwd())
+        if iteration > 0:
+            _write_completion_notification(state_dir, name, Path.cwd())
+        _archive_workspace(state_dir, name)
 
 
 # ---------------------------------------------------------------------------

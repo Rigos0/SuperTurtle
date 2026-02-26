@@ -684,6 +684,7 @@ do_stop() {
   if ! is_running "$name"; then
     echo "[subturtle:${name}] not running"
     rm -f "$(pid_file "$name")" "$(meta_file "$name")"
+    do_archive "$name"
     exit 0
   fi
 
@@ -698,6 +699,7 @@ do_stop() {
     if ! kill -0 "$pid" 2>/dev/null; then
       echo "[subturtle:${name}] stopped"
       rm -f "$(pid_file "$name")" "$(meta_file "$name")"
+      do_archive "$name"
       return
     fi
     sleep 1
@@ -707,6 +709,7 @@ do_stop() {
   kill -9 "$pid" 2>/dev/null || true
   rm -f "$(pid_file "$name")" "$(meta_file "$name")"
   echo "[subturtle:${name}] killed"
+  do_archive "$name"
 }
 
 do_status() {
@@ -781,6 +784,10 @@ do_archive() {
   fi
 
   if [[ ! -d "$ws" ]]; then
+    if [[ -d "$archive_ws" ]]; then
+      echo "[subturtle:${name}] already archived at ${archive_ws}"
+      return 0
+    fi
     echo "[subturtle:${name}] ERROR: workspace not found at ${ws}" >&2
     exit 1
   fi
