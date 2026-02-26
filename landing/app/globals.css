@@ -1,35 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  /* Primary background - warm cream */
-  --bg-page: #faf8f5;
+  --bg-page: #f7f4ee;
+  --bg-glass: #fffdfa;
+  --text-heading: #161412;
+  --text-body: #3f3a33;
+  --text-muted: #6f675d;
 
-  /* Text colors */
-  --text-heading: #1a1815;
-  --text-body: #4a4642;
-  --text-light: #6b6562;
+  --accent-olive: #556c4b;
+  --accent-terracotta: #b66d4b;
+  --accent-sage: #8aa67c;
 
-  /* Earthy accent colors (updated to match design specs) */
-  --color-olive: #4a5f3b;
-  --color-terracotta: #b86f4c;
-  --color-sage: #8fa87e;
+  --surface-ink: #161412;
+  --surface-line: rgba(86, 108, 75, 0.16);
+  --surface-shadow: 0 18px 45px -36px rgba(34, 30, 25, 0.52);
 
-  /* Terminal/code block colors */
-  --terminal-bg: #1a1815;
-  --terminal-text: #e8e8e4;
-  --terminal-prompt: #d4a574;
-  --terminal-accent: #8fa87e;
+  --terminal-bg: #161412;
+  --terminal-text: #eceae5;
+  --terminal-prompt: #d5a36b;
+  --terminal-accent: #9ac27c;
 
-  /* Card and UI element backgrounds */
-  --card-bg: #ffffff;
-  --card-bg-subtle: #f5f3f0;
-
-  /* Borders and shadows */
-  --border-subtle: rgba(74, 95, 59, 0.12);
-  --border-light: rgba(74, 95, 59, 0.08);
-  --shadow-sm: rgba(0, 0, 0, 0.06);
-  --shadow-md: rgba(0, 0, 0, 0.10);
-  --shadow-warm: rgba(184, 111, 76, 0.08);
+  --radius-lg: 1.1rem;
+  --radius-md: 0.8rem;
 }
 
 @theme inline {
@@ -37,126 +29,385 @@
   --color-foreground: var(--text-body);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-
-  /* Olive color scale (PRIMARY) */
-  --color-olive-50: #f8faf5;
-  --color-olive-100: #eef2e8;
-  --color-olive-200: #dfe7d4;
-  --color-olive-300: #c8d8b6;
-  --color-olive-400: #aac392;
-  --color-olive-500: #8fa87e;
-  --color-olive-600: #6d8f5d;
-  --color-olive-700: #4a5f3b;
-  --color-olive-800: #3d4d31;
-  --color-olive-900: #2f3a25;
-
-  /* Terracotta color scale (SECONDARY) */
-  --color-terracotta-50: #fdf8f5;
-  --color-terracotta-100: #faeae2;
-  --color-terracotta-200: #f3d3c3;
-  --color-terracotta-300: #e9b4a0;
-  --color-terracotta-400: #dd8f70;
-  --color-terracotta-500: #c97d59;
-  --color-terracotta-600: #b86f4c;
-  --color-terracotta-700: #9b5a3f;
-  --color-terracotta-800: #7e4733;
-  --color-terracotta-900: #6a3729;
 }
 
-/* Base styles */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  @apply bg-[#faf8f5] text-[#4a4642] transition-colors duration-300;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  @apply min-h-screen transition-colors duration-300;
+  font-family: var(--font-geist-sans), 'Inter', 'Segoe UI', sans-serif;
+  background: radial-gradient(circle at 10% 15%, #fefaf2 0%, var(--bg-page) 55%, #f3efe6 100%);
+  color: var(--text-body);
 }
 
-/* Typography */
-h1, h2, h3, h4, h5, h6 {
-  @apply text-[#1a1815] font-bold;
+.landing-root {
+  position: relative;
+  overflow-x: hidden;
 }
 
-h1 {
-  @apply text-3xl sm:text-4xl lg:text-5xl leading-tight;
-  letter-spacing: -0.02em;
-}
-
-h2 {
-  @apply text-2xl sm:text-3xl lg:text-4xl leading-snug;
-  letter-spacing: -0.01em;
-}
-
-h3 {
-  @apply text-xl sm:text-2xl leading-snug;
-}
-
-/* Links */
-a {
-  @apply text-[#4a5f3b] no-underline transition-colors duration-200 hover:text-[#b86f4c];
-}
-
-/* Code elements */
-code {
-  @apply bg-[#1a1815] text-[#e8e8e4] px-1 py-0.5 rounded font-mono text-sm;
-}
-
-pre {
-  @apply bg-[#1a1815] text-[#e8e8e4] p-4 rounded-lg overflow-x-auto border border-[rgba(74,95,59,0.12)] whitespace-pre-wrap break-words;
-}
-
-pre code {
-  @apply bg-transparent text-inherit p-0 rounded-none;
-}
-
-/* Card with left accent bar (4px colored left border) */
-.card-accent {
-  @apply bg-white rounded-lg border-l-4 border-l-[#4a5f3b] shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all duration-200 hover:shadow-[0_8px_16px_rgba(0,0,0,0.10)] hover:-translate-y-1;
-}
-
-.card-accent.terracotta {
-  @apply border-l-[#b86f4c];
-}
-
-.card-accent.sage {
-  @apply border-l-[#8fa87e];
-}
-
-/* Rounded card without accent */
-.card-simple {
-  @apply bg-white rounded-lg border border-[rgba(74,95,59,0.12)] shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all duration-200;
-}
-
-/* Primary button */
-.btn-primary {
-  @apply bg-[#4a5f3b] text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:bg-[#3d4d31] hover:-translate-y-0.5 hover:shadow-[0_8px_16px_rgba(74,95,59,0.2)] active:translate-y-0;
-}
-
-/* Secondary button (outline) */
-.btn-secondary {
-  @apply bg-transparent text-[#4a5f3b] px-6 py-3 rounded-lg font-semibold border border-[#4a5f3b] transition-all duration-200 hover:bg-[#4a5f3b] hover:text-white hover:-translate-y-0.5;
-}
-
-/* Section spacing utilities */
-.section-padding {
-  @apply py-12 sm:py-16 lg:py-20;
+.section-shell {
+  position: relative;
+  padding-top: clamp(2.6rem, 3.8vw, 4rem);
+  padding-bottom: clamp(2.8rem, 4vw, 4.5rem);
 }
 
 .section-container {
-  @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
+  @apply max-w-[76rem] mx-auto px-4 sm:px-6 lg:px-8;
 }
 
-/* Sticky nav (appears on scroll) */
-.sticky-nav {
-  @apply fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm shadow-md transition-transform duration-300;
+.section-head h2 {
+  @apply text-3xl sm:text-4xl xl:text-5xl font-semibold leading-tight tracking-tight;
+  color: var(--text-heading);
 }
 
-/* Accent color utilities */
-.accent-olive {
-  @apply text-[#4a5f3b];
+.section-head p {
+  @apply mt-3 text-base sm:text-lg max-w-2xl;
+  color: var(--text-muted);
 }
 
-.accent-terracotta {
-  @apply text-[#b86f4c];
+.eyebrow {
+  @apply text-sm font-semibold uppercase tracking-[0.2em];
+  color: var(--text-muted);
 }
 
-.accent-sage {
-  @apply text-[#8fa87e];
+.headline {
+  @apply text-4xl sm:text-5xl xl:text-6xl font-semibold tracking-tight;
+  color: var(--text-heading);
+  line-height: 0.98;
+}
+
+.lead {
+  @apply mt-5 text-base sm:text-lg;
+  color: var(--text-muted);
+}
+
+.hero-shell {
+  padding-top: clamp(5.5rem, 10vw, 8rem);
+}
+
+.hero-glow {
+  position: absolute;
+  inset: auto;
+  width: min(70vw, 26rem);
+  height: min(70vw, 26rem);
+  border-radius: 50%;
+  background: radial-gradient(circle at center, rgba(182, 109, 75, 0.3), rgba(182, 109, 75, 0));
+  filter: blur(1px);
+  top: -5rem;
+  right: -8rem;
+  transform: translateZ(0);
+  pointer-events: none;
+}
+
+.pill {
+  @apply inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold;
+  color: var(--accent-olive);
+  border: 1px solid rgba(85, 108, 75, 0.28);
+  background: rgba(134, 152, 122, 0.12);
+}
+
+.feature-chip {
+  @apply inline-flex items-center gap-2 text-sm;
+  color: #4d473f;
+}
+
+.feature-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--accent-sage);
+  box-shadow: 0 0 0 5px rgba(138, 166, 124, 0.2);
+  display: inline-block;
+}
+
+.control-dash {
+  @apply rounded-2xl border;
+  border-color: rgba(86, 108, 75, 0.2);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.92), rgba(248, 246, 241, 0.94));
+  box-shadow: var(--surface-shadow);
+}
+
+.control-dash-head {
+  @apply px-4 py-3 text-xs uppercase tracking-[0.2em] font-semibold;
+  color: var(--accent-olive);
+  border-bottom: 1px solid rgba(86, 108, 75, 0.15);
+}
+
+.metric-pill {
+  @apply inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold;
+  background: rgba(86, 108, 75, 0.11);
+  border: 1px solid rgba(86, 108, 75, 0.24);
+  color: #4d5a42;
+}
+
+.alt-shell {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0.15));
+}
+
+.deck-card {
+  @apply relative rounded-2xl border p-5 sm:p-6;
+  background: var(--bg-glass);
+  border-color: var(--surface-line);
+  box-shadow: var(--surface-shadow);
+}
+
+.deck-card h3 {
+  @apply text-xl font-semibold;
+  color: var(--text-heading);
+  margin-bottom: 0.55rem;
+}
+
+.deck-card p {
+  @apply text-sm leading-relaxed;
+  color: var(--text-muted);
+}
+
+.deck-mark {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 0.4rem;
+  height: 100%;
+  border-radius: 1rem 0 0 1rem;
+  opacity: 0.9;
+}
+
+.deck-card.olive .deck-mark {
+  background: var(--accent-olive);
+}
+
+.deck-card.terracotta .deck-mark {
+  background: var(--accent-terracotta);
+}
+
+.deck-card.sage .deck-mark {
+  background: var(--accent-sage);
+}
+
+.flow-step {
+  @apply flex gap-4 rounded-2xl border p-4;
+  border-color: var(--surface-line);
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.flow-step-index {
+  @apply w-11 h-11 shrink-0 rounded-xl text-xs font-black flex items-center justify-center;
+  color: var(--accent-olive);
+  background: rgba(85, 108, 75, 0.14);
+  border: 1px solid rgba(85, 108, 75, 0.24);
+}
+
+.flow-step h3 {
+  @apply text-lg font-semibold;
+  color: var(--text-heading);
+}
+
+.flow-step p {
+  @apply text-sm mt-1;
+  color: var(--text-muted);
+}
+
+.control-pane {
+  @apply rounded-2xl border p-6;
+  border-color: rgba(85, 108, 75, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(250, 246, 238, 0.85));
+}
+
+.control-pane h3 {
+  @apply text-2xl font-semibold text-[var(--text-heading)] mb-4;
+}
+
+.check-row {
+  @apply flex items-start gap-3;
+  color: var(--text-muted);
+}
+
+.check-dot {
+  @apply inline-block mt-1.5 w-2 h-2 rounded-full;
+  background: var(--accent-sage);
+  box-shadow: 0 0 0 4px rgba(138, 166, 124, 0.16);
+}
+
+.mode-card {
+  @apply relative overflow-hidden rounded-2xl border p-6 sm:p-7;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(252, 249, 244, 0.92));
+  border-color: rgba(85, 108, 75, 0.22);
+}
+
+.mode-card h3 {
+  @apply text-2xl font-semibold;
+  color: var(--text-heading);
+}
+
+.mode-card p {
+  @apply text-sm mt-3 leading-relaxed;
+  color: var(--text-muted);
+}
+
+.mode-card .muted-label {
+  @apply mt-5 text-xs font-semibold uppercase tracking-[0.15em];
+  color: var(--accent-olive);
+}
+
+.mode-strip {
+  margin-top: 1.5rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  width: 100%;
+}
+
+.mode-card.olive .mode-strip {
+  background: linear-gradient(90deg, var(--accent-olive), rgba(85, 108, 75, 0.25));
+}
+
+.mode-card.terracotta .mode-strip {
+  background: linear-gradient(90deg, var(--accent-terracotta), rgba(182, 109, 75, 0.3));
+}
+
+.mode-card.sage .mode-strip {
+  background: linear-gradient(90deg, var(--accent-sage), rgba(138, 166, 124, 0.32));
+}
+
+.step-card {
+  @apply rounded-xl border p-4;
+  border-color: rgba(86, 108, 75, 0.24);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.step-label {
+  @apply inline-block rounded-full px-3 py-1 text-xs font-semibold mb-3;
+  color: #4d5a42;
+  border: 1px solid rgba(85, 108, 75, 0.24);
+  background: rgba(86, 108, 75, 0.12);
+}
+
+.step-code {
+  @apply font-mono text-xs sm:text-sm leading-relaxed;
+  color: #2b251f;
+  background: var(--terminal-bg);
+  border-radius: 0.7rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(212, 163, 107, 0.2);
+  color: var(--terminal-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.footer-shell {
+  border-top: 1px solid rgba(85, 108, 75, 0.2);
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.65), rgba(248, 246, 241, 0.4));
+}
+
+.footer-shell nav a {
+  @apply transition-colors duration-200;
+  color: #5b6356;
+}
+
+.footer-shell nav a:hover {
+  color: var(--accent-olive);
+}
+
+/* Buttons */
+.btn-primary {
+  @apply inline-flex items-center justify-center rounded-xl px-5 py-2.5 sm:px-6 sm:py-3 font-semibold text-sm sm:text-base;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent-olive), var(--accent-sage));
+  box-shadow: 0 12px 24px -18px rgba(86, 108, 75, 0.85);
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  filter: saturate(1.04);
+}
+
+.btn-ghost {
+  @apply inline-flex items-center justify-center rounded-xl border px-5 py-2.5 sm:px-6 sm:py-3 font-semibold text-sm sm:text-base;
+  color: var(--accent-olive);
+  border-color: rgba(85, 108, 75, 0.35);
+  background: rgba(255, 255, 255, 0.7);
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.btn-ghost:hover {
+  background: rgba(86, 108, 75, 0.1);
+  transform: translateY(-1px);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--text-heading);
+}
+
+p {
+  color: var(--text-body);
+}
+
+a {
+  @apply no-underline;
+}
+
+code {
+  @apply rounded-[0.35rem] px-1.5 py-0.5 font-mono;
+  background: var(--terminal-bg);
+  color: var(--terminal-text);
+}
+
+code::before,
+code::after {
+  content: "";
+}
+
+pre {
+  @apply rounded-xl border p-4 overflow-x-auto;
+  border-color: rgba(86, 108, 75, 0.2);
+  background: var(--terminal-bg);
+  color: var(--terminal-text);
+}
+
+.reveal {
+  opacity: 0;
+  animation: reveal 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  transform: translateY(14px);
+}
+
+@keyframes reveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .section-head h2 {
+    @apply text-3xl;
+  }
+
+  .headline {
+    @apply text-4xl;
+  }
+
+  .hero-glow {
+    width: 75vw;
+    height: 75vw;
+    top: -10rem;
+    right: -12rem;
+  }
 }
