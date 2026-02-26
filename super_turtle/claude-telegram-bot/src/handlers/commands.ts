@@ -1512,6 +1512,7 @@ export async function handleContext(ctx: Context): Promise<void> {
 export async function handleRestart(ctx: Context): Promise<void> {
   const userId = ctx.from?.id;
   const chatId = ctx.chat?.id;
+  const restartSelfMarker = `${WORKING_DIR}/super_turtle/claude-telegram-bot/.restart-self`;
 
   if (!isAuthorized(userId, ALLOWED_USERS)) {
     await ctx.reply("Unauthorized.");
@@ -1534,6 +1535,12 @@ export async function handleRestart(ctx: Context): Promise<void> {
     } catch (e) {
       console.warn("Failed to save restart info:", e);
     }
+  }
+
+  try {
+    await Bun.write(restartSelfMarker, `${Date.now()}\n`);
+  } catch (e) {
+    console.warn("Failed to write restart-self marker:", e);
   }
 
   // Give time for the message to send
