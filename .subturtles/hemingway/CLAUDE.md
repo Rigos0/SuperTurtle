@@ -10,7 +10,10 @@ A complete 3-chapter short novella (~2000 words total) in Markdown format at `bo
 - [x] Write Chapter 2: "The Storm" — a typhoon separates the turtle from its group
 - [x] Write Chapter 3: "The Shore" — the turtle arrives at the nesting beach, alone but alive
 - [x] Final read-through: fix inconsistencies, tighten prose, add an epigraph
-- [ ] Commit the finished book <- current
+- [x] Commit the finished book
 
 ## Notes
 Style: Hemingway-esque. Short sentences. No sentimentality. Let the ocean do the talking.
+
+## Loop Control
+STOP
