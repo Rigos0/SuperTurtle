@@ -4,6 +4,7 @@
 # Any other exit code = real crash or Ctrl+C → stop.
 
 cd "$(dirname "$0")"
+RESTART_SELF_MARKER=".restart-self"
 
 # Source environment variables
 if [ -f .env ]; then
@@ -18,6 +19,11 @@ while true; do
     EXIT_CODE=$?
 
     if [ "$EXIT_CODE" -eq 0 ]; then
+        if [ -f "$RESTART_SELF_MARKER" ]; then
+            echo "[run-loop] Detected self-restart marker — exiting loop."
+            rm -f "$RESTART_SELF_MARKER"
+            exit 0
+        fi
         echo "[run-loop] Bot exited with code 0 — restarting in 1s..."
         sleep 1
     else
