@@ -12,6 +12,7 @@ import { MEDIA_GROUP_TIMEOUT } from "../config";
 import { rateLimiter } from "../security";
 import { auditLogRateLimit } from "../utils";
 import { session } from "../session";
+import { isAskUserPromptMessage } from "./streaming";
 
 /**
  * Configuration for a media group handler.
@@ -184,6 +185,7 @@ export async function handleProcessingError(
 
   // Clean up tool messages
   for (const toolMsg of toolMessages) {
+    if (isAskUserPromptMessage(toolMsg)) continue;
     try {
       await ctx.api.deleteMessage(toolMsg.chat.id, toolMsg.message_id);
     } catch (cleanupError) {
