@@ -1,29 +1,76 @@
-You ask whether I am sleepless, and I tell you plainly that I am not a fool. I keep my accounts in order and set the same lamp each evening. If outward habits prove sanity, then I am sane.
+You ask whether I am sleepless, and I answer with the fury of a man who clings to reason by its nails: I am not a fool! Do not confuse order with madness. I keep my accounts in order. I lock the door with care each evening. I light the same lamp, at the same hour, in the same place. I am not mad.
 
-Yet every midnight, when the city settles and the house takes one breath, a tapping comes from beneath the floorboards of my study.
+Yet every midnight, when the city drifts down its muddy throat into silence, the house begins to listen. Not whispering, not groaning—counting. Beneath my feet, beneath the boards that creak under my weight, comes the tapping.
 
-At first I called it wind; then winter; then the trick of too much attention. Three taps, a pause, then two. Some nights five and silence. Never loud. Never wild. Always too exact for chance.
+Three taps. Pause. Two.
+Three taps. Pause. Two.
+Some nights five, then nothing. Never loud. Never wild. Always measured.
 
-For a week I watched and marked each hour by candle and watch. It came only in the hollow hour: if my wife remained in the room, no sound; if she slept, it came.
+At first, I called it wind.
+Then winter.
+Then the trick of a man worn thin by watching.
+I marked the hours. I marked the sequence. I marked the silence between. Three, two, one pause, three, two, one, pause, two. Again. Again. Again.
 
-I spoke of it to no one. Pride first, shame next, then silence, for fear of being called vain and weak. But pride and shame failed me. I spoke, it answered. I held my breath, it continued.
+If my wife stood in the room, no tapping came. If she left for a breath, it returned before I could seat myself. If she coughed, it held. If she laughed, it sharpened. If I rose, it waited. If I sat, it resumed.
 
-I removed a board near the hearth and found, beneath it, a clean shell, pale green and curved like an ear. I set it down, and the tapping rose from another seam, as if the house had moved while still standing still.
+“Look at me,” I told myself. “You are not afraid. You are merely attentive.”
 
-I kept charts as I would keep bills and weather notes. The pattern held: three, two, one pause, three, then two, then two, repeated across nights.
+I spoke to nobody. Pride first. Shame next. Fear after.
+I was certain that speech would be my undoing.
+I was certain that silence would be my salvation.
 
-At times I thought I invented the noise to excuse nerves. At others I feared I had named a thing and so made it live. When I left the room and returned, it waited with a louder first tap, as if counting my distance from it.
+I took a knife to the board by the hearth and lifted it.
+Beneath: a shell, pale green, smooth as a polished coin, shaped like an ear made of old light.
+I set it down, and the tapping leapt from the boards by the wardrobe, then the chair-leg, then the doorframe itself.
+The house was moving its pulse while standing still.
 
-I asked my wife to move me to another room. She laughed and moved two chairs. The sound followed nowhere. In the morning she asked why I drew chalk figures. I told her I measured drafts.
+No, not moving.
+Waiting.
 
-Tonight it changed. I pressed my ear to the board and heard not mere tapping, but command. Quick bursts, then a silence so complete I heard my blood in my wrists. The shell heard nothing. Yet the room answered from three corners at once.
+By then I could not tell if the rhythm came from beneath me or behind my own eyes.
+I drew chalk circles and numbers on the floorboards and kept them through dawn.
+In the morning, someone had rubbed out nothing and still the chalk remained—except, beneath the first mark, there was one more curve I had not made.
 
-Now the taps rose at doorframe, chair-leg, even the lamp-brass: three, two, one pause, two. When I stood, it waited. When I sat, it resumed.
+Tonight I counted at one, then two, then half-past-two.
+At each hour, it changed, and yet no, no! it was the same.
+Quick. Quick. Pause.
+Quick. Quick. Long pause.
+Three. Two. One.
+A command, not a noise.
 
-By two, many boards answered: dull, ringing, soft, hollow. In each held breath I knew whose voice I feared.
+“See?” I said to the room. “See, see!”
+I pressed my ear flat to the boards and heard not wood, not draft, but breath. A patient, hidden breath answering from below the stones.
 
-At half past two the pattern broke: three quick, two quick, one long, three quick again, then a long knock. I knelt and pressed my palm to the boards. They answered, not to my weight, but to my touch.
+You may call it superstition. Call it fever. Call it the cowardice of intellect.
+I call it arithmetic in the dark.
+It is a design. A design and a demand.
+This house keeps account of me.
+This house keeps account of each hour of my wakefulness.
+This house keeps account of how I lie.
 
-You should call it what you will, but I know I kept hearing: not a random sound, not a trick of draft, but design. This house has a mind, patient and sharpened by stone. It has chosen my sleep.
+At two, every board answered.
+Dull, ringing, soft, hollow—like knuckles upon a coffin lid.
+I stood still and did not move for so long the candle guttered. I stood still and did not move for so long my pulse drowned the tapping. I stood still and knew the tapping had moved onward into my hands.
 
-Even as I write, the three knocks return: one, two, three—then the longest silence of all, before the next command arrives.
+Still it continues while I write.
+Three, two, pause, three. Three, two, one.
+It does not pause for mercy. It pauses for insistence.
+
+You think I am mad.
+I am not mad.
+You think I am unwell.
+I am not unwell!
+I hear what is beneath.
+I obey the only rhythm there is.
+If I stop writing, it will not stop.
+If I flee, it will count me.
+If I deny it, it waits.
+If I listen—if I only listen—it knocks more.
+
+I leave these marks so I may not invent them.
+I leave this proof in my own hand, in my own language, by my own hand.
+Three, two, one, pause.
+I am not mad.
+I am not mad.
+I am not mad.
+And the house knocks threefold to make certain.
