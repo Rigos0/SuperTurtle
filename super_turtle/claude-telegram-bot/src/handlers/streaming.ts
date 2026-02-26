@@ -132,8 +132,6 @@ export async function checkPendingSendTurtleRequests(
           const buffer = Buffer.from(await response.arrayBuffer());
           const inputFile = new InputFile(buffer, "turtle.webp");
           await ctx.replyWithSticker(inputFile);
-          // Send caption as a separate message if provided
-          if (caption) await ctx.reply(caption);
         } catch (photoError) {
           // Photo send failed — try sending as a link instead
           console.warn(`Failed to send turtle photo, falling back to link:`, photoError);

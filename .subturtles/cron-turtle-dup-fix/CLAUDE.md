@@ -1,5 +1,5 @@
 ## Current Task
-Ensure only one turtle sticker is sent per job (no extra manual echo).
+Add/adjust test or logging to prevent regressions.
 
 ## End Goal with Specs
 - A scheduled turtle job produces exactly one sticker and one "you’re doing great" message.
@@ -9,8 +9,8 @@ Ensure only one turtle sticker is sent per job (no extra manual echo).
 ## Backlog
 - [x] Reproduce/trace how scheduled prompts are injected and executed
 - [x] Implement guard so cron runs do not double-trigger when prompt already contains scheduled notice
-- [ ] Ensure only one turtle sticker is sent per job (no extra manual echo) <- current
-- [ ] Add/adjust test or logging to prevent regressions
+- [x] Ensure only one turtle sticker is sent per job (no extra manual echo)
+- [ ] Add/adjust test or logging to prevent regressions <- current
 - [ ] Commit changes
 
 ## Notes
