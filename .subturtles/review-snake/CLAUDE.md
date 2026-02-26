@@ -1,5 +1,5 @@
 ## Current Task
-Fix inconsistent naming or style patterns in the Snake game files.
+Simplify overly complex functions (especially collision logic, rendering).
 
 ## End Goal with Specs
 Review all recent Snake game changes for code quality issues — dead code, TODOs, inconsistent style, unused variables, overly complex logic, missing error handling. Fix anything found and commit clean.
@@ -12,8 +12,9 @@ Files to review:
 - [x] Read index.html and server.js thoroughly
 - [x] Identify dead code, unused variables, console.logs left behind, TODOs
   - Progress: Removed unused `isOnSnake` helper and stripped non-essential client/server `console.log` calls.
-- [ ] Fix inconsistent naming or style patterns <- current
-- [ ] Simplify overly complex functions (especially collision logic, rendering)
+- [x] Fix inconsistent naming or style patterns
+  - Progress: Normalized naming/style for WebSocket/socket variables, URL casing, and abbreviated identifiers in client/server Snake code.
+- [ ] Simplify overly complex functions (especially collision logic, rendering) <- current
 - [ ] Remove any debug/temp code
 - [ ] Ensure error handling is solid (WebSocket disconnect, edge cases)
 - [ ] Commit all cleanup changes with descriptive message

@@ -22,7 +22,7 @@ function respond(res, code, body, headers = {}) {
   res.end(body);
 }
 
-function fileFromURL(url) {
+function fileFromUrl(url) {
   if (url === "/") {
     return path.join(ROOT, "index.html");
   }
@@ -30,14 +30,14 @@ function fileFromURL(url) {
 }
 
 const server = http.createServer((req, res) => {
-  const requestURL = req.url || "/";
-  const safeURL = requestURL.split("?")[0];
+  const requestUrl = req.url || "/";
+  const safeUrl = requestUrl.split("?")[0];
 
-  if (safeURL.includes("..")) {
+  if (safeUrl.includes("..")) {
     return respond(res, 403, "Forbidden");
   }
 
-  const filePath = fileFromURL(safeURL);
+  const filePath = fileFromUrl(safeUrl);
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME_TYPES[ext] || "application/octet-stream";
 
@@ -205,7 +205,7 @@ function moveSnake(player) {
 }
 
 function broadcastGameState() {
-  const state = {
+  const serializedGameState = {
     player1Snake: gameState.player1.snake,
     player2Snake: gameState.player2.snake,
     food: gameState.food,
@@ -219,19 +219,19 @@ function broadcastGameState() {
 
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify(state));
+      client.send(JSON.stringify(serializedGameState));
     }
   });
 }
 
 function resetGameState() {
-  // Preserve player ws references
-  const p1ws = gameState.player1.id;
-  const p2ws = gameState.player2.id;
+  // Preserve player socket references
+  const player1Socket = gameState.player1.id;
+  const player2Socket = gameState.player2.id;
 
   gameState = {
     player1: {
-      id: p1ws,
+      id: player1Socket,
       snake: [
         { x: 3, y: 3 },
         { x: 2, y: 3 },
@@ -242,7 +242,7 @@ function resetGameState() {
       score: 0,
     },
     player2: {
-      id: p2ws,
+      id: player2Socket,
       snake: [
         { x: 21, y: 21 },
         { x: 22, y: 21 },
@@ -288,33 +288,35 @@ function startNewRound() {
   startCountdown();
 }
 
-wss.on("connection", (ws) => {
+wss.on("connection", (socket) => {
   let playerId = null;
 
   // Assign player
   if (!gameState.player1.id) {
     playerId = "player1";
-    gameState.player1.id = ws;
+    gameState.player1.id = socket;
   } else if (!gameState.player2.id) {
     playerId = "player2";
-    gameState.player2.id = ws;
+    gameState.player2.id = socket;
     // Start countdown when both players connected
-    if (gameLoop) clearInterval(gameLoop);
+    if (gameLoop) {
+      clearInterval(gameLoop);
+    }
     startCountdown();
   } else {
     // Third player - spectator mode
-    ws.send(JSON.stringify({ spectator: true }));
+    socket.send(JSON.stringify({ spectator: true }));
   }
 
   // Send player assignment to the client
   if (playerId) {
-    ws.send(JSON.stringify({ type: "assigned", playerId }));
+    socket.send(JSON.stringify({ type: "assigned", playerId }));
   }
 
   // Send current state to new player
   broadcastGameState();
 
-  ws.on("message", (message) => {
+  socket.on("message", (message) => {
     try {
       const data = JSON.parse(message);
       if (data.type === "direction" && playerId) {
@@ -322,12 +324,12 @@ wss.on("connection", (ws) => {
       } else if (data.type === "newGame") {
         startNewRound();
       }
-    } catch (e) {
-      console.error("Error parsing message:", e);
+    } catch (error) {
+      console.error("Error parsing message:", error);
     }
   });
 
-  ws.on("close", () => {
+  socket.on("close", () => {
     if (playerId === "player1") {
       gameState.player1.id = null;
     } else if (playerId === "player2") {

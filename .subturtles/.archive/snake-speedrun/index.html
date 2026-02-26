@@ -353,7 +353,7 @@
       const CELL_COUNT = 24;
       const CELL_SIZE = canvas.width / CELL_COUNT;
 
-      let ws = null;
+      let socket = null;
       let playerId = null;
       let gameState = {
         player1Snake: [],
@@ -367,18 +367,18 @@
         winner: null,
       };
 
-      let tongueOutP1 = false;
-      let tongueOutP2 = false;
+      let isTongueOutPlayer1 = false;
+      let isTongueOutPlayer2 = false;
 
       function connectWebSocket() {
         const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-        ws = new WebSocket(`${protocol}//${location.host}`);
+        socket = new WebSocket(`${protocol}//${location.host}`);
 
-        ws.onopen = () => {
+        socket.onopen = () => {
           render();
         };
 
-        ws.onmessage = (event) => {
+        socket.onmessage = (event) => {
           const data = JSON.parse(event.data);
           if (data.spectator) {
             return;
@@ -391,24 +391,24 @@
           render();
         };
 
-        ws.onerror = (error) => {
+        socket.onerror = (error) => {
           console.error("WebSocket error:", error);
         };
 
-        ws.onclose = () => {
+        socket.onclose = () => {
           setTimeout(connectWebSocket, 3000);
         };
       }
 
       function sendDirection(dx, dy) {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "direction", dx, dy }));
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: "direction", dx, dy }));
         }
       }
 
       function sendNewGame() {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "newGame" }));
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: "newGame" }));
         }
       }
 
@@ -651,8 +651,8 @@
         context.fillStyle = "rgba(4, 11, 20, 0.95)";
         context.fillRect(0, 0, canvas.width, canvas.height);
 
-        tongueOutP1 = gameState.isRunning && now % 600 < 300;
-        tongueOutP2 = gameState.isRunning && now % 600 < 300;
+        isTongueOutPlayer1 = gameState.isRunning && now % 600 < 300;
+        isTongueOutPlayer2 = gameState.isRunning && now % 600 < 300;
 
         // Draw grid
         for (let y = 0; y <= CELL_COUNT; y++) {
@@ -687,9 +687,9 @@
 
         // Draw eyes and tongue for both snakes
         drawSnakeEyes(gameState.player1Snake);
-        drawTongue(gameState.player1Snake, tongueOutP1);
+        drawTongue(gameState.player1Snake, isTongueOutPlayer1);
         drawSnakeEyes(gameState.player2Snake);
-        drawTongue(gameState.player2Snake, tongueOutP2);
+        drawTongue(gameState.player2Snake, isTongueOutPlayer2);
 
         // Draw status messages
         if (!gameState.isRunning && gameState.player1Snake.length > 0 && !gameState.isGameOver) {
@@ -809,7 +809,7 @@
 
       function onKeyDown(event) {
         const key = event.key;
-        const move = {
+        const directionByKey = {
           ArrowUp: [0, -1],
           ArrowDown: [0, 1],
           ArrowLeft: [-1, 0],
@@ -820,9 +820,9 @@
           d: [1, 0],
         }[key];
 
-        if (move) {
+        if (directionByKey) {
           event.preventDefault();
-          handleDpadClick(move[0], move[1]);
+          handleDpadClick(directionByKey[0], directionByKey[1]);
           return;
         }
       }
