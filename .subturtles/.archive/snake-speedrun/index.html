@@ -158,11 +158,18 @@
         box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.28);
       }
       .dpad-container {
-        margin-top: 1.2rem;
+        position: absolute;
+        bottom: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 0.5rem;
+        background: rgba(6, 9, 15, 0.5);
+        padding: 0.8rem;
+        border-radius: 10px;
+        backdrop-filter: blur(4px);
       }
       .dpad {
         display: grid;
@@ -181,8 +188,8 @@
         border: 1px solid rgba(var(--accent-rgb), 0.5);
         background: linear-gradient(
           180deg,
-          rgba(var(--accent-rgb), 0.25),
-          rgba(8, 17, 30, 0.85)
+          rgba(var(--accent-rgb), 0.35),
+          rgba(8, 17, 30, 0.7)
         );
         color: var(--accent);
         cursor: pointer;
@@ -198,10 +205,10 @@
       .dpad-btn:hover {
         background: linear-gradient(
           180deg,
-          rgba(var(--accent-rgb), 0.35),
-          rgba(12, 21, 40, 0.9)
+          rgba(var(--accent-rgb), 0.55),
+          rgba(12, 21, 40, 0.95)
         );
-        box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.35);
+        box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.45);
         transform: translateY(-2px);
       }
       .dpad-btn:active {
@@ -253,14 +260,18 @@
         .description {
           text-align: center;
         }
+        .dpad-container {
+          bottom: 0.7rem;
+          padding: 0.6rem;
+        }
         .dpad {
-          width: 180px;
-          height: 180px;
+          width: 160px;
+          height: 160px;
         }
         .dpad-btn {
-          min-width: 50px;
-          min-height: 50px;
-          font-size: 1.2rem;
+          min-width: 48px;
+          min-height: 48px;
+          font-size: 1.1rem;
         }
       }
     </style>
@@ -275,20 +286,19 @@
         </p>
         <div class="stage">
           <canvas id="board" width="480" height="480" aria-label="Snake game board placeholder"></canvas>
+          <div class="dpad-container">
+            <div class="dpad">
+              <button class="dpad-btn dpad-up" id="dpad-up" aria-label="Up">↑</button>
+              <button class="dpad-btn dpad-left" id="dpad-left" aria-label="Left">←</button>
+              <button class="dpad-btn dpad-down" id="dpad-down" aria-label="Down">↓</button>
+              <button class="dpad-btn dpad-right" id="dpad-right" aria-label="Right">→</button>
+            </div>
+          </div>
         </div>
         <div class="hud">
           <span class="pill" id="status-pill">Press Space/Enter to start</span>
           <span class="pill" id="score-pill">Score: 0</span>
           <button class="button" id="restart-btn">Restart</button>
-        </div>
-        <div class="dpad-container">
-          <div class="dpad">
-            <button class="dpad-btn dpad-up" id="dpad-up" aria-label="Up">↑</button>
-            <button class="dpad-btn dpad-left" id="dpad-left" aria-label="Left">←</button>
-            <button class="dpad-btn dpad-down" id="dpad-down" aria-label="Down">↓</button>
-            <button class="dpad-btn dpad-right" id="dpad-right" aria-label="Right">→</button>
-          </div>
-          <span class="dpad-hint" id="dpad-hint">Tap arrows or swipe</span>
         </div>
       </section>
     </main>
