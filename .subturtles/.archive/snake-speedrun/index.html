@@ -73,17 +73,18 @@
         pointer-events: none;
       }
       .title {
-        margin: 0 0 0.6rem;
+        margin: 0 0 0.3rem;
         font-size: clamp(1.5rem, 3.6vw, 2.2rem);
         letter-spacing: 0.14em;
         text-transform: uppercase;
         text-shadow: 0 0 12px rgba(var(--accent-rgb), 0.45);
       }
-      .description {
-        margin: 0 0 1rem;
-        color: rgba(230, 240, 255, 0.82);
-        line-height: 1.45;
-        max-width: 60ch;
+      .score-display {
+        margin: 0 0 0.8rem;
+        font-size: clamp(1rem, 2vw, 1.25rem);
+        color: rgba(230, 240, 255, 0.9);
+        text-align: left;
+        letter-spacing: 0.04em;
       }
       .stage {
         width: 100%;
@@ -94,13 +95,15 @@
         background:
           linear-gradient(180deg, rgba(8, 15, 32, 0.85), rgba(4, 9, 18, 0.94)),
           var(--canvas);
-        display: grid;
-        place-items: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         position: relative;
         padding: 0.5rem;
         box-shadow:
           inset 0 0 0 1px rgba(255, 255, 255, 0.07),
           0 12px 34px rgba(0, 0, 0, 0.35);
+        margin-bottom: 0.8rem;
       }
       canvas {
         width: min(90vw, 560px);
@@ -135,8 +138,8 @@
         align-items: center;
         justify-content: center;
         gap: 1rem;
-        margin-top: 0.8rem;
         flex-wrap: wrap;
+        width: 100%;
       }
       .button {
         border: 1px solid rgba(var(--accent-rgb), 0.6);
@@ -288,10 +291,7 @@
     <main class="wrap">
       <section class="card">
         <h1 class="title">Snake Speedrun</h1>
-        <p class="description">
-          Playable snake core with grid movement, food collection, collisions, scoring, and
-          restart flow.
-        </p>
+        <div class="score-display" id="score-display">Score: 0</div>
         <div class="stage">
           <canvas id="board" width="480" height="480" aria-label="Snake game board placeholder"></canvas>
         </div>
@@ -304,25 +304,17 @@
               <button class="dpad-btn dpad-right" id="dpad-right" aria-label="Right">→</button>
             </div>
           </div>
-          <button class="button" id="restart-btn">Start</button>
-        </div>
-        <div class="hud">
-          <span class="pill" id="status-pill">Tap Start to begin</span>
-          <span class="pill" id="score-pill">Score: 0</span>
         </div>
       </section>
     </main>
     <script>
       const canvas = document.getElementById("board");
       const context = canvas.getContext("2d");
-      const statusPill = document.getElementById("status-pill");
-      const scorePill = document.getElementById("score-pill");
-      const restartButton = document.getElementById("restart-btn");
+      const scoreDisplay = document.getElementById("score-display");
       const dpadUpBtn = document.getElementById("dpad-up");
       const dpadLeftBtn = document.getElementById("dpad-left");
       const dpadDownBtn = document.getElementById("dpad-down");
       const dpadRightBtn = document.getElementById("dpad-right");
-      const dpadHint = document.getElementById("dpad-hint");
 
       let touchStartX = 0;
       let touchStartY = 0;
@@ -356,9 +348,6 @@
         updateHud();
         render();
         gameLoop = setInterval(step, TICK_MS);
-        statusPill.textContent = isTouchDevice()
-          ? "Tap arrows or swipe to steer"
-          : "Arrow keys to steer";
       }
 
       function isTouchDevice() {
@@ -374,9 +363,6 @@
         isRunning = false;
         isGameOver = true;
         clearInterval(gameLoop);
-        statusPill.textContent = isTouchDevice()
-          ? "Game over — tap Start"
-          : "Game over — tap Start or press Space/Enter/R";
         render();
       }
 
@@ -441,7 +427,7 @@
           snake.pop();
         }
 
-        scorePill.textContent = `Score: ${score}`;
+        scoreDisplay.textContent = `Score: ${score}`;
         render();
       }
 
@@ -509,14 +495,15 @@
       }
 
       function updateHud() {
-        scorePill.textContent = `Score: ${score}`;
-      }
-
-      function handleStartOrRestart() {
-        startGame();
+        scoreDisplay.textContent = `Score: ${score}`;
       }
 
       function handleDpadClick(dx, dy) {
+        if (!isRunning || isGameOver) {
+          startGame();
+          setDirection(dx, dy);
+          return;
+        }
         setDirection(dx, dy);
       }
 
@@ -536,7 +523,12 @@
         const deltaY = touchEndY - touchStartY;
         const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-        if (distance < 30) return;
+        if (distance < 30) {
+          if (!isRunning || isGameOver) {
+            startGame();
+          }
+          return;
+        }
 
         const absX = Math.abs(deltaX);
         const absY = Math.abs(deltaY);
@@ -576,7 +568,6 @@
         }
       }
 
-      restartButton.addEventListener("click", handleStartOrRestart);
       window.addEventListener("keydown", onKeyDown);
 
       dpadUpBtn.addEventListener("click", () => handleDpadClick(0, -1));
@@ -589,7 +580,6 @@
 
       food = randomFood();
       updateHud();
-      statusPill.textContent = "Tap Start to begin";
       render();
     </script>
   </body>
