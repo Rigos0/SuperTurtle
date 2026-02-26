@@ -23,8 +23,20 @@ set -euo pipefail
 PROJECT_DIR="${1:?project-dir required}"
 PORT="${2:-3000}"
 WORKSPACE_DIR="${3:-.}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 # Resolve to absolute paths
+if [[ ! -d "$PROJECT_DIR" ]]; then
+  ARCHIVE_PROJECT_DIR="${ROOT_DIR}/.subturtles/.archive/${PROJECT_DIR}"
+  if [[ -d "$ARCHIVE_PROJECT_DIR" ]]; then
+    echo "[start-tunnel] INFO: project-dir '${PROJECT_DIR}' not found in cwd; using archived workspace '${ARCHIVE_PROJECT_DIR}'."
+    PROJECT_DIR="$ARCHIVE_PROJECT_DIR"
+  else
+    echo "[start-tunnel] ERROR: project-dir '${PROJECT_DIR}' does not exist." >&2
+    exit 1
+  fi
+fi
 PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
 WORKSPACE_DIR="$(cd "$WORKSPACE_DIR" && pwd)"
 
