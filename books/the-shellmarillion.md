@@ -105,6 +105,8 @@ Northward rose Ilyssar by Cheladri’s seed. Its scribes pressed pearl-dust into
 
 For long centuries they traded in peace. A basin at the Nine Steps became their meeting-place, and an Accord was sworn: no city would starve another, no gate would close without counsel, no captain would turn a current to private war. Prosperity came, and with it a slower appetite for restraint.
 
+If one could have carved their realm in that age upon a shell-plate, the map would have shown four bright circles set around the Nine Steps like constellations turned to sea. Selenrata sat in the south-east basin, broad-bellied and calm; Auralis cleaved the western glass ridges and rang to the long distance; Kheledath held the northern vents and read the pressure as law; Ilyssar traced the lower southern trench, where currents turned inward and records were kept for ages ahead. Between them ran the Quiet Trench-lines, a ring-river of trade and warning whose deepest turn was said to hold the world’s oldest memory of sound.
+
 Then came the first soft fracture. Counselors of blood argued that law belonged to the oldest carapace, not the oldest vow. In Selenrata, some demanded greater rights for builders. In Kheledath, some argued for permanent watch and full levy. In Auralis, bell-masters asked why far cities should summon them in every need. In Ilyssar, some hid ledgers from those who could not pay.
 
 Trade diminished though no embargo was named. Envoys waited longer at outer gates. Gates that once opened with little ceremony now bore layered watch-signs. In the dark between visits, old songs were recited less for joy and more as proof. A small wound can be named at once; a small pride is harder to tend.
