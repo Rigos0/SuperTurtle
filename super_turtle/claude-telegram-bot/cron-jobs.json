@@ -1,11 +1,29 @@
 [
   {
-    "id": "3b29bd",
-    "prompt": "[SILENT CHECK-IN] Check SubTurtle codex-driver-v2: run `./super_turtle/subturtle/ctl status codex-driver-v2`, inspect `.subturtles/codex-driver-v2/CLAUDE.md`, and review `git log --oneline -10`.\nRules: Do NOT message the user unless one of these conditions is met:\n- \ud83c\udf89 SubTurtle completed all backlog items -> stop SubTurtle codex-driver-v2 and report what shipped\n- \u26a0\ufe0f SubTurtle appears stuck (no meaningful progress across 2+ checks) -> stop it, diagnose, and report\n- \u274c SubTurtle errored, crashed, or is otherwise broken -> report the error clearly\n- \ud83d\ude80 New milestone reached (significant backlog progress) -> send one brief update\nIf SubTurtle is progressing normally without notable events, respond with only: [SILENT]",
+    "id": "a5d5ab",
+    "prompt": "[SILENT CHECK-IN] Check SubTurtle codex-mcp-fix: run `./super_turtle/subturtle/ctl status codex-mcp-fix`, inspect `.subturtles/codex-mcp-fix/CLAUDE.md`, and review `git log --oneline -10`.\nRules: Do NOT message the user unless one of these conditions is met:\n- \ud83c\udf89 SubTurtle completed all backlog items -> stop SubTurtle codex-mcp-fix and report what shipped\n- \u26a0\ufe0f SubTurtle appears stuck (no meaningful progress across 2+ checks) -> stop it, diagnose, and report\n- \u274c SubTurtle errored, crashed, or is otherwise broken -> report the error clearly\n- \ud83d\ude80 New milestone reached (significant backlog progress) -> send one brief update\nIf SubTurtle is progressing normally without notable events, respond with only: [SILENT]",
+    "type": "recurring",
+    "interval_ms": 600000,
+    "silent": true,
+    "fire_at": 1772106542365,
+    "created_at": "2026-02-26T10:18:12Z"
+  },
+  {
+    "id": "f1cb9a",
+    "prompt": "[SILENT CHECK-IN] Check SubTurtle codex-mcp-fix: run `./super_turtle/subturtle/ctl status codex-mcp-fix`, inspect `.subturtles/codex-mcp-fix/CLAUDE.md`, and review `git log --oneline -10`.\nRules: Do NOT message the user unless one of these conditions is met:\n- \ud83c\udf89 SubTurtle completed all backlog items -> stop SubTurtle codex-mcp-fix and report what shipped\n- \u26a0\ufe0f SubTurtle appears stuck (no meaningful progress across 2+ checks) -> stop it, diagnose, and report\n- \u274c SubTurtle errored, crashed, or is otherwise broken -> report the error clearly\n- \ud83d\ude80 New milestone reached (significant backlog progress) -> send one brief update\nIf SubTurtle is progressing normally without notable events, respond with only: [SILENT]",
+    "type": "recurring",
+    "interval_ms": 600000,
+    "silent": true,
+    "fire_at": 1772106558798,
+    "created_at": "2026-02-26T10:37:24Z"
+  },
+  {
+    "id": "6d298c",
+    "prompt": "[SILENT CHECK-IN] Check SubTurtle commit-dangling: run `./super_turtle/subturtle/ctl status commit-dangling`, inspect `.subturtles/commit-dangling/CLAUDE.md`, and review `git log --oneline -10`.\nRules: Do NOT message the user unless one of these conditions is met:\n- \ud83c\udf89 SubTurtle completed all backlog items -> stop SubTurtle commit-dangling and report what shipped\n- \u26a0\ufe0f SubTurtle appears stuck (no meaningful progress across 2+ checks) -> stop it, diagnose, and report\n- \u274c SubTurtle errored, crashed, or is otherwise broken -> report the error clearly\n- \ud83d\ude80 New milestone reached (significant backlog progress) -> send one brief update\nIf SubTurtle is progressing normally without notable events, respond with only: [SILENT]",
     "silent": true,
     "type": "recurring",
-    "fire_at": 1772062555426,
+    "fire_at": 1772106921078,
     "interval_ms": 600000,
-    "created_at": "2026-02-25T23:25:55Z"
+    "created_at": "2026-02-26T11:45:21Z"
   }
 ]

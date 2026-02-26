@@ -54,9 +54,7 @@ An autonomous coding system you talk to on Telegram. You describe what you want 
 
 # Current task
 
-UX Overhaul complete (Phases 1-6). All phases shipped. System is now fully autonomous: specs-driven decomposition, parallel SubTurtles, silent supervision, usage-aware resource management.
-
-Ready for new project work or integration testing.
+Commit dangling changes in the repo.
 
 # End goal with specs
 
@@ -96,11 +94,15 @@ Agentic repository — autonomous agent coordination system (SubTurtles). Core i
 
 # Roadmap (Upcoming)
 
-- Integration testing — verify all UX phases work together end-to-end
-- Update UX-overhaul-proposal.md with completion status
+- Codex parity gap audit (Claude vs Codex flows)
+- Implement missing Codex driver/session/command features
+- Harden restart behavior to avoid unsafe self-termination during autonomous runs
+- End-to-end parity testing and overnight supervision validation
+- Update docs with parity completion status and residual limitations
 
 # Backlog
 
+- [ ] Commit dangling changes <- current
 - [x] Plan silent check-in architecture
 - [x] Implement silent check-in mechanism in bot + cron system
 - [x] Update META_SHARED.md supervision section for silent behavior
@@ -113,5 +115,9 @@ Agentic repository — autonomous agent coordination system (SubTurtles). Core i
 - [x] UX Phase 5: Enhanced /status command
 - [x] UX Phase 6: Usage-aware resource management
 - [x] Change ctl default to yolo-codex
-- [ ] Integration testing — verify all phases work together <- current
-- [ ] Update UX-overhaul-proposal.md with completion status
+- [ ] Build Codex-vs-Claude parity checklist from current code/tests
+- [ ] Investigate iOS Telegram inline button disappearance (ask_user + command buttons)
+- [ ] Implement Codex parity fixes in driver/session/handlers
+- [ ] Add/expand tests for `/usage`, `/restart`, `/resume`, MCP, and bot-control flows on Codex
+- [ ] Run integration pass (Codex mode + Claude mode) and verify no regressions
+- [ ] Update docs with completion status and known gaps
