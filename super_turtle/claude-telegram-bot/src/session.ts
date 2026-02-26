@@ -86,6 +86,7 @@ function normalizeQueryError(error: unknown): Error {
  */
 // Maximum number of sessions to keep in history
 const MAX_SESSIONS = 5;
+const EVENT_STREAM_STALL_TIMEOUT_MS = 30_000;
 
 // Model configuration
 export type EffortLevel = "low" | "medium" | "high";
@@ -379,6 +380,7 @@ export class ClaudeSession {
     let lastTextUpdate = 0;
     let queryCompleted = false;
     let askUserTriggered = false;
+    let stalled = false;
 
     try {
       // Use V1 query() API - supports all options including cwd, mcpServers, etc.
@@ -390,8 +392,43 @@ export class ClaudeSession {
         },
       });
 
-      // Process streaming response
-      for await (const event of queryInstance) {
+      // Process streaming response with stall detection. If the SDK stream stops
+      // yielding events without closing, break out and flush accumulated text.
+      const iterator = queryInstance[Symbol.asyncIterator]();
+      const stallTimeoutSentinel = Symbol("event-stream-stall-timeout");
+
+      while (true) {
+        const iteratorNext = iterator.next();
+        let stallTimer: ReturnType<typeof setTimeout> | null = null;
+        const nextResult = await Promise.race<
+          IteratorResult<SDKMessage> | typeof stallTimeoutSentinel
+        >([
+          iteratorNext,
+          new Promise<typeof stallTimeoutSentinel>((resolve) => {
+            stallTimer = setTimeout(
+              () => resolve(stallTimeoutSentinel),
+              EVENT_STREAM_STALL_TIMEOUT_MS
+            );
+          }),
+        ]);
+        if (stallTimer) {
+          clearTimeout(stallTimer);
+        }
+
+        if (nextResult === stallTimeoutSentinel) {
+          stalled = true;
+          console.warn(
+            `Event stream stalled for ${EVENT_STREAM_STALL_TIMEOUT_MS}ms; aborting stream and flushing partial response`
+          );
+          this.abortController?.abort();
+          break;
+        }
+
+        if (nextResult.done) {
+          break;
+        }
+
+        const event = nextResult.value;
         // Check for abort
         if (this.stopRequested) {
           console.log("Query aborted by user");
@@ -581,6 +618,10 @@ export class ClaudeSession {
         }
       }
 
+      if (stalled) {
+        console.log("Stall recovery activated; continuing with partial response flush");
+      }
+
       // V1 query completes automatically when the generator ends
     } catch (error) {
       const normalizedError = normalizeQueryError(error);
@@ -588,12 +629,14 @@ export class ClaudeSession {
       const isCleanupError =
         errorStr.includes("cancel") || errorStr.includes("abort");
       const isPostCompletionError = queryCompleted || askUserTriggered;
+      const isStallAbort = stalled && responseParts.length > 0;
 
       // Claude CLI may exit non-zero after emitting a completed "result" event.
       // Treat that as success to avoid duplicate retries/errors.
       if (
         (isCleanupError &&
-          (isPostCompletionError || this.stopRequested)) ||
+          (isPostCompletionError || this.stopRequested || isStallAbort)) ||
+        isStallAbort ||
         isPostCompletionError
       ) {
         console.warn(
