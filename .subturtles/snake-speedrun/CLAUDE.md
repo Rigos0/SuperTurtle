@@ -1,5 +1,5 @@
 ## Current Task
-Start dev server + cloudflared tunnel using `bash super_turtle/subturtle/start-tunnel.sh snake-speedrun 3000`, then verify the game URL is written to `.tunnel-url`.
+Verify the game loads and is playable through the tunnel URL.
 
 ## End Goal with Specs
 A simple but polished HTML/JS Snake game served by a local dev server, accessible via a public cloudflared tunnel URL. The game should be fully playable: arrow key controls, growing snake, food spawning, score display, game over + restart. Dark background with neon green snake for that classic retro look.
@@ -8,8 +8,8 @@ A simple but polished HTML/JS Snake game served by a local dev server, accessibl
 - [x] Create a minimal Next.js or static HTML snake game in `snake-speedrun/` directory (single page app — `app/page.tsx` or plain `index.html` + bundler)
 - [x] Implement snake game logic: grid canvas, arrow key movement, food, collision, score, game over screen with restart
 - [x] Style it: dark background, neon green snake, retro aesthetic, centered on page, mobile-friendly
-- [ ] Start dev server + cloudflared tunnel using `bash super_turtle/subturtle/start-tunnel.sh snake-speedrun 3000`, write URL to `.tunnel-url` <- current
-- [ ] Verify the game loads and is playable through the tunnel URL
+- [x] Start dev server + cloudflared tunnel using `bash super_turtle/subturtle/start-tunnel.sh snake-speedrun 3000`, write URL to `.tunnel-url`
+- [ ] Verify the game loads and is playable through the tunnel URL <- current
 - [ ] Commit with clear message
 
 ## Notes
