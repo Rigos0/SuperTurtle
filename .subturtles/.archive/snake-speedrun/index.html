@@ -304,10 +304,10 @@
               <button class="dpad-btn dpad-right" id="dpad-right" aria-label="Right">→</button>
             </div>
           </div>
-          <button class="button" id="restart-btn">Restart</button>
+          <button class="button" id="restart-btn">Start</button>
         </div>
         <div class="hud">
-          <span class="pill" id="status-pill">Tap Restart to begin</span>
+          <span class="pill" id="status-pill">Tap Start to begin</span>
           <span class="pill" id="score-pill">Score: 0</span>
         </div>
       </section>
@@ -375,8 +375,8 @@
         isGameOver = true;
         clearInterval(gameLoop);
         statusPill.textContent = isTouchDevice()
-          ? "Game over — tap Restart"
-          : "Game over — tap Restart or press Space/Enter/R";
+          ? "Game over — tap Start"
+          : "Game over — tap Start or press Space/Enter/R";
         render();
       }
 
@@ -417,13 +417,8 @@
         };
 
         direction = nextDirection;
-
-        const hitWall =
-          next.x < 0 || next.x >= CELL_COUNT || next.y < 0 || next.y >= CELL_COUNT;
-        if (hitWall) {
-          gameOver();
-          return;
-        }
+        next.x = (next.x + CELL_COUNT) % CELL_COUNT;
+        next.y = (next.y + CELL_COUNT) % CELL_COUNT;
 
         const willGrow = next.x === food.x && next.y === food.y;
         const isColliding = snake.some((segment, index) => {
@@ -594,7 +589,7 @@
 
       food = randomFood();
       updateHud();
-      statusPill.textContent = "Tap Restart to begin";
+      statusPill.textContent = "Tap Start to begin";
       render();
     </script>
   </body>
