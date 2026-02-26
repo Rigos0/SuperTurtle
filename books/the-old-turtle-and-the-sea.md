@@ -36,7 +36,7 @@ He swam into the darkness.
 
 ## Chapter 2: The Storm
 
-The typhoon did not announce itself. There was only a change in the texture of the air, a thickening, a smell like copper in the water. The turtle felt it through his shell before he saw it—a pressure dropping, the ocean beginning to boil with something that was not hunger or hunger or heat, but rage.
+The typhoon did not announce itself. There was only a change in the texture of the air, a thickening, a smell like copper in the water. The turtle felt it through his shell before he saw it—a pressure dropping, the ocean beginning to boil with something that was not hunger or cold or heat, but rage.
 
 The wind came from the northeast. It drove the waves into mountains that had no shape, no pattern. The turtle had swum through storms before, but this was different. This was the ocean's refusal. This was death sorting through possibilities.
 
@@ -64,7 +64,7 @@ He swam forward anyway. There was nothing else to do.
 
 The beach came to him in stages. First, the water changed color—from the deep black of the open ocean to a blue-green that meant the bottom was rising. Then came the smell, something green and alive and nothing like the salt and emptiness he had known for so long. The current shifted. The sand began to whisper beneath him.
 
-He had been swimming for four months. The numbers meant nothing to him, but his body knew. The missing flipper had cost him. The injured one, worse. He had learned to move through the water like a broken thing, all asymmetry and compromise, but it had been enough. The ocean had not killed him. This was enough.
+He had been swimming for four months. The numbers meant nothing to him, but his body knew. The injured flipper had cost him. The other one, worse. He had learned to move through the water like a broken thing, all asymmetry and compromise, but it had been enough. The ocean had not killed him. This was enough.
 
 As the water shallowed, his damaged flippers touched bottom. He rested. He had not rested in months. The sensation of sand beneath his shell was strange, solid after the endless emptiness, and he did not know if he liked it. He did not know if he could move on land anymore. His left rear flipper was useless—bent wrong, the bone healed badly. But he had come this far. He had crossed the Pacific on three working limbs and will.
 
