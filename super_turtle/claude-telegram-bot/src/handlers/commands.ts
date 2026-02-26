@@ -1546,7 +1546,18 @@ export async function handleRestart(ctx: Context): Promise<void> {
   // Give time for the message to send
   await Bun.sleep(500);
 
-  // Exit - launchd will restart us
+  // Re-exec this same command so /restart works even when launched directly.
+  const botDir = `${WORKING_DIR}/super_turtle/claude-telegram-bot`;
+  const child = Bun.spawn(process.argv, {
+    cwd: botDir,
+    stdin: "ignore",
+    stdout: "ignore",
+    stderr: "ignore",
+    detached: true,
+  });
+  child.unref();
+
+  // Exit current process after replacement is spawned.
   process.exit(0);
 }
 

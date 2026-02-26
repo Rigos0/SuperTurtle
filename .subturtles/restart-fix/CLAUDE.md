@@ -1,5 +1,5 @@
 ## Current Task
-Replace `process.exit(0)` with: spawn detached child using `process.argv`, then exit.
+Update `run-loop.sh` to check for `.restart-self` marker and exit cleanly if found.
 
 ## End Goal with Specs
 `/restart` must work regardless of how the bot was launched (directly via `bun run src/index.ts` OR via `run-loop.sh`). After restart, the bot should:
@@ -57,8 +57,8 @@ This way:
 
 ## Backlog
 - [x] Add `.restart-self` marker file write in `handleRestart()` before spawning
-- [ ] Replace `process.exit(0)` with: spawn detached child using `process.argv`, then exit <- current
-- [ ] Update `run-loop.sh` to check for `.restart-self` marker and exit cleanly if found
+- [x] Replace `process.exit(0)` with: spawn detached child using `process.argv`, then exit
+- [ ] Update `run-loop.sh` to check for `.restart-self` marker and exit cleanly if found <- current
 - [ ] Test: run bot directly with `bun run src/index.ts`, send `/restart`, verify bot comes back
 - [ ] Commit with clear message
 
