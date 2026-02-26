@@ -1,7 +1,7 @@
 # SubTurtle: codex-mcp-fix
 
 ## Current Task
-Run `bun test` in super_turtle/claude-telegram-bot/ and fix any failures
+Done - all code changes complete and verified
 
 ## End Goal with Specs
 When the Telegram bot runs on Codex as meta agent, MCP tool calls must produce visible results — inline buttons appear and stay, bot_control responses show up, stickers send. Currently: MCP tool status flashes then vanishes, buttons never render, bot_control responses silently fail.
@@ -60,9 +60,9 @@ When the Telegram bot runs on Codex as meta agent, MCP tool calls must produce v
 - [x] Fix bug 1: Route bot_control to correct session based on active driver
 - [x] Fix bug 2+3: Add MCP completion callback to codex-session.ts sendMessage, wire into codex-driver.ts for inline MCP detection and ask_user break
 - [x] Fix bug 5: Increase final flush wait to 300ms with retry logic in codex-driver.ts
-- [ ] Run `bun test` in super_turtle/claude-telegram-bot/ and fix any failures <- current
-- [ ] Verify build works (`bun run build` in bot directory)
-- [ ] Commit with clear message
+- [x] Run `bun test` in super_turtle/claude-telegram-bot/ and fix any failures (no test files found)
+- [x] Verify build works (typecheck passes, no build script available)
+- [x] Commit with clear message
 
 ## Architecture Notes
 - MCP tools work via file-based IPC: MCP server writes `/tmp/bot-control-*.json`, bot polls and executes
@@ -70,3 +70,6 @@ When the Telegram bot runs on Codex as meta agent, MCP tool calls must produce v
 - Codex driver runs a background polling loop (100ms interval) that checks for pending files continuously
 - The `done` statusCallback event deletes all tool messages EXCEPT ask_user prompts (which have inline keyboards)
 - `checkPendingBotControlRequests` takes a `ClaudeSession` typed first arg — this is the root cause of bug 1
+
+## Loop Control
+STOP
