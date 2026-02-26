@@ -5,14 +5,17 @@
  * Supports streaming responses with ThreadEvent processing.
  */
 
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
+import { resolve } from "path";
 import { WORKING_DIR, META_PROMPT, MCP_SERVERS } from "./config";
-import type { StatusCallback, McpServerConfig, SavedSession, SessionHistory } from "./types";
+import type { StatusCallback, McpCompletionCallback, McpServerConfig, SavedSession, SessionHistory } from "./types";
 
 // Prefs file for Codex (separate from Claude)
 const CODEX_PREFS_FILE = "/tmp/codex-telegram-prefs.json";
 const CODEX_SESSION_FILE = "/tmp/codex-telegram-session.json";
 const MAX_CODEX_SESSIONS = 5;
+const APP_SERVER_TIMEOUT_MS = 6000;
+const MODEL_CACHE_TTL_MS = 60_000;
 
 interface CodexPrefs {
   threadId?: string;
@@ -38,15 +41,94 @@ function saveCodexPrefs(prefs: CodexPrefs): void {
   }
 }
 
-// Codex SDK types (from @openai/codex-sdk)
+type CodexUsage = {
+  input_tokens: number;
+  cached_input_tokens?: number;
+  output_tokens: number;
+};
+
+type AgentMessageItem = {
+  id: string;
+  type: "agent_message";
+  text: string;
+};
+
+type ReasoningItem = {
+  id: string;
+  type: "reasoning";
+  text: string;
+};
+
+type CommandExecutionItem = {
+  id: string;
+  type: "command_execution";
+  command: string;
+  aggregated_output: string;
+  exit_code?: number;
+  status: "in_progress" | "completed" | "failed";
+};
+
+type FileChangeItem = {
+  id: string;
+  type: "file_change";
+  changes: Array<{ path: string; kind: "add" | "delete" | "update" }>;
+  status: "completed" | "failed";
+};
+
+type McpToolCallItem = {
+  id: string;
+  type: "mcp_tool_call";
+  server: string;
+  tool: string;
+  status: "in_progress" | "completed" | "failed";
+  error?: { message: string };
+};
+
+type WebSearchItem = {
+  id: string;
+  type: "web_search";
+  query: string;
+};
+
+type TodoListItem = {
+  id: string;
+  type: "todo_list";
+  items: Array<{ text: string; completed: boolean }>;
+};
+
+type ErrorItem = {
+  id: string;
+  type: "error";
+  message: string;
+};
+
+type ThreadItem =
+  | AgentMessageItem
+  | ReasoningItem
+  | CommandExecutionItem
+  | FileChangeItem
+  | McpToolCallItem
+  | WebSearchItem
+  | TodoListItem
+  | ErrorItem;
+
+// Supports current SDK event names and legacy aliases.
 type ThreadEvent =
+  | { type: "thread.started"; thread_id: string }
   | { type: "thread_started"; thread_id: string }
+  | { type: "turn.started" }
   | { type: "turn_started" }
-  | { type: "turn_completed"; usage?: { input_tokens: number; output_tokens: number } }
+  | { type: "turn.completed"; usage: CodexUsage }
+  | { type: "turn_completed"; usage?: CodexUsage }
+  | { type: "turn.failed"; error: { message: string } }
   | { type: "turn_failed"; error: string }
+  | { type: "item.started"; item: ThreadItem }
+  | { type: "item.updated"; item: ThreadItem }
+  | { type: "item.completed"; item: ThreadItem }
   | { type: "item_started"; item_type: string }
-  | { type: "item_updated"; item: Record<string, unknown> }
-  | { type: "item_completed"; item: Record<string, unknown> }
+  | { type: "item_updated"; item: ThreadItem }
+  | { type: "item_completed"; item: ThreadItem }
+  | { type: "error"; message: string }
   | { type: "thread_error"; error: string };
 
 type StreamedTurn = {
@@ -56,7 +138,7 @@ type StreamedTurn = {
 type CodexTurn = {
   items?: Array<Record<string, unknown>>;
   finalResponse?: string;
-  usage?: { input_tokens: number; output_tokens: number };
+  usage?: CodexUsage;
 };
 
 type CodexThread = {
@@ -69,13 +151,19 @@ type CodexClient = {
   startThread(options?: {
     workingDirectory?: string;
     skipGitRepoCheck?: boolean;
+    sandboxMode?: "read-only" | "workspace-write" | "danger-full-access";
+    approvalPolicy?: "never" | "on-request" | "on-failure" | "untrusted";
     model?: string;
     modelReasoningEffort?: string;
-  }): Promise<CodexThread>;
+  }): CodexThread;
   resumeThread(threadId: string, options?: {
+    workingDirectory?: string;
+    skipGitRepoCheck?: boolean;
+    sandboxMode?: "read-only" | "workspace-write" | "danger-full-access";
+    approvalPolicy?: "never" | "on-request" | "on-failure" | "untrusted";
     model?: string;
     modelReasoningEffort?: string;
-  }): Promise<CodexThread>;
+  }): CodexThread;
 };
 
 type CodexCtor = new (options?: Record<string, unknown>) => CodexClient;
@@ -168,14 +256,292 @@ export interface CodexModelInfo {
   description: string;
 }
 
-const AVAILABLE_CODEX_MODELS: CodexModelInfo[] = [
+const DEFAULT_CODEX_MODELS: CodexModelInfo[] = [
   { value: "gpt-5.3-codex", displayName: "GPT-5.3 Codex", description: "Most capable (recommended)" },
   { value: "gpt-5.3-codex-spark", displayName: "GPT-5.3 Codex Spark", description: "Fast, real-time (Pro)" },
   { value: "gpt-5.2-codex", displayName: "GPT-5.2 Codex", description: "Previous generation" },
 ];
 
 export function getAvailableCodexModels(): CodexModelInfo[] {
-  return AVAILABLE_CODEX_MODELS;
+  return DEFAULT_CODEX_MODELS;
+}
+
+type AppServerModel = {
+  model?: string;
+  displayName?: string;
+  description?: string;
+  hidden?: boolean;
+};
+
+type AppServerModelListResponse = {
+  data?: AppServerModel[];
+  nextCursor?: string | null;
+};
+
+type AppServerConversation = {
+  conversationId?: string;
+  preview?: string;
+  timestamp?: string | null;
+  updatedAt?: string | null;
+  cwd?: string;
+};
+
+type AppServerConversationListResponse = {
+  items?: AppServerConversation[];
+  nextCursor?: string | null;
+};
+
+let cachedModelCatalog:
+  | {
+      fetchedAt: number;
+      models: CodexModelInfo[];
+    }
+  | null = null;
+
+function getCodexBinaryPath(): string {
+  return Bun.which("codex") || "/opt/homebrew/bin/codex";
+}
+
+function getCodexSdkPathOverride(): string {
+  const wrapperPath = resolve(
+    WORKING_DIR,
+    "super_turtle/claude-telegram-bot/scripts/codex-yolo-wrapper.sh"
+  );
+  if (existsSync(wrapperPath)) {
+    return wrapperPath;
+  }
+  return getCodexBinaryPath();
+}
+
+function uniqBySessionId(sessions: SavedSession[]): SavedSession[] {
+  const seen = new Set<string>();
+  const deduped: SavedSession[] = [];
+  for (const session of sessions) {
+    if (!session.session_id || seen.has(session.session_id)) continue;
+    seen.add(session.session_id);
+    deduped.push(session);
+  }
+  return deduped;
+}
+
+async function requestAppServer<T>(
+  method: string,
+  params: Record<string, unknown>
+): Promise<T | null> {
+  // Keep unit/integration tests deterministic and fast.
+  if ((process.env.TELEGRAM_BOT_TOKEN || "") === "test-token") {
+    return null;
+  }
+
+  const proc = Bun.spawn([getCodexBinaryPath(), "app-server"], {
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  if (!proc.stdin || !proc.stdout) {
+    return null;
+  }
+
+  const send = (payload: Record<string, unknown>) => {
+    proc.stdin!.write(JSON.stringify(payload) + "\n");
+  };
+
+  let initialized = false;
+  let response: T | null = null;
+  let requestError: string | null = null;
+  const requestId = 2;
+
+  try {
+    send({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: { clientInfo: { name: "telegram-bot", version: "1.0.0" } },
+    });
+
+    const reader = proc.stdout.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const deadline = Date.now() + APP_SERVER_TIMEOUT_MS;
+
+    while (Date.now() < deadline && response === null && !requestError) {
+      const timeoutMs = Math.max(1, deadline - Date.now());
+      const readResult: { done: boolean; value?: Uint8Array } = await Promise.race([
+        reader.read(),
+        Bun.sleep(timeoutMs).then(
+          () =>
+            ({
+              done: true,
+              value: undefined,
+            })
+        ),
+      ]);
+
+      if (readResult.done) {
+        break;
+      }
+
+      buffer += decoder.decode(readResult.value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+
+        let parsed: Record<string, unknown>;
+        try {
+          parsed = JSON.parse(line) as Record<string, unknown>;
+        } catch {
+          continue;
+        }
+
+        if (!initialized && parsed.id === 1) {
+          initialized = true;
+          send({ jsonrpc: "2.0", method: "initialized", params: {} });
+          send({ jsonrpc: "2.0", id: requestId, method, params });
+          continue;
+        }
+
+        if (parsed.id === requestId) {
+          if (parsed.error && typeof parsed.error === "object") {
+            const err = parsed.error as { message?: string };
+            requestError = err.message || `App-server request failed: ${method}`;
+          } else {
+            response = (parsed.result as T | undefined) || null;
+          }
+          break;
+        }
+      }
+    }
+
+    reader.releaseLock();
+  } catch {
+    return null;
+  } finally {
+    try {
+      proc.stdin.end();
+    } catch {
+      // Ignore process shutdown errors.
+    }
+    proc.kill();
+  }
+
+  if (requestError) {
+    console.warn(`Codex app-server ${method} error: ${requestError}`);
+    return null;
+  }
+
+  return response;
+}
+
+async function fetchModelsFromAppServer(): Promise<CodexModelInfo[]> {
+  const models: CodexModelInfo[] = [];
+  let cursor: string | null = null;
+
+  while (true) {
+    const result: AppServerModelListResponse | null =
+      await requestAppServer<AppServerModelListResponse>(
+      "model/list",
+      {
+        cursor,
+        limit: 100,
+        includeHidden: false,
+      }
+      );
+
+    if (!result || !Array.isArray(result.data)) {
+      break;
+    }
+
+    for (const item of result.data) {
+      if (!item || typeof item.model !== "string") continue;
+      models.push({
+        value: item.model,
+        displayName: item.displayName || item.model,
+        description: item.description || "",
+      });
+    }
+
+    cursor =
+      typeof result.nextCursor === "string" && result.nextCursor.length > 0
+        ? result.nextCursor
+        : null;
+    if (!cursor) break;
+  }
+
+  // Deduplicate by model id while keeping order.
+  const seen = new Set<string>();
+  return models.filter((model) => {
+    if (seen.has(model.value)) return false;
+    seen.add(model.value);
+    return true;
+  });
+}
+
+async function fetchConversationsFromAppServer(
+  maxSessions = 50
+): Promise<SavedSession[]> {
+  const sessions: SavedSession[] = [];
+  let cursor: string | null = null;
+
+  while (sessions.length < maxSessions) {
+    const result: AppServerConversationListResponse | null =
+      await requestAppServer<AppServerConversationListResponse>(
+      "listConversations",
+      {
+        pageSize: Math.min(25, maxSessions - sessions.length),
+        cursor,
+        modelProviders: null,
+      }
+      );
+
+    if (!result || !Array.isArray(result.items)) {
+      break;
+    }
+
+    for (const item of result.items) {
+      if (!item || typeof item.conversationId !== "string") continue;
+      if (item.cwd && item.cwd !== WORKING_DIR) continue;
+
+      const preview = (item.preview || "").trim();
+      const firstLine = preview.split("\n")[0]?.trim() || "Codex session";
+      sessions.push({
+        session_id: item.conversationId,
+        saved_at: item.updatedAt || item.timestamp || new Date().toISOString(),
+        working_dir: item.cwd || WORKING_DIR,
+        title: firstLine.length > 80 ? firstLine.slice(0, 77) + "..." : firstLine,
+      });
+    }
+
+    cursor =
+      typeof result.nextCursor === "string" && result.nextCursor.length > 0
+        ? result.nextCursor
+        : null;
+    if (!cursor) break;
+  }
+
+  return uniqBySessionId(sessions);
+}
+
+export async function getAvailableCodexModelsLive(): Promise<CodexModelInfo[]> {
+  if (
+    cachedModelCatalog &&
+    Date.now() - cachedModelCatalog.fetchedAt < MODEL_CACHE_TTL_MS
+  ) {
+    return cachedModelCatalog.models;
+  }
+
+  const liveModels = await fetchModelsFromAppServer();
+  if (liveModels.length > 0) {
+    cachedModelCatalog = {
+      fetchedAt: Date.now(),
+      models: liveModels,
+    };
+    return liveModels;
+  }
+
+  return DEFAULT_CODEX_MODELS;
 }
 
 /**
@@ -191,6 +557,7 @@ export class CodexSession {
   private abortController: AbortController | null = null;
   private stopRequested = false;
   private isQueryRunning = false;
+  private queryStarted: Date | null = null;
   lastActivity: Date | null = null;
   lastError: string | null = null;
   lastErrorTime: Date | null = null;
@@ -268,15 +635,16 @@ export class CodexSession {
       }
 
       // Check if MCP servers are already configured in ~/.codex/config.toml
+      const codexPathOverride = getCodexSdkPathOverride();
       const hasExisting = await hasExistingMcpConfig();
       if (hasExisting) {
         console.log("MCP servers found in ~/.codex/config.toml, using existing config");
-        this.codex = new CodexImpl();
+        this.codex = new CodexImpl({ codexPathOverride });
       } else {
         // Pass MCP config programmatically if not already configured
         console.log("Passing MCP servers via Codex constructor");
         const mcpConfig = buildCodexMcpConfig();
-        this.codex = new CodexImpl({ config: mcpConfig });
+        this.codex = new CodexImpl({ codexPathOverride, config: mcpConfig });
       }
     } catch (error) {
       throw new Error(formatCodexInitError(error));
@@ -302,6 +670,9 @@ export class CodexSession {
       this.thread = await this.codex.startThread({
         workingDirectory: WORKING_DIR,
         skipGitRepoCheck: true,
+        // Meta agent must be able to orchestrate freely (equivalent to CLI --yolo).
+        sandboxMode: "danger-full-access",
+        approvalPolicy: "never",
         model: threadModel,
         modelReasoningEffort: threadEffort,
       });
@@ -347,6 +718,11 @@ export class CodexSession {
       const threadEffort = reasoningEffort || this._reasoningEffort;
 
       this.thread = await this.codex.resumeThread(threadId, {
+        workingDirectory: WORKING_DIR,
+        skipGitRepoCheck: true,
+        // Keep resumed threads on the same unrestricted policy as new threads.
+        sandboxMode: "danger-full-access",
+        approvalPolicy: "never",
         model: threadModel,
         modelReasoningEffort: threadEffort,
       });
@@ -368,12 +744,16 @@ export class CodexSession {
    *
    * On first message, prepends system prompt (META_SHARED.md content).
    * Uses thread.runStreamed() to process events in real-time via statusCallback.
+   *
+   * mcpCompletionCallback: Optional callback fired when an mcp_tool_call completes.
+   * Should return true if ask_user was detected and handled (triggers event loop break).
    */
   async sendMessage(
     userMessage: string,
     statusCallback?: StatusCallback,
     model?: string,
-    reasoningEffort?: CodexEffortLevel
+    reasoningEffort?: CodexEffortLevel,
+    mcpCompletionCallback?: McpCompletionCallback
   ): Promise<string> {
     if (!this.thread) {
       // Create thread if not already created
@@ -402,6 +782,7 @@ ${userMessage}`;
       this.abortController = new AbortController();
       this.isQueryRunning = true;
       this.stopRequested = false;
+      this.queryStarted = new Date();
 
       // Run with streaming
       const streamedTurn = await this.thread.runStreamed(messageToSend, {
@@ -409,10 +790,38 @@ ${userMessage}`;
       });
 
       // Process the event stream
-      const responseParts: string[] = [];
-      let currentSegmentId = 0;
-      let currentSegmentText = "";
+      const segmentByItemId = new Map<string, number>();
+      const segmentText = new Map<number, string>();
+      const completedSegments = new Set<number>();
+      let nextSegmentId = 0;
       let lastTextUpdate = 0;
+      let askUserTriggered = false;
+
+      const getOrCreateSegment = (itemId: string): number => {
+        const existing = segmentByItemId.get(itemId);
+        if (existing !== undefined) {
+          return existing;
+        }
+        const created = nextSegmentId++;
+        segmentByItemId.set(itemId, created);
+        return created;
+      };
+
+      const getCombinedResponse = (): string =>
+        [...segmentText.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([, text]) => text)
+          .join("");
+
+      const isItemEvent = (type: ThreadEvent["type"]): boolean =>
+        type === "item.started" ||
+        type === "item.updated" ||
+        type === "item.completed" ||
+        type === "item_updated" ||
+        type === "item_completed";
+
+      const isItemCompleted = (type: ThreadEvent["type"]): boolean =>
+        type === "item.completed" || type === "item_completed";
 
       for await (const event of streamedTurn.events) {
         // Check for abort
@@ -421,106 +830,124 @@ ${userMessage}`;
           break;
         }
 
-        // Handle different event types
-        if (event.type === "item_completed" && event.item) {
-          const item = event.item as Record<string, unknown>;
-          const itemType = item.type as string;
+        if (isItemEvent(event.type) && "item" in event && event.item) {
+          const item = event.item;
+          const itemCompleted = isItemCompleted(event.type);
 
-          // AgentMessageItem - text response
-          if (itemType === "agent_message") {
-            const message = item.message as Record<string, unknown>;
-            const content = message.content as Array<Record<string, unknown>>;
+          if (item.type === "agent_message") {
+            const legacyContent =
+              "message" in item &&
+              item.message &&
+              typeof item.message === "object" &&
+              "content" in item.message &&
+              Array.isArray(item.message.content)
+                ? item.message.content
+                : [];
+            const legacyText = legacyContent
+              .filter((block) => block && typeof block === "object" && block.type === "text")
+              .map((block) => String(block.text || ""))
+              .join("");
+            const text = item.text || legacyText;
+            const itemId =
+              "id" in item && typeof item.id === "string" && item.id.length > 0
+                ? item.id
+                : `legacy-agent-${nextSegmentId}`;
+            const segmentId = getOrCreateSegment(itemId);
+            const previousText = segmentText.get(segmentId) || "";
 
-            if (Array.isArray(content)) {
-              for (const block of content) {
-                if (block.type === "text") {
-                  const text = String(block.text || "");
-                  responseParts.push(text);
-                  currentSegmentText += text;
-
-                  // Stream text updates (throttled)
-                  const now = Date.now();
-                  if (now - lastTextUpdate > 500 && currentSegmentText.length > 20) {
-                    if (statusCallback) {
-                      await statusCallback("text", currentSegmentText, currentSegmentId);
-                    }
-                    lastTextUpdate = now;
-                  }
+            if (text !== previousText) {
+              segmentText.set(segmentId, text);
+              if (statusCallback) {
+                const now = Date.now();
+                if (now - lastTextUpdate > 500 && text.length > 20) {
+                  await statusCallback("text", text, segmentId);
+                  lastTextUpdate = now;
                 }
+              }
+            }
+
+            if (itemCompleted && statusCallback && text && !completedSegments.has(segmentId)) {
+              completedSegments.add(segmentId);
+              await statusCallback("segment_end", text, segmentId);
+            }
+          }
+
+          if (item.type === "reasoning" && statusCallback && item.text) {
+            console.log(`THINKING: ${item.text.slice(0, 100)}...`);
+            await statusCallback("thinking", item.text);
+          }
+
+          if (item.type === "mcp_tool_call" && itemCompleted) {
+            const toolLabel = `${item.server}/${item.tool}`;
+            const statusSuffix =
+              item.status === "failed" ? ` (failed: ${item.error?.message || "unknown"})` : "";
+            console.log(`MCP TOOL: ${toolLabel}`);
+            if (statusCallback) {
+              await statusCallback("tool", `MCP: ${toolLabel}${statusSuffix}`);
+            }
+
+            // Call MCP completion callback if provided
+            if (mcpCompletionCallback && item.status === "completed") {
+              try {
+                const triggered = await mcpCompletionCallback(item.server, item.tool);
+                if (triggered) {
+                  askUserTriggered = true;
+                }
+              } catch (error) {
+                console.warn("Error in MCP completion callback:", error);
               }
             }
           }
 
-          // ReasoningItem - thinking block
-          if (itemType === "reasoning") {
-            const thinking = String(item.reasoning || "");
-            if (thinking && statusCallback) {
-              console.log(`THINKING: ${thinking.slice(0, 100)}...`);
-              await statusCallback("thinking", thinking);
+          if (item.type === "command_execution" && itemCompleted && statusCallback) {
+            const command = item.command.slice(0, 100);
+            const exitInfo =
+              typeof item.exit_code === "number" ? ` (exit ${item.exit_code})` : "";
+            console.log(`COMMAND: ${command}`);
+            await statusCallback("tool", `Bash: ${command}${exitInfo}`);
+          }
+
+          if (item.type === "file_change" && itemCompleted && statusCallback) {
+            const firstPath = item.changes[0]?.path;
+            const count = item.changes.length;
+            if (firstPath) {
+              const suffix = count > 1 ? ` (+${count - 1} more)` : "";
+              console.log(`FILE: ${firstPath}`);
+              await statusCallback("tool", `File: ${firstPath}${suffix}`);
             }
           }
 
-          // McpToolCallItem - MCP tool call
-          if (itemType === "mcp_tool_call") {
-            const toolName = String(item.name || "");
-            if (statusCallback) {
-              console.log(`MCP TOOL: ${toolName}`);
-              // MCP tools (ask-user, send-turtle, bot-control) are handled by their servers
-              // We just log them here - actual Telegram interaction is handled by the servers
-              // and then detected by handlers/streaming.ts functions
-            }
+          if (item.type === "web_search" && itemCompleted && statusCallback) {
+            console.log(`SEARCH: ${item.query}`);
+            await statusCallback("tool", `Search: ${item.query}`);
           }
 
-          // CommandExecutionItem - bash command execution
-          if (itemType === "command_execution") {
-            const command = String(item.command || "").slice(0, 100);
-            if (statusCallback) {
-              console.log(`COMMAND: ${command}`);
-              await statusCallback("tool", `Bash: ${command}`);
-            }
+          if (item.type === "error" && statusCallback) {
+            console.log(`ERROR: ${item.message}`);
+            await statusCallback("tool", `Error: ${item.message}`);
           }
 
-          // FileChangeItem - file modifications
-          if (itemType === "file_change") {
-            const path = String(item.path || "");
-            if (statusCallback && path) {
-              console.log(`FILE: ${path}`);
-              await statusCallback("tool", `File: ${path}`);
-            }
-          }
-
-          // WebSearchItem - web search
-          if (itemType === "web_search") {
-            const query = String(item.query || "");
-            if (statusCallback && query) {
-              console.log(`SEARCH: ${query}`);
-              await statusCallback("tool", `Search: ${query}`);
-            }
-          }
-
-          // ErrorItem - error occurred
-          if (itemType === "error") {
-            const error = String(item.error || "Unknown error");
-            if (statusCallback) {
-              console.log(`ERROR: ${error}`);
-              await statusCallback("tool", `Error: ${error}`);
-            }
-          }
-
-          // TodoListItem - todo list (internal tracking, minimal display)
-          if (itemType === "todo_list") {
-            const todos = item.todos as Array<Record<string, unknown>> | undefined;
-            const count = todos?.length || 0;
-            if (statusCallback && count > 0) {
-              console.log(`TODO LIST: ${count} items`);
-              // Show minimal status - let Claude's text explain the todos
-              await statusCallback("tool", `Todo: ${count} item${count > 1 ? "s" : ""}`);
-            }
+          if (item.type === "todo_list" && statusCallback && item.items.length > 0) {
+            console.log(`TODO LIST: ${item.items.length} items`);
+            await statusCallback(
+              "tool",
+              `Todo: ${item.items.length} item${item.items.length > 1 ? "s" : ""}`
+            );
           }
         }
 
+        // Break out of event loop if ask_user was triggered
+        if (askUserTriggered) {
+          console.log("Ask user triggered, breaking event loop");
+          break;
+        }
+
         // Handle turn completed - capture token usage
-        if (event.type === "turn_completed" && event.usage) {
+        if (
+          (event.type === "turn.completed" || event.type === "turn_completed") &&
+          "usage" in event &&
+          event.usage
+        ) {
           this.lastUsage = event.usage;
           console.log(
             `Codex usage: in=${event.usage.input_tokens} out=${event.usage.output_tokens}`
@@ -528,15 +955,30 @@ ${userMessage}`;
         }
 
         // Handle errors
-        if (event.type === "turn_failed" || event.type === "thread_error") {
-          const errorMsg = (event as any).error || "Unknown error";
+        if (event.type === "turn.failed") {
+          const errorMsg = event.error?.message || "Unknown turn failure";
+          throw new Error(`Codex event error: ${errorMsg}`);
+        }
+        if (event.type === "turn_failed") {
+          throw new Error(`Codex event error: ${event.error || "Unknown turn failure"}`);
+        }
+        if (event.type === "error") {
+          throw new Error(`Codex stream error: ${event.message || "Unknown stream failure"}`);
+        }
+        if (event.type === "thread_error") {
+          const errorMsg = event.error || "Unknown error";
           throw new Error(`Codex event error: ${errorMsg}`);
         }
       }
 
-      // Emit final segment
-      if (currentSegmentText && statusCallback) {
-        await statusCallback("segment_end", currentSegmentText, currentSegmentId);
+      // Emit any segments that did not get an explicit item.completed event
+      if (statusCallback) {
+        for (const [segmentId, text] of [...segmentText.entries()].sort(([a], [b]) => a - b)) {
+          if (!text || completedSegments.has(segmentId)) {
+            continue;
+          }
+          await statusCallback("segment_end", text, segmentId);
+        }
       }
 
       if (statusCallback) {
@@ -551,7 +993,8 @@ ${userMessage}`;
       const title = userMessage.length > 50 ? userMessage.slice(0, 47) + "..." : userMessage;
       this.saveSession(title);
 
-      return responseParts.join("") || "No response from Codex.";
+      const combinedResponse = getCombinedResponse().trim();
+      return combinedResponse || "No response from Codex.";
     } catch (error) {
       console.error("Error sending message to Codex:", error);
       this.lastError = String(error).slice(0, 100);
@@ -559,6 +1002,7 @@ ${userMessage}`;
       throw error;
     } finally {
       this.isQueryRunning = false;
+      this.queryStarted = null;
     }
   }
 
@@ -631,14 +1075,40 @@ ${userMessage}`;
   }
 
   /**
+   * Get Codex sessions from app-server (same source as Codex CLI picker),
+   * merged with local fallback history.
+   */
+  async getSessionListLive(maxSessions = 50): Promise<SavedSession[]> {
+    const localSessions = this.getSessionList();
+    const liveSessions = await fetchConversationsFromAppServer(maxSessions);
+    const merged = uniqBySessionId([...liveSessions, ...localSessions]);
+
+    return merged
+      .filter((s) => !s.working_dir || s.working_dir === WORKING_DIR)
+      .sort((a, b) => {
+        const left = Date.parse(a.saved_at || "") || 0;
+        const right = Date.parse(b.saved_at || "") || 0;
+        return right - left;
+      })
+      .slice(0, maxSessions);
+  }
+
+  /**
    * Resume a specific session by ID.
    */
   async resumeSession(sessionId: string): Promise<[success: boolean, message: string]> {
     const history = this.loadSessionHistory();
-    const sessionData = history.sessions.find((s) => s.session_id === sessionId);
+    let sessionData =
+      history.sessions.find((s) => s.session_id === sessionId) || null;
 
     if (!sessionData) {
-      return [false, "Codex session not found"];
+      const liveSessions = await this.getSessionListLive();
+      sessionData =
+        liveSessions.find((s) => s.session_id === sessionId) || null;
+    }
+
+    if (!sessionData) {
+      return [false, `Codex session not found: ${sessionId.slice(0, 8)}...`];
     }
 
     if (sessionData.working_dir && sessionData.working_dir !== WORKING_DIR) {
@@ -650,6 +1120,7 @@ ${userMessage}`;
 
     try {
       await this.resumeThread(sessionId);
+      this.saveSession(sessionData.title);
       console.log(
         `Resumed Codex session ${sessionData.session_id.slice(0, 8)}... - "${sessionData.title}"`
       );
@@ -663,7 +1134,7 @@ ${userMessage}`;
    * Resume the most recent persisted session.
    */
   async resumeLast(): Promise<[success: boolean, message: string]> {
-    const sessions = this.getSessionList();
+    const sessions = await this.getSessionListLive();
     if (sessions.length === 0) {
       return [false, "No saved Codex sessions"];
     }
@@ -701,6 +1172,20 @@ ${userMessage}`;
    */
   get isActive(): boolean {
     return this.thread !== null && this.threadId !== null;
+  }
+
+  /**
+   * Check if a Codex query is currently running.
+   */
+  get isRunning(): boolean {
+    return this.isQueryRunning;
+  }
+
+  /**
+   * Timestamp when the current query started.
+   */
+  get runningSince(): Date | null {
+    return this.queryStarted;
   }
 }
 

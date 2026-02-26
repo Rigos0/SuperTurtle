@@ -1,7 +1,7 @@
 # SubTurtle: codex-mcp-fix
 
 ## Current Task
-Fix bug 2+3: Add MCP completion callback to codex-session.ts sendMessage, wire into codex-driver.ts for inline MCP detection and ask_user break.
+Fix bug 5: Increase final flush wait to 300ms with retry logic in codex-driver.ts
 
 ## End Goal with Specs
 When the Telegram bot runs on Codex as meta agent, MCP tool calls must produce visible results — inline buttons appear and stay, bot_control responses show up, stickers send. Currently: MCP tool status flashes then vanishes, buttons never render, bot_control responses silently fail.
@@ -58,8 +58,8 @@ When the Telegram bot runs on Codex as meta agent, MCP tool calls must produce v
 
 ## Backlog
 - [x] Fix bug 1: Route bot_control to correct session based on active driver
-- [ ] Fix bug 2+3: Add MCP completion callback to codex-session.ts sendMessage, wire into codex-driver.ts for inline MCP detection and ask_user break <- current
-- [ ] Fix bug 5: Increase final flush wait to 300ms with retry logic in codex-driver.ts
+- [x] Fix bug 2+3: Add MCP completion callback to codex-session.ts sendMessage, wire into codex-driver.ts for inline MCP detection and ask_user break
+- [ ] Fix bug 5: Increase final flush wait to 300ms with retry logic in codex-driver.ts <- current
 - [ ] Run `bun test` in super_turtle/claude-telegram-bot/ and fix any failures
 - [ ] Verify build works (`bun run build` in bot directory)
 - [ ] Commit with clear message

@@ -12,6 +12,13 @@ export type StatusCallback = (
   segmentId?: number
 ) => Promise<void>;
 
+// MCP completion callback - fired when an mcp_tool_call completes
+// Returns true if ask_user was detected and handled, false otherwise
+export type McpCompletionCallback = (
+  server: string,
+  tool: string
+) => Promise<boolean>;
+
 // Rate limit bucket for token bucket algorithm
 export interface RateLimitBucket {
   tokens: number;

@@ -1,5 +1,6 @@
 import { codexSession, mapThinkingToReasoningEffort } from "../codex-session";
 import type { ChatDriver, DriverRunInput, DriverStatusSnapshot } from "./types";
+import type { McpCompletionCallback } from "../types";
 
 async function wait(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -18,6 +19,71 @@ export class CodexDriver implements ChatDriver {
     } = await import("../handlers/streaming");
 
     const reasoningEffort = mapThinkingToReasoningEffort(input.message);
+
+    // MCP completion callback: fires when an mcp_tool_call completes
+    const mcpCompletionCallback: McpCompletionCallback = async (server, tool) => {
+      // Detect ask-user tool and handle inline
+      if (tool === "ask-user") {
+        console.log("Ask-user tool completed, checking for pending requests");
+        // Small delay to let MCP server write the file
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        // Retry a few times in case of timing issues
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const buttonsSent = await checkPendingAskUserRequests(
+            input.ctx,
+            input.chatId
+          );
+          if (buttonsSent) {
+            console.log("Ask-user buttons sent, ask_user triggered");
+            return true; // Signal to break event loop
+          }
+          if (attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+        }
+      }
+
+      // Detect send-turtle tool and handle inline
+      if (tool === "send-turtle") {
+        console.log("Send-turtle tool completed, checking for pending requests");
+        // Small delay to let MCP server write the file
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        // Retry a few times in case of timing issues
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const photoSent = await checkPendingSendTurtleRequests(
+            input.ctx,
+            input.chatId
+          );
+          if (photoSent) break;
+          if (attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+        }
+      }
+
+      // Detect bot-control tool and handle inline
+      if (tool === "bot-control") {
+        console.log("Bot-control tool completed, checking for pending requests");
+        // Small delay to let MCP server write the file
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        // Retry a few times in case of timing issues
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const handled = await checkPendingBotControlRequests(
+            codexSession,
+            input.chatId
+          );
+          if (handled) break;
+          if (attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+        }
+      }
+
+      return false; // Only ask-user triggers event loop break
+    };
 
     let keepPolling = true;
     const pendingPump = (async () => {
@@ -41,7 +107,8 @@ export class CodexDriver implements ChatDriver {
         input.message,
         input.statusCallback,
         undefined,
-        reasoningEffort
+        reasoningEffort,
+        mcpCompletionCallback
       );
     } finally {
       keepPolling = false;
