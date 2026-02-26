@@ -7,6 +7,52 @@ process.env.CLAUDE_WORKING_DIR ||= process.cwd();
 const { CodexSession } = await import("./codex-session");
 
 describe("CodexSession Phase D", () => {
+  it("prepends current date/time on first message only", async () => {
+    const codex = new CodexSession();
+    let firstSentMessage = "";
+    let secondSentMessage = "";
+
+    const fakeThread = {
+      id: "thread-date-prefix",
+      run: async () => ({ finalResponse: "", usage: null }),
+      runStreamed: async (message: string) => {
+        if (!firstSentMessage) {
+          firstSentMessage = message;
+        } else {
+          secondSentMessage = message;
+        }
+        return {
+          events: (async function* () {
+            yield {
+              type: "item_completed",
+              item: {
+                type: "agent_message",
+                message: {
+                  content: [{ type: "text", text: "ok" }],
+                },
+              },
+            };
+            yield { type: "turn_completed", usage: { input_tokens: 1, output_tokens: 1 } };
+          })(),
+        };
+      },
+    };
+
+    (codex as any).thread = fakeThread;
+    (codex as any).threadId = "thread-date-prefix";
+    (codex as any).systemPromptPrepended = false;
+
+    await codex.sendMessage("first");
+    await codex.sendMessage("second");
+
+    expect(firstSentMessage).toContain("[Current date/time: ");
+    expect(firstSentMessage).toContain("]\n\n");
+    expect(firstSentMessage).toContain("first");
+    expect(secondSentMessage).toBe("second");
+
+    await codex.kill();
+  });
+
   it("captures usage from turn_completed and streams final text", async () => {
     const codex = new CodexSession();
     let passedSignal: AbortSignal | undefined;

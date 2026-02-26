@@ -767,14 +767,30 @@ export class CodexSession {
     this.lastMessage = userMessage;
 
     try {
-      // Prepend system prompt to first message
+      // Prepend system prompt and date/time prefix to first message in a new thread.
       let messageToSend = userMessage;
-      if (!this.systemPromptPrepended && META_PROMPT) {
-        messageToSend = `<system-instructions>
+      if (!this.systemPromptPrepended) {
+        const now = new Date();
+        const datePrefix = `[Current date/time: ${now.toLocaleDateString(
+          "en-US",
+          {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZoneName: "short",
+          }
+        )}]\n\n`;
+        messageToSend = `${datePrefix}${userMessage}`;
+        if (META_PROMPT) {
+          messageToSend = `<system-instructions>
 ${META_PROMPT}
 </system-instructions>
 
-${userMessage}`;
+${messageToSend}`;
+        }
         this.systemPromptPrepended = true;
       }
 

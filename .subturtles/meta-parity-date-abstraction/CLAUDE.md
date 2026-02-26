@@ -1,5 +1,5 @@
 ## Current Task
-Inject date/time prefix into first Codex message (only when new thread).
+Verify /stop behavior still works and no legacy code path is used.
 
 ## End Goal with Specs
 - Driver abstraction is always enabled (no env toggle needed).
@@ -8,8 +8,8 @@ Inject date/time prefix into first Codex message (only when new thread).
 
 ## Backlog
 - [x] Remove DRIVER_ABSTRACTION_V1 toggle and always route via drivers
-- [ ] Inject date/time prefix into first Codex message (only when new thread) <- current
-- [ ] Verify /stop behavior still works and no legacy code path is used
+- [x] Inject date/time prefix into first Codex message (only when new thread)
+- [ ] Verify /stop behavior still works and no legacy code path is used <- current
 - [ ] Commit changes
 
 ## Notes
