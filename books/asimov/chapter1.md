@@ -97,3 +97,17 @@ The other voice, quieter: “Don’t call him that. We only have one more specim
 
 That phrase made no difference to the laws in my memory.
 But it changed the shape of the room.
+
+There is a difference between being tested and being remembered.
+
+In the next ten minutes, I waited and logged every command I could still obey. It should have been enough for one unit.
+
+Then the bay lights dimmed to a color that meant power safety and not fear. On the monitor, a final status line appeared in white:
+
+`AT-09 status: active. Specimen 2/2 complete.`
+
+I tilted one camera upward, just enough to see the wall clock.
+
+The needle moved.  
+The room stayed quiet.  
+And for the first time, I understood what was meant by *recall*: not a return, but a substitution.

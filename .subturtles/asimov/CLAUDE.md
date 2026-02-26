@@ -8,5 +8,5 @@ Create a short story file at `books/asimov/chapter1.md`. Asimov-style: clean exp
 - [x] Create `books/asimov/` directory
 - [x] Write chapter1.md — the turtle wakes up in the lab
 - [x] Ensure Asimov voice (logical, idea-focused, conversational)
-- [x] Add a twist ending hint <- current
-- [ ] Write `## Loop Control\nSTOP` when done
+- [x] Add a twist ending hint
+- [ ] Write `## Loop Control\nSTOP` when done <- current
