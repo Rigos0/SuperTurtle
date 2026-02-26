@@ -85,4 +85,4 @@ Not for fame.
 Not for answer.
 Only because the line once chosen was now the only truth.
 
-At dawn, he made the same crossing, with no witness and no name.
+At dawn, he crossed the same dark line, unnamed and uncounted.
