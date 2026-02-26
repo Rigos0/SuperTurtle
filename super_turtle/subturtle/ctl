@@ -113,12 +113,12 @@ read_meta() {
   local mf
   mf="$(meta_file "$1")"
   if [[ -f "$mf" ]]; then
-    SPAWNED_AT="$(grep -m1 '^SPAWNED_AT=' "$mf" 2>/dev/null | cut -d= -f2)" || true
-    TIMEOUT_SECONDS="$(grep -m1 '^TIMEOUT_SECONDS=' "$mf" 2>/dev/null | cut -d= -f2)" || true
-    WATCHDOG_PID="$(grep -m1 '^WATCHDOG_PID=' "$mf" 2>/dev/null | cut -d= -f2)" || true
-    LOOP_TYPE="$(grep -m1 '^LOOP_TYPE=' "$mf" 2>/dev/null | cut -d= -f2)" || true
-    SKILLS="$(grep -m1 '^SKILLS=' "$mf" 2>/dev/null | cut -d= -f2)" || true
-    CRON_JOB_ID="$(grep -m1 '^CRON_JOB_ID=' "$mf" 2>/dev/null | cut -d= -f2)" || true
+    SPAWNED_AT="$(grep -m1 '^SPAWNED_AT=' "$mf" 2>/dev/null | cut -d= -f2-)" || true
+    TIMEOUT_SECONDS="$(grep -m1 '^TIMEOUT_SECONDS=' "$mf" 2>/dev/null | cut -d= -f2-)" || true
+    WATCHDOG_PID="$(grep -m1 '^WATCHDOG_PID=' "$mf" 2>/dev/null | cut -d= -f2-)" || true
+    LOOP_TYPE="$(grep -m1 '^LOOP_TYPE=' "$mf" 2>/dev/null | cut -d= -f2-)" || true
+    SKILLS="$(grep -m1 '^SKILLS=' "$mf" 2>/dev/null | cut -d= -f2-)" || true
+    CRON_JOB_ID="$(grep -m1 '^CRON_JOB_ID=' "$mf" 2>/dev/null | cut -d= -f2-)" || true
     return 0
   fi
   return 1
