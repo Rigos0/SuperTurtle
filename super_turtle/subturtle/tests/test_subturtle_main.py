@@ -48,10 +48,34 @@ def test_run_yolo_loop_retries_on_oserror(monkeypatch, tmp_path, capsys) -> None
     def stop_after_retry(_delay: int) -> None:
         raise StopLoop
 
-    monkeypatch.setattr(subturtle_main, "Claude", lambda: BrokenClaude())
+    monkeypatch.setattr(subturtle_main, "Claude", lambda **_kwargs: BrokenClaude())
     monkeypatch.setattr(subturtle_main.time, "sleep", stop_after_retry)
 
     with pytest.raises(StopLoop):
         subturtle_main.run_yolo_loop(tmp_path, "default")
 
     assert "retrying in" in capsys.readouterr().err
+
+
+def test_archive_workspace_uses_ctl_stop_and_preserves_meta(monkeypatch, tmp_path) -> None:
+    pid_file = tmp_path / "subturtle.pid"
+    meta_file = tmp_path / "subturtle.meta"
+    pid_file.write_text("4321\n", encoding="utf-8")
+    meta_file.write_text("CRON_JOB_ID=abc123\n", encoding="utf-8")
+
+    monkeypatch.setattr(subturtle_main.os, "getpid", lambda: 4321)
+
+    called = {}
+
+    def fake_run(cmd, **kwargs):
+        called["cmd"] = cmd
+        called["kwargs"] = kwargs
+
+    monkeypatch.setattr(subturtle_main.subprocess, "run", fake_run)
+
+    subturtle_main._archive_workspace(tmp_path, "worker-1")
+
+    assert not pid_file.exists()
+    assert meta_file.exists()
+    assert called["cmd"][1:] == ["stop", "worker-1"]
+    assert called["kwargs"]["check"] is True

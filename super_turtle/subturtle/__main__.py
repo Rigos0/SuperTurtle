@@ -335,25 +335,24 @@ def _log_retry(name: str, error: subprocess.CalledProcessError | OSError) -> Non
 
 
 def _archive_workspace(state_dir: Path, name: str) -> None:
-    """Archive a stopped SubTurtle workspace via ctl."""
+    """Finalize a self-stopped SubTurtle workspace via ctl stop."""
     ctl_path = Path(__file__).resolve().with_name("ctl")
     pid_file = state_dir / "subturtle.pid"
-    meta_file = state_dir / "subturtle.meta"
 
-    # Self-stop runs inside the SubTurtle process. Clear our own pid/meta markers
-    # first so `ctl archive` does not treat this workspace as still running.
+    # Self-stop runs inside the SubTurtle process. Clear our own PID marker
+    # first so `ctl stop` does not try to kill this process.
+    # Keep metadata intact so `ctl stop` can remove the recurring cron job.
     try:
         if pid_file.exists():
             pid_text = pid_file.read_text(encoding="utf-8").strip()
             if pid_text and int(pid_text) == os.getpid():
                 pid_file.unlink(missing_ok=True)
-                meta_file.unlink(missing_ok=True)
     except (OSError, ValueError):
         pass
 
     try:
         subprocess.run(
-            [str(ctl_path), "archive", name],
+            [str(ctl_path), "stop", name],
             cwd=Path.cwd(),
             check=True,
             stdout=subprocess.DEVNULL,
