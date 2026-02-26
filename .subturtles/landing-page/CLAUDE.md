@@ -20,7 +20,7 @@ Acceptance criteria:
 - [x] Update `landing/app/globals.css` tokens/utilities to match the new visual direction (no generic defaults)
 - [x] Verify responsive layout in code for mobile + desktop breakpoints and fix any overflow/alignment issues
 - [x] Run `npm run lint` (or project check command) in `landing/` and resolve issues
-- [ ] Update this CLAUDE.md progress, append `## Loop Control\nSTOP`, and commit changes
+- [ ] Update this CLAUDE.md progress, append `## Loop Control\nSTOP`, and commit changes <- current
 
 # Notes
 Target files:
