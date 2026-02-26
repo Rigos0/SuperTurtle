@@ -5,6 +5,9 @@ import sys
 from pathlib import Path
 
 
+MAX_CAPTURE_CHARS = 500_000
+
+
 def _run_streaming(cmd: list[str], cwd: Path) -> str:
     """Run a command, stream stdout line-by-line to stderr, return captured stdout.
 
@@ -17,19 +20,31 @@ def _run_streaming(cmd: list[str], cwd: Path) -> str:
         cmd,
         cwd=cwd,
         stdout=subprocess.PIPE,
-        text=True,
+        stderr=subprocess.STDOUT,
+        text=False,
     )
-    lines: list[str] = []
+    chunks: list[str] = []
+    captured_chars = 0
     if proc.stdout is None:
         raise RuntimeError("stdout is None despite PIPE being set")
-    for line in proc.stdout:
+    for raw_line in proc.stdout:
+        # Codex can emit binary/null-filled chunks on reconnect paths.
+        # Decode defensively so the SubTurtle loop keeps retrying instead of crashing.
+        line = raw_line.decode("utf-8", errors="replace").replace("\x00", "")
         sys.stderr.write(line)
         sys.stderr.flush()
-        lines.append(line)
+        if captured_chars < MAX_CAPTURE_CHARS:
+            remaining = MAX_CAPTURE_CHARS - captured_chars
+            if len(line) <= remaining:
+                chunks.append(line)
+                captured_chars += len(line)
+            else:
+                chunks.append(line[:remaining])
+                captured_chars = MAX_CAPTURE_CHARS
     proc.wait()
     if proc.returncode != 0:
         raise subprocess.CalledProcessError(proc.returncode, cmd)
-    return "".join(lines).strip()
+    return "".join(chunks).strip()
 
 
 class Claude:
@@ -81,7 +96,7 @@ class Codex:
     def execute(self, prompt: str) -> str:
         """Execute a prompt with full auto-approval. Returns agent output."""
         print(f"[codex] executing in {self.cwd} ...")
-        cmd = ["codex", "exec", "--yolo"]
+        cmd = ["codex", "exec", "--yolo", "--cd", str(self.cwd)]
         for add_dir in self.add_dirs:
             cmd.extend(["--add-dir", add_dir])
         cmd.append(prompt)

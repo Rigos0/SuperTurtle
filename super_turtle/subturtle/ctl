@@ -267,11 +267,62 @@ try:
 except (ValueError, TypeError):
     skills = []
 
+def _can_write_home(path: str | None) -> bool:
+    if not path:
+        return False
+    try:
+        os.makedirs(path, exist_ok=True)
+        probe = os.path.join(path, \".subturtle-home-write-test\")
+        with open(probe, \"w\", encoding=\"utf-8\") as f:
+            f.write(\"ok\")
+        os.remove(probe)
+        return True
+    except OSError:
+        return False
+
 env = os.environ.copy()
 # Strip Claude Code session vars so child can spawn its own claude processes
 for key in list(env):
     if key.startswith('CLAUDECODE'):
         del env[key]
+# Strip ALL Codex session/sandbox vars so inner codex processes start fresh.
+# Same pattern as CLAUDECODE* stripping above. The inner `codex exec` must
+# not inherit session IDs, thread IDs, or sandbox flags from the outer
+# Codex session (when the meta-agent is Codex). This prevents concurrent
+# session conflicts and auth errors.
+for key in list(env):
+    if key.startswith('CODEX'):
+        del env[key]
+
+# Re-pin CODEX_HOME to the real ~/.codex so the inner codex finds
+# auth.json and config.toml regardless of what the outer process had.
+real_codex_home = os.path.join(os.path.expanduser(\"~\"), \".codex\")
+if os.path.isdir(real_codex_home):
+    env[\"CODEX_HOME\"] = real_codex_home
+
+# In sandboxed runs, HOME can be read-only which makes Claude/Codex crash
+# before doing any work (they write ~/.claude*, ~/.claude.json, ~/.codex, etc.).
+# Fall back to a writable per-SubTurtle runtime HOME only when needed.
+original_home = env.get(\"HOME\")
+if not _can_write_home(original_home):
+    runtime_home = os.path.join(state_dir, \".runtime-home\")
+    os.makedirs(runtime_home, exist_ok=True)
+    env[\"HOME\"] = runtime_home
+    env[\"CLAUDE_CONFIG_DIR\"] = os.path.join(runtime_home, \".claude\")
+    env[\"XDG_CONFIG_HOME\"] = os.path.join(runtime_home, \".config\")
+    env[\"XDG_DATA_HOME\"] = os.path.join(runtime_home, \".local\", \"share\")
+    env[\"XDG_STATE_HOME\"] = os.path.join(runtime_home, \".local\", \"state\")
+    env[\"XDG_CACHE_HOME\"] = os.path.join(runtime_home, \".cache\")
+    env[\"TMPDIR\"] = os.path.join(runtime_home, \".tmp\")
+    for d in (
+        env[\"CLAUDE_CONFIG_DIR\"],
+        env[\"XDG_CONFIG_HOME\"],
+        env[\"XDG_DATA_HOME\"],
+        env[\"XDG_STATE_HOME\"],
+        env[\"XDG_CACHE_HOME\"],
+        env[\"TMPDIR\"],
+    ):
+        os.makedirs(d, exist_ok=True)
 
 log_fd = open(log_file, 'w')
 cmd = [python, '-u', '-m', 'super_turtle.subturtle', '--state-dir', state_dir, '--name', name, '--type', loop_type]
