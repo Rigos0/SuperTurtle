@@ -79,9 +79,25 @@ export async function handleCallback(ctx: Context): Promise<void> {
     const model = models.find((m) => m.value === modelId);
 
     if (model) {
+      const hadActiveSession = codexSession.isActive;
       codexSession.model = modelId;
+
+      // Codex model is thread-level. Start a fresh thread so selection applies immediately.
+      if (hadActiveSession) {
+        try {
+          await codexSession.startNewThread(codexSession.model, codexSession.reasoningEffort);
+        } catch (error) {
+          await ctx.answerCallbackQuery({ text: `Failed to apply model: ${String(error).slice(0, 50)}` });
+          return;
+        }
+      }
+
       await ctx.editMessageText(`<b>Codex Model:</b> ${model.displayName}\n<b>Reasoning Effort:</b> ${codexSession.reasoningEffort}`, { parse_mode: "HTML" });
-      await ctx.answerCallbackQuery({ text: `Codex model set to ${model.displayName}` });
+      await ctx.answerCallbackQuery({
+        text: hadActiveSession
+          ? `Codex model set to ${model.displayName} (new thread)`
+          : `Codex model set to ${model.displayName}`,
+      });
     } else {
       await ctx.answerCallbackQuery({ text: "Unknown Codex model" });
     }
@@ -94,13 +110,29 @@ export async function handleCallback(ctx: Context): Promise<void> {
     const validEfforts = ["minimal", "low", "medium", "high", "xhigh"];
 
     if (validEfforts.includes(effort)) {
+      const hadActiveSession = codexSession.isActive;
       codexSession.reasoningEffort = effort;
+
+      // Reasoning effort is thread-level. Start a fresh thread so selection applies immediately.
+      if (hadActiveSession) {
+        try {
+          await codexSession.startNewThread(codexSession.model, codexSession.reasoningEffort);
+        } catch (error) {
+          await ctx.answerCallbackQuery({ text: `Failed to apply effort: ${String(error).slice(0, 50)}` });
+          return;
+        }
+      }
+
       const { getAvailableCodexModels } = await import("../codex-session");
       const models = getAvailableCodexModels();
       const model = models.find((m) => m.value === codexSession.model);
       const modelName = model?.displayName || codexSession.model;
       await ctx.editMessageText(`<b>Codex Model:</b> ${modelName}\n<b>Reasoning Effort:</b> ${effort}`, { parse_mode: "HTML" });
-      await ctx.answerCallbackQuery({ text: `Codex reasoning effort set to ${effort}` });
+      await ctx.answerCallbackQuery({
+        text: hadActiveSession
+          ? `Codex reasoning effort set to ${effort} (new thread)`
+          : `Codex reasoning effort set to ${effort}`,
+      });
     } else {
       await ctx.answerCallbackQuery({ text: "Unknown effort level" });
     }

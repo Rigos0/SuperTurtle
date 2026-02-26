@@ -320,8 +320,8 @@ export class CodexSession {
       saveCodexPrefs({
         threadId: this.threadId || undefined,
         createdAt: new Date().toISOString(),
-        model,
-        reasoningEffort,
+        model: threadModel,
+        reasoningEffort: threadEffort,
       });
     } catch (error) {
       console.error("Error starting Codex thread:", error);
@@ -679,8 +679,12 @@ ${userMessage}`;
     this.threadId = null;
     this.systemPromptPrepended = false;
 
-    // Clear saved prefs
-    saveCodexPrefs({});
+    // Clear thread linkage but keep user model preferences.
+    saveCodexPrefs({
+      model: this._model,
+      reasoningEffort: this._reasoningEffort,
+      createdAt: new Date().toISOString(),
+    });
 
     console.log("Codex session cleared");
   }

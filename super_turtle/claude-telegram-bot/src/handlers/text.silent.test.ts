@@ -33,6 +33,7 @@ async function probeHandleText(silent: boolean): Promise<HandleTextProbeResult> 
 
     const { handleText } = await import(textHandlerPath);
     const { session } = await import(sessionPath);
+    session.activeDriver = "claude";
 
     const replies = [];
     const chatActions = [];

@@ -1,6 +1,6 @@
 # Current Task
 
-All Codex driver backlog items are complete. Commit is finalized and loop can stop.
+All Codex driver backlog items are complete. This commit finalizes verification and then the loop should stop.
 
 # End Goal with Specs
 
@@ -169,7 +169,7 @@ Alternatively, the MCP servers may already be configured in `~/.codex/config.tom
 
 # Notes
 
-- Verification run: `bun run typecheck`, `bun test`, plus a scripted smoke probe for `/switch codex` → message streaming/tool events → `/model` + `codex_model` callback → `/stop` → `/resume`.
+- Verification run: `bun run typecheck`, `bun test`, `bun test src/codex-session.phase-d.test.ts`, and `bun test src/handlers/codex.flow.test.ts`.
 - The Codex SDK uses the Codex CLI binary under the hood. It shells out to `codex exec` with the right flags.
 - OAuth auth comes from `~/.codex/auth.json` (already working, no API key needed).
 - MCP servers in Codex are handled by the CLI process — they start when the thread starts and stop when it ends. We don't manage their lifecycle.
@@ -178,6 +178,9 @@ Alternatively, the MCP servers may already be configured in `~/.codex/config.tom
 - System prompt: keep the current approach of prepending META_SHARED.md to first message. The Codex SDK doesn't have a dedicated systemPrompt option.
 - When the user does `/model` while on Codex, show Codex models (gpt-5.3-codex, gpt-5.2-codex, etc.) not Claude models.
 - The `config` option on the Codex constructor accepts a JSON object that gets flattened to TOML `--config` flags. This is how we pass MCP server config programmatically.
+
+## Loop Control
+STOP
 
 ## Loop Control
 STOP
