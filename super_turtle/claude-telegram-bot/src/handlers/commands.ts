@@ -13,7 +13,6 @@ import {
   RESTART_FILE,
   TELEGRAM_SAFE_LIMIT,
   CODEX_ENABLED,
-  DRIVER_ABSTRACTION_V1,
   META_PROMPT,
 } from "../config";
 import { getContextReport } from "../context-command";
@@ -68,7 +67,7 @@ export function getSettingsOverviewLines(): string[] {
     `<b>Active driver:</b> ${driverLabel}`,
     activeModelLine,
     `<b>Meta agent prompt:</b> ${META_PROMPT ? "loaded" : "missing"} (<code>${escapeHtml(metaPromptPath)}</code>)`,
-    `<b>Driver routing:</b> ${DRIVER_ABSTRACTION_V1 ? "abstraction-v1" : "legacy"}`,
+    `<b>Driver routing:</b> abstraction-v1`,
     `<b>Dir:</b> <code>${escapeHtml(WORKING_DIR)}</code>`,
   ];
 }
@@ -270,33 +269,14 @@ export async function handleStop(ctx: Context): Promise<void> {
   // Kill typing indicator immediately so the bot stops showing "typing..."
   session.stopTyping();
 
-  if (DRIVER_ABSTRACTION_V1) {
-    const { getCurrentDriver } = await import("../drivers/registry");
-    await getCurrentDriver().stop();
-    return;
-  }
-
-  // Route based on active driver
-  if (session.activeDriver === "codex") {
-    const result = await codexSession.stop();
+  if (isAnyDriverRunning()) {
+    const result = await stopActiveDriverQuery();
     if (result) {
-      // Wait for the abort to be processed
       await Bun.sleep(100);
-    }
-    // Silent stop - no message shown
-  } else {
-    // Claude stop
-    if (session.isRunning) {
-      const result = await session.stop();
-      if (result) {
-        // Wait for the abort to be processed, then clear stopRequested so next message can proceed
-        await Bun.sleep(100);
-        session.clearStopRequested();
-      }
-      // Silent stop - no message shown
+      session.clearStopRequested();
     }
   }
-  // If nothing running, also stay silent
+  // Silent stop, including idle state.
 }
 
 /**
@@ -312,32 +292,16 @@ export async function handleStatus(ctx: Context): Promise<void> {
 
   const lines: string[] = ["📊 <b>Bot Status</b>\n"];
 
-  const abstractionDriver = DRIVER_ABSTRACTION_V1
-    ? (await import("../drivers/registry")).getCurrentDriver()
-    : null;
-  const abstractionSnapshot = abstractionDriver?.getStatusSnapshot() || null;
+  const abstractionDriver = (await import("../drivers/registry")).getCurrentDriver();
+  const abstractionSnapshot = abstractionDriver.getStatusSnapshot();
 
   // Session status (driver-specific)
-  if (abstractionSnapshot) {
-    if (abstractionSnapshot.isActive) {
-      lines.push(
-        `✅ ${abstractionSnapshot.driverName} Session: Active (${abstractionSnapshot.sessionId?.slice(0, 8)}...)`
-      );
-    } else {
-      lines.push(`⚪ ${abstractionSnapshot.driverName} Session: None`);
-    }
-  } else if (session.activeDriver === "codex") {
-    if (codexSession.isActive) {
-      lines.push(`✅ Codex Session: Active (${codexSession.getThreadId()?.slice(0, 8)}...)`);
-    } else {
-      lines.push("⚪ Codex Session: None");
-    }
+  if (abstractionSnapshot.isActive) {
+    lines.push(
+      `✅ ${abstractionSnapshot.driverName} Session: Active (${abstractionSnapshot.sessionId?.slice(0, 8)}...)`
+    );
   } else {
-    if (session.isActive) {
-      lines.push(`✅ Claude Session: Active (${session.sessionId?.slice(0, 8)}...)`);
-    } else {
-      lines.push("⚪ Claude Session: None");
-    }
+    lines.push(`⚪ ${abstractionSnapshot.driverName} Session: None`);
   }
 
   // Query status
@@ -364,7 +328,7 @@ export async function handleStatus(ctx: Context): Promise<void> {
   }
 
   // Last activity
-  const lastActivity = abstractionSnapshot?.lastActivity || session.lastActivity;
+  const lastActivity = abstractionSnapshot.lastActivity || session.lastActivity;
   if (lastActivity) {
     const ago = Math.floor(
       (Date.now() - lastActivity.getTime()) / 1000
@@ -373,48 +337,23 @@ export async function handleStatus(ctx: Context): Promise<void> {
   }
 
   // Usage stats (driver-specific)
-  if (abstractionSnapshot) {
-    const usage = abstractionSnapshot.lastUsage;
-    if (usage) {
-      const usageLabel =
-        abstractionSnapshot.driverName === "Codex" ? " (Codex)" : "";
-      lines.push(
-        `\n📈 Last query usage${usageLabel}:`,
-        `   Input: ${usage.inputTokens.toLocaleString()} tokens`,
-        `   Output: ${usage.outputTokens.toLocaleString()} tokens`
-      );
-      if (usage.cacheReadInputTokens) {
-        lines.push(`   Cache read: ${usage.cacheReadInputTokens.toLocaleString()}`);
-      }
-    }
-  } else if (session.activeDriver === "codex") {
-    if (codexSession.lastUsage) {
-      const usage = codexSession.lastUsage;
-      lines.push(
-        `\n📈 Last query usage (Codex):`,
-        `   Input: ${usage.input_tokens?.toLocaleString() || "?"} tokens`,
-        `   Output: ${usage.output_tokens?.toLocaleString() || "?"} tokens`
-      );
-    }
-  } else {
-    if (session.lastUsage) {
-      const usage = session.lastUsage;
-      lines.push(
-        `\n📈 Last query usage:`,
-        `   Input: ${usage.input_tokens?.toLocaleString() || "?"} tokens`,
-        `   Output: ${usage.output_tokens?.toLocaleString() || "?"} tokens`
-      );
-      if (usage.cache_read_input_tokens) {
-        lines.push(
-          `   Cache read: ${usage.cache_read_input_tokens.toLocaleString()}`
-        );
-      }
+  const usage = abstractionSnapshot.lastUsage;
+  if (usage) {
+    const usageLabel =
+      abstractionSnapshot.driverName === "Codex" ? " (Codex)" : "";
+    lines.push(
+      `\n📈 Last query usage${usageLabel}:`,
+      `   Input: ${usage.inputTokens.toLocaleString()} tokens`,
+      `   Output: ${usage.outputTokens.toLocaleString()} tokens`
+    );
+    if (usage.cacheReadInputTokens) {
+      lines.push(`   Cache read: ${usage.cacheReadInputTokens.toLocaleString()}`);
     }
   }
 
   // Error status
-  const lastError = abstractionSnapshot?.lastError || session.lastError;
-  const lastErrorTime = abstractionSnapshot?.lastErrorTime || session.lastErrorTime;
+  const lastError = abstractionSnapshot.lastError || session.lastError;
+  const lastErrorTime = abstractionSnapshot.lastErrorTime || session.lastErrorTime;
   if (lastError) {
     const ago = lastErrorTime
       ? Math.floor((Date.now() - lastErrorTime.getTime()) / 1000)
