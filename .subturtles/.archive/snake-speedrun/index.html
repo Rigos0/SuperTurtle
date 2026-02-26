@@ -130,6 +130,12 @@
         text-transform: uppercase;
         letter-spacing: 0.05em;
       }
+      .restart-container {
+        position: absolute;
+        top: clamp(0.75rem, 1.5vw, 1.2rem);
+        right: clamp(0.75rem, 1.5vw, 1.2rem);
+        z-index: 10;
+      }
       .button {
         border: 1px solid rgba(var(--accent-rgb), 0.6);
         background: linear-gradient(
@@ -158,10 +164,6 @@
         box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.28);
       }
       .dpad-container {
-        position: absolute;
-        bottom: 1rem;
-        left: 50%;
-        transform: translateX(-50%);
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -170,6 +172,8 @@
         padding: 0.8rem;
         border-radius: 10px;
         backdrop-filter: blur(4px);
+        margin: 0.5rem auto 0;
+        width: fit-content;
       }
       .dpad {
         display: grid;
@@ -253,6 +257,16 @@
         .button {
           flex: 0 0 100%;
         }
+        .restart-container {
+          position: absolute;
+          top: 0.6rem;
+          right: 0.6rem;
+        }
+        .restart-container .button {
+          width: auto;
+          padding: 0.45rem 0.8rem;
+          font-size: 0.75rem;
+        }
         .title {
           text-align: center;
           font-size: 1.45rem;
@@ -261,8 +275,8 @@
           text-align: center;
         }
         .dpad-container {
-          bottom: 0.7rem;
           padding: 0.6rem;
+          margin: 0.4rem auto 0;
         }
         .dpad {
           width: 160px;
@@ -286,18 +300,20 @@
         </p>
         <div class="stage">
           <canvas id="board" width="480" height="480" aria-label="Snake game board placeholder"></canvas>
-          <div class="dpad-container">
-            <div class="dpad">
-              <button class="dpad-btn dpad-up" id="dpad-up" aria-label="Up">↑</button>
-              <button class="dpad-btn dpad-left" id="dpad-left" aria-label="Left">←</button>
-              <button class="dpad-btn dpad-down" id="dpad-down" aria-label="Down">↓</button>
-              <button class="dpad-btn dpad-right" id="dpad-right" aria-label="Right">→</button>
-            </div>
+        </div>
+        <div class="dpad-container">
+          <div class="dpad">
+            <button class="dpad-btn dpad-up" id="dpad-up" aria-label="Up">↑</button>
+            <button class="dpad-btn dpad-left" id="dpad-left" aria-label="Left">←</button>
+            <button class="dpad-btn dpad-down" id="dpad-down" aria-label="Down">↓</button>
+            <button class="dpad-btn dpad-right" id="dpad-right" aria-label="Right">→</button>
           </div>
         </div>
         <div class="hud">
           <span class="pill" id="status-pill">Press Space/Enter to start</span>
           <span class="pill" id="score-pill">Score: 0</span>
+        </div>
+        <div class="restart-container">
           <button class="button" id="restart-btn">Restart</button>
         </div>
       </section>
