@@ -331,6 +331,7 @@
       let score = 0;
       let isRunning = false;
       let isGameOver = false;
+      let tongueOut = false;
 
       function startGame() {
         clearInterval(gameLoop);
@@ -447,6 +448,7 @@
         context.clearRect(0, 0, canvas.width, canvas.height);
         context.fillStyle = "rgba(4, 11, 20, 0.95)";
         context.fillRect(0, 0, canvas.width, canvas.height);
+        tongueOut = isRunning && Date.now() % 600 < 300;
 
         for (let y = 0; y <= CELL_COUNT; y++) {
           const p = y * CELL_SIZE;
@@ -472,6 +474,73 @@
           const body = `rgba(25, 249, 107, ${glow})`;
           drawCell(segment.x, segment.y, index === 0 ? "#b8ff4a" : body, "rgba(25, 249, 107, 0.3)");
         });
+
+        if (snake.length > 0) {
+          const head = snake[0];
+          const headLeft = head.x * CELL_SIZE;
+          const headTop = head.y * CELL_SIZE;
+          const headCenterX = headLeft + CELL_SIZE / 2;
+          const headCenterY = headTop + CELL_SIZE / 2;
+          const eyeRadius = CELL_SIZE * 0.15;
+          const pupilRadius = CELL_SIZE * 0.07;
+          const pupilShift = CELL_SIZE * 0.08;
+          const eyeSpread = CELL_SIZE * 0.18;
+          const forwardOffset = CELL_SIZE * 0.12;
+          const dirX = direction.x;
+          const dirY = direction.y;
+
+          const eyePairCenterX = headCenterX + dirX * forwardOffset;
+          const eyePairCenterY = headCenterY + dirY * forwardOffset;
+
+          let eyeOne = { x: eyePairCenterX, y: eyePairCenterY - eyeSpread };
+          let eyeTwo = { x: eyePairCenterX, y: eyePairCenterY + eyeSpread };
+          if (dirY !== 0) {
+            eyeOne = { x: eyePairCenterX - eyeSpread, y: eyePairCenterY };
+            eyeTwo = { x: eyePairCenterX + eyeSpread, y: eyePairCenterY };
+          }
+
+          context.fillStyle = "#ffffff";
+          context.beginPath();
+          context.arc(eyeOne.x, eyeOne.y, eyeRadius, 0, Math.PI * 2);
+          context.arc(eyeTwo.x, eyeTwo.y, eyeRadius, 0, Math.PI * 2);
+          context.fill();
+
+          context.fillStyle = "#0b1420";
+          context.beginPath();
+          context.arc(eyeOne.x + dirX * pupilShift, eyeOne.y + dirY * pupilShift, pupilRadius, 0, Math.PI * 2);
+          context.arc(eyeTwo.x + dirX * pupilShift, eyeTwo.y + dirY * pupilShift, pupilRadius, 0, Math.PI * 2);
+          context.fill();
+
+          if (tongueOut) {
+            const tongueBaseX = headCenterX + dirX * (CELL_SIZE * 0.5);
+            const tongueBaseY = headCenterY + dirY * (CELL_SIZE * 0.5);
+            const tongueLen = CELL_SIZE * 0.4;
+            const tongueTipX = tongueBaseX + dirX * tongueLen;
+            const tongueTipY = tongueBaseY + dirY * tongueLen;
+            const perpX = -dirY;
+            const perpY = dirX;
+            const forkLen = CELL_SIZE * 0.15;
+            const forkSpread = CELL_SIZE * 0.12;
+
+            context.strokeStyle = "#ff3b5c";
+            context.lineWidth = Math.max(2, CELL_SIZE * 0.08);
+            context.lineCap = "round";
+            context.beginPath();
+            context.moveTo(tongueBaseX, tongueBaseY);
+            context.lineTo(tongueTipX, tongueTipY);
+            context.moveTo(tongueTipX, tongueTipY);
+            context.lineTo(
+              tongueTipX + dirX * forkLen + perpX * forkSpread,
+              tongueTipY + dirY * forkLen + perpY * forkSpread
+            );
+            context.moveTo(tongueTipX, tongueTipY);
+            context.lineTo(
+              tongueTipX + dirX * forkLen - perpX * forkSpread,
+              tongueTipY + dirY * forkLen - perpY * forkSpread
+            );
+            context.stroke();
+          }
+        }
 
         if (!isRunning && snake.length > 0 && !isGameOver) {
           context.fillStyle = "rgba(233, 239, 255, 0.92)";
