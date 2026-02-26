@@ -10,17 +10,13 @@ import { unlinkSync, readFileSync, existsSync, writeFileSync, openSync, closeSyn
 import {
   handleStart,
   handleNew,
-  handleStop,
   handleStatus,
   handleUsage,
-  handleCodexQuota,
   handleContext,
   handleModel,
   handleSwitch,
-  handleDashboard,
   handleResume,
   handleRestart,
-  handleRetry,
   handleSubturtle,
   handleCron,
   handleText,
@@ -357,18 +353,15 @@ bot.use(
 
 bot.command("start", handleStart);
 bot.command("new", handleNew);
-bot.command("stop", handleStop);
 bot.command("status", handleStatus);
 bot.command("usage", handleUsage);
-bot.command("codex-quota", handleCodexQuota);
 bot.command("context", handleContext);
 bot.command("model", handleModel);
 bot.command("switch", handleSwitch);
-bot.command("dashboard", handleDashboard);
 bot.command("resume", handleResume);
+bot.command("sub", handleSubturtle);
 bot.command("subturtle", handleSubturtle);
 bot.command("restart", handleRestart);
-bot.command("retry", handleRetry);
 bot.command("cron", handleCron);
 
 // ============== Message Handlers ==============

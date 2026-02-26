@@ -5,17 +5,13 @@
 export {
   handleStart,
   handleNew,
-  handleStop,
   handleStatus,
   handleUsage,
-  handleCodexQuota,
   handleContext,
   handleModel,
   handleSwitch,
-  handleDashboard,
   handleResume,
   handleRestart,
-  handleRetry,
   handleSubturtle,
   handleCron,
 } from "./commands";

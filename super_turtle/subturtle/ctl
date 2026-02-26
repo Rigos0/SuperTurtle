@@ -661,6 +661,8 @@ do_spawn() {
   echo "CRON_JOB_ID=${cron_job_id}" >> "$(meta_file "$name")"
 
   echo "[subturtle:${name}] cron registered (${cron_job_id}, every ${cron_interval})"
+  echo ""
+  do_list
 }
 
 do_stop() {

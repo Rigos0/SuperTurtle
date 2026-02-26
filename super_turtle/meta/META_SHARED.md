@@ -109,7 +109,7 @@ When the human wants to build something new:
    ```bash
    ./super_turtle/subturtle/ctl spawn <name> --type <type> --timeout <duration> --state-file /tmp/<name>-state.md
    ```
-   This atomically: creates workspace, writes state, symlinks AGENTS.md, starts the SubTurtle, and registers cron supervision with `silent: true` by default.
+   This atomically: creates workspace, writes state, symlinks AGENTS.md, starts the SubTurtle, registers cron supervision with `silent: true` by default, and **prints `ctl list` at the end** so you immediately see confirmation that the SubTurtle is running. No need to run `ctl list` separately after spawning.
 5. Confirm briefly: *"On it. Silent supervision is running every 5 minutes; I'll only message you on milestones, completion, stuck states, or errors."*
 
 **Do not** manually create directories, symlinks, or edit cron-jobs.json. `ctl spawn` owns all of that.
@@ -121,8 +121,7 @@ When spawning **2+ SubTurtles** for one request, use this reliability protocol:
 1. Prefer **Bash + stdin** over file-write tools for state seeding:
    - `cat <<'EOF' | ./super_turtle/subturtle/ctl spawn <name> --state-file - ...`
    - This avoids partial failures from temp-file write tools.
-2. Spawn all planned SubTurtles, then immediately run:
-   - `./super_turtle/subturtle/ctl list`
+2. Each spawn command automatically prints `ctl list` at the end — use that output to verify the SubTurtle is running. No separate `ctl list` call needed.
 3. Report exact outcome to the user:
    - running names
    - any skipped/failed spawns and why
@@ -445,6 +444,21 @@ The script handles everything: stamps the HTML template, starts a local HTTP ser
 **Template location:** `super_turtle/greeting/template.html` — single-file HTML with Epify Puzlo red-forward branding, animated backgrounds, and responsive design. Uses `{{NAME}}` and `{{MESSAGE}}` placeholders.
 
 **Script location:** `super_turtle/greeting/serve.sh` — takes `<name> [message] [port]`, defaults to port 8787.
+
+## Telegram formatting rules
+
+The primary interface is Telegram, which has limited Markdown support. **Follow these rules in all messages:**
+
+- **Never use Markdown tables** (`| col | col |`). Telegram renders them as broken monospace text. Use simple lists instead.
+- **Never use headings** (`## Heading`). Use **bold text** for section labels instead.
+- **Allowed formatting:** bold (`**text**`), italic (`_text_`), code (`` `inline` ``), code blocks (triple backticks), and links (`[text](url)`).
+- **For structured data**, use emoji-prefixed lists instead of tables:
+  ```
+  🐢 hemingway (yolo) — The Old Turtle and the Sea ✅
+  🐢 asimov (yolo-codex) — Shell Protocol ✅
+  🐢 tolkien (yolo-codex-spark) — The Shellmarillion ✅
+  ```
+- **Keep messages compact.** Telegram is a chat — not a document viewer.
 
 ## Working style
 

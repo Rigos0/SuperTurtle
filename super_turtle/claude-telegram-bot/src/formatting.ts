@@ -311,3 +311,38 @@ export function formatToolStatus(
 
   return `${emoji} ${escapeHtml(toolName)}`;
 }
+
+/**
+ * Format Codex tool events for display in Telegram with HTML formatting.
+ *
+ * Codex emits typed item events (mcp_tool_call, command_execution,
+ * file_change, web_search) instead of Claude's tool_use blocks.
+ * This normalises them to the same visual style.
+ */
+export function formatCodexToolStatus(
+  type: "mcp" | "bash" | "file" | "search",
+  label: string,
+  extra?: string,
+): string {
+  switch (type) {
+    case "bash": {
+      // label = command string, extra = exit info
+      const desc = truncate(label, 50);
+      return `▶️ ${code(desc)}${extra ? ` ${escapeHtml(extra)}` : ""}`;
+    }
+    case "file": {
+      const shortPath = shortenPath(label);
+      return `📝 Editing ${code(shortPath)}${extra ? ` ${escapeHtml(extra)}` : ""}`;
+    }
+    case "search": {
+      return `🔍 Searching: ${escapeHtml(truncate(label, 50))}`;
+    }
+    case "mcp": {
+      // label = "server/tool", extra = optional error suffix
+      const parts = label.split("/");
+      const server = parts[0] || "mcp";
+      const tool = (parts.slice(1).join("/") || "").replace(/_/g, " ");
+      return `🔧 ${escapeHtml(server)}: ${escapeHtml(tool)}${extra ? ` ${escapeHtml(extra)}` : ""}`;
+    }
+  }
+}

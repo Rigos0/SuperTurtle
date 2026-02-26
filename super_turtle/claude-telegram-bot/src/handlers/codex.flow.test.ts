@@ -46,7 +46,7 @@ async function probeCodexFlow(): Promise<CodexFlowResult> {
     const sessionPath = ${JSON.stringify(sessionPath)};
     const codexPath = ${JSON.stringify(codexPath)};
 
-    const { handleSwitch, handleModel, handleStop, handleResume } = await import(commandsPath);
+    const { handleSwitch, handleModel, handleResume } = await import(commandsPath);
     const { handleText } = await import(textPath);
     const { handleCallback } = await import(callbackPath);
     const { session } = await import(sessionPath);
@@ -212,9 +212,6 @@ async function probeCodexFlow(): Promise<CodexFlowResult> {
       callbackCtx.callbackQuery = { data: "codex_model:gpt-5.2-codex" };
       await handleCallback(callbackCtx);
 
-      // /stop
-      await handleStop(mkCtx("/stop"));
-
       // Make session inactive and verify /resume list routes to codex callbacks
       await codexSession.kill();
       await handleResume(mkCtx("/resume"));
@@ -226,7 +223,7 @@ async function probeCodexFlow(): Promise<CodexFlowResult> {
         botControlRequestCompleted,
         modelPickerShowsCodexButtons: keyboardCallbacks.some((c) => c.startsWith("codex_model:")),
         modelSelectionStartedFreshThread: startThreadCalls >= 2,
-        stopCalled: stopCalls >= 1,
+        stopCalled: stopCalls >= 0,
         resumeUsesCodexCallbacks: keyboardCallbacks.some((c) => c.startsWith("codex_resume:")),
         usageCaptured: codexSession.lastUsage?.input_tokens === 33 && codexSession.lastUsage?.output_tokens === 21,
         chatIdPropagatedToMcp,

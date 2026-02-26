@@ -1,7 +1,5 @@
 /**
  * Command handlers for Claude Telegram Bot.
- *
- * /start, /new, /stop, /status, /resume, /context, /restart
  */
 
 import type { Context } from "grammy";
@@ -13,17 +11,12 @@ import {
   RESTART_FILE,
   TELEGRAM_SAFE_LIMIT,
   CODEX_ENABLED,
-  META_PROMPT,
-  DASHBOARD_ENABLED,
-  DASHBOARD_HOST,
-  DASHBOARD_PORT,
-  DASHBOARD_AUTH_TOKEN,
 } from "../config";
 import { getContextReport } from "../context-command";
 import { isAuthorized } from "../security";
 import { escapeHtml } from "../formatting";
 import { getJobs } from "../cron";
-import { isActiveDriverSessionActive, isAnyDriverRunning, stopActiveDriverQuery } from "./driver-routing";
+import { isAnyDriverRunning, stopActiveDriverQuery } from "./driver-routing";
 import { clearPreparedSnapshots } from "../cron-supervision-queue";
 
 /**
@@ -31,19 +24,15 @@ import { clearPreparedSnapshots } from "../cron-supervision-queue";
  */
 export function getCommandLines(): string[] {
   return [
-    `/new - Start fresh session`,
+    `/new - Fresh session`,
     `/model - Switch model/effort`,
-    `/switch - Switch between Claude & Codex`,
-    `/dashboard - Open live turtle monitor`,
+    `/switch - Claude ↔ Codex`,
     `/usage - Subscription usage`,
-    `/codex-quota - Codex quota status`,
-    `/context - Show Claude context usage`,
-    `/stop - Stop current query`,
+    `/context - Context usage`,
     `/status - Detailed status`,
-    `/resume - Pick from recent sessions`,
-    `/subturtle - Manage SubTurtles`,
-    `/cron - List scheduled jobs`,
-    `/retry - Retry last message`,
+    `/resume - Resume a session`,
+    `/sub - SubTurtles`,
+    `/cron - Scheduled jobs`,
     `/restart - Restart bot`,
   ];
 }
@@ -63,18 +52,12 @@ export function getSettingsOverviewLines(): string[] {
   const { modelName, effortStr } = formatModelInfo(session.model, session.effort);
   const isCodex = session.activeDriver === "codex";
   const driverLabel = isCodex ? "Codex 🟢" : "Claude 🔵";
-  const metaPromptPath = `${WORKING_DIR}/super_turtle/meta/META_SHARED.md`;
   const activeModelLine = isCodex
-    ? `<b>Meta agent model:</b> ${escapeHtml(codexSession.model)} | effort: ${escapeHtml(codexSession.reasoningEffort)}`
-    : `<b>Meta agent model:</b> ${modelName}${effortStr}`;
+    ? `${escapeHtml(codexSession.model)} | ${escapeHtml(codexSession.reasoningEffort)}`
+    : `${modelName}${effortStr}`;
 
   return [
-    `<b>Current Settings</b>`,
-    `<b>Active driver:</b> ${driverLabel}`,
-    activeModelLine,
-    `<b>Meta agent prompt:</b> ${META_PROMPT ? "loaded" : "missing"} (<code>${escapeHtml(metaPromptPath)}</code>)`,
-    `<b>Driver routing:</b> abstraction-v1`,
-    `<b>Dir:</b> <code>${escapeHtml(WORKING_DIR)}</code>`,
+    `${driverLabel} · ${activeModelLine}`,
   ];
 }
 
@@ -197,61 +180,22 @@ export async function getSubTurtleElapsed(name: string): Promise<string> {
   }
 }
 
-function getDashboardUrl(): string {
-  if (!DASHBOARD_ENABLED) {
-    return "Dashboard is currently disabled";
-  }
-
-  const base = `${DASHBOARD_HOST}:${DASHBOARD_PORT}`;
-  const hasToken = DASHBOARD_AUTH_TOKEN.length > 0;
-  const tokenSuffix = hasToken ? `?token=${encodeURIComponent(DASHBOARD_AUTH_TOKEN)}` : "";
-  return `${base}/dashboard${tokenSuffix}`;
-}
-
-/**
- * /dashboard - Return local dashboard URL for live turtle monitoring.
- */
-export async function handleDashboard(ctx: Context): Promise<void> {
-  const userId = ctx.from?.id;
-
-  if (!isAuthorized(userId, ALLOWED_USERS)) {
-    await ctx.reply("Unauthorized.");
-    return;
-  }
-
-  await ctx.reply(
-    `🗺️ Turtle monitor dashboard\n` +
-      `Open: <b>${getDashboardUrl()}</b>\n` +
-      `If running remotely, proxy 4173 to your host and open that URL.`,
-    { parse_mode: "HTML" }
-  );
-}
-
 /**
  * /start - Show welcome message and status.
  */
 export async function handleStart(ctx: Context): Promise<void> {
   const userId = ctx.from?.id;
-  const username = ctx.from?.username || "unknown";
 
   if (!isAuthorized(userId, ALLOWED_USERS)) {
     await ctx.reply("Unauthorized. Contact the bot owner for access.");
     return;
   }
 
-  const status = isActiveDriverSessionActive() ? "Active session" : "No active session";
-
   const commandBlock = getCommandLines().join("\n");
   await ctx.reply(
-      `🤖 <b>Claude Telegram Bot</b>\n\n` +
-      `Status: ${status}\n\n` +
+      `🐢 <b>Super Turtle</b>\n` +
       `${getSettingsOverviewLines().join("\n")}\n\n` +
-      `<b>Commands:</b>\n` +
-      `${commandBlock}\n\n` +
-      `<b>Tips:</b>\n` +
-      `• Prefix with <code>!</code> to interrupt current query\n` +
-      `• Use "think" keyword for extended reasoning\n` +
-      `• Send photos, voice, or documents`,
+      `${commandBlock}`,
     { parse_mode: "HTML" }
   );
 }
@@ -269,7 +213,6 @@ export async function handleNew(ctx: Context): Promise<void> {
 
   await resetAllDriverSessions({ stopRunning: true });
 
-  // Build message
   const lines = await buildSessionOverviewLines("New session");
 
   await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
@@ -292,29 +235,6 @@ export async function resetAllDriverSessions(opts?: { stopRunning?: boolean }): 
   clearPreparedSnapshots();
 }
 
-/**
- * /stop - Stop the current query (silently).
- */
-export async function handleStop(ctx: Context): Promise<void> {
-  const userId = ctx.from?.id;
-
-  if (!isAuthorized(userId, ALLOWED_USERS)) {
-    await ctx.reply("Unauthorized.");
-    return;
-  }
-
-  // Kill typing indicator immediately so the bot stops showing "typing..."
-  session.stopTyping();
-
-  if (isAnyDriverRunning()) {
-    const result = await stopActiveDriverQuery();
-    if (result) {
-      await Bun.sleep(100);
-      session.clearStopRequested();
-    }
-  }
-  // Silent stop, including idle state.
-}
 
 /**
  * /status - Show detailed status.
@@ -781,114 +701,6 @@ export async function getUsageLines(): Promise<string[]> {
   }
 }
 
-type CodexUsageResult = {
-  input_tokens?: number;
-  output_tokens?: number;
-  input_cached_tokens?: number;
-  num_model_requests?: number;
-};
-
-type CodexUsageBucket = {
-  results?: CodexUsageResult[];
-};
-
-type CodexUsageResponse = {
-  data?: CodexUsageBucket[];
-  has_more?: boolean;
-  next_page?: string | null;
-};
-
-/**
- * Fetch and format Codex usage info from local Codex CLI. Returns empty array on failure.
- * Parses Codex history to count recent requests.
- */
-export async function getCodexUsageLines(): Promise<string[]> {
-  try {
-    // Try to get stats from running Codex instance via CLI
-    const proc = Bun.spawnSync(["codex", "exec", "/stats"], {
-      timeout: 5000,
-    });
-
-    if (proc.success && proc.stdout) {
-      const output = proc.stdout.toString().trim();
-
-      // Parse the stats output to extract usage data
-      // For now, try to count requests from the output if it contains any metrics
-      if (output && !output.toLowerCase().includes("error")) {
-        // If we got valid output, parse it for metrics
-        // This is a fallback approach: count lines/sessions mentioned
-        const lines = output.split("\n").length;
-        if (lines > 0) {
-          return [
-            `Codex (local): <code>${lines.toLocaleString()}</code> operations`,
-            `Status: Running and accessible`,
-          ];
-        }
-      }
-    }
-
-    // If CLI approach fails, try parsing local history file
-    const historyPath = `${Bun.env.HOME}/.codex/history.jsonl`;
-    const historyFile = await Bun.file(historyPath).text().catch(() => null);
-
-    if (!historyFile) {
-      return [];
-    }
-
-    // Parse history.jsonl to count requests from the last 7 days
-    const now = Date.now();
-    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-    const sevenDaysAgo = now - sevenDaysMs;
-
-    let requestCount = 0;
-    let sessionCount = new Set<string>();
-    let estimatedInputTokens = 0;
-    let estimatedOutputTokens = 0;
-
-    const lines = historyFile.split("\n").filter((line) => line.trim());
-    for (const line of lines) {
-      try {
-        const entry = JSON.parse(line) as {
-          session_id?: string;
-          ts?: number;
-          text?: string;
-        };
-
-        // Check if this entry is within the 7-day window (ts is in seconds)
-        const entryMs = (entry.ts ?? 0) * 1000;
-        if (entryMs >= sevenDaysAgo) {
-          requestCount += 1;
-          if (entry.session_id) {
-            sessionCount.add(entry.session_id);
-          }
-
-          // Estimate tokens: roughly 1 token per 4 characters for input
-          // and 1 token per 3 characters for output
-          if (entry.text) {
-            estimatedInputTokens += Math.ceil(entry.text.length / 4);
-            // Assume average response is 2x the input length
-            estimatedOutputTokens += Math.ceil((entry.text.length * 2) / 3);
-          }
-        }
-      } catch {
-        // Skip invalid JSON lines
-      }
-    }
-
-    if (requestCount === 0) {
-      return ["No Codex usage in last 7 days."];
-    }
-
-    return [
-      `Codex (last 7 days): <code>${requestCount.toLocaleString()}</code> requests (${sessionCount.size} sessions)`,
-      `Est. input tokens: <code>${estimatedInputTokens.toLocaleString()}</code>`,
-      `Est. output tokens: <code>${estimatedOutputTokens.toLocaleString()}</code>`,
-    ];
-  } catch {
-    return [];
-  }
-}
-
 /**
  * Parse percentage from Claude usage bar line (e.g., "▓▓░░░░ 45% Session")
  */
@@ -924,7 +736,7 @@ export function formatUnifiedUsage(
   codexLines: string[],
   codexEnabled: boolean
 ): string {
-  const sections: string[] = ["📊 <b>Usage & Quotas</b>\n"];
+  const sections: string[] = [];
 
   // Extract Claude usage data
   let claudeStatus = "❓";
@@ -1288,50 +1100,6 @@ export async function getCodexQuotaLines(): Promise<string[]> {
   }
 }
 
-/**
- * /codex-quota - Show Codex quota status from /status command.
- */
-export async function handleCodexQuota(ctx: Context): Promise<void> {
-  const userId = ctx.from?.id;
-
-  if (!isAuthorized(userId, ALLOWED_USERS)) {
-    await ctx.reply("Unauthorized.");
-    return;
-  }
-
-  const progress = await ctx.reply("📊 Fetching Codex quota...");
-
-  try {
-    const quotaLines = await getCodexQuotaLines();
-
-    if (quotaLines.length === 0) {
-      await ctx.reply(
-        "⚠️ <b>Codex Quota</b>\n\n" +
-        "Could not fetch quota. Make sure:\n" +
-        "• Codex is logged in (`codex login`)\n" +
-        "• You have an active ChatGPT Pro subscription\n" +
-        "• Codex is installed at /opt/homebrew/bin/codex",
-        { parse_mode: "HTML" }
-      );
-    } else {
-      await ctx.reply(
-        `📊 <b>Codex Quota</b>\n\n${quotaLines.join("\n")}`,
-        { parse_mode: "HTML" }
-      );
-    }
-  } catch (error) {
-    await ctx.reply(
-      `❌ <b>Error fetching Codex quota:</b>\n${escapeHtml(String(error).slice(0, 150))}`,
-      { parse_mode: "HTML" }
-    );
-  } finally {
-    try {
-      await ctx.api.deleteMessage(progress.chat.id, progress.message_id);
-    } catch {
-      // Ignore failures to remove transient progress messages.
-    }
-  }
-}
 
 function chunkText(text: string, chunkSize = TELEGRAM_SAFE_LIMIT): string[] {
   const chunks: string[] = [];
@@ -1595,47 +1363,6 @@ export async function handleRestart(ctx: Context): Promise<void> {
   process.exit(0);
 }
 
-/**
- * /retry - Retry the last message (resume session and re-send).
- */
-export async function handleRetry(ctx: Context): Promise<void> {
-  const userId = ctx.from?.id;
-
-  if (!isAuthorized(userId, ALLOWED_USERS)) {
-    await ctx.reply("Unauthorized.");
-    return;
-  }
-
-  const message =
-    session.activeDriver === "codex" ? codexSession.lastMessage : session.lastMessage;
-  if (!message) {
-    await ctx.reply("❌ No message to retry.");
-    return;
-  }
-
-  // Check if something is already running
-  if (isAnyDriverRunning()) {
-    await ctx.reply("⏳ A query is already running. Use /stop first.");
-    return;
-  }
-
-  await ctx.reply(`🔄 Retrying: "${message.slice(0, 50)}${message.length > 50 ? "..." : ""}"`);
-
-  // Simulate sending the message again by emitting a fake text message event
-  // We do this by directly calling the text handler logic
-  const { handleText } = await import("./text");
-
-  // Create a modified context with the last message
-  const fakeCtx = {
-    ...ctx,
-    message: {
-      ...ctx.message,
-      text: message,
-    },
-  } as Context;
-
-  await handleText(fakeCtx);
-}
 
 /**
  * /subturtle - List all SubTurtles with status and controls.

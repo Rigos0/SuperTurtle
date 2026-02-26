@@ -8,7 +8,8 @@
 import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 import { WORKING_DIR, META_PROMPT, MCP_SERVERS } from "./config";
-import type { StatusCallback, McpCompletionCallback, McpServerConfig, SavedSession, SessionHistory } from "./types";
+import { formatCodexToolStatus } from "./formatting";
+import type { StatusCallback, McpCompletionCallback, SavedSession, SessionHistory } from "./types";
 
 // Prefs file for Codex (separate from Claude)
 const CODEX_PREFS_FILE = "/tmp/codex-telegram-prefs.json";
@@ -896,10 +897,10 @@ ${messageToSend}`;
           if (item.type === "mcp_tool_call" && itemCompleted) {
             const toolLabel = `${item.server}/${item.tool}`;
             const statusSuffix =
-              item.status === "failed" ? ` (failed: ${item.error?.message || "unknown"})` : "";
+              item.status === "failed" ? `(failed: ${item.error?.message || "unknown"})` : "";
             console.log(`MCP TOOL: ${toolLabel}`);
             if (statusCallback) {
-              await statusCallback("tool", `MCP: ${toolLabel}${statusSuffix}`);
+              await statusCallback("tool", formatCodexToolStatus("mcp", toolLabel, statusSuffix || undefined));
             }
 
             // Call MCP completion callback if provided
@@ -918,24 +919,24 @@ ${messageToSend}`;
           if (item.type === "command_execution" && itemCompleted && statusCallback) {
             const command = item.command.slice(0, 100);
             const exitInfo =
-              typeof item.exit_code === "number" ? ` (exit ${item.exit_code})` : "";
+              typeof item.exit_code === "number" ? `(exit ${item.exit_code})` : "";
             console.log(`COMMAND: ${command}`);
-            await statusCallback("tool", `Bash: ${command}${exitInfo}`);
+            await statusCallback("tool", formatCodexToolStatus("bash", command, exitInfo || undefined));
           }
 
           if (item.type === "file_change" && itemCompleted && statusCallback) {
             const firstPath = item.changes[0]?.path;
             const count = item.changes.length;
             if (firstPath) {
-              const suffix = count > 1 ? ` (+${count - 1} more)` : "";
+              const suffix = count > 1 ? `(+${count - 1} more)` : "";
               console.log(`FILE: ${firstPath}`);
-              await statusCallback("tool", `File: ${firstPath}${suffix}`);
+              await statusCallback("tool", formatCodexToolStatus("file", firstPath, suffix || undefined));
             }
           }
 
           if (item.type === "web_search" && itemCompleted && statusCallback) {
             console.log(`SEARCH: ${item.query}`);
-            await statusCallback("tool", `Search: ${item.query}`);
+            await statusCallback("tool", formatCodexToolStatus("search", item.query));
           }
 
           if (item.type === "error" && statusCallback) {
