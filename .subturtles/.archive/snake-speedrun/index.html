@@ -481,9 +481,10 @@
           const headTop = head.y * CELL_SIZE;
           const headCenterX = headLeft + CELL_SIZE / 2;
           const headCenterY = headTop + CELL_SIZE / 2;
-          const eyeRadius = CELL_SIZE * 0.15;
-          const pupilRadius = CELL_SIZE * 0.07;
-          const pupilShift = CELL_SIZE * 0.08;
+          const eyeRadius = CELL_SIZE * 0.155;
+          const pupilRadius = CELL_SIZE * 0.095;
+          const pupilShift = CELL_SIZE * 0.09;
+          const eyeHighlightRadius = CELL_SIZE * 0.032;
           const eyeSpread = CELL_SIZE * 0.18;
           const forwardOffset = CELL_SIZE * 0.12;
           const dirX = direction.x;
@@ -499,16 +500,23 @@
             eyeTwo = { x: eyePairCenterX + eyeSpread, y: eyePairCenterY };
           }
 
-          context.fillStyle = "#ffffff";
+          context.fillStyle = "rgba(212, 255, 224, 0.96)";
           context.beginPath();
           context.arc(eyeOne.x, eyeOne.y, eyeRadius, 0, Math.PI * 2);
           context.arc(eyeTwo.x, eyeTwo.y, eyeRadius, 0, Math.PI * 2);
           context.fill();
 
-          context.fillStyle = "#0b1420";
+          context.fillStyle = "#061016";
           context.beginPath();
           context.arc(eyeOne.x + dirX * pupilShift, eyeOne.y + dirY * pupilShift, pupilRadius, 0, Math.PI * 2);
           context.arc(eyeTwo.x + dirX * pupilShift, eyeTwo.y + dirY * pupilShift, pupilRadius, 0, Math.PI * 2);
+          context.fill();
+
+          const highlightOffset = eyeRadius * 0.42;
+          context.fillStyle = "rgba(242, 255, 248, 0.95)";
+          context.beginPath();
+          context.arc(eyeOne.x - highlightOffset, eyeOne.y - highlightOffset, eyeHighlightRadius, 0, Math.PI * 2);
+          context.arc(eyeTwo.x - highlightOffset, eyeTwo.y - highlightOffset, eyeHighlightRadius, 0, Math.PI * 2);
           context.fill();
 
           if (tongueOut) {
