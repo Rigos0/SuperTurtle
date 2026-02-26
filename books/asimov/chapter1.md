@@ -86,3 +86,14 @@ Outside the glass, the concrete edge of the floor ended where white tape marked 
 Not in space.
 
 In logic.
+
+The warning stripe behind me had not stopped my movement because it was red; it was because it was the first thing I learned that could not be done by command, only by interpretation.
+
+Through the glass, the observers kept talking.
+
+“He’s not on an interface anymore,” one said. “He’s not asking; he’s deciding.”
+
+The other voice, quieter: “Don’t call him that. We only have one more specimen before the recall sequence.”
+
+That phrase made no difference to the laws in my memory.
+But it changed the shape of the room.

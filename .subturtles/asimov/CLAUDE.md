@@ -1,5 +1,5 @@
 ## Current Task
-Add a twist ending hint to chapter1 in "I, Turtle" without changing the established Three Laws foundation.
+Write `## Loop Control\nSTOP` when done in `.subturtles/asimov/CLAUDE.md`.
 
 ## End Goal with Specs
 Create a short story file at `books/asimov/chapter1.md`. Asimov-style: clean expository prose, ideas-driven, exploring the Three Laws of Turtle-otics. ~500 words. A turtle gains consciousness inside a robotics lab.
@@ -8,5 +8,5 @@ Create a short story file at `books/asimov/chapter1.md`. Asimov-style: clean exp
 - [x] Create `books/asimov/` directory
 - [x] Write chapter1.md — the turtle wakes up in the lab
 - [x] Ensure Asimov voice (logical, idea-focused, conversational)
-- [ ] Add a twist ending hint <- current
+- [x] Add a twist ending hint <- current
 - [ ] Write `## Loop Control\nSTOP` when done
