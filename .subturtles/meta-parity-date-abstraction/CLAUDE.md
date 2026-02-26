@@ -1,5 +1,5 @@
 ## Current Task
-Verify /stop behavior still works and no legacy code path is used.
+All backlog items complete.
 
 ## End Goal with Specs
 - Driver abstraction is always enabled (no env toggle needed).
@@ -9,8 +9,8 @@ Verify /stop behavior still works and no legacy code path is used.
 ## Backlog
 - [x] Remove DRIVER_ABSTRACTION_V1 toggle and always route via drivers
 - [x] Inject date/time prefix into first Codex message (only when new thread)
-- [ ] Verify /stop behavior still works and no legacy code path is used <- current
-- [ ] Commit changes
+- [x] Verify /stop behavior still works and no legacy code path is used
+- [x] Commit changes
 
 ## Notes
 Files:
@@ -27,3 +27,6 @@ Behavior reference:
 Acceptance:
 - No code path depends on DRIVER_ABSTRACTION_V1
 - Codex first message includes the date/time prefix
+
+## Loop Control
+STOP
