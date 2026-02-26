@@ -1,6 +1,6 @@
 # Chapter I
 
-It is a truth universally acknowledged, that a turtle in possession of a good shell must be in want of a mate.
+In Pemberley Quay, where the weather is as changeable as a proposal and every shell is judged by the way it reflects the sun, it is a truth universally acknowledged that a turtle with a good shell must be in want of a mate.
 
 Mrs. Penelope Shellby, of Pemberley Quay, had been possessed of this truth since before she could distinguish a pearl from a pebble; yet she had long ago taught herself to act surprised whenever it was uttered at her door. Her three daughters, excellent young turtles in every measurable accomplishment except prudence, all knew the ritual by heart: Mrs. Shellby would open a parcel, or a letter, or even merely a cloud of bad weather, and discover in it a matrimonial possibility.
 
