@@ -14,13 +14,12 @@ import {
   TELEGRAM_SAFE_LIMIT,
   STREAMING_THROTTLE_MS,
   BUTTON_LABEL_MAX_LENGTH,
-  WORKING_DIR,
   CODEX_ENABLED,
 } from "../config";
 import type { ClaudeSession } from "../session";
 import type { CodexSession } from "../codex-session";
 import { bot } from "../bot";
-import { getUsageLines, getCommandLines, formatModelInfo, formatUnifiedUsage, getCodexQuotaLines } from "./commands";
+import { getUsageLines, getCommandLines, getSettingsOverviewLines, formatUnifiedUsage, getCodexQuotaLines } from "./commands";
 
 // Union type for bot control to work with both Claude and Codex sessions
 type BotControlSession = ClaudeSession | CodexSession;
@@ -303,21 +302,6 @@ async function executeBotControlAction(
     }
 
     case "new_session": {
-      const isCodexSession = "reasoningEffort" in sessionObj;
-      let modelName = sessionObj.model;
-      let effortStr = "";
-
-      if (isCodexSession) {
-        const codexSession = sessionObj as CodexSession;
-        modelName = codexSession.model;
-        effortStr = ` | ${codexSession.reasoningEffort}`;
-      } else {
-        const claudeSession = sessionObj as ClaudeSession;
-        const { modelName: name, effortStr: effort } = formatModelInfo(claudeSession.model, claudeSession.effort);
-        modelName = name;
-        effortStr = effort;
-      }
-
       await sessionObj.stop();
       await sessionObj.kill();
 
@@ -326,8 +310,8 @@ async function executeBotControlAction(
         try {
           const lines: string[] = [
             `<b>New session</b>\n`,
-            `<b>Model:</b> ${modelName}${effortStr}`,
-            `<b>Dir:</b> <code>${WORKING_DIR}</code>\n`,
+            ...getSettingsOverviewLines(),
+            "",
           ];
 
           const usageLines = await getUsageLines();

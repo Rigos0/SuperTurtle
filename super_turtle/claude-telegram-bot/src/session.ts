@@ -160,7 +160,7 @@ export class ClaudeSession {
   get model(): string { return this._model; }
   set model(value: string) {
     this._model = value;
-    savePrefs({ model: this._model, effort: this._effort });
+    savePrefs({ model: this._model, effort: this._effort, activeDriver: this._activeDriver });
   }
 
   get effort(): EffortLevel { return this._effort; }
@@ -347,10 +347,12 @@ export class ClaudeSession {
         `RESUMING session ${this.sessionId.slice(
           0,
           8
-        )}... (thinking=${thinkingLabel})`
+        )}... (model=${this.model}, effort=${this.effort}, thinking=${thinkingLabel})`
       );
     } else {
-      console.log(`STARTING new Claude session (thinking=${thinkingLabel})`);
+      console.log(
+        `STARTING new Claude session (model=${this.model}, effort=${this.effort}, thinking=${thinkingLabel})`
+      );
       this.sessionId = null;
     }
 

@@ -30,7 +30,7 @@ import {
   handleVideo,
   handleCallback,
 } from "./handlers";
-import { getCommandLines, formatModelInfo, getUsageLines } from "./handlers/commands";
+import { getCommandLines, getSettingsOverviewLines, getUsageLines } from "./handlers/commands";
 import { session } from "./session";
 import { getDueJobs, advanceRecurringJob, removeJob } from "./cron";
 import { bot } from "./bot";
@@ -340,15 +340,11 @@ if (existsSync(RESTART_FILE)) {
         "✅ Bot restarted"
       );
 
-      // Kill previous session (same as /new)
-      await session.kill();
-
-      // Send fresh session message with model info, usage, and commands
-      const { modelName, effortStr } = formatModelInfo(session.model, session.effort);
+      // Send startup message with persisted settings, usage, and commands
       const lines: string[] = [
-        `<b>New session</b>\n`,
-        `<b>Model:</b> ${modelName}${effortStr}`,
-        `<b>Dir:</b> <code>${WORKING_DIR}</code>\n`,
+        `<b>Bot restarted</b>\n`,
+        ...getSettingsOverviewLines(),
+        "",
       ];
       const usageLines = await getUsageLines();
       if (usageLines.length > 0) {

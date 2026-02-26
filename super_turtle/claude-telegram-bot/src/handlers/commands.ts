@@ -14,6 +14,7 @@ import {
   TELEGRAM_SAFE_LIMIT,
   CODEX_ENABLED,
   DRIVER_ABSTRACTION_V1,
+  META_PROMPT,
 } from "../config";
 import { getContextReport } from "../context-command";
 import { isAuthorized } from "../security";
@@ -51,6 +52,22 @@ export function formatModelInfo(model: string, effort: string): { modelName: str
   const modelName = currentModel?.displayName || model;
   const effortStr = model.includes("haiku") ? "" : ` | ${EFFORT_DISPLAY[effort as EffortLevel]} effort`;
   return { modelName, effortStr };
+}
+
+export function getSettingsOverviewLines(): string[] {
+  const { modelName, effortStr } = formatModelInfo(session.model, session.effort);
+  const driverLabel = session.activeDriver === "codex" ? "Codex 🟢" : "Claude 🔵";
+  const metaPromptPath = `${WORKING_DIR}/super_turtle/meta/META_SHARED.md`;
+
+  return [
+    `<b>Current Settings</b>`,
+    `<b>Active driver:</b> ${driverLabel}`,
+    `<b>Claude model:</b> ${modelName}${effortStr}`,
+    `<b>Codex model:</b> ${escapeHtml(codexSession.model)} | effort: ${escapeHtml(codexSession.reasoningEffort)}`,
+    `<b>Meta agent prompt:</b> ${META_PROMPT ? "loaded" : "missing"} (<code>${escapeHtml(metaPromptPath)}</code>)`,
+    `<b>Driver routing:</b> ${DRIVER_ABSTRACTION_V1 ? "abstraction-v1" : "legacy"}`,
+    `<b>Dir:</b> <code>${escapeHtml(WORKING_DIR)}</code>`,
+  ];
 }
 
 type ListedSubTurtle = {
@@ -174,15 +191,12 @@ export async function handleStart(ctx: Context): Promise<void> {
   }
 
   const status = isActiveDriverSessionActive() ? "Active session" : "No active session";
-  const driverLabel = session.activeDriver === "codex" ? "Codex 🟢" : "Claude 🔵";
-  const workDir = WORKING_DIR;
 
   const commandBlock = getCommandLines().join("\n");
   await ctx.reply(
       `🤖 <b>Claude Telegram Bot</b>\n\n` +
-      `Driver: ${driverLabel}\n` +
-      `Status: ${status}\n` +
-      `Working directory: <code>${workDir}</code>\n\n` +
+      `Status: ${status}\n\n` +
+      `${getSettingsOverviewLines().join("\n")}\n\n` +
       `<b>Commands:</b>\n` +
       `${commandBlock}\n\n` +
       `<b>Tips:</b>\n` +
@@ -219,25 +233,7 @@ export async function handleNew(ctx: Context): Promise<void> {
   await codexSession.kill();
 
   // Build message
-  const lines: string[] = [`<b>New session</b>\n`];
-  if (session.activeDriver === "codex") {
-    const { getAvailableCodexModelsLive } = await import("../codex-session");
-    const codexModels = await getAvailableCodexModelsLive();
-    const codexModel = codexModels.find((m) => m.value === codexSession.model);
-    lines.push(
-      `<b>Driver:</b> Codex 🟢`,
-      `<b>Model:</b> ${codexModel?.displayName || codexSession.model}`,
-      `<b>Reasoning Effort:</b> ${codexSession.reasoningEffort}`,
-      `<b>Dir:</b> <code>${WORKING_DIR}</code>\n`
-    );
-  } else {
-    const { modelName, effortStr } = formatModelInfo(session.model, session.effort);
-    lines.push(
-      `<b>Driver:</b> Claude 🔵`,
-      `<b>Model:</b> ${modelName}${effortStr}`,
-      `<b>Dir:</b> <code>${WORKING_DIR}</code>\n`
-    );
-  }
+  const lines: string[] = [`<b>New session</b>\n`, ...getSettingsOverviewLines(), ""];
 
   // Fetch usage (non-blocking — show what we can)
   const usageLines = await getUsageLines();
@@ -685,7 +681,8 @@ export async function handleSwitch(ctx: Context): Promise<void> {
     const currentDriver = session.activeDriver;
     const driverEmoji = currentDriver === "codex" ? "🟢" : "🔵";
     await ctx.reply(
-      `<b>Current driver:</b> ${currentDriver} ${driverEmoji}\n\n` +
+      `${getSettingsOverviewLines().join("\n")}\n\n` +
+        `<b>Current driver:</b> ${currentDriver} ${driverEmoji}\n\n` +
         `Switch to:`,
       {
         parse_mode: "HTML",
@@ -713,7 +710,9 @@ export async function handleSwitch(ctx: Context): Promise<void> {
   // Direct switch via argument
   if (target === "claude") {
     session.activeDriver = "claude";
-    await ctx.reply("✅ Switched to Claude Code 🔵");
+    await ctx.reply(`✅ Switched to Claude Code 🔵\n\n${getSettingsOverviewLines().join("\n")}`, {
+      parse_mode: "HTML",
+    });
   } else if (target === "codex") {
     session.activeDriver = "codex";
     try {
@@ -726,7 +725,9 @@ export async function handleSwitch(ctx: Context): Promise<void> {
       await ctx.reply(`❌ Failed to switch to Codex: ${String(error).slice(0, 100)}`);
       return;
     }
-    await ctx.reply("✅ Switched to Codex 🟢");
+    await ctx.reply(`✅ Switched to Codex 🟢\n\n${getSettingsOverviewLines().join("\n")}`, {
+      parse_mode: "HTML",
+    });
   } else {
     await ctx.reply(`❌ Unknown driver: ${target}. Use /switch claude or /switch codex`);
   }
