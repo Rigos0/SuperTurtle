@@ -81,3 +81,57 @@ The crab accepted the explanation. Old Shellsworth never asked whether the crab 
 Below the Great Coral Stone, in layers of sediment and memory, the original words remained: *All reef creatures are equal.* No creature in the reef could quite remember anymore what they had originally meant.
 
 ## Chapter 3: The Banquet
+
+In the third year of the new reign, Old Shellsworth declared a celebration. The reef had stabilized, the harvests had been bountiful, and the Council had, in their estimation, guided the creatures toward an era of unprecedented order and prosperity. The occasion would be marked with a great Banquet in the Central Lagoon—a feast to honor the Council's wisdom and, quite incidentally, to demonstrate to the other reefs in the surrounding waters that the Reef of Equality had achieved something remarkable.
+
+The preparations began weeks in advance. The finest kelp was harvested and prepared. The rarest fish were caught and preserved. The communal stores—reserves meant for times of scarcity, for the benefit of all creatures—were opened and redirected to the Banquet's kitchens.
+
+Not all creatures were invited. The banquet was, Old Shellsworth explained in a carefully worded proclamation, "a gathering of representatives and honored guests." In practice, this meant the Council of fifteen, a selection of allied creatures whose loyalty had been proven, and—after much internal debate—the eldest of the Dolphins, brought up from the Deep as a gesture of reconciliation and superiority.
+
+The younger turtles who had fought in the revolution noticed the preparations with growing unease. When they approached the Council chambers with questions, they were given explanations by the younger Council members—turtles who had once been revolutionaries themselves, but who had discovered that power suited them better than principle ever had.
+
+"The leader must be honored," explained Mindful the Turtle, once a fierce agitator, now a functionary of the state. "The reef cannot expect its guides to lead while eating the same simple rations as workers. This is not privilege—it is necessity."
+
+The logic was irrefutable, or so it seemed. After all, had not the Dolphins claimed the same?
+
+On the night of the Banquet, the Central Lagoon was transformed. The water itself seemed to shimmer with importance. Elaborate decorations—woven kelp, polished shells, colored stones arranged in patterns—framed the gathering space. At the head of the assembly, on a platform crafted specifically for the occasion, sat Old Shellsworth, surrounded by the Council.
+
+What happened next was subtle, almost imperceptible, and yet profound.
+
+The eldest Dolphin, brought from the Deep, approached the gathering. The water around him seemed to still. The younger creatures watched with mixture of fear and fascination—this was, after all, the first time a Dolphin had been seen in the lagoon since the revolution. But the Dolphin did not come as a subject. He came as an equal, invited by the Council to share the feast.
+
+Old Shellsworth rose to greet him, and in that moment, something shifted. The assembled creatures watched as their leader and the Dolphin exchanged acknowledgments—not words, but a recognition that passed between them like an invisible current. Here was understanding, an unspoken agreement that transcended the revolution itself.
+
+"The reef has grown strong," the Dolphin said, his voice carrying across the lagoon, "under leadership of such wisdom."
+
+Old Shellsworth accepted the compliment without deflection. He gestured for the Dolphin to sit beside the Council, in a place of honor. "We are not so different, you and I," he said. "Both understand that order requires hierarchy. Both recognize that some are born to lead."
+
+The words hung in the water like sediment, settling into the consciousness of every creature present. Around the edges of the lagoon, younger turtles and crabs felt something cold move through them. This was not the rhetoric of their revolution. These were the words of their former masters, now spoken in the voice of their liberator.
+
+The Banquet proceeded. Course after course was served to the Council and their honored guests, while the assembled creatures of the reef watched. The original commandments, still visible on the Great Coral Stone, seemed to blur in the shifting light: *All reef creatures are equal.*
+
+But the reef was watching something else unfold: Old Shellsworth and the eldest Dolphin were, in every way that mattered, indistinguishable. Both were confident. Both were comfortable. Both carried the peculiar bearing of creatures who had grown accustomed to privilege, who had rationalized it into necessity, and who now saw equality as a concept for others.
+
+One younger turtle, braver than the rest, approached the Council chamber later that night. She was Shelly, who had sat at Old Shellsworth's fins during the revolution, who had heard him speak of justice in the darkness before dawn.
+
+"Forgive me," she began, "but I do not understand. The Dolphins ruled us, and we revolted against them. Now our Council rules us in the same way. How is this the freedom we fought for?"
+
+Old Shellsworth looked at her with eyes that had seen much, and they were no longer kind. "Freedom," he said slowly, "was your misunderstanding. You were free to fight against oppression. That was your freedom. Now you are free to be governed by those most suited to govern. That is the only freedom that matters."
+
+"But the commandments—"
+
+"Have evolved," he interrupted, with the finality of one accustomed to being obeyed. "Laws must adapt. The reef has changed. We have changed. This is progress, not betrayal."
+
+Shelly looked at the Council members surrounding him—creatures she had known as revolutionaries, who had spoken of justice and equality with genuine fervor. But they had tasted power, and power had remade them. It had smoothed away their rough idealism and polished them into something sleek, efficient, and utterly indistinguishable from the hierarchy they had destroyed.
+
+She understood, finally, what Old Shellsworth had never said aloud but had always believed: the revolution was not meant to destroy power. It was meant to *transfer* it. And those who carried it, in the end, would always become what they had fought against.
+
+The Banquet continued into the night. The reef celebrated the order it had achieved, unaware that it was celebrating the completion of a cycle. The Dolphins had ruled through decree. Now the Turtles ruled through the same mechanism, merely with shells instead of streamlined bodies.
+
+In the morning, when the younger creatures returned to their work in the kelp beds and the rocky outcroppings, they found that their rations had been reduced. The announcement came from the Council: "Resources must be allocated efficiently. Those who guide the reef must be fed to think clearly."
+
+An old saying began to circulate quietly through the reef, whispered in the darkness, passed from fin to fin: *All reef creatures are equal, but some shells are more equal than others.*
+
+No one remembered who had first spoken it. No one could say whether it was meant as satire or simple truth. But it captured something essential: the revolution was complete. The wheel had turned. And the reef, having traded one master for another, had learned that the name of the master matters less than the fact of mastery itself.
+
+The original Commandments, carved into the Great Coral Stone those three years ago with such hope, remained beneath the newer stone. Perhaps someday, if the water wore away the newer carvings, a future generation would rediscover them: *All reef creatures are equal.* And perhaps, finding them, they would wonder what they meant, and whether they had ever meant anything at all.
