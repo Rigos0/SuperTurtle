@@ -1,5 +1,5 @@
 ## Current Task
-Write `## Loop Control\nSTOP` when done.
+Mark backlog complete after finishing remaining task.
 
 ## End Goal with Specs
 Create a short story file at `books/austen/chapter1.md`. Austen-style: witty social commentary, ironic narrator, marriage plot. ~500 words. A truth universally acknowledged: a single turtle in possession of a good shell must be in want of a mate.
@@ -8,5 +8,8 @@ Create a short story file at `books/austen/chapter1.md`. Austen-style: witty soc
 - [x] Create `books/austen/` directory
 - [x] Write chapter1.md — introduce the Shellnet family
 - [x] Ensure Austen voice (ironic narrator, social wit, Regency diction)
-- [x] Include a memorable opening line <- current
-- [ ] Write `## Loop Control\nSTOP` when done <- current
+- [x] Include a memorable opening line
+- [x] Write `## Loop Control\nSTOP` when done
+
+## Loop Control
+STOP

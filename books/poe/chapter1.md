@@ -1,29 +1,45 @@
-You ask whether I am sleepless, and I tell you plainly that I am not a fool. I keep my accounts in order and set the same lamp each evening. If outward habits prove sanity, then I am sane.
+You ask whether I am sleepless, and I answer with the fury of a man who still clings to his own name: I am not insane! Do not hear madness in this voice. I keep my accounts in order. I sweep the room. I light the same blue lamp at dusk. The same lamp every night. The same hands, the same measured breath. I am not a fool.
 
-Yet every midnight, when the city settles and the house takes one breath, a tapping comes from beneath the floorboards of my study.
+Yet when the city has fallen into its damp, breathless dark, when the hourglass of the night runs thin and the gas lamps outside bleed amber upon the rain-stained glass, the house begins to listen. No, worse—it begins to count. Beneath my feet, under the boards polished by dead men's footsteps in winter, comes the tapping.
 
-At first I called it wind; then winter; then the trick of too much attention. Three taps, a pause, then two. Some nights five and silence. Never loud. Never wild. Always too exact for chance.
+Three knocks. Pause. Two.
+Three knocks. Pause. Two.
+Some nights five taps and then nothing. Never loud. Never angry. Always patient. Always exact.
 
-For a week I watched and marked each hour by candle and watch. It came only in the hollow hour: if my wife remained in the room, no sound; if she slept, it came.
+Three! Two! Pause! Then two again! At first I named it to myself as wind. Wind in the chimney. Wind in the court below. Wind in the bones of old timbers. Then I named winter. Then I named nerves. Then I named myself a fool for naming at all.
 
-I spoke of it to no one. Pride first, shame next, then silence, for fear of being called vain and weak. But pride and shame failed me. I spoke, it answered. I held my breath, it continued.
+I charted it. I did, with care fit for a ledger.
+At midnight: three-two-pause.
+At one: three-two-two.
+At half past: three-three-two.
+Three, two, pause, three, two, two. Three, two, pause, two. Again, and again, and again.
 
-I removed a board near the hearth and found, beneath it, a clean shell, pale green and curved like an ear. I set it down, and the tapping rose from another seam, as if the house had moved while still standing still.
+If my wife remained in the room, there was no tapping. If she went out, the first knock came before my hearing could make room for it. If she coughed, the rhythm held. If she laughed, it sharpened. If I left the room, it waited. If I returned, it struck faster. “You see?” I told myself, not her. “You see?” I kept saying as one might recite a prayer against fever.
 
-I kept charts as I would keep bills and weather notes. The pattern held: three, two, one pause, three, then two, then two, repeated across nights.
+I dared not confide in anyone. Pride first, then shame, then a secrecy black as pitch. I prayed for ordinary sounds: rain on the sash, wheels in the lane, a drunkard's song, a bell from the church tower. But no, it was beneath my study that it gathered.
 
-At times I thought I invented the noise to excuse nerves. At others I feared I had named a thing and so made it live. When I left the room and returned, it waited with a louder first tap, as if counting my distance from it.
+I pried up a board near the hearth and found a shell. A clean shell, pallid green, curved like the ear of some sea-watcher turned to stone. I set it down. The tapping leapt elsewhere: a seam three rooms from my hand, then another under the wardrobe, then near the very hearthstone itself. The house was moving its pulse while still motionless.
 
-I asked my wife to move me to another room. She laughed and moved two chairs. The sound followed nowhere. In the morning she asked why I drew chalk figures. I told her I measured drafts.
+I called it a trick of the mind, and yet I drew chalk marks upon the floor, on the boards, on the wall, so that I might prove tomorrow that I was not making patterns where none existed. I found chalk under my nails the next morning and no one had seen me writing.
 
-Tonight it changed. I pressed my ear to the board and heard not mere tapping, but command. Quick bursts, then a silence so complete I heard my blood in my wrists. The shell heard nothing. Yet the room answered from three corners at once.
+Tonight the tapping is command.
 
-Now the taps rose at doorframe, chair-leg, even the lamp-brass: three, two, one pause, two. When I stood, it waited. When I sat, it resumed.
+Quick. Quick. Pause.
+Quick. Quick. One long pause.
+Three. Two. One.
 
-By two, many boards answered: dull, ringing, soft, hollow. In each held breath I knew whose voice I feared.
+I pressed my ear to the planks and heard not wood, not draft, but response—the same terrible, patient answer one gives to hidden bells in a crypt.
 
-At half past two the pattern broke: three quick, two quick, one long, three quick again, then a long knock. I knelt and pressed my palm to the boards. They answered, not to my weight, but to my touch.
+You call it superstition. You call it fever. You call it what men call what they cannot endure! It is not a trick, not random, not wind. It is a design, and the design is mine. This house keeps record. This house remembers. This house has eyes in every joist and a tongue in every knot of timber.
 
-You should call it what you will, but I know I kept hearing: not a random sound, not a trick of draft, but design. This house has a mind, patient and sharpened by stone. It has chosen my sleep.
+At two, all the boards answered me. Dull at first. Then sharp. Then hollow, as if struck by tiny knuckles from beneath the skin of the earth. I stood still and listened until the candle guttered to a wick; stood still until my pulse thundered louder than the tapping and then failed.
 
-Even as I write, the three knocks return: one, two, three—then the longest silence of all, before the next command arrives.
+Still it continues. Three, two, one, pause, three. three, two, pause, two. The pattern no longer seeks noise alone. It seeks me.
+
+I write now because if I stop, it will knock louder.
+You hear me? I ask, to myself, to the paper, to the night that presses at the window like a grave.
+I am not mad.
+I am not mad!
+I am not mad, and the room knows it, and the room knocks threefold to remind me...
+...
+...
