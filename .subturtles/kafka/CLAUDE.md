@@ -1,14 +1,12 @@
 ## Current Task
-Write the full story in Markdown format.
+Write chapter1.md for "The Metamorphosis of Shell" — Gregor discovers his transformation.
 
 ## End Goal with Specs
-Create a complete short story (500-800 words) at `books/kafka/the-metamorphosis-of-code.md`. Kafka style: surreal bureaucratic dread, alienation, absurdist transformation. The story follows a developer who wakes up one morning to find they have been transformed into a SubTurtle process.
+Create a short story file at `books/kafka/chapter1.md`. Kafka-style: matter-of-fact surrealism, bureaucratic dread, alienation. ~500 words. A turtle named Gregor wakes one morning to find himself transformed into a monstrous human being. His family of turtles is horrified.
 
 ## Backlog
 - [x] Create `books/kafka/` directory
-- [ ] Write the full story in Markdown format <- current
-- [ ] Add a brief author's note at the end
-- [ ] Commit the finished story
-
-## Loop Control Reminder
-When all backlog items are done, append `## Loop Control\nSTOP` to this file.
+- [ ] Write chapter1.md — Gregor discovers his transformation <- current
+- [ ] Ensure Kafka voice (flat affect, surreal premises treated as mundane problems)
+- [ ] End on a note of quiet dread
+- [ ] Write `## Loop Control\nSTOP` when done
