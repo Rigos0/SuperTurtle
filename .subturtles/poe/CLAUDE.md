@@ -1,12 +1,13 @@
 ## Current Task
-Write Chapter 3: "The Confession" — the narrator tears up the sand screaming "it is the beating of his shell!"
+Write Chapter 1 of "The Shell-Tale Heart" — a gothic horror tale narrated by a paranoid turtle. Create `books/poe/chapter1.md` and draft the narrator’s confession in the Poe voice with escalating paranoia and a climactic ending.
 
 ## End Goal with Specs
-A 3-chapter gothic horror novella (~2000 words) at `books/the-tell-tale-shell.md`. Poe-esque — unreliable narrator, mounting paranoia, rhythmic prose building to madness.
+Create a short story file at `books/poe/chapter1.md`. Poe-style: first-person unreliable narrator, escalating paranoia, gothic atmosphere. ~500 words. The narrator insists they are not mad — but the tapping of a shell beneath the floorboards says otherwise.
 
 ## Backlog
-- [x] Create `books/the-tell-tale-shell.md` with title page
-- [x] Write Chapter 1: "The Burial" — the narrator buries a rival's broken shell on the beach
-- [x] Write Chapter 2: "The Sound" — a tapping begins, faint at first, then inescapable
-- [ ] Write Chapter 3: "The Confession" — the narrator tears up the sand screaming "it is the beating of his shell!" <- current
-- [ ] Final polish and commit
+- [ ] Create `books/poe/` directory <- current
+- [x] Create `books/poe/` directory
+- [ ] Write chapter1.md — the narrator's fevered confession <- current
+- [ ] Ensure Poe voice (frantic, repetitive, exclamatory, gothic)
+- [ ] Build to a crescendo ending
+- [ ] Write `## Loop Control\nSTOP` when done
