@@ -123,17 +123,19 @@ No kingdom fell. Yet the deep did not heal. It waited, and watched.
 
 When the Accord still hung and the kingdoms still rang their evening bells, the Deep beneath began a strange breath. It was no storm, nor fire from the vents, nor the old violence of quake. It was a long holding of water, as if the sea itself had learned to keep still.
 
-Across the kingdoms, the old alarms sounded late and thin, as if the sea itself refused to answer.
+Across the kingdoms, old alarms sounded late and thin, as if the sea itself had refused.
+
+A rider of the open deep might read their map only by memory: Selenrata lay in the south-east basin, Auralis on the western glass ridges, Kheledath held the northern vent-chain, and Ilyssar curved toward the lower south trench.
 
 The elders met and sent for Chelónatar. He came with the patience of deep basalt. Without speaking, he stood at the edge of the Nine Steps and placed no hand upon stone. He only looked toward the trenches and said,
 
 > You have kept your walls. You have not kept the seam between you.
 
-At dusk the seam split open. From the trench rose shapes that no map had ever named: serpent-bodies broad as wrecked vessels, scales like old moon-metal, crowns of black vent-crust. They did not rush, for force was not their need. They searched for the hidden chords that held the kingdoms together.
+From the trench rose shapes no map had ever named: serpent-bodies broad as wrecked vessels, scales like old moon-metal, crowns of black vent-crust. They did not rush, for force was not their need. They searched for the hidden chords that held the kingdoms together.
 
 Their first touch was on Selenrata’s ward-stones. One by one, the runes failed. Auralis sent bell-chains across the trench, but song alone could not stand where trust was already cracked. Ilyssar’s ledgers, once proud with routes and vows, blurred into one another and vanished in the tide.
 
-In Kheledath they held through three turns of nightfall and returned to find western ridges split, and streets of copper-sand where bells had sung. The city did not fall in one blow. It broke by intervals, like ribs bent in old age.
+In Kheledath they held through three turns of nightfall and returned to find western ridges split, and streets of copper-sand where bells had sung.
 
 Then came what the old singers call the Sundering.
 

@@ -15,3 +15,4 @@ A complete 3-chapter fantasy novella (~2000 words total) in Markdown format at `
 ## Notes
 Style: Tolkien's Silmarillion. Mythic register. Formal prose. Names matter.
 File: books/the-shellmarillion.md
+Progress: Chapter 3 draft and Sundering map sketch are in place; full consistency pass remains.
