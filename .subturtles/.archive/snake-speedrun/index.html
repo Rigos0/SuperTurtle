@@ -244,6 +244,35 @@
         text-align: center;
         letter-spacing: 0.05em;
       }
+      .new-game-btn {
+        margin-top: 0.8rem;
+        border: 1px solid rgba(25, 249, 107, 0.6);
+        background: linear-gradient(
+          180deg,
+          rgba(25, 249, 107, 0.28),
+          rgba(8, 17, 30, 0.8)
+        );
+        color: #19f96b;
+        cursor: pointer;
+        border-radius: 999px;
+        padding: 0.55rem 1.2rem;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 700;
+        font-family: "Share Tech Mono", "VT323", ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .new-game-btn:active {
+        transform: translateY(1px);
+      }
+      .new-game-btn:hover {
+        background: linear-gradient(
+          180deg,
+          rgba(25, 249, 107, 0.38),
+          rgba(12, 21, 40, 0.85)
+        );
+        box-shadow: 0 0 10px rgba(25, 249, 107, 0.4);
+      }
       @media (max-width: 520px) {
         .hud {
           gap: 0.45rem;
@@ -303,6 +332,7 @@
               <button class="dpad-btn dpad-down" id="dpad-down" aria-label="Down">↓</button>
               <button class="dpad-btn dpad-right" id="dpad-right" aria-label="Right">→</button>
             </div>
+            <button class="new-game-btn" id="new-game-btn" aria-label="New Game" style="display:none;">New Game</button>
           </div>
         </div>
       </section>
@@ -315,6 +345,7 @@
       const dpadLeftBtn = document.getElementById("dpad-left");
       const dpadDownBtn = document.getElementById("dpad-down");
       const dpadRightBtn = document.getElementById("dpad-right");
+      const newGameBtn = document.getElementById("new-game-btn");
 
       let touchStartX = 0;
       let touchStartY = 0;
@@ -323,6 +354,7 @@
       const CELL_SIZE = canvas.width / CELL_COUNT;
 
       let ws = null;
+      let playerId = null;
       let gameState = {
         player1Snake: [],
         player2Snake: [],
@@ -332,6 +364,7 @@
         isRunning: false,
         isGameOver: false,
         countdown: null,
+        winner: null,
       };
 
       let player1Direction = { x: 1, y: 0 };
@@ -353,6 +386,11 @@
             console.log("You are a spectator");
             return;
           }
+          if (data.type === "assigned") {
+            playerId = data.playerId;
+            console.log(`You are ${playerId}`);
+            return;
+          }
           gameState = data;
           render();
         };
@@ -370,6 +408,12 @@
       function sendDirection(dx, dy) {
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: "direction", dx, dy }));
+        }
+      }
+
+      function sendNewGame() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "newGame" }));
         }
       }
 
@@ -719,19 +763,25 @@
           context.fillStyle = "rgba(2, 8, 16, 0.72)";
           context.fillRect(0, 40, canvas.width, canvas.height - 80);
 
-          context.fillStyle = "#ff6d7b";
-          context.font = "bold 32px ui-monospace, SFMono-Regular, Menlo, monospace";
-          context.textAlign = "center";
-
           let message = "Game Over";
-          if (gameState.player1Score > gameState.player2Score) {
-            message = "Player 1 Wins!";
-          } else if (gameState.player2Score > gameState.player1Score) {
-            message = "Player 2 Wins!";
-          } else {
-            message = "Draw!";
+          let messageColor = "#ff6d7b";
+
+          if (gameState.winner === "draw") {
+            message = "🤝 Draw!";
+            messageColor = "#ffd700";
+          } else if (playerId) {
+            if (gameState.winner === playerId) {
+              message = "🏆 You Win!";
+              messageColor = "#19f96b";
+            } else {
+              message = "💀 You Lose!";
+              messageColor = "#ff6d7b";
+            }
           }
 
+          context.fillStyle = messageColor;
+          context.font = "bold 32px ui-monospace, SFMono-Regular, Menlo, monospace";
+          context.textAlign = "center";
           context.fillText(message, canvas.width / 2, canvas.height / 2 - 8);
           context.fillStyle = "#e6efff";
           context.font = "20px ui-monospace, SFMono-Regular, Menlo, monospace";
@@ -740,6 +790,13 @@
 
         // Update score display
         scoreDisplay.textContent = `P1: ${gameState.player1Score} | P2: ${gameState.player2Score}`;
+
+        // Show/hide New Game button
+        if (gameState.isGameOver) {
+          newGameBtn.style.display = "block";
+        } else {
+          newGameBtn.style.display = "none";
+        }
       }
 
       function handleDpadClick(dx, dy) {
@@ -802,6 +859,7 @@
       dpadLeftBtn.addEventListener("click", () => handleDpadClick(-1, 0));
       dpadDownBtn.addEventListener("click", () => handleDpadClick(0, 1));
       dpadRightBtn.addEventListener("click", () => handleDpadClick(1, 0));
+      newGameBtn.addEventListener("click", sendNewGame);
 
       canvas.addEventListener("touchstart", onCanvasTouchStart, { passive: true });
       canvas.addEventListener("touchend", onCanvasTouchEnd, { passive: true });
