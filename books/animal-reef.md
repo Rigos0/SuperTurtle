@@ -46,4 +46,38 @@ The revolution was complete. What came next would be far more complicated.
 
 ## Chapter 2: The Commandments
 
+The first Council of Shells met beneath the Great Coral Stone on a morning bright with promise. Old Shellsworth sat at the center of a circle of representatives—a delegation of turtles, crabs, angelfish, and smaller sharks, all elected by their kind to draft the new laws. The mood was reverent. They were writing a future, carving hope into stone.
+
+Old Shellsworth proposed the first commandment: "All reef creatures are equal."
+
+It was unanimous. The creatures cheered. Around the circle, eyes glistened with the water of tears. After so many generations under the Dolphin boot, equality felt like breathing for the first time.
+
+The second commandment followed naturally: "All creatures shall have equal access to food, shelter, and the fruits of the reef's labor."
+
+Then the third: "All creatures shall participate equally in the governance of the reef."
+
+By the fifth commandment, Old Shellsworth noticed something interesting. The younger turtles—the ones who had fought most fiercely in the revolution—had begun to defer to him. When he suggested a new law, they adopted it without debate. When he questioned another turtle's proposal, it was withdrawn. He told himself this was merely respect for his wisdom. He did not question it further.
+
+Within a moon's cycle, the commandments had grown to seven. They were no longer concise principles but intricate regulations, each one refined and revised under Old Shellsworth's guidance. The Council still gathered, still debated, but the debates had become theater. Old Shellsworth held the quill that carved into stone. His word, somehow, had become law.
+
+Then came the first revision.
+
+"We must add a clarification," Old Shellsworth announced, "to the third commandment. Equal participation in governance requires wisdom. Not all creatures possess the capacity for complex decisions." He paused, his ancient eyes scanning the circle. "Leadership must reside in those most suited for it. The most intelligent, the most experienced, the most... aware."
+
+The crabs exchanged glances. One attempted to object, but Old Shellsworth had already moved to the next point, and the Council, made weary by endless sessions, simply accepted it. The modification was carved into the Coral Stone: *All creatures shall participate equally in governance, though leadership belongs to those of superior understanding.*
+
+It was around this time that Old Shellsworth began to eat first at the communal feeding. When a younger turtle questioned it, he explained, quite reasonably, that a leader must be nourished to lead effectively. Surely no one could object to this? No one did. Within weeks, it became custom. The Council members—fifteen of them now, all carefully selected by Old Shellsworth for their "wisdom"—also began eating first. They reasoned much the same: leadership demands sustenance.
+
+The commandments, now carved in a new section of stone, had become something other than what they were. "All creatures are equal, but those who govern require special consideration," read the amended version. The original carving was left beneath, still visible if one dove deep enough to examine it, but few did. The new stone was smooth, polished, official.
+
+Old Shellsworth moved into a new chamber—not the Dolphin Palace, but a specially constructed grotto at the heart of the reef, where the currents were warm and the light was filtered through colored water. The Council insisted on it. They said it was fitting for a leader of his stature. He accepted with what he told himself was reluctance, but the chamber was quite comfortable, and he found he did not wish to leave it.
+
+At night, floating in his new grotto, Old Shellsworth sometimes thought of the promises he had made. The revolution had been so clear. Power was the enemy. Hierarchy was the enemy. Now he held both, and somehow, through the peculiar logic of authority, he had convinced himself—and most of the reef—that this was necessary, even virtuous.
+
+When he saw the smaller creatures gathering hesitantly at the edges of the Council chamber, as if afraid to enter, he told himself they were simply shy. When he noticed that fewer creatures attended the communal gatherings, he assumed they trusted in the Council's wisdom and saw no need. And when a young crab from the old revolution approached him one evening with questions about the changing commandments, Old Shellsworth explained, with the patient tone of a teacher, that evolution of law was natural. Progress required adjustment.
+
+The crab accepted the explanation. Old Shellsworth never asked whether the crab believed it.
+
+Below the Great Coral Stone, in layers of sediment and memory, the original words remained: *All reef creatures are equal.* No creature in the reef could quite remember anymore what they had originally meant.
+
 ## Chapter 3: The Banquet
