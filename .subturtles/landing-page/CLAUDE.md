@@ -1,5 +1,5 @@
 # Current task
-Refine the polished landing page redesign in `landing/app/page.tsx` and `landing/app/globals.css`, then close remaining acceptance gaps.
+Finalizing the landing-page subtask by closing the last backlog item and marking the loop to stop.
 
 # End goal with specs
 Deliver a visibly upgraded landing page that feels intentional and modern (not template-like), while preserving the Super Turtle product story.
@@ -20,7 +20,10 @@ Acceptance criteria:
 - [x] Update `landing/app/globals.css` tokens/utilities to match the new visual direction (no generic defaults)
 - [x] Verify responsive layout in code for mobile + desktop breakpoints and fix any overflow/alignment issues
 - [x] Run `npm run lint` (or project check command) in `landing/` and resolve issues
-- [ ] Update this CLAUDE.md progress, append `## Loop Control\nSTOP`, and commit changes <- current
+- [x] Update this CLAUDE.md progress, append `## Loop Control\nSTOP`, and commit changes
+
+## Loop Control
+STOP
 
 # Notes
 Target files:
