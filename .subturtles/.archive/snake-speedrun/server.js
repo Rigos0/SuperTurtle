@@ -68,7 +68,6 @@ let gameState = {
     direction: { x: 1, y: 0 },
     nextDirection: { x: 1, y: 0 },
     score: 0,
-    color: "#19f96b", // neon green
   },
   player2: {
     id: null,
@@ -80,7 +79,6 @@ let gameState = {
     direction: { x: -1, y: 0 },
     nextDirection: { x: -1, y: 0 },
     score: 0,
-    color: "#19d4f9", // neon cyan
   },
   food: { x: 12, y: 10 },
   isRunning: false,
@@ -90,7 +88,6 @@ let gameState = {
 };
 
 let gameLoop = null;
-let clients = new Map(); // playerId -> WebSocket
 
 function randomFood() {
   let candidate;
@@ -247,7 +244,6 @@ function resetGameState() {
       direction: { x: 1, y: 0 },
       nextDirection: { x: 1, y: 0 },
       score: 0,
-      color: "#19f96b",
     },
     player2: {
       id: p2ws,
@@ -259,7 +255,6 @@ function resetGameState() {
       direction: { x: -1, y: 0 },
       nextDirection: { x: -1, y: 0 },
       score: 0,
-      color: "#19d4f9",
     },
     food: randomFood(),
     isRunning: false,
@@ -304,11 +299,9 @@ wss.on("connection", (ws) => {
   if (!gameState.player1.id) {
     playerId = "player1";
     gameState.player1.id = ws;
-    clients.set("player1", ws);
   } else if (!gameState.player2.id) {
     playerId = "player2";
     gameState.player2.id = ws;
-    clients.set("player2", ws);
     // Start countdown when both players connected
     if (gameLoop) clearInterval(gameLoop);
     startCountdown();
@@ -343,10 +336,8 @@ wss.on("connection", (ws) => {
   ws.on("close", () => {
     if (playerId === "player1") {
       gameState.player1.id = null;
-      clients.delete("player1");
     } else if (playerId === "player2") {
       gameState.player2.id = null;
-      clients.delete("player2");
     }
     if (gameState.isRunning) {
       gameState.isRunning = false;

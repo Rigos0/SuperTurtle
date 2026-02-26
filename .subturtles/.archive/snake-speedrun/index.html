@@ -367,7 +367,6 @@
         winner: null,
       };
 
-      let player1Direction = { x: 1, y: 0 };
       let tongueOutP1 = false;
       let tongueOutP2 = false;
 
@@ -414,27 +413,6 @@
       function sendNewGame() {
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: "newGame" }));
-        }
-      }
-
-      function isTouchDevice() {
-        return (
-          typeof window !== "undefined" &&
-          (navigator.maxTouchPoints > 0 ||
-            navigator.msMaxTouchPoints > 0 ||
-            window.matchMedia?.("(hover: none)").matches)
-        );
-      }
-
-      function drawCell(x, y, color, border) {
-        const left = x * CELL_SIZE;
-        const top = y * CELL_SIZE;
-        context.fillStyle = color;
-        context.fillRect(left, top, CELL_SIZE, CELL_SIZE);
-        if (border) {
-          context.strokeStyle = border;
-          context.lineWidth = 1;
-          context.strokeRect(left + 0.5, top + 0.5, CELL_SIZE - 1, CELL_SIZE - 1);
         }
       }
 
@@ -592,7 +570,7 @@
         };
       }
 
-      function drawSnakeEyes(snake, colorHex) {
+      function drawSnakeEyes(snake) {
         if (snake.length === 0) return;
         const direction = getSnakeDirection(snake);
         const head = snake[0];
@@ -712,9 +690,9 @@
         });
 
         // Draw eyes and tongue for both snakes
-        drawSnakeEyes(gameState.player1Snake, "#19f96b");
+        drawSnakeEyes(gameState.player1Snake);
         drawTongue(gameState.player1Snake, tongueOutP1);
-        drawSnakeEyes(gameState.player2Snake, "#19d4f9");
+        drawSnakeEyes(gameState.player2Snake);
         drawTongue(gameState.player2Snake, tongueOutP2);
 
         // Draw status messages
