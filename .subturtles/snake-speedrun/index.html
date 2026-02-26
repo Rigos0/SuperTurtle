@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snake Speedrun</title>
+    <style>
+      :root {
+        --bg: #0b1020;
+        --panel: rgba(18, 28, 52, 0.86);
+        --text: #e9efff;
+        --accent: #35d0ff;
+        --accent-soft: rgba(53, 208, 255, 0.28);
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background:
+          radial-gradient(circle at top left, #1d2a55 0, transparent 40%),
+          radial-gradient(circle at 85% 5%, #0b4e88 0, transparent 35%),
+          var(--bg);
+        color: var(--text);
+        font-family:
+          Inter,
+          "Segoe UI",
+          system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      .wrap {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 1.5rem;
+        box-sizing: border-box;
+      }
+      .card {
+        width: min(900px, 100%);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 16px;
+        background: linear-gradient(160deg, var(--panel), #111a34);
+        box-shadow: 0 24px 80px rgba(2, 4, 18, 0.45);
+        padding: 1.25rem;
+      }
+      .title {
+        margin: 0 0 0.6rem;
+        font-size: clamp(1.4rem, 3.4vw, 2.1rem);
+        letter-spacing: 0.02em;
+      }
+      .description {
+        margin: 0 0 1rem;
+        color: rgba(233, 239, 255, 0.78);
+        line-height: 1.45;
+      }
+      .stage {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        max-height: 72vh;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: linear-gradient(160deg, #071021, #080f21);
+        display: grid;
+        place-items: center;
+      }
+      canvas {
+        width: min(90vw, 600px);
+        height: min(90vw, 600px);
+        border-radius: 8px;
+        border: 1px dashed rgba(255, 255, 255, 0.2);
+        background: rgba(4, 6, 14, 0.74);
+      }
+      .hud {
+        margin-top: 0.9rem;
+        display: flex;
+        justify-content: space-between;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        color: rgba(233, 239, 255, 0.9);
+      }
+      .pill {
+        border: 1px solid rgba(53, 208, 255, 0.35);
+        background: var(--accent-soft);
+        border-radius: 999px;
+        padding: 0.35rem 0.8rem;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="card">
+        <h1 class="title">Snake Speedrun</h1>
+        <p class="description">
+          Minimal shell for a browser snake game. The playable core lands in the next step of the backlog:
+          game logic, movement, scoring, and restart flow.
+        </p>
+        <div class="stage">
+          <canvas id="board" width="480" height="480" aria-label="Snake game board placeholder"></canvas>
+        </div>
+        <div class="hud">
+          <span class="pill">Press space/enter to start when logic lands</span>
+          <span class="pill">Ready for mobile/desktop controls</span>
+        </div>
+      </section>
+    </main>
+    <script>
+      const canvas = document.getElementById("board");
+      const context = canvas.getContext("2d");
+      context.fillStyle = "#0e162f";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = "#7da7ff";
+      context.font = "18px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.textAlign = "center";
+      context.fillText("Snake game shell placeholder", canvas.width / 2, canvas.height / 2);
+      context.fillText("Next task: implement movement + collisions", canvas.width / 2, canvas.height / 2 + 24);
+    </script>
+  </body>
+</html>

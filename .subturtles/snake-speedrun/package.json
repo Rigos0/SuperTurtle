@@ -1,0 +1,9 @@
+{
+  "name": "snake-speedrun",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Minimal static shell for the snake speedrun frontend.",
+  "scripts": {
+    "dev": "node server.js"
+  }
+}
