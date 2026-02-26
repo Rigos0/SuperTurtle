@@ -20,33 +20,40 @@ export class CodexDriver implements ChatDriver {
 
     const reasoningEffort = mapThinkingToReasoningEffort(input.message);
 
-    const response = await codexSession.sendMessage(
-      input.message,
-      input.statusCallback,
-      undefined,
-      reasoningEffort
-    );
+    let keepPolling = true;
+    const pendingPump = (async () => {
+      while (keepPolling) {
+        try {
+          await checkPendingAskUserRequests(input.ctx, input.chatId);
+          await checkPendingSendTurtleRequests(input.ctx, input.chatId);
+          await checkPendingBotControlRequests(session, input.chatId);
+        } catch (error) {
+          console.warn("Failed to process pending Codex MCP request:", error);
+        }
+        if (keepPolling) {
+          await wait(100);
+        }
+      }
+    })();
 
-    // Codex MCP handlers write request files to /tmp; poll briefly to flush them.
-    await wait(200);
-
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const buttonsSent = await checkPendingAskUserRequests(input.ctx, input.chatId);
-      if (buttonsSent) break;
-      if (attempt < 2) await wait(100);
+    let response: string;
+    try {
+      response = await codexSession.sendMessage(
+        input.message,
+        input.statusCallback,
+        undefined,
+        reasoningEffort
+      );
+    } finally {
+      keepPolling = false;
+      await pendingPump;
     }
 
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const photoSent = await checkPendingSendTurtleRequests(input.ctx, input.chatId);
-      if (photoSent) break;
-      if (attempt < 2) await wait(100);
-    }
-
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const handled = await checkPendingBotControlRequests(session, input.chatId);
-      if (handled) break;
-      if (attempt < 2) await wait(100);
-    }
+    // Final flush for late writes near turn completion.
+    await wait(100);
+    await checkPendingAskUserRequests(input.ctx, input.chatId);
+    await checkPendingSendTurtleRequests(input.ctx, input.chatId);
+    await checkPendingBotControlRequests(session, input.chatId);
 
     return response;
   }
