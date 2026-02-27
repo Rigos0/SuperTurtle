@@ -72,7 +72,7 @@ export default function Home() {
       <StickyNav />
       <main>
         <section id="hero" className="section-shell hero-shell relative">
-          <div className="section-container grid gap-10 xl:gap-16 items-start xl:items-center xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="section-container max-w-4xl space-y-10">
             <div className="reveal" style={{ animationDelay: '80ms' }}>
               <div className="mb-4">
                 <img src="/turtle-logo.png" alt="Super Turtle" width={72} height={72} />
@@ -126,14 +126,14 @@ export default function Home() {
         <SectionDivider />
 
         <section id="value-proposition" className="section-shell alt-shell">
-          <div className="section-container">
+          <div className="section-container max-w-4xl">
             <div className="section-head reveal">
               <p className="eyebrow">Why Super Turtle</p>
               <h2>What you get</h2>
               <p>Clear priorities, in the order users care about.</p>
             </div>
 
-            <div className="mt-10 grid gap-4 sm:gap-6 lg:gap-8 sm:grid-cols-2">
+            <div className="mt-10 grid gap-4 sm:gap-6">
               {valueProps.map((item, index) => (
                 <article
                   className={`reveal deck-card ${index % 3 === 0 ? 'olive' : index % 3 === 1 ? 'terracotta' : 'sage'}`}
@@ -152,7 +152,7 @@ export default function Home() {
         <SectionDivider />
 
         <section id="execution" className="section-shell">
-          <div className="section-container grid gap-10 xl:gap-16 xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="section-container max-w-4xl space-y-10">
             <div>
               <div className="section-head reveal">
                 <p className="eyebrow">Execution</p>
@@ -171,7 +171,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="reveal" style={{ animationDelay: '260ms' }}>
+            <div className="reveal max-w-2xl" style={{ animationDelay: '260ms' }}>
               <div className="tg-chat">
                 <div className="tg-chat-head">
                   <div className="tg-avatar">🐢</div>
@@ -197,13 +197,13 @@ export default function Home() {
         <SectionDivider />
 
         <section id="getting-started" className="section-shell alt-shell">
-          <div className="section-container">
+          <div className="section-container max-w-4xl">
             <div className="section-head reveal">
               <p className="eyebrow">Quick start</p>
               <h2>Get running in two minutes</h2>
             </div>
 
-            <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-10 grid gap-5">
               {[
                 'git clone <repo>',
                 'cd super-turtle\nclaude\n# or codex',
