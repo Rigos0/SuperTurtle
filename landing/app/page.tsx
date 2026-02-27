@@ -21,15 +21,10 @@ const valueProps = [
     accent: 'terracotta',
   },
   {
-    title: 'Autonomous execution',
+    title: 'Parallel sub-agents, managed for you',
     description:
       'Breaks work into tasks, runs sub-agents, can open/test webpages, and iterates until done.',
     accent: 'sage',
-  },
-  {
-    title: 'Built for long-running, large jobs',
-    description: 'Designed to keep big multi-phase work moving (for example, rebuilding products end-to-end).',
-    accent: 'olive',
   },
   {
     title: 'Runs on your machine',
@@ -71,7 +66,7 @@ const executionFlow = [
 export default function Home() {
   const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL ?? "/docs";
   const githubUrl = "https://github.com/Rigos0/superturtle";
-  const topFour = valueProps.slice(0, 4);
+  const topThree = valueProps.slice(0, 3);
   return (
     <div className="landing-root">
       <StickyNav />
@@ -106,7 +101,7 @@ export default function Home() {
 
             <div className="reveal" style={{ animationDelay: '220ms' }}>
               <div className="grid gap-4">
-                {topFour.map((item, index) => (
+                {topThree.map((item, index) => (
                   <article
                     className={`deck-card ${index === 0 ? 'olive' : index === 1 ? 'terracotta' : 'sage'}`}
                     key={item.title}
