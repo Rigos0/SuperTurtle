@@ -11,11 +11,11 @@ Scope commits: `9db5311`, `1ed668c`, `dd7ba1c`, `dd5671d`, `68e26ed`, `c0d7bac`,
 - Risk: user asks to stop all work, but queued work resumes right away, causing surprising side effects.
 - Suggested fix: track `didStopIntent` in `handleVoice` and skip draining queue for that path, or clear queue for that chat before returning.
 
-2. Medium: `ctl stop` writes phantom run-state events for non-existent runs
+2. Resolved: `ctl stop` wrote phantom run-state events for non-existent runs
 - File: `super_turtle/subturtle/ctl:743`
 - Problem: in the `! is_running` branch, `append_run_event "$name" "stop" "not_running"` executes before `do_archive "$name"`. For typo/non-existent names, `do_archive` exits with error, but the ledger already contains a synthetic stop event.
 - Risk: `super_turtle/state/runs.jsonl` gets polluted with fake run names, degrading handoff summaries and operator trust in run-state data.
-- Suggested fix: only append `not_running` after confirming workspace exists (or when the run has known metadata), and avoid logging events for unknown names.
+- Fix applied: `append_run_event ... not_running` now runs only when `.subturtles/<name>/` exists, so unknown names no longer write ledger entries.
 
 ## Validation Run
 

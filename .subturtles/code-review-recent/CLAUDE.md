@@ -1,5 +1,5 @@
 ## Current Task
-Fix small issues from the review and document larger issues without risky behavior changes.
+Update state and stop.
 
 ## End Goal with Specs
 Provide a review doc with top risks and implement small fixes. Call out larger issues without changing behavior unexpectedly.
@@ -7,8 +7,8 @@ Provide a review doc with top risks and implement small fixes. Call out larger i
 ## Backlog
 - [x] Identify recent commits and areas touched
 - [x] Review for bugs, security issues, regressions
-- [ ] Fix small issues; document larger ones <- current
-- [ ] Update state and stop
+- [x] Fix small issues; document larger ones
+- [ ] Update state and stop <- current
 
 ## Notes
-Use git log to scope; focus on Telegram handlers and SubTurtle control changes.
+Fixed `ctl stop` phantom run-state logging for unknown names; left voice stop/deferred-queue behavior documented as a larger follow-up risk.

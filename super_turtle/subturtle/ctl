@@ -723,6 +723,8 @@ do_spawn() {
 
 do_stop() {
   local name="${1:-default}"
+  local ws
+  ws="$(workspace_dir "$name")"
 
   # Remove recurring supervision cron before stopping the process.
   CRON_JOB_ID=""
@@ -743,7 +745,9 @@ do_stop() {
   if ! is_running "$name"; then
     echo "[subturtle:${name}] not running"
     rm -f "$(pid_file "$name")" "$(meta_file "$name")"
-    append_run_event "$name" "stop" "not_running"
+    if [[ -d "$ws" ]]; then
+      append_run_event "$name" "stop" "not_running"
+    fi
     do_archive "$name"
     exit 0
   fi
