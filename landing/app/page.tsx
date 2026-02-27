@@ -128,17 +128,9 @@ export default function Home() {
                   <span>{turtleBubbleText}</span>
                 </div>
                 <div
-                  className="turtle-sticker-button"
+                  className="turtle-sticker-trigger"
                   onClick={handleTurtleClick}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      handleTurtleClick();
-                    }
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Show step by step message"
+                  aria-label="Show turtle message"
                 >
                   <img className="turtle-sticker-image" src="/turtle-logo.png" alt="Super Turtle" width={104} height={104} />
                 </div>

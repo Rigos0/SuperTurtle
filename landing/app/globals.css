@@ -110,22 +110,16 @@ body {
   display: inline-flex;
 }
 
-.turtle-sticker-button {
+.turtle-sticker-trigger {
   border: 0;
   padding: 0;
   background: transparent;
   transition: transform 0.18s ease;
-  cursor: pointer;
+  cursor: default;
 }
 
-.turtle-sticker-button:hover {
+.turtle-sticker-trigger:hover {
   transform: translateY(-2px) scale(1.02);
-}
-
-.turtle-sticker-button:focus-visible {
-  outline: 2px solid rgba(86, 108, 75, 0.45);
-  outline-offset: 4px;
-  border-radius: 0.75rem;
 }
 
 .turtle-sticker-image {
@@ -133,8 +127,7 @@ body {
   transition: filter 0.22s ease, transform 0.22s ease;
 }
 
-.turtle-sticker-button:hover .turtle-sticker-image,
-.turtle-sticker-button:focus-visible .turtle-sticker-image {
+.turtle-sticker-trigger:hover .turtle-sticker-image {
   filter:
     drop-shadow(0 0 0.55rem rgba(182, 109, 75, 0.42))
     drop-shadow(0 0 0.9rem rgba(138, 166, 124, 0.22))
@@ -147,15 +140,12 @@ body {
   left: -120px;
   top: 50%;
   transform: translateY(-56%) translateX(8px) scale(0.96);
-  padding: 0.35rem 0.65rem;
-  border-radius: 999px;
-  background: #fff;
-  border: 1px solid rgba(86, 108, 75, 0.28);
+  padding: 0;
   color: var(--text-heading);
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: 0.95rem;
+  font-weight: 700;
   white-space: nowrap;
-  box-shadow: 0 10px 24px -20px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 8px rgba(255, 255, 255, 0.75);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -177,27 +167,22 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .turtle-sticker-button,
+  .turtle-sticker-trigger,
   .turtle-sticker-image,
   .turtle-tip-bubble {
     transition: none;
   }
 
-  .turtle-sticker-button:hover {
+  .turtle-sticker-trigger:hover {
     transform: none;
   }
 
-  .turtle-sticker-button:hover .turtle-sticker-image,
-  .turtle-sticker-button:focus-visible .turtle-sticker-image {
+  .turtle-sticker-trigger:hover .turtle-sticker-image {
     transform: none;
   }
 
   .turtle-tip-bubble {
     transform: translateY(-56%) translateX(0) scale(1);
-  }
-
-  .turtle-tip-word {
-    animation: none;
   }
 }
 
