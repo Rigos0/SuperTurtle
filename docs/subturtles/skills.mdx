@@ -1,0 +1,146 @@
+---
+title: Skills
+description: How `--skill` works, where skills live, and how to use Remotion and custom skills with SubTurtles
+---
+
+# Skills
+
+SubTurtles support Claude Code skills through repeatable `--skill` flags on `ctl spawn` and `ctl start`.
+
+Use skills when a task needs domain-specific workflows (frontend QA, Remotion video pipelines, testing patterns, migration playbooks).
+
+## What `--skill` Does
+
+`--skill` is both a runtime toggle and a tracking field.
+
+<Steps>
+  <Step title="Capture skill names">
+    `ctl` parses each `--skill <name>` flag and stores names as JSON in `subturtle.meta` (`SKILLS=[...]`).
+  </Step>
+  <Step title="Pass names into SubTurtle runtime">
+    `ctl` starts the worker with `python -m super_turtle.subturtle ... --skills <name1> <name2>`.
+  </Step>
+  <Step title="Enable project skill directory">
+    If skills are non-empty, the loop sets `add_dirs = [\"super_turtle/skills\"]`.
+  </Step>
+  <Step title="Forward to underlying agent CLI">
+    Claude/Codex calls include `--add-dir super_turtle/skills`, so the agent can discover project-scoped skills.
+  </Step>
+  <Step title="Expose in status/list output">
+    `ctl status` and `ctl list` print the configured skill names for that SubTurtle.
+  </Step>
+</Steps>
+
+<Warning>
+`ctl` does not validate skill names. A typo in `--skill` still appears in metadata/output, but no matching skill will be loaded.
+</Warning>
+
+## CLI Usage
+
+`spawn` example:
+
+```bash
+./super_turtle/subturtle/ctl spawn video-agent \
+  --type yolo-codex \
+  --state-file /tmp/video-agent.md \
+  --skill remotion-best-practices \
+  --skill testing
+```
+
+`start` example (existing workspace):
+
+```bash
+./super_turtle/subturtle/ctl start video-agent \
+  --type yolo \
+  --timeout 2h \
+  --skill remotion-best-practices
+```
+
+Verify what was set:
+
+```bash
+./super_turtle/subturtle/ctl status video-agent
+./super_turtle/subturtle/ctl list
+```
+
+## Skill Directory Layout
+
+Project-scoped skills should live under:
+
+```text
+super_turtle/skills/
+└── .claude/
+    └── skills/
+        └── <skill-name>/
+            ├── SKILL.md
+            ├── scripts/        # optional helpers
+            ├── references/     # optional docs/examples
+            └── assets/         # optional templates/snippets
+```
+
+This layout keeps skill logic versioned with the repo so every SubTurtle run sees the same behavior.
+
+## Remotion Example: `remotion-best-practices`
+
+If you already have the Remotion skill in your local skills library, copy it into the project skill directory:
+
+```bash
+mkdir -p super_turtle/skills/.claude/skills/remotion-best-practices
+cp -R ~/.agents/skills/remotion-best-practices/* \
+  super_turtle/skills/.claude/skills/remotion-best-practices/
+```
+
+Then spawn a SubTurtle with that skill:
+
+```bash
+./super_turtle/subturtle/ctl spawn remotion-agent \
+  --type yolo-codex \
+  --state-file /tmp/remotion-agent.md \
+  --skill remotion-best-practices
+```
+
+The skill provides Remotion-specific guidance (animations, sequencing, captions/subtitles, ffmpeg usage, render patterns) without bloating the SubTurtle state file.
+
+## Create a Custom Skill
+
+Create a new skill folder and `SKILL.md`:
+
+```bash
+mkdir -p super_turtle/skills/.claude/skills/api-migrations
+```
+
+```markdown
+---
+name: api-migrations
+description: Safe schema and API migration workflow for this repo
+allowed-tools: Read, Write, Bash, Glob
+---
+
+# API Migrations
+
+When changing DB schema or API contracts:
+
+1. Identify affected models, handlers, and tests.
+2. Add backward-compatible migration first.
+3. Update handlers with feature-flagged fallback if needed.
+4. Run tests and add migration notes in docs/changelog.
+```
+
+Use it:
+
+```bash
+./super_turtle/subturtle/ctl spawn migration-agent \
+  --state-file /tmp/migration.md \
+  --skill api-migrations
+```
+
+<Tip>
+Keep skills narrow and reusable. Put durable workflows in skills, and keep task-specific details in each SubTurtle's `CLAUDE.md`.
+</Tip>
+
+## Related Pages
+
+- [SubTurtles Overview](/subturtles/overview)
+- [Loop Types](/subturtles/loop-types)
+- [CTL Commands](/subturtles/ctl-commands)
+- [State Files](/subturtles/state-files)
