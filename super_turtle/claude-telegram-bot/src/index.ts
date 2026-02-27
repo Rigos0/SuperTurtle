@@ -54,6 +54,7 @@ import {
 } from "./cron-supervision-queue";
 import { buildCronScheduledPrompt } from "./cron-scheduled-prompt";
 import { UpdateDedupeCache } from "./update-dedupe";
+import { startTurtleGreetings } from "./turtle-greetings";
 
 // Re-export for any existing consumers
 export { bot };
@@ -872,6 +873,10 @@ console.log(`Bot started: @${botInfo.username}`);
 
 // Start cron timer
 startCronTimer();
+if (process.env.TURTLE_GREETINGS !== "false" && ALLOWED_USERS.length > 0) {
+  startTurtleGreetings(bot, ALLOWED_USERS[0]!);
+  console.log("Turtle greetings enabled (8am/8pm Europe/Prague)");
+}
 startDashboardServer();
 
 // Drop any messages that arrived while the bot was offline
