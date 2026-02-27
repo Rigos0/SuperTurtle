@@ -1,13 +1,13 @@
 ## Current Task
-Implement stop-intent parser (normalize text, match `stop`, `pause`, `abort`, `!`, `!stop` and common voice variants).
+Wire stop intent to a handler that stops all running SubTurtles (via `ctl stop` or existing stop flow).
 
 ## End Goal with Specs
 User messages containing stop intents trigger a global stop of running SubTurtles, regardless of command prefix. Voice-transcribed variants should be tolerated. Behavior is consistent across text and command handlers. Tests cover the stop intent parsing.
 
 ## Backlog
 - [x] Identify entry points for Telegram updates (commands, text, callbacks) in `super_turtle/claude-telegram-bot/src`
-- [ ] Implement stop-intent parser (normalize text, match `stop`, `pause`, `abort`, `!`, `!stop` and common voice variants) <- current
-- [ ] Wire stop intent to a handler that stops all running SubTurtles (via `ctl stop` or existing stop flow)
+- [x] Implement stop-intent parser (normalize text, match `stop`, `pause`, `abort`, `!`, `!stop` and common voice variants)
+- [ ] Wire stop intent to a handler that stops all running SubTurtles (via `ctl stop` or existing stop flow) <- current
 - [ ] Add/extend tests for stop intent parsing and stop action
 - [ ] Update docs if needed, update state, stop
 

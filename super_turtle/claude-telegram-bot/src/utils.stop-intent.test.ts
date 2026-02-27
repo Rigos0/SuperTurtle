@@ -7,11 +7,25 @@ describe("isStopIntent", () => {
     expect(isStopIntent("Stop.")).toBe(true);
     expect(isStopIntent("please pause now")).toBe(true);
     expect(isStopIntent("halt this")).toBe(true);
+    expect(isStopIntent("abort")).toBe(true);
+    expect(isStopIntent("!")).toBe(true);
+    expect(isStopIntent("!stop")).toBe(true);
+    expect(isStopIntent("! stop")).toBe(true);
   });
 
-  it("does not match regular sentences", () => {
+  it("matches common voice and conversational variants", () => {
+    expect(isStopIntent("stahp")).toBe(true);
+    expect(isStopIntent("stop it please")).toBe(true);
+    expect(isStopIntent("can you stop now")).toBe(true);
+    expect(isStopIntent("would you please abort current run")).toBe(true);
+  });
+
+  it("does not match regular sentences or non-stop !commands", () => {
     expect(isStopIntent("how to stop docker container")).toBe(false);
     expect(isStopIntent("unstoppable force")).toBe(false);
     expect(isStopIntent("please continue")).toBe(false);
+    expect(isStopIntent("!deploy")).toBe(false);
+    expect(isStopIntent("! run tests")).toBe(false);
+    expect(isStopIntent("can you deploy stop button")).toBe(false);
   });
 });

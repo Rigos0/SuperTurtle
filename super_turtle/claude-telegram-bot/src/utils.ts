@@ -237,16 +237,113 @@ export async function checkInterrupt(text: string): Promise<string> {
   return strippedText;
 }
 
-export function isStopIntent(text: string): boolean {
-  const normalized = text
+const STOP_KEYWORDS = new Set([
+  "stop",
+  "stopp",
+  "stahp",
+  "pause",
+  "abort",
+  "halt",
+  "cancel",
+]);
+
+const STOP_TAIL_WORDS = new Set([
+  "it",
+  "now",
+  "please",
+  "this",
+  "that",
+  "everything",
+  "all",
+  "run",
+  "runs",
+  "query",
+  "queries",
+  "job",
+  "jobs",
+  "task",
+  "tasks",
+  "work",
+  "working",
+  "process",
+  "processes",
+  "agent",
+  "subturtle",
+  "subturtles",
+  "current",
+  "the",
+  "for",
+  "right",
+  "away",
+  "immediately",
+  "thanks",
+  "thank",
+  "you",
+  "to",
+  "my",
+  "your",
+  "our",
+  "stop",
+]);
+
+function normalizeStopIntentText(text: string): string {
+  return text
     .toLowerCase()
-    .replace(/[^a-z\s]/g, " ")
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[^a-z0-9!\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+export function isStopIntent(text: string): boolean {
+  const normalized = normalizeStopIntentText(text);
 
   if (!normalized) {
     return false;
   }
 
-  return /^(please\s+)?(stop|halt|pause)\b/.test(normalized);
+  if (normalized === "!") {
+    return true;
+  }
+
+  if (normalized.startsWith("!")) {
+    const bangCommand = normalized.slice(1).trim();
+    return bangCommand === "stop";
+  }
+
+  const words = normalized.split(" ");
+  if (words.length === 0) {
+    return false;
+  }
+
+  let idx = 0;
+  while (words[idx] === "please" || words[idx] === "hey" || words[idx] === "ok" || words[idx] === "okay") {
+    idx += 1;
+  }
+
+  const helperVerb = words[idx];
+  const helperYou = words[idx + 1];
+  if (
+    (helperVerb === "can" || helperVerb === "could" || helperVerb === "would" || helperVerb === "will") &&
+    helperYou === "you"
+  ) {
+    idx += 2;
+    if (words[idx] === "please") {
+      idx += 1;
+    }
+  }
+
+  const keyword = words[idx];
+  if (!keyword || !STOP_KEYWORDS.has(keyword)) {
+    return false;
+  }
+
+  for (const tailWord of words.slice(idx + 1)) {
+    if (!STOP_TAIL_WORDS.has(tailWord)) {
+      return false;
+    }
+  }
+
+  return true;
 }
