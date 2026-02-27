@@ -1,0 +1,236 @@
+---
+title: Architecture
+description: How Super Turtle coordinates work across agents and drivers
+---
+
+# Architecture
+
+Super Turtle is a multi-agent orchestration system. A Meta Agent decomposes tasks and spawns SubTurtles (parallel workers) to execute them. The system silently supervises progress and routes work to the most cost-effective driver (Claude Code or Codex).
+
+## System Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Telegram Chat (User)                      │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                      Text/Voice/Photos
+                           │
+                 ┌─────────▼────────────┐
+                 │  Telegram Bot        │
+                 │  (receives message)  │
+                 └──────────┬───────────┘
+                            │
+                 ┌──────────▼──────────┐
+                 │  Meta Agent (Smart) │
+                 │  - Decomposes task  │
+                 │  - Routes to driver │
+                 │  - Supervises work  │
+                 └────┬─────────────┬──┘
+         ┌───────────┘             └──────────────┐
+         │                                        │
+    ┌────▼──────────┐              ┌────────────▼──┐
+    │ Claude Code   │              │ Codex CLI     │
+    │ (Premium AI)  │              │ (Fast/Cheap)  │
+    │ ✓ Reasoning   │              │ ✓ Lightweight │
+    │ ✓ Complex     │              │ ✓ Quick loops │
+    │ ✗ Expensive   │              │ ✗ Less capable│
+    └────┬──────────┘              └────────┬──────┘
+         │                                   │
+         ├──────────────────┬────────────────┤
+         │                  │                │
+    ┌────▼──────┐  ┌────────▼────┐  ┌───────▼──┐
+    │ SubTurtle │  │ SubTurtle   │  │SubTurtle │
+    │ (slow)    │  │ (yolo)      │  │(yolo-cod)│
+    │ Plan→Exec │  │ Single call │  │ Fastest  │
+    └────┬──────┘  └────────┬────┘  └────┬─────┘
+         │                  │             │
+    ┌────▼──────────────────▼─────────────▼──┐
+    │      Cron Supervision (Silent)          │
+    │  - Check-ins every 30-60 seconds       │
+    │  - Detect failures, auto-recover        │
+    │  - Only notify on milestones            │
+    └──────────────────────────────────────────┘
+         │
+    ┌────▼──────────────────────────────┐
+    │  Telegram Notifications (Events)   │
+    │  - "🎉 Feature done"              │
+    │  - "⚠️ Hit a snag with X"         │
+    │  - "✅ All done"                  │
+    └────────────────────────────────────┘
+```
+
+## Key Components
+
+### Meta Agent
+
+The Meta Agent is the decision-maker. It:
+
+1. **Receives messages** from Telegram (text, voice, files)
+2. **Understands intent** using Claude's reasoning
+3. **Decomposes tasks** into subtasks for parallel work
+4. **Delegates to SubTurtles** with context and deadlines
+5. **Checks progress** via cron supervision
+6. **Handles errors** and retries failed work
+7. **Routes to drivers** based on cost and capability:
+   - Claude Code for complex reasoning
+   - Codex for fast, cheap loops
+8. **Notifies you** only on meaningful progress (not spam)
+
+The Meta Agent runs continuously. New Telegram messages queue up, and it processes them in order.
+
+### SubTurtles (Parallel Workers)
+
+SubTurtles are lightweight agents spawned by the Meta Agent. Each one:
+
+- Runs an **autonomous loop** (no human in the middle)
+- Has a **timeout** (prevents runaway work)
+- Writes progress to a **state file** (CLAUDE.md per SubTurtle)
+- Can spawn **sub-SubTurtles** if needed
+- **Self-stops** when done via a `## Loop Control\nSTOP` directive
+
+**Loop types:**
+
+| Type | Speed | Cost | Best For |
+|------|-------|------|----------|
+| `slow` | Slow (10+ min) | Medium | Complex reasoning, planning |
+| `yolo` | Medium (1-5 min) | High | Direct Claude calls |
+| `yolo-codex` | Fast (30s-2min) | Low | Iterations, quick feedback loops |
+| `yolo-codex-spark` | Fastest (<30s) | Very Low | Simple operations, heavy parallelism |
+
+See [SubTurtle Loop Types](/docs/subturtles/loop-types) for detailed comparison.
+
+### Cron Supervision
+
+Background cron jobs silently monitor progress:
+
+- **Check-in interval:** 30-60 seconds (adjustable)
+- **What it checks:** Status files, git logs, error traces
+- **When it notifies:** Only on milestones (task done, failure, timeout)
+- **Automatic recovery:** Restarts failed workers, re-queues blocked tasks
+- **No spam:** If nothing changed, no message sent
+
+Think of it as a background manager who doesn't bother you unless something important happened.
+
+### Driver Abstraction
+
+The system supports two drivers transparently:
+
+**Claude Code** (Premium)
+- Full Claude capabilities (reasoning, long-context, tool use)
+- High cost per token
+- Best for complex tasks requiring planning
+
+**Codex CLI** (Cost-effective)
+- Fast, lightweight coding agent
+- Low cost per request
+- Best for iterations and quick loops
+- No reasoning, but good for straightforward execution
+
+The Meta Agent automatically routes:
+- **Heavy reasoning** → Claude Code
+- **Repeated loops** → Codex
+- **Mixed work** → Both in parallel
+
+See [Drivers](/docs/bot/drivers) for configuration options.
+
+## State Management
+
+Each agent (Meta and SubTurtles) has a state file: `CLAUDE.md`
+
+```
+## Current Task
+Build a landing page with three sections
+
+## Progress
+- [x] Set up Astro project
+- [x] Create header component
+- [ ] Add footer
+- [ ] Deploy preview link
+
+## Loop Control
+(empty while running)
+```
+
+When the agent finishes, it appends:
+```
+## Loop Control
+STOP
+```
+
+The system checks this file on each cron check-in and:
+- Detects completion (STOP marker)
+- Extracts progress from the markdown
+- Notifies you of milestones
+- Cleans up resources (stops tunnels, kills cron jobs)
+
+## How a Task Flows Through the System
+
+**Example: "Build me a weather app"**
+
+1. **You send message on Telegram**
+   ```
+   Build me a weather app with React
+   ```
+
+2. **Meta Agent receives and decomposes**
+   ```
+   → Frontend: Set up React + styling
+   → Backend: Weather API integration
+   → Integration: Wire them together
+   → Test: Verify all endpoints work
+   ```
+
+3. **Meta Agent spawns 3 SubTurtles in parallel**
+   ```
+   SubTurtle #1: Build frontend (yolo-codex)
+   SubTurtle #2: Build backend (yolo-codex)
+   SubTurtle #3: Set up tunnel + deploy (yolo-codex)
+   ```
+
+4. **Cron supervision checks every 30s**
+   - Is SubTurtle #1 done? (checks CLAUDE.md)
+   - Is SubTurtle #2 done? (checks CLAUDE.md)
+   - Is SubTurtle #3 done? (checks CLAUDE.md)
+   - Did any worker crash? (restart if yes)
+
+5. **You get notified only on milestones**
+   ```
+   🚀 On it. Spawning 3 workers...
+
+   (silence for 2 minutes...)
+
+   🎉 Frontend done. Starting integration...
+
+   (silence for 30 seconds...)
+
+   ✅ All done. App live at https://xxxx.trycloudflare.com
+   ```
+
+## Long-Run Tracking
+
+The system logs all runs in `runs.jsonl`:
+
+```json
+{"start": "2026-02-27T14:30:00Z", "task": "Build weather app", "status": "running"}
+{"start": "2026-02-27T14:30:00Z", "task": "Build weather app", "status": "done", "duration": "185s"}
+```
+
+And maintains handoff state in `super_turtle/state/handoff.md` to resume work after restarts.
+
+This ensures **no work is lost** — if the bot crashes or you restart your machine, the system knows what was in flight and can pick up where it left off.
+
+## Security & Permissions
+
+- **User allowlist:** Only your Telegram ID can use the bot
+- **Path restriction:** Claude can only access allowed directories (configurable)
+- **Intent filtering:** Dangerous requests are blocked
+- **Audit logging:** All interactions logged to `/tmp/claude-telegram-audit.log`
+
+See [Security](/docs/config/security) for detailed permissions model.
+
+## What's Next
+
+- Learn about [SubTurtle commands](/docs/subturtles/ctl-commands) to manually spawn and monitor workers
+- Understand [Meta Agent supervision](/docs/meta/supervision) for how cron handles failures
+- See [Task decomposition](/docs/meta/task-decomposition) for how the Meta Agent breaks down complex work

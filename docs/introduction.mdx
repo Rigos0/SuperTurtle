@@ -1,0 +1,87 @@
+---
+title: Introduction
+description: What Super Turtle is and how it works
+---
+
+# Introduction
+
+Super Turtle is an autonomous coding system that runs on your machine and responds to your Telegram messages. Tell it what to build, and it breaks down the work, runs agents in parallel, supervises progress, and delivers results — all from your phone.
+
+**Core principle:** Say what → get results. You never think about agents, processes, or infrastructure. You describe what you want built, and the system figures out how.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card
+    title="Voice & Text Control"
+    description="Speak naturally or type. Send screenshots, documents, audio — Claude processes everything."
+  />
+  <Card
+    title="Parallel SubTurtles"
+    description="Spawn multiple agents to work on different tasks at once. System coordinates and merges results."
+  />
+  <Card
+    title="Dual Driver (Claude & Codex)"
+    description="Automatically routes work to Claude Code or Codex based on cost and availability. You pay only for what you use."
+  />
+  <Card
+    title="Autonomous Supervision"
+    description="Background cron jobs silently monitor progress and alert you only when there's news. Failures recover automatically."
+  />
+  <Card
+    title="Long-Run Tracking"
+    description="System tracks runs, their status, and handoff state across restarts. No work is lost."
+  />
+  <Card
+    title="AI-Guided Setup"
+    description="Clone the repo, open Claude Code or Codex, say 'Set up Super Turtle' — the system walks you through install."
+  />
+</CardGroup>
+
+## How It Works
+
+```
+Human
+  ↓
+Telegram (text/voice/photos/docs)
+  ↓
+Meta Agent (plans, delegates, supervises)
+  ↓
+SubTurtles (fast parallel workers)
+  ↓
+Code (delivered to Telegram as results)
+```
+
+**What you see:**
+- You send a message: "Build me a landing page"
+- System responds: "🚀 On it."
+- Silence while work happens (no spam)
+- Notification: "🎉 Landing page is live at https://..."
+
+**What the system does (invisibly):**
+- Meta Agent decomposes the task into subtasks
+- Spawns SubTurtles to work in parallel
+- Cron jobs check progress every 30 seconds
+- Routes work to Claude Code or Codex based on cost
+- Recovers automatically if a worker fails
+- Merges results and notifies you only when there's news
+
+## When to Use Super Turtle
+
+✅ **Great for:**
+- Building features from natural language descriptions
+- Long-running tasks (hours or days)
+- Work that needs iteration (test, fail, refine)
+- Parallel tasks that benefit from multiple agents
+- Staying productive from your phone
+
+❌ **Not designed for:**
+- Simple one-off questions (use Claude Code directly)
+- Real-time collaboration or live coding
+- Tasks requiring human input in the middle
+
+## What's Next
+
+Ready to get started? Head to [Quickstart](/docs/quickstart) to set up Super Turtle on your machine.
+
+For technical details on how the system is architected, see [Architecture](/docs/architecture).
