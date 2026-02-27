@@ -101,11 +101,9 @@ export default function Home() {
           <div className="section-container max-w-5xl space-y-10">
             <div className="reveal text-center flex flex-col items-center" style={{ animationDelay: '80ms' }}>
               <div className="mb-4 mx-auto turtle-sticker-wrap">
-                {showTurtleTip && (
-                  <div className="turtle-tip-bubble" role="status" aria-live="polite">
-                    step by step
-                  </div>
-                )}
+                <div className={`turtle-tip-bubble ${showTurtleTip ? 'active' : ''}`} aria-hidden={!showTurtleTip}>
+                  step by step
+                </div>
                 <button
                   type="button"
                   className="turtle-sticker-button"
