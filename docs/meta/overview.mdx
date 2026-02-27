@@ -1,0 +1,138 @@
+---
+title: Meta Agent Overview
+description: How the Meta Agent works as the user-facing orchestrator across Telegram, CLI, and SubTurtle delegation
+---
+
+# Meta Agent Overview
+
+The Meta Agent is the single conversational interface for Super Turtle. It talks to the user in Telegram or CLI, decides execution strategy, and keeps delivery moving.
+
+At runtime, it is a player-coach:
+- It can code directly for small, self-contained tasks.
+- It can spawn SubTurtles for larger autonomous work.
+- It supervises progress and reports only meaningful milestones.
+
+## Two-Layer Architecture
+
+<CardGroup cols={2}>
+  <Card title="Layer 1: Meta Agent">
+    Conversational control plane. Handles user intent, task framing, delegation decisions, and milestone messaging.
+  </Card>
+  <Card title="Layer 2: SubTurtles">
+    Autonomous background workers that execute scoped coding tasks from state files in `.subturtles/&lt;name&gt;/`.
+  </Card>
+</CardGroup>
+
+The behavior contract for the Meta Agent lives in:
+
+```text
+super_turtle/meta/META_SHARED.md
+```
+
+The contract is injected into both entrypoints:
+
+```bash
+# CLI meta entrypoint
+./super_turtle/meta/claude-meta
+
+# Telegram bot startup loads META_SHARED.md into META_PROMPT
+super_turtle/claude-telegram-bot/src/config.ts
+```
+
+<Info>
+`claude-meta` appends `META_SHARED.md` as system prompt, while the Telegram bot loads the same file into `META_PROMPT`, so both interfaces follow one shared policy.
+</Info>
+
+## What the Meta Agent Owns
+
+Core responsibilities:
+- Interpret user requests in plain language.
+- Choose whether to implement directly or delegate.
+- Seed SubTurtle `CLAUDE.md` state files.
+- Spawn workers with `ctl spawn` and monitor progress.
+- Keep updates milestone-focused (not process noise).
+
+## Direct Work vs Delegation
+
+`META_SHARED.md` defines the decision model:
+
+<Steps>
+  <Step title="Do it directly for short tasks">
+    Use direct edits for quick, contained changes where spawning overhead would be slower than implementation.
+  </Step>
+  <Step title="Delegate for multi-step work">
+    Spawn SubTurtles when work is multi-file, iterative, or benefits from autonomous test/fix loops.
+  </Step>
+  <Step title="Keep state explicit">
+    Before spawn, write `.subturtles/&lt;name&gt;/CLAUDE.md` with Current Task, End Goal, and Backlog.
+  </Step>
+  <Step title="Use spawn as the atomic boundary">
+    Prefer a single `ctl spawn` command to create workspace, seed state, start loop, and register cron supervision.
+  </Step>
+</Steps>
+
+Example spawn shape:
+
+```bash
+./super_turtle/subturtle/ctl spawn docs-agent \
+  --type yolo-codex \
+  --timeout 1h \
+  --state-file /tmp/docs-agent-state.md
+```
+
+## Interface Surfaces
+
+The Meta Agent is exposed primarily through Telegram bot handlers:
+
+```ts
+bot.command("status", handleStatus);
+bot.command("sub", handleSubturtle);
+bot.command("subs", handleSubturtle);
+bot.command("subtitles", handleSubturtle);
+bot.on("message:voice", handleVoice);
+bot.on("message:audio", handleAudio);
+```
+
+This keeps one chat surface for:
+- Direction changes ("build X", "stop", "continue")
+- Progress checks ("how's it going?")
+- Voice-first usage when typing is inconvenient
+
+## Voice Mode and Transcription Handling
+
+Voice support is built into the Telegram path (`handlers/voice.ts` and `handlers/audio.ts`):
+
+1. Authorize user and rate-limit request.
+2. Download voice/audio file from Telegram.
+3. Transcribe with `transcribeVoice(...)`.
+4. Show transcript preview in chat.
+5. Route transcript to the active driver.
+
+```ts
+if (!TRANSCRIPTION_AVAILABLE) {
+  await ctx.reply("Voice transcription is not configured. Set OPENAI_API_KEY in .env");
+  return;
+}
+```
+
+Transcription behavior is configured in:
+
+```text
+super_turtle/claude-telegram-bot/src/config.ts
+```
+
+Key details:
+- `OPENAI_API_KEY` enables transcription (`TRANSCRIPTION_AVAILABLE`).
+- `TRANSCRIPTION_PROMPT` is built from a base prompt plus optional context file.
+- Stop intent detected from transcript can interrupt active work immediately.
+
+<Note>
+Voice input is treated as first-class user intent. In-progress background runs can be preempted or queued so urgent spoken commands are not ignored.
+</Note>
+
+## Related Pages
+
+- [Meta Supervision](/meta/supervision)
+- [Task Decomposition](/meta/task-decomposition)
+- [Resource Management](/meta/resource-management)
+- [SubTurtles Overview](/subturtles/overview)
