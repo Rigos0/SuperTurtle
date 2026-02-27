@@ -11,7 +11,7 @@ Super Turtle is an autonomous coding system you talk to on Telegram. You describ
 Full docs: [docs/index.md](docs/index.md)
 
 <p align="center">
-  <img src="assets/readme-stickers/philosophy-thinking-turtle.png" width="108" alt="Thinking turtle sticker" />
+  <img src="assets/readme-stickers/skills-idea-turtle.png" width="108" alt="Philosophy turtle sticker" />
 </p>
 
 ## Philosophy
@@ -63,10 +63,6 @@ The system is designed to be:
                  commits/logs/state files
 ```
 
-<p align="center">
-  <img src="assets/readme-stickers/layers-chat-turtle.png" width="92" alt="Layers turtle sticker" />
-</p>
-
 ### Two layers
 
 1. **Meta Agent (`super_turtle/meta/META_SHARED.md`)**
@@ -83,10 +79,6 @@ The system is designed to be:
   - `yolo-codex`: single Codex call/iteration (default)
   - `yolo-codex-spark`: single Codex Spark call/iteration
 
-<p align="center">
-  <img src="assets/readme-stickers/skills-idea-turtle.png" width="92" alt="Skills turtle sticker" />
-</p>
-
 ### Skills, supervision, and previews
 
 - **Skills**: loaded on demand per SubTurtle (`--skill frontend --skill testing`) so expertise stays scoped to the task.
@@ -100,10 +92,6 @@ The system is designed to be:
 ## Setup (AI-guided, clone-and-open)
 
 Super Turtle setup is designed to run through **Claude Code or Codex**. You should not need manual config editing.
-
-<p align="center">
-  <img src="assets/readme-stickers/clone-laptop-turtle.png" width="92" alt="Clone turtle sticker" />
-</p>
 
 ### 1) Clone and open the repo root
 
@@ -120,10 +108,6 @@ Set up Super Turtle on this machine.
 
 The root `CLAUDE.md`/`AGENTS.md` instructions are loaded automatically and the agent should walk you through setup, run install commands, and configure project files.
 
-<p align="center">
-  <img src="assets/readme-stickers/manual-phone-turtle.png" width="92" alt="Manual info turtle sticker" />
-</p>
-
 ### 2) Manual info you must provide
 
 You only need to bring:
@@ -131,10 +115,6 @@ You only need to bring:
 - Telegram bot token from [@BotFather](https://t.me/BotFather) (`TELEGRAM_BOT_TOKEN`)
 - Your Telegram user/chat ID (`TELEGRAM_ALLOWED_USERS`) from [@userinfobot](https://t.me/userinfobot) or your bot's `/start`
 - Optional `OPENAI_API_KEY` for voice transcription
-
-<p align="center">
-  <img src="assets/readme-stickers/setup-run-chart-turtle.png" width="92" alt="Setup run turtle sticker" />
-</p>
 
 ### 3) What the setup agent runs
 
@@ -159,10 +139,6 @@ Optional flags:
 - `--driver codex` or `--driver claude` to force a driver
 - `--non-interactive` for CI scripts
 
-<p align="center">
-  <img src="assets/readme-stickers/subscription-warning-turtle.png" width="92" alt="Subscription turtle sticker" />
-</p>
-
 ### 4) Subscription requirements
 
 - Use either local `codex` auth or local `claude` auth.
@@ -174,27 +150,15 @@ Optional flags:
 
 ## Run
 
-<p align="center">
-  <img src="assets/readme-stickers/clone-laptop-turtle.png" width="92" alt="CLI turtle sticker" />
-</p>
-
 ### Start the Meta Agent (CLI)
 
 ```bash
 ./super_turtle/meta/claude-meta
 ```
 
-<p align="center">
-  <img src="assets/readme-stickers/telegram-phone-turtle.png" width="92" alt="Telegram turtle sticker" />
-</p>
-
 ### Talk through Telegram
 
 Run the bot and message it; the Meta Agent becomes your chat interface to the repo.
-
-<p align="center">
-  <img src="assets/readme-stickers/docs-book-turtle.png" width="92" alt="Docs turtle sticker" />
-</p>
 
 ### Run docs locally
 
@@ -203,10 +167,6 @@ cd docs
 npm install
 npm run docs:dev
 ```
-
-<p align="center">
-  <img src="assets/readme-stickers/manage-ticket-turtle.png" width="92" alt="SubTurtle management sticker" />
-</p>
 
 ### Manage SubTurtles
 
@@ -221,10 +181,6 @@ npm run docs:dev
 ```
 
 Use `ctl spawn` for normal work. It creates the workspace, seeds state from `--state-file` (or stdin), starts the worker, and registers cron supervision.
-
-<p align="center">
-  <img src="assets/readme-stickers/screenshots-image-turtle.png" width="92" alt="Screenshot turtle sticker" />
-</p>
 
 ### Capture Browser Screenshots (CLI)
 
@@ -242,10 +198,6 @@ bash super_turtle/subturtle/browser-screenshot.sh http://localhost:3000 .tmp/scr
 ```
 
 This wrapper uses Playwright CLI via `npx` and works without adding Playwright as a repo dependency.
-
-<p align="center">
-  <img src="assets/readme-stickers/intake-book-turtle.png" width="92" alt="Intake docs turtle sticker" />
-</p>
 
 ### Project intake docs
 
