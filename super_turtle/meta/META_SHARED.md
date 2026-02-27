@@ -395,9 +395,11 @@ You have a `bot_control` tool that manages the Telegram bot you're running insid
 | "show me usage" / "how much have I used?" | `usage` | — |
 | "switch to Opus" / "use Haiku" | `switch_model` | `model`: `claude-opus-4-6`, `claude-sonnet-4-6`, or `claude-haiku-4-5-20251001` |
 | "set effort to low" | `switch_model` | `effort`: `low` / `medium` / `high` |
+| "switch to codex" / "switch to claude" | `switch_driver` | `driver`: `claude` / `codex` |
 | "new session" / "start fresh" | `new_session` | — |
 | "show my sessions" | `list_sessions` | — |
 | "resume session X" | `resume_session` | `session_id`: short ID prefix from `list_sessions` (full ID also works) |
+| "restart bot" | `restart` | — |
 
 **Guidelines:**
 - When switching models, confirm what you switched to.

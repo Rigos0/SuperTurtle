@@ -8,7 +8,6 @@ import { run, sequentialize } from "@grammyjs/runner";
 import { WORKING_DIR, ALLOWED_USERS, RESTART_FILE } from "./config";
 import { unlinkSync, readFileSync, existsSync, writeFileSync, openSync, closeSync } from "fs";
 import {
-  handleStart,
   handleNew,
   handleStatus,
   handleUsage,
@@ -351,7 +350,6 @@ bot.use(
 
 // ============== Command Handlers ==============
 
-bot.command("start", handleStart);
 bot.command("new", handleNew);
 bot.command("status", handleStatus);
 bot.command("usage", handleUsage);

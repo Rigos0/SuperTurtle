@@ -15,11 +15,18 @@ import {
   STREAMING_THROTTLE_MS,
   BUTTON_LABEL_MAX_LENGTH,
   CODEX_ENABLED,
+  RESTART_FILE,
 } from "../config";
-import type { ClaudeSession } from "../session";
-import type { CodexSession } from "../codex-session";
+import { session, type ClaudeSession } from "../session";
+import { codexSession, type CodexSession } from "../codex-session";
 import { bot } from "../bot";
-import { buildSessionOverviewLines, getUsageLines, formatUnifiedUsage, getCodexQuotaLines } from "./commands";
+import {
+  buildSessionOverviewLines,
+  getUsageLines,
+  formatUnifiedUsage,
+  getCodexQuotaLines,
+  resetAllDriverSessions,
+} from "./commands";
 
 // Union type for bot control to work with both Claude and Codex sessions
 type BotControlSession = ClaudeSession | CodexSession;
@@ -299,6 +306,24 @@ async function executeBotControlAction(
       }
     }
 
+    case "switch_driver": {
+      const driver = params.driver?.toLowerCase();
+      if (driver !== "claude" && driver !== "codex") {
+        return `Invalid driver "${params.driver ?? ""}". Use: claude or codex`;
+      }
+
+      await resetAllDriverSessions({ stopRunning: true });
+
+      if (driver === "codex") {
+        await codexSession.startNewThread();
+        session.activeDriver = "codex";
+        return "Switched to Codex";
+      }
+
+      session.activeDriver = "claude";
+      return "Switched to Claude Code";
+    }
+
     case "new_session": {
       await sessionObj.stop();
       await sessionObj.kill();
@@ -355,6 +380,30 @@ async function executeBotControlAction(
 
       const [success, message] = result;
       return success ? `Resumed: "${match.title}"` : `Failed: ${message}`;
+    }
+
+    case "restart": {
+      if (chatId) {
+        try {
+          const msg = await bot.api.sendMessage(chatId, "🔄 Restarting bot...");
+          await Bun.write(
+            RESTART_FILE,
+            JSON.stringify({
+              chat_id: chatId,
+              message_id: msg.message_id,
+              timestamp: Date.now(),
+            }),
+          );
+        } catch (e) {
+          console.warn("Failed to save restart info:", e);
+        }
+      }
+
+      setTimeout(() => {
+        process.exit(0);
+      }, 500);
+
+      return "Restarting bot...";
     }
 
     default:

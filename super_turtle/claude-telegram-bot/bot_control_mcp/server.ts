@@ -24,9 +24,11 @@ const POLL_TIMEOUT_MS = 10_000;
 const VALID_ACTIONS = [
   "usage",
   "switch_model",
+  "switch_driver",
   "new_session",
   "list_sessions",
   "resume_session",
+  "restart",
 ] as const;
 
 type Action = (typeof VALID_ACTIONS)[number];
@@ -49,9 +51,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         '  "switch_model"   — change model and/or effort level. params: { model?: string, effort?: string }',
         '                     models: "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"',
         '                     effort: "low", "medium", "high"',
+        '  "switch_driver"  — switch active driver. params: { driver: "claude" | "codex" }',
         '  "new_session"    — kill current session, start fresh',
         '  "list_sessions"  — list saved sessions (id, title, date)',
         '  "resume_session" — resume a past session. params: { session_id: string }',
+        '  "restart"        — restart the bot process',
       ].join("\n"),
       inputSchema: {
         type: "object" as const,
@@ -67,6 +71,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             properties: {
               model: { type: "string", description: "Model identifier for switch_model" },
               effort: { type: "string", description: "Effort level for switch_model (low/medium/high)" },
+              driver: { type: "string", description: "Driver for switch_driver (claude/codex)" },
               session_id: { type: "string", description: "Session ID for resume_session" },
             },
           },

@@ -20,7 +20,7 @@ import { isAnyDriverRunning, stopActiveDriverQuery } from "./driver-routing";
 import { clearPreparedSnapshots } from "../cron-supervision-queue";
 
 /**
- * Shared command list for display in /start, /new, and new_session bot-control.
+ * Shared command list for display in /new and /status, and new_session bot-control.
  */
 export function getCommandLines(): string[] {
   return [
@@ -178,26 +178,6 @@ export async function getSubTurtleElapsed(name: string): Promise<string> {
   } catch {
     return "unknown";
   }
-}
-
-/**
- * /start - Show welcome message and status.
- */
-export async function handleStart(ctx: Context): Promise<void> {
-  const userId = ctx.from?.id;
-
-  if (!isAuthorized(userId, ALLOWED_USERS)) {
-    await ctx.reply("Unauthorized. Contact the bot owner for access.");
-    return;
-  }
-
-  const commandBlock = getCommandLines().join("\n");
-  await ctx.reply(
-      `🐢 <b>Super Turtle</b>\n` +
-      `${getSettingsOverviewLines().join("\n")}\n\n` +
-      `${commandBlock}`,
-    { parse_mode: "HTML" }
-  );
 }
 
 /**

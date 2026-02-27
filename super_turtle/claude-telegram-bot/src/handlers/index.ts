@@ -3,7 +3,6 @@
  */
 
 export {
-  handleStart,
   handleNew,
   handleStatus,
   handleUsage,
