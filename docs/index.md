@@ -55,14 +55,16 @@ Use this value in `TELEGRAM_ALLOWED_USERS`.
 Create `super_turtle/claude-telegram-bot/.env`:
 
 ```bash
-TELEGRAM_BOT_TOKEN=1234567890:ABC-DEF...
-TELEGRAM_ALLOWED_USERS=123456789
+TELEGRAM_BOT_TOKEN=<telegram_bot_token_from_botfather>
+TELEGRAM_ALLOWED_USERS=<telegram_user_id>
 
 CLAUDE_WORKING_DIR=/absolute/path/to/agentic
-OPENAI_API_KEY=sk-... # optional, only for voice transcription
+OPENAI_API_KEY=<optional_openai_api_key> # optional, only for voice transcription
 
 CODEX_ENABLED=true # optional, for Codex usage in /usage and Codex flows
 ```
+
+Keep `.env` local only. Real credentials should never be committed.
 
 ## Run
 

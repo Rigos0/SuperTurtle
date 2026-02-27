@@ -67,7 +67,7 @@ The bot uses the `@anthropic-ai/claude-agent-sdk` which supports two authenticat
 **API Key**: For environments where Claude Code isn't installed. Get a key from [console.anthropic.com](https://console.anthropic.com/) and add to `.env`:
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-api03-...
+ANTHROPIC_API_KEY=<optional_anthropic_api_key>
 ```
 
 Note: API usage is billed per token and can get expensive quickly for heavy use.
@@ -84,7 +84,7 @@ If CLOTH is not active, Codex-specific workflows will not be available. Claude-o
 
 1. Open [@BotFather](https://t.me/BotFather) on Telegram
 2. Send `/newbot` and follow the prompts to create your bot
-3. Copy the token (looks like `1234567890:ABC-DEF...`)
+3. Copy the token and keep it private
 
 Then send `/setcommands` to BotFather and paste this:
 
@@ -104,13 +104,15 @@ Create `.env` with your settings:
 
 ```bash
 # Required
-TELEGRAM_BOT_TOKEN=1234567890:ABC-DEF...   # From @BotFather
-TELEGRAM_ALLOWED_USERS=123456789           # Your Telegram user ID
+TELEGRAM_BOT_TOKEN=<telegram_bot_token_from_botfather>  # From @BotFather
+TELEGRAM_ALLOWED_USERS=<telegram_user_id>               # Your Telegram user ID
 
 # Recommended
 CLAUDE_WORKING_DIR=/path/to/your/folder    # Where Claude runs (loads CLAUDE.md, skills, MCP)
-OPENAI_API_KEY=sk-...                      # For voice transcription
+OPENAI_API_KEY=<optional_openai_api_key>   # For voice transcription
 ```
+
+`.env` is gitignored. Keep real credentials only in local env files.
 
 **Finding your Telegram user ID:** Message [@userinfobot](https://t.me/userinfobot) on Telegram.
 
@@ -267,7 +269,7 @@ Multiple layers protect against misuse:
 **Claude authentication issues**
 
 - For CLI auth: run `claude` in terminal and verify you're logged in
-- For API key: check `ANTHROPIC_API_KEY` is set and starts with `sk-ant-api03-`
+- For API key: check `ANTHROPIC_API_KEY` is set and uses the expected Anthropic key prefix
 - Verify the API key has credits at [console.anthropic.com](https://console.anthropic.com/)
 
 **Voice messages fail**
