@@ -4,10 +4,7 @@
   <img src="assets/readme-stickers/hero-double-turtle.png" width="160" alt="Super Turtle" />
 </p>
 
-Super Turtle is an autonomous coding system you talk to on Telegram.
-You say what to build; it coordinates workers and ships results.
 Code from anywhere with your voice.
-Step by step, from request to result.
 
 Full docs: [docs/index.md](docs/index.md)
 
