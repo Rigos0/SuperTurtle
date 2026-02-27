@@ -49,7 +49,146 @@ import { UpdateDedupeCache } from "./update-dedupe";
 export { bot };
 
 const INSTANCE_LOCK_FILE = "/tmp/claude-telegram-bot.instance.lock";
+const RUN_STATE_DIR = `${WORKING_DIR}/super_turtle/state`;
+const RUN_STATE_WRITER = `${RUN_STATE_DIR}/run_state_writer.py`;
+const RUN_STATE_LEDGER = `${RUN_STATE_DIR}/runs.jsonl`;
+const SUBTURTLE_VENV_PYTHON = `${WORKING_DIR}/super_turtle/subturtle/.venv/bin/python3`;
 const telegramUpdateDedupe = new UpdateDedupeCache();
+
+interface RunLedgerEntry {
+  timestamp: string;
+  runName: string;
+  event: string;
+  status: string;
+}
+
+function chooseRunStatePythonBinary(): string {
+  return existsSync(SUBTURTLE_VENV_PYTHON) ? SUBTURTLE_VENV_PYTHON : "python3";
+}
+
+function parseRunLedgerEntries(rawLedger: string): RunLedgerEntry[] {
+  const entries: RunLedgerEntry[] = [];
+  const lines = rawLedger
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line);
+      if (!parsed || typeof parsed !== "object") continue;
+
+      const runName = typeof parsed.run_name === "string" ? parsed.run_name.trim() : "";
+      const event = typeof parsed.event === "string" ? parsed.event.trim() : "";
+      const timestamp = typeof parsed.timestamp === "string" ? parsed.timestamp.trim() : "";
+      const status = typeof parsed.status === "string" ? parsed.status.trim() : "";
+      if (!runName || !event) continue;
+
+      entries.push({
+        timestamp,
+        runName,
+        event,
+        status,
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  return entries;
+}
+
+function buildActiveRunLines(entries: RunLedgerEntry[]): string[] {
+  const latestByRun = new Map<string, RunLedgerEntry>();
+  for (const entry of entries) {
+    latestByRun.set(entry.runName, entry);
+  }
+
+  return Array.from(latestByRun.values())
+    .filter((entry) => entry.status.toLowerCase() === "running")
+    .sort((a, b) => a.runName.localeCompare(b.runName))
+    .map((entry) => {
+      const when = entry.timestamp || "unknown time";
+      return `${entry.runName} (last event: ${entry.event} at ${when})`;
+    });
+}
+
+function isMilestoneEntry(entry: RunLedgerEntry): boolean {
+  const event = entry.event.toLowerCase();
+  const status = entry.status.toLowerCase();
+  return (
+    event.includes("milestone") ||
+    event === "complete" ||
+    event === "completed" ||
+    event === "completion" ||
+    status === "complete" ||
+    status === "completed" ||
+    status === "done"
+  );
+}
+
+function buildRecentMilestoneLines(entries: RunLedgerEntry[]): string[] {
+  const lines: string[] = [];
+  for (let idx = entries.length - 1; idx >= 0; idx--) {
+    const entry = entries[idx]!;
+    if (!isMilestoneEntry(entry)) continue;
+
+    const statusPart = entry.status ? ` (${entry.status})` : "";
+    const when = entry.timestamp || "unknown time";
+    lines.push(`${entry.runName}: ${entry.event}${statusPart} at ${when}`);
+    if (lines.length >= 5) break;
+  }
+  return lines;
+}
+
+function summarizeProcessFailure(proc: {
+  exitCode: number;
+  stderr: Uint8Array;
+  stdout: Uint8Array;
+}): string {
+  const stderr = proc.stderr.toString().replace(/\s+/g, " ").trim();
+  const stdout = proc.stdout.toString().replace(/\s+/g, " ").trim();
+  const detail = stderr || stdout || "no output";
+  return `exit=${proc.exitCode} ${detail}`.slice(0, 240);
+}
+
+function refreshHandoffSummaryFromRunLedger(): string | null {
+  if (!existsSync(RUN_STATE_WRITER)) {
+    return `handoff refresh skipped: missing ${RUN_STATE_WRITER}`;
+  }
+
+  let entries: RunLedgerEntry[] = [];
+  try {
+    const rawLedger = existsSync(RUN_STATE_LEDGER) ? readFileSync(RUN_STATE_LEDGER, "utf-8") : "";
+    entries = parseRunLedgerEntries(rawLedger);
+  } catch (error) {
+    return `handoff refresh skipped: failed reading run ledger (${summarizeCronError(error)})`;
+  }
+
+  const activeRuns = buildActiveRunLines(entries);
+  const milestones = buildRecentMilestoneLines(entries);
+  const args = [
+    chooseRunStatePythonBinary(),
+    RUN_STATE_WRITER,
+    "--state-dir",
+    RUN_STATE_DIR,
+    "update-handoff",
+  ];
+
+  for (const activeRun of activeRuns) {
+    args.push("--active-run", activeRun);
+  }
+  for (const milestone of milestones) {
+    args.push("--milestone", milestone);
+  }
+  args.push("--note", "Auto-refreshed by cron check-ins from runs.jsonl.");
+
+  const updateProc = Bun.spawnSync(args, { cwd: WORKING_DIR });
+  if (updateProc.exitCode !== 0) {
+    return `handoff refresh failed: ${summarizeProcessFailure(updateProc)}`;
+  }
+  return null;
+}
 
 function acquireInstanceLockOrExit(): () => void {
   const thisPid = process.pid;
@@ -146,6 +285,11 @@ async function prepareSubturtleSnapshot(
   subturtleName: string
 ) {
   const prepErrors: string[] = [];
+
+  const handoffRefreshError = refreshHandoffSummaryFromRunLedger();
+  if (handoffRefreshError) {
+    prepErrors.push(handoffRefreshError);
+  }
 
   const ctlPath = `${WORKING_DIR}/super_turtle/subturtle/ctl`;
   const statusProc = Bun.spawnSync([ctlPath, "status", subturtleName], {
