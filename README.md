@@ -13,29 +13,20 @@ Full docs: [docs/index.md](docs/index.md)
   <img src="assets/readme-stickers/skills-idea-turtle.png" width="108" alt="Philosophy turtle sticker" />
 </p>
 
-## Philosophy
+## Why Super Turtle
 
-**Core experience: say what -> get results.**
-
-- **Meta Agent**: your main chat interface. It can code directly or delegate.
-- **SubTurtles**: autonomous workers that implement, test, and commit.
-- **Voice-first + milestone-first**: minimal noise, only meaningful updates.
+1. Uses your Claude Code or Codex subscription.
+2. Mobile and voice control first: run everything from Telegram by text or voice.
+3. Autonomous execution: breaks work into tasks, runs sub-agents, can open/test webpages, and iterates until done.
+4. Runs on your machine (cloud deployment coming up).
+5. Tracks remaining usage and load-balances between Claude Code and Codex.
+6. Autonomous supervision: scheduled cron check-ins monitor progress in the background and send important updates.
 
 <p align="center">
   <img src="assets/readme-stickers/setup-save-turtle.png" width="108" alt="Setup turtle sticker" />
 </p>
 
 ## Setup
-
-Install one CLI (once):
-
-```bash
-# Claude Code
-npm install -g @anthropic-ai/claude-code
-
-# Codex
-npm install -g @openai/codex
-```
 
 ### 1) Clone the repo
 
@@ -44,9 +35,7 @@ git clone <your-fork-or-repo-url>
 cd <repo-directory>
 ```
 
-You can also ask Claude/Codex to clone it for you, then make sure you are in the repo root.
-
-### 2) Open CLI in this repo directory and run setup
+### 2) Open Claude Code or Codex in the repo root
 
 ```bash
 # from repo root
@@ -55,7 +44,7 @@ claude
 codex
 ```
 
-Then say:
+### 3) Say the setup prompt
 
 ```text
 Set up Super Turtle on this machine.
