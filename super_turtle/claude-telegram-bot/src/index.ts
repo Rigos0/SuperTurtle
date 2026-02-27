@@ -10,6 +10,7 @@ import { unlinkSync, readFileSync, existsSync, writeFileSync, openSync, closeSyn
 import {
   handleNew,
   handleStatus,
+  handleLooplogs,
   handleUsage,
   handleContext,
   handleModel,
@@ -557,6 +558,7 @@ bot.use(
 
 bot.command("new", handleNew);
 bot.command("status", handleStatus);
+bot.command("looplogs", handleLooplogs);
 bot.command("usage", handleUsage);
 bot.command("context", handleContext);
 bot.command("model", handleModel);

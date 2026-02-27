@@ -191,6 +191,7 @@ The bot includes a built-in `ask_user` MCP server that lets Claude present optio
 | `/context` | Show Claude context usage         |
 | `/stop`    | Interrupt current query (plain `stop`/`pause`/`abort` also work) |
 | `/status`  | Check what Claude is doing        |
+| `/looplogs`| Show last 50 lines of main run-loop log |
 | `/restart` | Restart the bot                   |
 
 ## Running as a Service (macOS)
@@ -215,6 +216,7 @@ tail -f /tmp/claude-telegram-bot-ts.err   # stderr
 ## Monitor Background Bot
 
 Use the live launcher so the bot always runs in one visible terminal (`tmux`) and multiple starts just re-attach.
+`bun run start` appends the caffeinated run-loop output to `/tmp/claude-telegram-bot-ts.log`; Telegram `/looplogs` tails this same file.
 
 ```bash
 # Start or re-attach the same terminal session
