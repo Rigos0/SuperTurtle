@@ -6,6 +6,7 @@ type RetryProbeMode =
   | "plain-crash"
   | "tool-before-stall"
   | "spawn-tool-before-stall"
+  | "encoded-spawn-tool-before-stall"
   | "plain-stall";
 
 type RetryProbePayload = {
@@ -93,6 +94,14 @@ async function probeRetry(mode: RetryProbeMode): Promise<RetryProbeResult> {
 
       if (${JSON.stringify(mode)} === "spawn-tool-before-stall" && attempts === 1) {
         await statusCallback("tool", "▶️ <code>./super_turtle/subturtle/ctl spawn web-ui --prompt 'x'</code>");
+        throw new Error("Event stream stalled for 120000ms before completion");
+      }
+
+      if (${JSON.stringify(mode)} === "encoded-spawn-tool-before-stall" && attempts === 1) {
+        await statusCallback(
+          "tool",
+          "▶️ &lt;code&gt;./super_turtle/subturtle/ctl spawn web-ui --prompt 'x'&lt;/code&gt;"
+        );
         throw new Error("Event stream stalled for 120000ms before completion");
       }
 
@@ -195,6 +204,21 @@ describe("handleText crash retry gating", () => {
     const result = await probeRetry("spawn-tool-before-stall");
     if (result.exitCode !== 0) {
       throw new Error(`Spawn-tool-before-stall probe failed:\n${result.stderr || result.stdout}`);
+    }
+
+    expect(result.payload).not.toBeNull();
+    expect(result.payload?.attempts).toBe(1);
+    expect(
+      result.payload?.replies.some((entry) =>
+        entry.includes("stalled after spawn orchestration")
+      )
+    ).toBe(true);
+  });
+
+  it("does not retry stalled runs when spawn orchestration tool status is HTML-encoded", async () => {
+    const result = await probeRetry("encoded-spawn-tool-before-stall");
+    if (result.exitCode !== 0) {
+      throw new Error(`Encoded-spawn-tool-before-stall probe failed:\n${result.stderr || result.stdout}`);
     }
 
     expect(result.payload).not.toBeNull();
