@@ -1,142 +1,115 @@
-# agentic
+# Super Turtle
 
-An autonomous coding system built on Claude Code. A lean meta agent orchestrates specialized SubTurtles that do the actual work — planning, coding, reviewing, and shipping, one commit at a time.
+Super Turtle is an autonomous coding system you talk to on Telegram. You describe what you want built, and it decomposes the work, runs autonomous workers, supervises progress, and ships results.
 
 ## Philosophy
 
-**The meta agent is a conductor, not a performer.** It stays lean — no domain knowledge, no coding skills, no bloated context. Its only job is orchestration: understanding what needs to be done, breaking it into scoped tasks, spawning the right workers, supervising progress, and keeping the human in the loop.
+**Core experience: say what -> get results.** The user should not think about infrastructure, loop orchestration, or process management.
 
-**SubTurtles are specialized workers.** Each one gets exactly the context it needs for its task: a scoped CLAUDE.md with a clear backlog, and optionally skills (frontend, video, data, etc.) that give it domain expertise. They don't know about each other. They don't manage their own lifecycle. They just loop: read state → implement → commit → repeat.
+Super Turtle runs a **player-coach model**:
+- The **Meta Agent** is your conversational interface and project coach. It can code directly for quick, self-contained tasks, and delegates bigger work.
+- **SubTurtles** are autonomous background workers for iterative coding, testing, and committing.
 
-**Skills make SubTurtles smart without making the system heavy.** Instead of baking expertise into the meta agent or the loop infrastructure, skills are loaded on demand. The meta agent decides "this is frontend work" and wires up the frontend skill before spawning. The SubTurtle gets deep domain knowledge without the meta agent ever carrying that weight.
-
-**The human sets direction, not process.** You say what you want built. The meta agent figures out how to break it down, which workers to spawn, what skills they need, and when the work is done. You get progress updates, preview links, and questions when decisions are needed — not implementation details.
-
-### Core design principles
-
-- **Separation of concerns** — orchestration lives in the meta agent, execution lives in SubTurtles, expertise lives in skills
-- **Lean context** — each layer carries only what it needs; nothing more
-- **Autonomous supervision** — the meta agent checks on workers via scheduled cron jobs, catches completions, handles failures, and progresses to the next task automatically
-- **Composable specialization** — skills can be mixed and matched per SubTurtle; a single worker can have frontend + testing skills, or video + design skills
-- **Observable by default** — every SubTurtle writes commits, logs, and state files; the meta agent can always answer "what's happening?"
-
-### Work allocation: Meta agent delegates, doesn't code
-
-The meta agent is a **communicator and coordinator**, not a coder. The boundary is simple:
-
-- **> 5 minutes of coding work** → Spawn a SubTurtle. Write its CLAUDE.md, schedule cron supervision, report back when done.
-- **≤ 5 minutes or non-coding** → Meta agent handles it directly:
-  - Quick fixes (typos, single-line edits, config tweaks)
-  - Reporting status to the human
-  - Reviewing and explaining code
-  - Restarting or course-correcting stuck workers
-  - Answering questions about architecture or decisions
-
-This keeps the meta agent **focused on the human interface** (staying responsive, making decisions, reporting progress) while **SubTurtles handle the conveyor belt** (planning, coding, testing, committing). When you ask for something non-trivial, the meta agent spawns a worker and gets back to you in seconds with "I'm on it — I'll check back in 5 minutes." No waiting for a slow agent to code.
+The system is designed to be:
+- **Silent by default**: no noise while work is progressing.
+- **Milestone-driven**: updates only when there is meaningful news.
+- **Usage-aware**: default to cheapest effective execution (`yolo-codex`) and escalate only when needed.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────┐
-│              Human (Telegram / CLI)      │
-└──────────────────┬──────────────────────┘
+┌────────────────────────────────────────┐
+│         Human (Telegram / CLI)         │
+└──────────────────┬─────────────────────┘
                    │
-┌──────────────────▼──────────────────────┐
-│           Meta Agent (Super Turtle)      │
-│                                          │
-│  • Understands the roadmap               │
-│  • Writes scoped CLAUDE.md per task      │
-│  • Spawns SubTurtles with skills         │
-│  • Supervises via cron check-ins         │
-│  • Reports progress, sends preview links │
-│  • Stops/restarts/progresses workers     │
-└──────┬───────────┬───────────┬──────────┘
-       │           │           │
-┌──────▼──┐  ┌─────▼───┐  ┌───▼────────┐
-│SubTurtle│  │SubTurtle│  │ SubTurtle  │
-│ (yolo)  │  │ (slow)  │  │(yolo-codex)│
-│         │  │         │  │            │
-│ skills: │  │ skills: │  │ skills:    │
-│ frontend│  │ video   │  │ (none)     │
-└─────────┘  └─────────┘  └────────────┘
+┌──────────────────▼─────────────────────┐
+│        Meta Agent (Super Turtle)       │
+│  • Conversational interface             │
+│  • Player-coach: codes + delegates      │
+│  • Decomposes work and tracks roadmap   │
+│  • Spawns SubTurtles with skills        │
+│  • Supervises via cron check-ins        │
+│  • Reports milestones/errors/completion │
+└─────────────┬───────────────┬──────────┘
+              │               │
+      direct edits      autonomous workers
+                              │
+                  ┌───────────▼───────────┐
+                  │      SubTurtles       │
+                  │  slow | yolo          │
+                  │  yolo-codex (default) │
+                  │  yolo-codex-spark     │
+                  │  + on-demand skills   │
+                  └───────────┬───────────┘
+                              │
+                 commits/logs/state files
 ```
 
-### Two layers, clear boundaries
+### Two layers
 
-1. **Meta Agent** — the human's interface. Runs via Telegram bot or CLI. Maintains the root CLAUDE.md (project-level state). Delegates all coding to SubTurtles. Defined by `super_turtle/meta/META_SHARED.md`.
+1. **Meta Agent (`super_turtle/meta/META_SHARED.md`)**
+- Handles conversation, status, direction, and coordination.
+- Uses direct coding for quick fixes and scoped tasks.
+- Delegates larger or iterative tasks to SubTurtles.
 
-2. **SubTurtles** — autonomous background workers. Each gets its own workspace at `.subturtles/<name>/` with a scoped CLAUDE.md, optional skills, and one of three loop types:
-   - **slow** — Plan → Groom → Execute → Review. 4 agent calls per iteration. Most thorough.
-   - **yolo** — Single Claude call per iteration. Fast. Best for well-scoped tasks.
-   - **yolo-codex** — Single Codex call per iteration. Cheapest.
+2. **SubTurtles (`.subturtles/<name>/`)**
+- Isolated autonomous workers with their own `CLAUDE.md`, `AGENTS.md` symlink, PID, and logs.
+- Loop by reading state -> implementing -> verifying -> committing.
+- Support four loop types:
+  - `slow`: Plan -> Groom -> Execute -> Review (4 calls/iteration)
+  - `yolo`: single Claude call/iteration
+  - `yolo-codex`: single Codex call/iteration (default)
+  - `yolo-codex-spark`: single Codex Spark call/iteration
 
-### Skills (on-demand expertise)
+### Skills, supervision, and previews
 
-Skills are Claude Code skill folders (`SKILL.md` + supporting files) that get loaded into SubTurtle sessions. The meta agent decides which skills a task needs and wires them up before spawning.
-
-Examples:
-- **Frontend** — React/Next.js patterns, component architecture, CSS best practices
-- **Remotion** — video generation with Remotion, composition patterns, rendering
-- **Testing** — test strategy, coverage patterns, mocking approaches
-
-Skills live in `super_turtle/skills/` or get installed from the Anthropic skills registry. They're loaded via Claude Code's native skill system — no custom infrastructure needed.
-
-### Tunnel previews (live frontend links)
-
-When a SubTurtle works on a frontend, it can spin up a dev server + Cloudflare tunnel and write the public URL to its workspace. The meta agent picks it up on the next cron check-in and sends the link to the human on Telegram — tap it on your phone and see the work in progress.
+- **Skills**: loaded on demand per SubTurtle (`--skill frontend --skill testing`) so expertise stays scoped to the task.
+- **Cron supervision**: `ctl spawn` auto-registers recurring check-ins (default `10m`) to monitor milestones, stalls, and failures.
+- **Tunnel previews**: frontend workers can publish Cloudflare tunnel links; the Meta Agent surfaces the URL when ready.
 
 ## Quick start
 
-### Meta agent (from PC)
+### Start the Meta Agent (CLI)
 
 ```bash
 ./super_turtle/meta/claude-meta
 ```
 
-### Meta agent (from Telegram)
+### Talk through Telegram
 
-Message the bot. It runs Claude with access to the repo — ask it anything.
+Run the bot and message it; the Meta Agent becomes your chat interface to the repo.
 
-### SubTurtles (autonomous workers)
-
-Each SubTurtle gets its own workspace at `.subturtles/<name>/` with its own CLAUDE.md state file. Multiple can run concurrently on different tasks.
+### Manage SubTurtles
 
 ```bash
 ./super_turtle/subturtle/ctl spawn [name] [--type TYPE] [--timeout DURATION] [--state-file PATH|-] [--cron-interval DURATION] [--skill NAME ...]
-./super_turtle/subturtle/ctl start [name] [--type TYPE] [--timeout DURATION]
-./super_turtle/subturtle/ctl stop  [name]       # stop it
-./super_turtle/subturtle/ctl status [name]       # check if running
-./super_turtle/subturtle/ctl logs  [name]        # tail output
-./super_turtle/subturtle/ctl list                # list all SubTurtles
+./super_turtle/subturtle/ctl start [name] [--type TYPE] [--timeout DURATION] [--skill NAME ...]
+./super_turtle/subturtle/ctl stop [name]
+./super_turtle/subturtle/ctl status [name]
+./super_turtle/subturtle/ctl logs [name]
+./super_turtle/subturtle/ctl list [--archived]
+./super_turtle/subturtle/ctl reschedule-cron <name> <interval>
 ```
 
-Use `ctl spawn` for normal work: it seeds state, starts the SubTurtle, and auto-registers cron supervision.
+Use `ctl spawn` for normal work. It creates the workspace, seeds state from `--state-file` (or stdin), starts the worker, and registers cron supervision.
 
-### Next project intake template
+### Project intake docs
 
-For new project kickoff, use the template at `docs/NEXT_PROJECT_INTAKE_TEMPLATE.md` to collect specs and generate the first SubTurtle state file.
-
-### Next project kickoff runbook
-
-For a step-by-step intake-to-spawn checklist, use `docs/NEXT_PROJECT_KICKOFF_RUNBOOK.md`.
+- `docs/NEXT_PROJECT_INTAKE_TEMPLATE.md`
+- `docs/NEXT_PROJECT_KICKOFF_RUNBOOK.md`
 
 ## Bot Monitoring
 
-Canonical workflow: always run the bot through the live launcher, which keeps one visible terminal session and prevents duplicate starts.
+Use the live launcher workflow so there is one visible bot session and no duplicate starts.
 
 ```bash
-# Start or re-attach (always the same tmux terminal session).
-# This IS the live log view (no second command needed).
 cd super_turtle/claude-telegram-bot
 bun run start
 
-# /restart from Telegram restarts in this same terminal session
-# (it does not detach into a hidden process)
-
-# Attach later from any terminal
+# Re-attach from any terminal
 tmux attach -t superturtle-bot
 
-# Check if the session exists
+# Check session health
 tmux has-session -t superturtle-bot && echo "running" || echo "stopped"
 
 # Stop completely
