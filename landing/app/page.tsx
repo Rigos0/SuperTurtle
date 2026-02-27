@@ -1,89 +1,81 @@
 'use client';
 
-import { TypedTerminal } from '@/components/TypedTerminal';
 import { StickyNav } from '@/components/StickyNav';
 import { SectionDivider } from '@/components/SectionDivider';
 
-const terminalLines = [
-  { text: '$ ./super_turtle/subturtle/ctl spawn api-hardening --type yolo-codex --timeout 2h', isCommand: true },
-  { text: 'Spawning SubTurtle "api-hardening"...', isOutput: true },
-  { text: 'Writing state to .subturtles/api-hardening/CLAUDE.md', isOutput: true },
-  { text: 'Registering autonomous loop: yolo-codex', isOutput: true },
-  { text: '', isOutput: true },
-  { text: 'Started (PID 42891) | timeout: 2h', isOutput: true },
-  { text: 'Cron supervision interval set to 5m', isOutput: true },
-  { text: '', isOutput: true },
-  { text: 'Task execution: Phase 1/4 complete', isOutput: true },
-  { text: 'Task execution: Drafting patch for target module', isOutput: true },
+const chatMessages = [
+  { from: 'user', text: 'build me an API client with tests' },
+  { from: 'bot', text: '🚀 On it. Starting worker "api-client" (yolo-codex, 2h timeout). I\'ll stay quiet unless there\'s news.' },
+  { from: 'bot', text: '🎉 Done. 4 files changed, 12 tests passing.\nCommitted: feat(api): add client with retry logic and test suite' },
 ];
 
-const operatingPillars = [
+const pillars = [
   {
-    title: 'Launch',
+    title: 'Your subscription, not API tokens',
     description:
-      'Spawn autonomous SubTurtles with isolated workspaces and scoped state so they can act immediately without setup friction.',
+      'Wraps Claude Code or Codex — whichever you have. No API keys, no per-token billing, no surprise invoices.',
     accent: 'olive',
   },
   {
-    title: 'Supervise',
+    title: 'Claude or Codex, one interface',
     description:
-      'Cron-based supervision keeps loops healthy, applies timeouts, and self-repairs stalled workers without your intervention.',
+      'Works with either provider. Switch between Claude Code (deep reasoning) and Codex (fast, cheap) per task, or let the system pick based on quota and complexity.',
     accent: 'terracotta',
   },
   {
-    title: 'Scale',
+    title: 'Quiet unless there is news',
     description:
-      'Coordinate many tasks as a fleet, track each run in its CLAUDE.md log, and keep a clean commit history of every move.',
+      'No progress spam. You get milestones, completions, and errors. Silence means everything is working.',
     accent: 'sage',
   },
 ];
 
 const workflowSteps = [
   {
-    title: 'Request',
-    description: 'You send one instruction to Meta Turtle on Telegram. The task gets decomposed and assigned to SubTurtles.',
+    title: 'Say what you want',
+    description: 'Text or voice message on Telegram. "Build me X" is enough.',
   },
   {
-    title: 'Deploy',
-    description: 'Agents receive dedicated state files and loop controls, then execute with the loop strategy you chose.',
+    title: 'It decomposes and dispatches',
+    description: 'Breaks the work into parallel tasks, picks Claude or Codex for each, and starts autonomous workers.',
   },
   {
-    title: 'Inspect',
-    description: 'Supervision stays quiet by default and reports only milestones, errors, or stuck states.',
+    title: 'Workers loop until done',
+    description: 'Each worker reads state → writes code → runs tests → commits. Supervision restarts stuck ones automatically.',
   },
   {
-    title: 'Deliver',
-    description: 'Each agent commits outputs autonomously and hands control back only when complete or blocked.',
+    title: 'Results land in your chat',
+    description: 'Commits ship. You get a summary, preview links for frontend work, and the next task starts automatically.',
   },
 ];
 
 const loopModes = [
   {
     title: 'slow',
-    cadence: 'Thorough mode',
-    copy: 'Plan → Groom → Execute → Review loop. Best for complex refactors or sensitive changes.',
-    budget: 'Highest quality, highest cost',
+    cadence: 'Plan → Groom → Execute → Review',
+    copy: 'Four-phase cycle. Best for complex multi-file architecture work.',
+    budget: 'Most thorough',
     tone: 'olive',
   },
   {
     title: 'yolo',
-    cadence: 'Direct mode',
-    copy: 'One-shot execution with minimal overhead. Best for quick fixes and simple improvements.',
-    budget: 'Fast, focused',
+    cadence: 'Single Claude call per iteration',
+    copy: 'Fast, focused passes using Claude Code. Good when the path is clear.',
+    budget: 'Fast',
     tone: 'terracotta',
   },
   {
     title: 'yolo-codex',
-    cadence: 'Cost-aware mode',
-    copy: 'Single Codex call per iteration for cost-optimized bulk work and repeatable operations.',
-    budget: 'Default mode',
+    cadence: 'Single Codex call per iteration',
+    copy: 'Default. Uses Codex for maximum cost efficiency on straightforward work.',
+    budget: 'Default — cheapest',
     tone: 'sage',
   },
   {
     title: 'yolo-codex-spark',
-    cadence: 'Fastest mode',
-    copy: 'Single Codex Spark call per iteration when speed matters most and iteration cycles need to stay short.',
-    budget: 'Highest speed, higher spend',
+    cadence: 'Single Codex Spark call per iteration',
+    copy: 'Fastest loop cycles. Good for rapid iterations on small changes.',
+    budget: 'Fastest',
     tone: 'sage',
   },
 ];
@@ -96,47 +88,53 @@ export default function Home() {
         <section id="hero" className="section-shell hero-shell relative">
           <div className="section-container grid gap-10 xl:gap-16 items-start xl:items-center xl:grid-cols-[1.05fr_0.95fr]">
             <div className="reveal" style={{ animationDelay: '80ms' }}>
-              <p className="pill">Super Turtle</p>
-              <h1 className="headline mt-4">
-                Build in silence, ship in waves
+              <div className="mb-4">
+                <img src="/turtle-logo.png" alt="Super Turtle" width={72} height={72} />
+              </div>
+              <h1 className="headline">
+                Super Turtle
               </h1>
               <p className="lead max-w-2xl">
-                Super Turtle orchestrates autonomous SubTurtles to execute multi-step work with
-                structured supervision and audit-ready commits.
+                Super Turtle is an autonomous coding system you chat with on Telegram. You send a request, it runs workers that code, test, and commit in your repo.
               </p>
 
-              <ul className="mt-8 space-y-2 text-sm">
-                <li className="feature-chip"><span className="feature-dot" /> No babysitting loops</li>
-                <li className="feature-chip"><span className="feature-dot" /> Self-healing check-ins and restarts</li>
-                <li className="feature-chip"><span className="feature-dot" /> CLI-first control with clear progress signals</li>
+              <ul className="mt-6 space-y-2 text-sm">
+                <li className="feature-chip"><span className="feature-dot" /> Use the Claude Code or Codex subscription you already have</li>
+                <li className="feature-chip"><span className="feature-dot" /> Send voice or text in Telegram to start work</li>
+                <li className="feature-chip"><span className="feature-dot" /> Big asks get split into parallel workers automatically</li>
               </ul>
 
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-7 flex flex-wrap gap-3">
                 <a
                   href="#"
                   className="btn-primary"
                 >
-                  Open on GitHub
+                  GitHub
                 </a>
-                <a href="#loop-types" className="btn-ghost">
-                  Explore loop types
+                <a href="#how-it-works" className="btn-ghost">
+                  How it works
                 </a>
               </div>
             </div>
 
             <div className="reveal" style={{ animationDelay: '220ms' }}>
-              <div className="control-dash">
-                <div className="control-dash-head">
-                  <span>Autonomy command console</span>
+              <div className="tg-chat">
+                <div className="tg-chat-head">
+                  <div className="tg-avatar">🐢</div>
+                  <div>
+                    <div className="tg-name">Super Turtle</div>
+                    <div className="tg-status">online</div>
+                  </div>
                 </div>
-                <div className="p-2 sm:p-3">
-                  <TypedTerminal lines={terminalLines} speed={20} />
+                <div className="tg-chat-body">
+                  {chatMessages.map((msg, i) => (
+                    <div key={i} className={`tg-bubble ${msg.from === 'user' ? 'tg-bubble-user' : 'tg-bubble-bot'}`}>
+                      {msg.text.split('\n').map((line, j) => (
+                        <span key={j}>{line}{j < msg.text.split('\n').length - 1 && <br />}</span>
+                      ))}
+                    </div>
+                  ))}
                 </div>
-              </div>
-              <div className="mt-5 flex flex-wrap gap-3 text-xs md:text-sm">
-                <span className="metric-pill">24/7 supervision</span>
-                <span className="metric-pill">4 loop strategies</span>
-                <span className="metric-pill">Commit-per-sprint</span>
               </div>
             </div>
           </div>
@@ -149,15 +147,14 @@ export default function Home() {
           <div className="section-container">
             <div className="section-head reveal">
               <p className="eyebrow">What it is</p>
-              <h2>The autonomous operating model</h2>
+              <h2>Your existing subscription, working autonomously</h2>
               <p>
-                A single message turns into a coordinated set of autonomous workers. Super Turtle keeps execution
-                visible, recoverable, and tuned for cost.
+                You already pay for Claude Code or Codex. Super Turtle puts them to work as autonomous agents — no API tokens, no extra billing.
               </p>
             </div>
 
             <div className="mt-10 grid gap-4 sm:gap-6 lg:gap-8 sm:grid-cols-2 xl:grid-cols-3">
-              {operatingPillars.map((pillar, index) => (
+              {pillars.map((pillar, index) => (
                 <article
                   className={`reveal deck-card ${index === 0 ? 'olive' : index === 1 ? 'terracotta' : 'sage'}`}
                   key={pillar.title}
@@ -178,8 +175,7 @@ export default function Home() {
           <div className="section-container">
             <div className="section-head reveal">
               <p className="eyebrow">How it works</p>
-              <h2>From message to merged result</h2>
-              <p>A dependable cycle that keeps noisy work from becoming noisy coordination.</p>
+              <h2>Message in, commits out</h2>
             </div>
 
             <div className="mt-10 grid gap-4 lg:grid-cols-[1fr_1fr] lg:items-start">
@@ -200,19 +196,22 @@ export default function Home() {
               </div>
 
               <article className="reveal control-pane" style={{ animationDelay: '560ms' }}>
-                <h3>What you gain by default</h3>
+                <h3>Under the hood</h3>
                 <ul className="space-y-3 text-sm">
                   <li className="check-row">
-                    <span className="check-dot" /> Safe checkpointing between loop phases
+                    <span className="check-dot" /> Each worker gets its own workspace, state file, and git branch
                   </li>
                   <li className="check-row">
-                    <span className="check-dot" /> Automatic logs + resumable progress in one place
+                    <span className="check-dot" /> Automatically routes to Claude or Codex based on task complexity and quota
                   </li>
                   <li className="check-row">
-                    <span className="check-dot" /> Clean commit flow with auditable state artifacts
+                    <span className="check-dot" /> Cron supervision detects stuck workers and restarts them
                   </li>
                   <li className="check-row">
-                    <span className="check-dot" /> Explicit exits when tasks finish or need human input
+                    <span className="check-dot" /> Frontend work gets a live Cloudflare tunnel preview link
+                  </li>
+                  <li className="check-row">
+                    <span className="check-dot" /> Workers self-stop when done — no orphan processes
                   </li>
                 </ul>
               </article>
@@ -225,12 +224,12 @@ export default function Home() {
         <section id="loop-types" className="section-shell alt-shell">
           <div className="section-container">
             <div className="section-head reveal">
-              <p className="eyebrow">Loop configuration</p>
-              <h2>Choose the execution profile</h2>
-              <p>Shift quality, speed, and cost from one command.</p>
+              <p className="eyebrow">Execution modes</p>
+              <h2>Four ways to run a worker</h2>
+              <p>Trade off depth, speed, and cost. The system defaults to the cheapest mode and escalates when needed.</p>
             </div>
 
-            <div className="mt-10 grid gap-4 lg:gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-10 grid gap-4 lg:gap-6 sm:grid-cols-2 xl:grid-cols-4">
               {loopModes.map((mode, index) => (
                 <article
                   className={`reveal mode-card ${mode.tone}`}
@@ -256,31 +255,21 @@ export default function Home() {
           <div className="section-container">
             <div className="section-head reveal">
               <p className="eyebrow">Quick start</p>
-              <h2>Get your first SubTurtle running</h2>
-              <p>Four steps, one predictable path.</p>
+              <h2>Get running</h2>
             </div>
 
             <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {[
-                'git clone <your-super-turtle-repo>',
+                'git clone <repo>',
                 'cd super-turtle',
-                './super_turtle/subturtle/ctl spawn my-task --type yolo-codex --timeout 1h',
-                'tail -f .subturtles/my-task/subturtle.log',
+                './super_turtle/subturtle/\nctl spawn my-task \\\n  --type yolo-codex \\\n  --timeout 1h',
+                'tail -f .subturtles/\n  my-task/subturtle.log',
               ].map((command, index) => (
-                <div className="reveal step-card" key={command} style={{ animationDelay: `${280 + index * 100}ms` }}>
+                <div className="reveal step-card" key={index} style={{ animationDelay: `${280 + index * 100}ms` }}>
                   <div className="step-label">Step {index + 1}</div>
                   <div className="step-code">{command}</div>
                 </div>
               ))}
-            </div>
-
-            <div className="mt-8 reveal" style={{ animationDelay: '700ms' }}>
-              <p className="text-sm text-[var(--text-muted)] text-center">Ready for autonomy without the noise?</p>
-              <div className="mt-4 text-center">
-                <a href="#hero" className="btn-primary">
-                  Try Super Turtle now
-                </a>
-              </div>
             </div>
           </div>
         </section>
@@ -289,14 +278,8 @@ export default function Home() {
       <footer className="relative section-shell footer-shell">
         <div className="section-container text-center">
           <p className="text-sm text-[var(--text-muted)]">
-            © {new Date().getFullYear()} Super Turtle • Built for autonomous coordination, open-source, MIT
+            Super Turtle is built using Super Turtle.
           </p>
-          <nav className="mt-4 flex items-center justify-center gap-6 text-sm">
-            <a href="#hero">Home</a>
-            <a href="#what-it-does">Features</a>
-            <a href="#how-it-works">How it works</a>
-            <a href="#getting-started">Get started</a>
-          </nav>
         </div>
       </footer>
     </div>
