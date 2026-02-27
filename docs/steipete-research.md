@@ -518,13 +518,182 @@ These repos directly address problems we're solving in agentic.
   - Browser-based agents could use this to control system apps
   - Lower priority than Peekaboo but useful infrastructure
 
-### poltergeist (331 ⭐) — **TypeScript**
-- **What**: Universal hot reload, file watcher, build automation for any language
-- **Applicability**: ✅ **MEDIUM** — Improves dev server management in SubTurtles
-- **Recommendation**: **Study + Potentially Adopt**
-  - Our start-tunnel.sh already does file watching. Poltergeist is a more general abstraction.
-  - Could improve how SubTurtles manage dev servers during frontend work
-  - Not critical, but could reduce boilerplate in SubTurtle spawn scripts
+### poltergeist (331 ⭐) — **TypeScript** — Deep Dive
+
+**Date**: 2026-02-27
+**Scope**: Evaluation of Poltergeist for SubTurtle frontend development workflow
+
+#### What is Poltergeist?
+
+Poltergeist is a **universal file watcher and build automation tool** designed to automatically rebuild projects whenever files change. It works across macOS, Linux, and Windows, and supports any programming language or build system (Swift, Node.js, Rust, Python, CMake, etc.).
+
+**Core tagline**: "The ghost that keeps your builds fresh—universal hot reload & file watcher."
+
+#### Key Features
+
+1. **Auto-Detection & Configuration**
+   - Detects project types (Next.js, Vite, Swift, Rust, Python, etc.)
+   - Generates optimized configurations with `poltergeist init`
+   - Zero setup for common frameworks
+
+2. **Intelligent Build Management**
+   - Smart build queuing: prioritizes targets based on recent file edits
+   - Real-time output streaming (developers see progress as builds happen)
+   - Concurrent build protection (prevents overlapping compilations)
+   - Automatic retry on failures with configurable delays
+
+3. **Developer Experience**
+   - `polter` command wrapper: executes binaries only after fresh builds complete
+   - Native system notifications for build status
+   - Live status panel showing build progress, git info, health checks
+   - Background daemon mode keeps builds running while you work
+
+4. **AI-Friendly Design**
+   - Explicitly designed for both human developers and coding agents
+   - Supports CI/CD integration with CLI tools
+   - Comprehensive logging and structured output
+
+#### Our Current Setup: start-tunnel.sh Deep Dive
+
+Our `super_turtle/subturtle/start-tunnel.sh` is a shell script that:
+
+1. **Starts dev server**: Runs `npm run dev` (Next.js) in project directory
+2. **Waits for readiness**: Polls `http://localhost:PORT` until responsive
+3. **Starts cloudflared tunnel**: Creates reverse tunnel to expose dev server
+4. **Extracts tunnel URL**: Parses cloudflared stderr for `https://xxx.trycloudflare.com` URL
+5. **Writes URL to file**: Stores URL in `.tunnel-url` for agent consumption
+6. **Manages cleanup**: Uses bash traps (EXIT, INT, TERM) to terminate child processes
+
+**Strengths of current approach**:
+- ✅ Simple, self-contained shell script
+- ✅ Handles process cleanup with trap handlers
+- ✅ Works with any dev server that binds to a port
+- ✅ Minimal dependencies (curl, npm, cloudflared)
+
+**Limitations**:
+- ❌ Only handles one dev server per invocation
+- ❌ No build monitoring or restart on file changes (relies on Next.js HMR)
+- ❌ No error recovery if dev server crashes mid-execution
+- ❌ No support for parallel builds if we had multiple projects
+- ❌ Limited visibility into build state (just stdout/stderr)
+
+#### Applicability Analysis: Would Poltergeist Help?
+
+**Context**: Our frontend development in SubTurtles involves:
+- Landing page (Next.js) — single project with HMR already built-in
+- Snake game (might be Next.js component) — also HMR-enabled
+- Occasional other frontend work — varied stack
+
+**Scenario 1: Single Frontend Project (Landing Page)**
+- ❌ **Low value**: Next.js already provides HMR (hot module replacement)
+- ❌ Poltergeist would be redundant for `next dev`
+- ✅ But Poltergeist could provide better build failure recovery and status visibility
+- **Net**: ~10-15% UX improvement, not worth the complexity for single project
+
+**Scenario 2: Multiple Frontend Projects in Parallel**
+- ✅ **High value**: Poltergeist excels at coordinating multi-project builds
+- ✅ Could manage landing + snake game + other frontends with smart prioritization
+- ✅ Unified status dashboard across all projects
+- **Risk**: We don't currently have multi-project frontend work
+- **Net**: Future-proofing but not currently applicable
+
+**Scenario 3: Build Coordination with Backends**
+- ✅ **Medium value**: If SubTurtles need to coordinate frontend + backend rebuilds
+- ✅ Poltergeist's smart queuing could optimize rebuild order
+- **Risk**: Our backend (Python orchestrator) uses different toolchain
+- **Net**: Only useful if we add Node.js backend services
+
+**Scenario 4: Error Recovery & Automatic Restart**
+- ✅ **Medium value**: If dev servers crash, Poltergeist auto-restarts
+- ✅ Better than our current approach which requires manual intervention
+- ✅ Agents could rely on Poltergeist to keep dev server alive
+- **Risk**: Adds daemon overhead and complexity
+- **Net**: Useful but not critical for current workflow
+
+#### Trade-Offs
+
+**Adopting Poltergeist Would Require**:
+1. Install Poltergeist (npm package or brew tap)
+2. Install Watchman dependency (for file monitoring)
+3. Replace start-tunnel.sh with Poltergeist-managed dev server
+4. Update SubTurtle spawn scripts to use poltergeist daemon instead of direct npm run
+5. Test with our specific tunnel + dev server combo
+
+**Benefits**:
+- Better build error recovery
+- Nicer status visibility (live panel + notifications)
+- Future-proofs if we add more frontend projects
+- AI-native design means agents can interact with it
+- Structured logging for agent consumption
+
+**Drawbacks**:
+- Adds 2+ dependencies (poltergeist + Watchman)
+- Complexity increase: daemon management instead of simple script
+- Learning curve for new tool
+- Potential issues with cloudflared tunnel integration (would need testing)
+- Start-tunnel.sh is working fine for current needs
+
+#### Concrete Recommendation
+
+**Primary Recommendation**: **SKIP for now, STUDY for future use**
+
+**Rationale**:
+1. **Current bottleneck is NOT file watching** — Next.js HMR is excellent
+2. **Complexity cost is HIGH** — start-tunnel.sh is 2x simpler
+3. **Use case is NARROW** — only valuable if we have multi-project coordination
+4. **Testing burden is REAL** — would need to validate tunnel + Poltergeist compatibility
+
+**However, file it away for**:
+- If we scale to 3+ frontend projects in parallel
+- If we add Node.js backend services that need coordinated rebuilds
+- If dev servers frequently crash and need auto-recovery
+
+**Alternative: Lightweight Enhancement (2-3 hour option)**
+Instead of Poltergeist, we could:
+1. Enhance start-tunnel.sh with dev server health checks
+2. Add auto-restart logic if dev server crashes
+3. Implement simple build status notifications
+4. Keep shell script simplicity, gain some resilience
+
+**If this option appeals**: Create `enhanced-start-tunnel.sh` that adds:
+- Periodic health checks (GET to dev server port)
+- Auto-restart if health check fails
+- Build status logging to shared file
+- Agent-readable status output
+
+#### Implementation Path (If Reconsidered)
+
+Should we decide to adopt Poltergeist in the future:
+
+1. **Phase 1: Prototype (4-6 hours)**
+   - Install Poltergeist locally
+   - Test with landing page project
+   - Validate tunnel + Poltergeist compatibility
+   - Document configuration
+
+2. **Phase 2: Integration (3-4 hours)**
+   - Create `poltergeist.json` config for landing project
+   - Update start-tunnel.sh to use Poltergeist daemon
+   - Test with SubTurtle spawn workflow
+   - Verify cleanup on agent termination
+
+3. **Phase 3: Documentation (1-2 hours)**
+   - Update SubTurtle guidelines for Poltergeist-managed dev servers
+   - Document status panel consumption for agents
+   - Add error recovery procedures
+
+**Estimated Total**: 8-12 hours if we decide to adopt
+
+#### Key Takeaway
+
+Poltergeist is **excellent infrastructure for teams with complex multi-project workflows** (like Cursor, where steipete works). For our current **single-project frontend work with HMR already built-in**, it's **overkill**.
+
+**Decision**: **File away for future consideration.** Revisit only if:
+1. We scale to 3+ simultaneous frontend projects, OR
+2. Dev server crashes become a recurrent issue, OR
+3. We add Node.js backend services that need coordinated rebuilds
+
+In the interim, we can achieve most benefits with a simple 2-3 hour enhancement to start-tunnel.sh.
 
 ---
 
