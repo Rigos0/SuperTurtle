@@ -17,9 +17,9 @@ Full docs: [docs/index.md](docs/index.md)
 
 ## Why Super Turtle
 
-1. SuperTurtle uses your Claude Code or Codex subscription.*
-2. Mobile and voice control first: run everything from Telegram by text or voice.
-3. Designed for long-running, large jobs: breaks work into tasks, runs sub-agents, can open/test webpages, and iterates until done.
+1. Uses your Claude Code or Codex subscription.* No extra API-token workflow for core use.
+2. Mobile and voice control first. Run everything from Telegram by text or voice.
+3. Designed for long-running, large jobs. Breaks work into tasks, runs sub-agents, can open/test webpages, and iterates until done.
 4. Runs on your machine (cloud deployment coming up).
 5. It tracks remaining usage and load-balances between Claude Code and Codex.
 6. Autonomous supervision: scheduled cron check-ins monitor progress in the background and send important updates.
