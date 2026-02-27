@@ -5,83 +5,45 @@ description: What Super Turtle is and how it works
 
 # Introduction
 
-Super Turtle is an autonomous coding system that runs on your machine and responds to your Telegram messages. Tell it what to build, and it breaks down the work, runs agents in parallel, supervises progress, and delivers results — all from your phone.
+Super Turtle is an autonomous coding system you control from Telegram. You describe what you want built, and it handles decomposition, execution, and supervision on your machine.
 
-**Core principle:** Say what → get results. You never think about agents, processes, or infrastructure. You describe what you want built, and the system figures out how.
+You interact with one Meta Agent in chat. Behind the scenes, it can run work itself or spawn SubTurtles in parallel, route work between Claude Code and Codex, and report only meaningful milestones.
 
 ## Key Features
 
 <CardGroup cols={2}>
   <Card
-    title="Voice & Text Control"
-    description="Speak naturally or type. Send screenshots, documents, audio — Claude processes everything."
+    title="Voice-First Control"
+    description="Send text or voice from Telegram; the system treats both as first-class input."
   />
   <Card
     title="Parallel SubTurtles"
-    description="Spawn multiple agents to work on different tasks at once. System coordinates and merges results."
+    description="Spawn multiple worker agents to execute subtasks concurrently and reduce turnaround time."
   />
   <Card
-    title="Dual Driver (Claude & Codex)"
-    description="Automatically routes work to Claude Code or Codex based on cost and availability. You pay only for what you use."
+    title="Claude + Codex Drivers"
+    description="Use dual driver support through one interface, with automatic routing by task type and cost."
   />
   <Card
     title="Autonomous Supervision"
-    description="Background cron jobs silently monitor progress and alert you only when there's news. Failures recover automatically."
+    description="Background cron check-ins monitor progress and notify you only when something meaningful changes."
   />
   <Card
-    title="Long-Run Tracking"
-    description="System tracks runs, their status, and handoff state across restarts. No work is lost."
-  />
-  <Card
-    title="AI-Guided Setup"
-    description="Clone the repo, open Claude Code or Codex, say 'Set up Super Turtle' — the system walks you through install."
+    title="Usage Tracking"
+    description="Track usage and driver load so long-running work can stay cost-aware and reliable."
   />
 </CardGroup>
 
 ## How It Works
 
-```
+```text
 Human
-  ↓
-Telegram (text/voice/photos/docs)
-  ↓
-Meta Agent (plans, delegates, supervises)
-  ↓
-SubTurtles (fast parallel workers)
-  ↓
-Code (delivered to Telegram as results)
+  -> Telegram
+  -> Meta Agent
+  -> SubTurtles
+  -> Code
 ```
 
-**What you see:**
-- You send a message: "Build me a landing page"
-- System responds: "🚀 On it."
-- Silence while work happens (no spam)
-- Notification: "🎉 Landing page is live at https://..."
-
-**What the system does (invisibly):**
-- Meta Agent decomposes the task into subtasks
-- Spawns SubTurtles to work in parallel
-- Cron jobs check progress every 30 seconds
-- Routes work to Claude Code or Codex based on cost
-- Recovers automatically if a worker fails
-- Merges results and notifies you only when there's news
-
-## When to Use Super Turtle
-
-✅ **Great for:**
-- Building features from natural language descriptions
-- Long-running tasks (hours or days)
-- Work that needs iteration (test, fail, refine)
-- Parallel tasks that benefit from multiple agents
-- Staying productive from your phone
-
-❌ **Not designed for:**
-- Simple one-off questions (use Claude Code directly)
-- Real-time collaboration or live coding
-- Tasks requiring human input in the middle
-
-## What's Next
-
-Ready to get started? Head to [Quickstart](/docs/quickstart) to set up Super Turtle on your machine.
-
-For technical details on how the system is architected, see [Architecture](/docs/architecture).
+<Tip>
+See <a href="/quickstart">Quickstart</a> to set up Super Turtle in a few minutes.
+</Tip>
