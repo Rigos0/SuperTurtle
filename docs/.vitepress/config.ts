@@ -4,6 +4,7 @@ export default defineConfig({
   title: "Super Turtle Docs",
   description: "Setup and run Super Turtle locally.",
   lang: "en-US",
+  head: [["link", { rel: "icon", href: "/double-turtle-favicon.svg", type: "image/svg+xml" }]],
   srcExclude: [
     "CODEX_QUOTA_INTEGRATION.md",
     "NEXT_PROJECT_INTAKE_TEMPLATE.md",
