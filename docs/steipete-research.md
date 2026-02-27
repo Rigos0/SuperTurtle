@@ -879,6 +879,284 @@ steipete maintains several high-quality forks of popular projects:
 
 ---
 
+## Deep Dive: agent-scripts Components and Adoption Path
+
+**Date**: 2026-02-27
+**Focus**: Detailed review of steipete's agent-scripts repo; identifying patterns to adopt for operational discipline
+
+### 1. Agent-Scripts Overview
+
+steipete's `agent-scripts` (2,078 ⭐) is a **portable, dependency-free utility library** designed for agents to follow operational guardrails. The repo is intentionally small and modular — each script is standalone and zero-repo-specific. It's meant to be **copied into projects as templates** rather than imported as dependencies.
+
+**Core Philosophy**: "Agent guardrails should be explicit, reusable, and not tied to any specific codebase."
+
+**Three Primary Components**:
+1. **committer** — Bash script ensuring disciplined git commits
+2. **docs-list.ts** — TypeScript tool enforcing front-matter on docs
+3. **browser-tools** — Chrome automation CLI for agent-driven browser work
+
+---
+
+### 2. Component Analysis: committer
+
+**What it does**: Bash script that stages specific files, validates commit messages, and creates commits with safety guardrails.
+
+**Key Safety Guards**:
+
+1. **Prevents bulk staging**: Blocks `"."` as argument — forces individual file specification
+   ```bash
+   # NOT ALLOWED: git add .
+   # REQUIRED: git add file1 file2 file3
+   ```
+
+2. **File existence validation**: Checks each file exists in disk/git index/HEAD before committing
+   - Prevents orphaned file references in commit
+
+3. **Change detection**: Uses `git diff --staged --quiet` to verify actual modifications exist
+   - Prevents accidental empty commits
+
+4. **Clean staging area**: `git restore --staged :/` clears staging before adding specified files
+   - Ensures no "stray" files sneak into commits
+
+5. **Lock file recovery**: `--force` flag removes stale `.git/index.lock` files
+   - Useful when git commands fail due to lock contention
+
+6. **Glob expansion disabled**: `set -f` prevents shell bracket expansion
+   - Improves handling of paths with special characters
+
+**Error Handling**:
+- Clear error messages for invalid inputs
+- Proper exit codes for CI/CD integration
+- Validates commit message contains non-whitespace content
+
+**Our Current State**:
+- We have `.claude/commands/commit.md` with guidelines for Claude agents
+- No automated safety script — agents must follow guidelines manually
+- Risk: agents could accidentally `git add .` or commit empty changesets
+
+**Adoption Recommendation**: ⭐ **HIGH PRIORITY**
+
+**Implementation Plan**:
+```bash
+# 1. Create orchestrator/scripts/committer (copy from steipete)
+# 2. Add to PATH in agent startup (orchestrator/scripts/agent-init.sh)
+# 3. Update agent guidelines to call `committer "msg" file1 file2` instead of raw git
+# 4. Add alias: `alias gco='committer'` in agent-init.sh
+```
+
+**Estimated Effort**: 1-2 hours
+- 20 min: Copy script, test locally
+- 30 min: Integrate into agent startup
+- 30 min: Test with SubTurtle workflows
+
+**Expected Benefits**:
+- ✅ Prevents `git add .` accidents
+- ✅ Prevents empty commits
+- ✅ Clearer commit hygiene
+- ✅ Easier to audit agent changes
+
+---
+
+### 3. Component Analysis: docs-list.ts
+
+**What it does**: TypeScript tool that walks `docs/`, extracts YAML front-matter (`summary` and `read_when` fields), and displays a formatted list of documentation with context hints.
+
+**Front-Matter Parsing**:
+```yaml
+---
+summary: "Brief one-liner description of the doc"
+read_when:
+  - "when starting SubTurtle work"
+  - "before refactoring scheduler"
+---
+```
+
+**Key Features**:
+
+1. **Recursive traversal**: Walks docs/ tree, skipping specified exclusions (archive, research, etc.)
+
+2. **Flexible array parsing**: Handles read_when in two formats:
+   - JSON inline: `read_when: ["hint1", "hint2"]`
+   - YAML list: `read_when:\n  - hint1\n  - hint2`
+
+3. **Error reporting**: Flags issues:
+   - Missing front-matter
+   - Unterminated delimiters
+   - Empty summaries
+   - Malformed arrays
+
+4. **Output formatting**: Lists with alphabetical sorting and context hints
+
+5. **Onboarding flow**: Suggests relevant docs to read based on task hints
+
+**Our Current State**:
+- Docs exist but have NO front-matter metadata
+- No automated doc discovery or context hints
+- Agents must manually browse docs/ to find relevant info
+
+**Adoption Recommendation**: ⭐ **MEDIUM-HIGH PRIORITY**
+
+**Implementation Plan**:
+
+**Phase 1: Port docs-list.ts (2-3 hours)**
+```bash
+# 1. Copy docs-list.ts to orchestrator/scripts/docs-list.ts
+# 2. Update exclusions to match our doc structure (skip reviews/, steipete-research.md)
+# 3. Test with: npx ts-node orchestrator/scripts/docs-list.ts
+```
+
+**Phase 2: Add front-matter to existing docs (1-2 hours)**
+```yaml
+---
+summary: "SubTurtle control system: spawn, monitor, stop autonomous agents"
+read_when:
+  - "when starting new SubTurtle work"
+  - "when debugging agent issues"
+---
+```
+
+Apply to:
+- `docs/code-quality-audit.md`
+- `docs/PRD-onboarding.md`
+- `docs/UX-overhaul-proposal.md`
+- `docs/CODEX_QUOTA_INTEGRATION.md`
+- `docs/reviews/review-subturtle.md`
+- `docs/steipete-research.md`
+
+**Phase 3: Integrate into agent startup (30 min)**
+- Add `docs-list` call to agent initialization
+- Display relevant docs based on current task context
+
+**Expected Benefits**:
+- ✅ Self-documenting codebase (docs advertise themselves)
+- ✅ Agents can discover relevant docs automatically
+- ✅ Reduced context-switching (read the right doc at the right time)
+- ✅ Better onboarding for new SubTurtles
+
+**Example Output**:
+```
+📚 Relevant Documentation:
+
+1. docs/PRD-onboarding.md
+   → "System architecture, goals, and core concepts"
+   📌 Read when: starting new SubTurtle work, architectural questions
+
+2. docs/code-quality-audit.md
+   → "Code quality issues and remediation priority"
+   📌 Read when: fixing bugs, code review, refactoring
+
+3. docs/steipete-research.md
+   → "Evaluation of steipete's agent infrastructure patterns"
+   📌 Read when: designing agent features, studying best practices
+```
+
+---
+
+### 4. Component Analysis: browser-tools
+
+**What it does**: Lightweight TypeScript CLI for direct Chrome automation via DevTools protocol. Provides process management, page navigation, screenshot capture, and content extraction without requiring a full MCP server.
+
+**Design Philosophy**: Inspired by Mario Zechner's "What if you don't need MCP?" — minimal CLI with big capabilities.
+
+**Key Commands**:
+
+**Process Management**:
+- `start` — Launch Chrome with `--remote-debugging-port`
+- `inspect` — List running Chrome processes and open tabs
+- `kill` — Terminate specific Chrome instance
+
+**Page Interaction**:
+- `nav` — Navigate to URL in current or new tab
+- `eval` — Execute JavaScript in page context
+- `pick` — Interactive DOM picker (click to select element, returns serialized structure)
+
+**Content & Monitoring**:
+- `screenshot` — Capture viewport as PNG
+- `console` — Monitor console logs with timestamps
+- `content` — Extract page content as Markdown
+- `search` — Google search with optional content extraction
+- `cookies` — Export cookies as JSON
+
+**Our Current State**:
+- We have a specialized `browser-tester` agent for validation testing
+- No lightweight CLI tool for ad-hoc browser automation
+- SubTurtles that need browser interaction must spawn the agent (expensive)
+- Peekaboo covers visual testing; browser-tools covers general automation
+
+**Adoption Recommendation**: ⭐ **MEDIUM PRIORITY**
+
+**Why Not High Priority**:
+- Our browser-tester agent already handles validation
+- Peekaboo (MCP server) covers visual QA
+- Most browser work in SubTurtles is via Playwright (existing approach)
+
+**Why Still Valuable**:
+- Lighter weight than spawning full browser-tester agent
+- Better for quick checks (does element exist? what does console show?)
+- Could replace some Playwright calls with simpler CLI commands
+- Useful for troubleshooting during agent execution
+
+**Implementation Path**:
+
+**Option A: Port & Deploy (3-4 hours)**
+- Copy browser-tools.ts to orchestrator/scripts/browser-tools.ts
+- Compile to binary with `esbuild` or `bun --build`
+- Add to agent PATH
+- Use for quick browser checks in SubTurtles
+
+**Option B: Integrate with Peekaboo (2-3 hours)**
+- Use Peekaboo for visual testing (higher priority)
+- Keep browser-tools as optional fallback for CLI usage
+- Don't prioritize unless SubTurtles need ad-hoc browser interaction
+
+**Recommended**: **Defer to Phase 2** — Peekaboo covers the immediate visual testing gap. Revisit browser-tools when SubTurtles need more frequent ad-hoc browser interaction.
+
+---
+
+### 5. Adoption Summary & Priority Matrix
+
+| Component | Priority | Effort | Impact | Adoption Path |
+|-----------|----------|--------|--------|---|
+| **committer** | ⭐⭐⭐ HIGH | 1-2h | Prevents git accidents | Copy script, integrate into agent-init |
+| **docs-list.ts** | ⭐⭐ MEDIUM-HIGH | 3-4h total (1h port + 2h frontmatter + 30m integration) | Better doc discovery | Port, add frontmatter, integrate into startup |
+| **browser-tools** | ⭐ MEDIUM | 3-4h | Optional CLI convenience | Defer to Phase 2, prototype with Peekaboo first |
+
+---
+
+### 6. Implementation Roadmap
+
+**Immediate (This Sprint)**:
+1. ✅ Copy `committer` script to orchestrator/scripts/
+2. ✅ Test with local git operations
+3. ✅ Update agent guidelines to use `committer` instead of raw `git commit`
+
+**Next Sprint (1-2 weeks)**:
+1. ✅ Port `docs-list.ts` to orchestrator/scripts/
+2. ✅ Add YAML front-matter to existing docs/
+3. ✅ Integrate `docs-list` into agent startup flow
+
+**Phase 2 (Medium-term)**:
+1. Deploy Peekaboo MCP for visual testing
+2. Prototype browser-tools as optional CLI enhancement
+3. Consider mcp2py integration for Python SubTurtles
+
+---
+
+### 7. Key Takeaway: Operational Discipline
+
+agent-scripts is fundamentally about **encoding guardrails as code** rather than relying on agent behavior. The patterns are:
+
+1. **committer**: Explicit file staging prevents accidents
+2. **docs-list**: Front-matter metadata enables self-discovery
+3. **browser-tools**: Minimal CLI avoids dependency bloat
+
+**For our system**: These patterns fit perfectly with our ethos of "silent, reliable, autonomous operation." Adopting them will improve:
+- Commit hygiene (fewer accidental `git add .` operations)
+- Documentation discoverability (agents find relevant docs automatically)
+- Browser automation (lightweight ad-hoc checks)
+
+---
+
 ## Summary: Key Takeaways
 
 **steipete is to "agent tooling" what Django is to web frameworks** — a pragmatic, opinionated collection of utilities that solve real problems agents face. His work is characterized by:
