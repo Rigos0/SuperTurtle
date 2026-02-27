@@ -8,6 +8,8 @@ Super Turtle is an autonomous coding system you talk to on Telegram. You describ
 
 **Super Turtle is built using Super Turtle.** The system develops itself: spawning SubTurtles to implement its own features, supervising its own improvements, and committing its own code.
 
+Full docs: [docs/index.md](docs/index.md)
+
 ## Philosophy
 
 **Core experience: say what → get results.** The user should not think about infrastructure, loop orchestration, or process management.
@@ -75,7 +77,64 @@ The system is designed to be:
 - **Cron supervision**: `ctl spawn` auto-registers recurring check-ins (default `10m`) to monitor milestones, stalls, and failures.
 - **Tunnel previews**: frontend workers can publish Cloudflare tunnel links; the Meta Agent surfaces the URL when ready.
 
-## Quick start
+## Setup (Clone-and-run)
+
+This repository is designed for **clone-and-run usage** on your own machine. Setup assumes you are running this repo directly, not embedding Super Turtle into an existing codebase.
+
+### 1) Clone and install
+
+```bash
+git clone <your-fork-or-repo-url>
+cd agentic
+cd super_turtle/claude-telegram-bot
+bun install
+```
+
+### 2) Subscription requirements
+
+- Required: active Claude Code subscription and local `claude` auth.
+- Optional for Codex flows: Codex access for the OpenAI account used by local `codex`.
+- Optional: `OPENAI_API_KEY` for voice transcription.
+
+### 3) Create a Telegram bot (BotFather)
+
+1. Open [@BotFather](https://t.me/BotFather).
+2. Run `/newbot` and follow prompts.
+3. Save the token for `TELEGRAM_BOT_TOKEN`.
+4. Configure bot commands with `/setcommands`:
+
+```text
+start - Show status and user ID
+new - Start a fresh session
+resume - Pick from recent sessions to resume
+context - Show context usage
+stop - Interrupt current query
+status - Check what Claude is doing
+restart - Restart the bot
+```
+
+### 4) Get your Telegram chat/user ID
+
+- Message [@userinfobot](https://t.me/userinfobot), or
+- Start your bot and run `/start` to display your ID.
+
+Use this value in `TELEGRAM_ALLOWED_USERS`.
+
+### 5) Configure environment
+
+Create `super_turtle/claude-telegram-bot/.env`:
+
+```bash
+TELEGRAM_BOT_TOKEN=1234567890:ABC-DEF...
+TELEGRAM_ALLOWED_USERS=123456789
+
+CLAUDE_WORKING_DIR=/absolute/path/to/agentic
+OPENAI_API_KEY=sk-... # optional, only for voice transcription
+
+CODEX_ENABLED=true # optional, enables Codex usage in /usage and Codex flows
+```
+
+## Run
 
 ### Start the Meta Agent (CLI)
 
@@ -86,6 +145,14 @@ The system is designed to be:
 ### Talk through Telegram
 
 Run the bot and message it; the Meta Agent becomes your chat interface to the repo.
+
+### Run docs locally
+
+```bash
+cd docs
+npm install
+npm run docs:dev
+```
 
 ### Manage SubTurtles
 
