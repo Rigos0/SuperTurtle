@@ -8,6 +8,10 @@ SUBTURTLES_DIR="${PROJECT_DIR}/.subturtles"
 DEFAULT_TIMEOUT="1h"
 CRON_JOBS_FILE_REL="super_turtle/claude-telegram-bot/cron-jobs.json"
 CRON_JOBS_FILE="${PROJECT_DIR}/${CRON_JOBS_FILE_REL}"
+RUN_STATE_DIR_REL="super_turtle/state"
+RUN_STATE_DIR="${PROJECT_DIR}/${RUN_STATE_DIR_REL}"
+RUNS_JSONL_FILE="${RUN_STATE_DIR}/runs.jsonl"
+HANDOFF_MD_FILE="${RUN_STATE_DIR}/handoff.md"
 
 # Use subturtle venv if available, otherwise system python3
 PYTHON="${SCRIPT_DIR}/.venv/bin/python3"
@@ -59,6 +63,31 @@ pid_file()  { echo "$(workspace_dir "$1")/subturtle.pid"; }
 log_file()  { echo "$(workspace_dir "$1")/subturtle.log"; }
 meta_file() { echo "$(workspace_dir "$1")/subturtle.meta"; }
 tunnel_url_file() { echo "$(workspace_dir "$1")/.tunnel-url"; }
+
+ensure_run_state_files() {
+  mkdir -p "$RUN_STATE_DIR"
+
+  if [[ ! -f "$RUNS_JSONL_FILE" ]]; then
+    : > "$RUNS_JSONL_FILE"
+  fi
+
+  if [[ ! -f "$HANDOFF_MD_FILE" ]]; then
+    cat > "$HANDOFF_MD_FILE" <<'EOF'
+# SubTurtle Long-Run Handoff
+
+Last updated: not yet
+
+## Active Runs
+- None yet.
+
+## Recent Milestones
+- None yet.
+
+## Notes
+- This summary is refreshed by supervision flows.
+EOF
+  fi
+}
 
 # --- Duration helpers ---
 
@@ -992,6 +1021,8 @@ fi
 
 CMD="$1"
 shift
+
+ensure_run_state_files
 
 case "$CMD" in
   start)
