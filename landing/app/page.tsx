@@ -81,14 +81,8 @@ export default function Home() {
                 Super Turtle
               </h1>
               <p className="lead max-w-2xl">
-                Autonomous coding on your existing subscription.
+                Code from anywhere with your voice, on your existing subscription.
               </p>
-
-              <ul className="mt-6 space-y-2 text-sm">
-                <li className="feature-chip"><span className="feature-dot" /> Uses your Claude Code or Codex subscription</li>
-                <li className="feature-chip"><span className="feature-dot" /> Mobile + voice control first via Telegram</li>
-                <li className="feature-chip"><span className="feature-dot" /> Breaks work into tasks and runs sub-agents</li>
-              </ul>
 
               <div className="mt-7 flex flex-wrap gap-3">
                 <a

@@ -6,6 +6,7 @@
 
 Super Turtle is an autonomous coding system you talk to on Telegram.
 You say what to build; it coordinates workers and ships results.
+Code from anywhere with your voice.
 
 Full docs: [docs/index.md](docs/index.md)
 
