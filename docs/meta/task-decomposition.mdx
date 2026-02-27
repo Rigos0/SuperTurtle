@@ -1,0 +1,159 @@
+---
+title: Meta Task Decomposition
+description: How the Meta Agent turns "build X" requests into parallel SubTurtles with dependency-aware execution and reliable multi-spawn behavior
+---
+
+# Meta Task Decomposition
+
+Task decomposition is how the Meta Agent converts high-level requests into concrete SubTurtle execution streams.
+
+Canonical rules live in:
+
+```text
+super_turtle/meta/DECOMPOSITION_PROMPT.md
+super_turtle/meta/META_SHARED.md
+```
+
+The target user experience is simple: say "build X", then receive milestone updates while the system handles splitting, ordering, and supervision.
+
+## When To Decompose
+
+Decompose when at least one of these is true:
+- The request spans multiple features or surfaces.
+- One focused worker would likely exceed about 3 backlog items.
+- Workstreams can be isolated by file/domain with low merge risk.
+
+## When Not To Decompose
+
+Keep a single worker when:
+- The task is a tiny fix (single-file edit, typo, one-function bug).
+- The work is mostly sequential and parallel workers would idle.
+- Coupling is high enough that splitting increases integration risk.
+
+<Warning>
+Do not split work just because the request is long. Split only when parallel execution improves delivery without creating dependency churn.
+</Warning>
+
+## Limits and Naming
+
+Hard constraints from the decomposition protocol:
+- Maximum `5` SubTurtles per user request.
+- Each SubTurtle backlog should have `3-7` items.
+- Use lowercase hyphenated names: `<project>-<feature>`.
+
+Examples:
+
+```text
+dashboard-search
+dashboard-filters
+billing-void-endpoint
+```
+
+If decomposition produces more than 5 streams, merge small related streams or queue extras.
+
+## Decomposition Workflow
+
+<Steps>
+  <Step title="Extract capabilities">
+    Parse the user request into concrete deliverables (UI, API, tests, deployment, etc.).
+  </Step>
+  <Step title="Group into workstreams">
+    Create independent SubTurtle candidates by feature boundary or ownership boundary.
+  </Step>
+  <Step title="Map dependencies">
+    Annotate edges like `A -> B` when output contracts or shared artifacts are required.
+  </Step>
+  <Step title="Partition running vs queued">
+    Start only unblocked streams now; queue blocked streams until dependencies complete.
+  </Step>
+  <Step title="Enforce limits">
+    Keep at most 5 active streams and 3-7 backlog items per stream by merging/simplifying.
+  </Step>
+  <Step title="Spawn and report">
+    Spawn ready SubTurtles, then report running and queued sets in one concise status message.
+  </Step>
+</Steps>
+
+## Dependency Handling
+
+If `B` depends on `A`, this is required behavior:
+1. Spawn `A` first.
+2. Record `B` as queued.
+3. Spawn `B` immediately after `A` finishes.
+
+Never spawn a blocked SubTurtle "just in case."
+
+<Info>
+This keeps autonomous progress predictable and avoids wasted loops on tasks that are waiting for contracts, schemas, or shared interfaces.
+</Info>
+
+## Multi-SubTurtle Spawn Reliability
+
+For 2+ spawns in one request, `META_SHARED.md` requires a reliability protocol:
+
+1. Prefer Bash here-doc + stdin state seeding.
+2. Use each spawn's built-in `ctl list` output to verify runtime success.
+3. If a stream stalls, check current running list and spawn only missing workers.
+4. Report exact outcome: running names plus skipped/failed names and reasons.
+
+Example:
+
+```bash
+cat <<'EOF' | ./super_turtle/subturtle/ctl spawn dashboard-search \
+  --type yolo-codex \
+  --timeout 1h \
+  --state-file -
+## Current Task
+Implement dashboard search.
+...
+EOF
+```
+
+## Worked Patterns
+
+<Tabs>
+  <Tab title="Frontend">
+    Request: "Build a dashboard with search, filters, export."
+
+    Decomposition:
+    - `dashboard-search` (running)
+    - `dashboard-filters` (running)
+    - `dashboard-export` (queued, depends on search query contract)
+  </Tab>
+  <Tab title="API">
+    Request: "Add billing APIs for create, list, and void invoice."
+
+    Decomposition:
+    - `billing-create-invoice-endpoint` (running)
+    - `billing-list-invoices-endpoint` (running)
+    - `billing-void-invoice-endpoint` (running)
+  </Tab>
+  <Tab title="Full Stack">
+    Request: "Add team invitations with UI, API, and coverage."
+
+    Decomposition:
+    - `teams-invitations-backend` (running first)
+    - `teams-invitations-frontend` (queued on backend API)
+    - `teams-invitations-tests` (queued on backend + frontend)
+  </Tab>
+</Tabs>
+
+## User-Facing Messaging
+
+Keep decomposition updates short and milestone-focused:
+
+```text
+I split this into 3 SubTurtles.
+Running now: dashboard-search, dashboard-filters.
+Queued: dashboard-export (after dashboard-search).
+I'll report milestones only.
+```
+
+This preserves the "say what -> get results" UX while still exposing meaningful execution state.
+
+## Related Pages
+
+- [Meta Agent Overview](/meta/overview)
+- [Meta Supervision](/meta/supervision)
+- [Resource Management](/meta/resource-management)
+- [SubTurtles Loop Types](/subturtles/loop-types)
