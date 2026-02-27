@@ -169,33 +169,6 @@ body {
   transform: translateY(-56%) translateX(0) scale(1);
 }
 
-.turtle-tip-word {
-  display: inline-block;
-  animation: turtle-tip-word-fade 780ms ease-in-out both;
-}
-
-@keyframes turtle-tip-word-fade {
-  0% {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  20% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  78% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translateY(-3px);
-  }
-}
-
 @media (max-width: 640px) {
   .turtle-tip-bubble {
     left: -92px;

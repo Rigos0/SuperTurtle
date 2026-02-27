@@ -85,15 +85,16 @@ const executionFlow = [
 
 export default function Home() {
   const [hasClickedTurtleTip, setHasClickedTurtleTip] = useState(false);
-  const [turtleBubbleStep, setTurtleBubbleStep] = useState(0);
+  const [turtleBubbleText, setTurtleBubbleText] = useState('I built this site');
+  const [nextBubbleText, setNextBubbleText] = useState<'I built this site' | 'step by step'>('I built this site');
   const [bubbleHideTimeout, setBubbleHideTimeout] = useState<number | null>(null);
   const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL ?? "/docs";
   const githubUrl = "https://github.com/Rigos0/superturtle";
-  const turtleBubbleWords = ['step', 'by', 'step'];
 
   const handleTurtleClick = () => {
     setHasClickedTurtleTip(true);
-    setTurtleBubbleStep(0);
+    setTurtleBubbleText(nextBubbleText);
+    setNextBubbleText((prev) => (prev === 'I built this site' ? 'step by step' : 'I built this site'));
 
     if (bubbleHideTimeout !== null) {
       window.clearTimeout(bubbleHideTimeout);
@@ -101,26 +102,11 @@ export default function Home() {
 
     const nextHideTimeout = window.setTimeout(() => {
       setHasClickedTurtleTip(false);
-      setTurtleBubbleStep(3);
       setBubbleHideTimeout(null);
-    }, 3500);
+    }, 3200);
 
     setBubbleHideTimeout(nextHideTimeout);
   };
-
-  useEffect(() => {
-    if (!hasClickedTurtleTip || turtleBubbleStep >= 2) {
-      return;
-    }
-
-    const stepTimeout = window.setTimeout(() => {
-      setTurtleBubbleStep((currentStep) => currentStep + 1);
-    }, 800);
-
-    return () => {
-      window.clearTimeout(stepTimeout);
-    };
-  }, [hasClickedTurtleTip, turtleBubbleStep]);
 
   useEffect(() => {
     return () => {
@@ -139,18 +125,23 @@ export default function Home() {
             <div className="reveal text-center flex flex-col items-center" style={{ animationDelay: '80ms' }}>
               <div className="mx-auto turtle-sticker-wrap">
                 <div className={`turtle-tip-bubble ${hasClickedTurtleTip ? 'active' : ''}`} aria-hidden={!hasClickedTurtleTip}>
-                  <span className="turtle-tip-word" key={turtleBubbleStep}>
-                    {turtleBubbleWords[Math.min(turtleBubbleStep, 2)]}
-                  </span>
+                  <span>{turtleBubbleText}</span>
                 </div>
-                <button
-                  type="button"
+                <div
                   className="turtle-sticker-button"
                   onClick={handleTurtleClick}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      handleTurtleClick();
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
                   aria-label="Show step by step message"
                 >
                   <img className="turtle-sticker-image" src="/turtle-logo.png" alt="Super Turtle" width={104} height={104} />
-                </button>
+                </div>
               </div>
               <h1 className="headline mt-6 sm:mt-7 md:mt-8">
                 Super Turtle
