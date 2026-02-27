@@ -27,6 +27,11 @@ const valueProps = [
     accent: 'sage',
   },
   {
+    title: 'Built for long-running, large jobs',
+    description: 'Designed to keep big multi-phase work moving (for example, rebuilding products end-to-end).',
+    accent: 'olive',
+  },
+  {
     title: 'Runs on your machine',
     description: 'Local-first today (cloud deployment coming up).',
     accent: 'olive',
@@ -66,7 +71,7 @@ const executionFlow = [
 export default function Home() {
   const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL ?? "/docs";
   const githubUrl = "https://github.com/Rigos0/superturtle";
-  const topThree = valueProps.slice(0, 3);
+  const topFour = valueProps.slice(0, 4);
   return (
     <div className="landing-root">
       <StickyNav />
@@ -81,7 +86,7 @@ export default function Home() {
                 Super Turtle
               </h1>
               <p className="lead max-w-2xl">
-                Code from anywhere with your voice, on your existing subscription.
+                Code from anywhere with your voice.
               </p>
 
               <div className="mt-7 flex flex-wrap gap-3">
@@ -101,7 +106,7 @@ export default function Home() {
 
             <div className="reveal" style={{ animationDelay: '220ms' }}>
               <div className="grid gap-4">
-                {topThree.map((item, index) => (
+                {topFour.map((item, index) => (
                   <article
                     className={`deck-card ${index === 0 ? 'olive' : index === 1 ? 'terracotta' : 'sage'}`}
                     key={item.title}
