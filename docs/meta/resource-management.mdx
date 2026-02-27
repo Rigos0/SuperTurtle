@@ -1,0 +1,134 @@
+---
+title: Meta Resource Management
+description: Usage-aware routing and supervision tuning for Claude Code and Codex across Meta Agent and SubTurtles
+---
+
+# Meta Resource Management
+
+Resource management keeps Super Turtle autonomous when usage limits get tight.  
+The Meta Agent reads Claude Code and Codex quota signals, routes work to the best loop type, and adjusts supervision frequency to preserve headroom.
+
+Canonical policy lives in:
+
+```text
+super_turtle/meta/META_SHARED.md
+```
+
+Runtime usage surfaces live in:
+
+```text
+super_turtle/claude-telegram-bot/src/handlers/commands.ts
+super_turtle/subturtle/ctl
+```
+
+## Signals and Data Sources
+
+The Meta Agent uses two quota inputs:
+
+<CardGroup cols={2}>
+  <Card title="Claude Code usage">
+    `getUsageLines()` reads OAuth usage from `https://api.anthropic.com/api/oauth/usage` and formats session + weekly utilization with reset times.
+  </Card>
+  <Card title="Codex quota usage">
+    `getCodexQuotaLines()` calls `codex app-server` via JSON-RPC (`account/rateLimits/read`) and returns 5-hour + weekly usage windows.
+  </Card>
+</CardGroup>
+
+Unified status rendering is handled by `formatUnifiedUsage(...)` and uses shared badge thresholds:
+
+```text
+✅ < 80%
+⚠️ 80-94%
+🔴 >= 95%
+```
+
+## Usage Check Cadence
+
+`META_SHARED.md` defines when usage should be evaluated:
+
+<Steps>
+  <Step title="Session start">
+    Check quota state at the beginning of every meta-agent session.
+  </Step>
+  <Step title="During active work">
+    Re-check about every 30 minutes while autonomous work is in progress.
+  </Step>
+  <Step title="Before spawning">
+    If the last reading is stale, refresh usage immediately before spawning new SubTurtles.
+  </Step>
+</Steps>
+
+## Decision Matrix
+
+Use this policy matrix for loop-type routing and user messaging:
+
+| Claude Code usage | Codex usage | Meta behavior |
+|---|---|---|
+| `<50%` | `<50%` | Normal operations. Any loop type allowed. |
+| `50-80%` | `<50%` | Prefer `yolo-codex`. Reduce cron supervision to `10m`. |
+| `>80%` | `<50%` | Force `yolo-codex` only. Minimal check-ins (`15m`). Keep responses shorter. |
+| `Any` | `>80%` | Switch SubTurtles to `yolo` (Claude) and warn Codex is constrained. |
+| `>80%` | `>80%` | Alert that both pools are constrained and suggest pausing non-critical work. |
+
+<Info>
+Default coding loop type is `yolo-codex`. Use `yolo` or `slow` only when deeper Claude reasoning/review is actually needed.
+</Info>
+
+## Cron Frequency Adaptation
+
+When Claude usage pressure increases, stretch supervision intervals to reduce meta overhead.
+
+Policy rule:
+
+```text
+Claude > 80% => 15m recurring check-ins
+Claude <= 80% => return to tighter intervals (typically 10m per matrix)
+```
+
+Operational command:
+
+```bash
+./super_turtle/subturtle/ctl reschedule-cron <name> <interval>
+```
+
+Examples:
+
+```bash
+# High Claude usage: reduce check-in frequency
+./super_turtle/subturtle/ctl reschedule-cron dashboard-api 15m
+
+# Usage recovered: tighten supervision again
+./super_turtle/subturtle/ctl reschedule-cron dashboard-api 10m
+```
+
+## Practical Routing Flow
+
+```bash
+# 1) Gather usage/quota state
+# (meta path uses usage + codex quota helpers)
+
+# 2) Choose loop type
+# default: yolo-codex
+# codex constrained: yolo
+# claude constrained + codex healthy: keep yolo-codex
+
+# 3) Spawn with selected mode
+./super_turtle/subturtle/ctl spawn <name> --type <selected> --timeout 1h --state-file -
+
+# 4) Adjust cron interval based on current Claude pressure
+./super_turtle/subturtle/ctl reschedule-cron <name> 10m
+# or
+./super_turtle/subturtle/ctl reschedule-cron <name> 15m
+```
+
+## Failure and Partial-Data Handling
+
+If one provider's metrics are missing, `formatUnifiedUsage(...)` reports partial state (`❓`) instead of guessing.  
+Routing should then prefer conservative defaults (`yolo-codex`) until a fresh measurement is available, unless there is a clear provider-specific limit error.
+
+## Related Pages
+
+- [Meta Agent Overview](/meta/overview)
+- [Meta Supervision](/meta/supervision)
+- [Task Decomposition](/meta/task-decomposition)
+- [SubTurtles Loop Types](/subturtles/loop-types)

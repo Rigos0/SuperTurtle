@@ -1,5 +1,5 @@
 ## Current Task
-Write docs/meta/resource-management.mdx.
+All backlog items complete.
 
 ## End Goal with Specs
 Create 9 documentation pages covering SubTurtles and the Meta Agent. Pages go in `docs/subturtles/` and `docs/meta/` as `.mdx` files. Use Mintlify MDX syntax (supports `<Steps>`, `<Card>`, `<CardGroup>`, `<Tip>`, `<Warning>`, `<Note>`, `<Info>`, `<Accordion>`, `<Tabs>`, `<Tab>`).
@@ -48,11 +48,14 @@ Create 9 documentation pages covering SubTurtles and the Meta Agent. Pages go in
 - [x] Write docs/meta/overview.mdx
 - [x] Write docs/meta/supervision.mdx
 - [x] Write docs/meta/task-decomposition.mdx
-- [ ] Write docs/meta/resource-management.mdx <- current
-- [ ] Commit
+- [x] Write docs/meta/resource-management.mdx
+- [x] Commit
 
 ## Notes
 - Repo root: /Users/Richard.Mladek/Documents/projects/agentic
 - Key source files: super_turtle/meta/META_SHARED.md, super_turtle/meta/DECOMPOSITION_PROMPT.md, super_turtle/subturtle/README.md, super_turtle/subturtle/ctl (the script itself)
 - docs.json navigation already points to these page slugs
 - Use .mdx extension
+
+## Loop Control
+STOP
