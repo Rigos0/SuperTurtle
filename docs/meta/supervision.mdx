@@ -1,0 +1,167 @@
+---
+title: Meta Supervision
+description: Cron-based autonomous supervision for SubTurtles with silent-first check-ins and milestone-only user notifications
+---
+
+# Meta Supervision
+
+Meta supervision is the mechanism that keeps SubTurtles moving without constant user prompts.  
+When the Meta Agent spawns a SubTurtle, it also schedules recurring cron check-ins that inspect progress and only notify on meaningful events.
+
+Core behavior is defined in:
+
+```text
+super_turtle/meta/META_SHARED.md
+```
+
+Core implementation paths:
+
+```text
+super_turtle/subturtle/ctl
+super_turtle/claude-telegram-bot/src/cron.ts
+super_turtle/claude-telegram-bot/src/index.ts
+super_turtle/claude-telegram-bot/src/silent-notifications.ts
+```
+
+## How Supervision Is Registered
+
+`ctl spawn` is the high-level entrypoint. It creates workspace state, starts the worker, and auto-registers a recurring cron job with `silent: true`.
+
+```bash
+./super_turtle/subturtle/ctl spawn docs-agent \
+  --type yolo-codex \
+  --timeout 1h \
+  --state-file /tmp/docs-agent.md \
+  --cron-interval 10m
+```
+
+The cron job prompt is pre-seeded to perform supervision actions:
+- Run `ctl status <name>`
+- Read `.subturtles/<name>/CLAUDE.md`
+- Review `git log --oneline -10`
+- Stay silent unless a notable event occurs
+
+<Info>
+Current `ctl` default supervision interval is `10m` (override with `--cron-interval` or `ctl reschedule-cron`).
+</Info>
+
+## Silent-First Supervision
+
+Silent check-ins are designed to be invisible during normal progress.
+
+<Steps>
+  <Step title="Cron job wakes up">
+    The bot checks due jobs every 10 seconds and executes the recurring SubTurtle job when `fire_at` is reached.
+  </Step>
+  <Step title="Meta Agent performs supervision work">
+    It runs the status/state/log checks and decides whether there is meaningful news.
+  </Step>
+  <Step title="Marker-gated forwarding">
+    For silent jobs, Telegram receives output only if the response includes a notable marker (`🎉`, `⚠️`, `❌`, `🚀`, `🔔`).
+  </Step>
+  <Step title="No news means no message">
+    If no marker is present, nothing is sent to the user.
+  </Step>
+</Steps>
+
+The marker filter is implemented in `getSilentNotificationText(...)`:
+
+```ts
+const SILENT_NOTIFICATION_MARKERS = ["🎉", "⚠️", "⚠", "❌", "🚀", "🔔"] as const;
+```
+
+## Notification Triggers
+
+Only these event classes should break silence:
+
+<CardGroup cols={2}>
+  <Card title="🎉 Finished">
+    All backlog items are complete. Stop the SubTurtle, summarize what shipped, and state what starts next.
+  </Card>
+  <Card title="📍 Milestone">
+    Significant progress checkpoint reached (for example major backlog completion or first working slice).
+  </Card>
+  <Card title="⚠️ Stuck">
+    No meaningful movement across multiple check-ins, repeated retries, or clear off-track behavior.
+  </Card>
+  <Card title="❌ Error">
+    Crash or hard failure blocking autonomous progress.
+  </Card>
+</CardGroup>
+
+Optional notable update:
+- `🔗 Preview` when a new `.tunnel-url` appears for frontend work.
+
+## Notification Templates
+
+Use concise, structured messages:
+
+```text
+🚀 Started: <name>
+Working on: <task description>
+Mode: <yolo-codex|yolo-codex-spark|yolo|slow> | Timeout: <duration>
+
+🎉 Finished: <name>
+✓ <item 1>
+✓ <item 2>
+✓ <item 3>
+Next: <what starts next, or "Roadmap complete">
+
+⚠️ Stuck: <name>
+No progress for <N> check-ins.
+Last activity: <description>
+Action: <stop/restart/needs input>
+
+❌ Error: <name>
+<error description>
+Action: <what meta agent did>
+
+📍 Milestone: <name>
+<N>/<total> backlog items complete.
+Latest: <what just shipped>
+
+🔗 Preview: <name>
+<url>
+```
+
+## Progressing to the Next Task
+
+When a SubTurtle finishes and the roadmap still has pending work:
+
+<Steps>
+  <Step title="Stop completed worker">
+    ```bash
+    ./super_turtle/subturtle/ctl stop <name>
+    ```
+    This also removes that SubTurtle's recurring cron supervision job.
+  </Step>
+  <Step title="Advance project state">
+    Update root `CLAUDE.md`: mark completed items and move current focus to the next backlog item.
+  </Step>
+  <Step title="Seed next SubTurtle state">
+    Write a fresh `.subturtles/&lt;name&gt;/CLAUDE.md` for the next focused chunk.
+  </Step>
+  <Step title="Spawn next run">
+    Start a new `ctl spawn` run; supervision is auto-registered again.
+  </Step>
+</Steps>
+
+This is the autonomous conveyor belt model: spawn -> supervise silently -> notify on real news -> stop -> advance state -> respawn until roadmap completion.
+
+## Failure Handling
+
+If a cron execution itself fails, the bot sends a direct failure message and does not retry that fire:
+
+```text
+❌ Scheduled job failed (<job-id>).
+<error summary>
+```
+
+This prevents hidden supervision failures while still avoiding noisy retries.
+
+## Related Pages
+
+- [Meta Agent Overview](/meta/overview)
+- [Task Decomposition](/meta/task-decomposition)
+- [Resource Management](/meta/resource-management)
+- [SubTurtles CTL Commands](/subturtles/ctl-commands)
