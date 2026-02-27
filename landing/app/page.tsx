@@ -9,6 +9,24 @@ const chatMessages = [
   { from: 'bot', text: '📍 Milestone: Hero shipped. Screenshot captured. Continuing.' },
 ];
 
+const heroHighlights = [
+  {
+    title: 'Code',
+    description: 'Uses your Claude Code or Codex subscription.',
+    accent: 'olive',
+  },
+  {
+    title: 'Mobile + Voice',
+    description: 'Control everything from Telegram by text or voice.',
+    accent: 'terracotta',
+  },
+  {
+    title: 'Parallel',
+    description: 'Sub-agents split tasks and iterate until done.',
+    accent: 'sage',
+  },
+];
+
 const valueProps = [
   {
     title: 'Uses your Claude Code or Codex subscription',
@@ -66,15 +84,14 @@ const executionFlow = [
 export default function Home() {
   const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL ?? "/docs";
   const githubUrl = "https://github.com/Rigos0/superturtle";
-  const topThree = valueProps.slice(0, 3);
   return (
     <div className="landing-root">
       <StickyNav />
       <main>
         <section id="hero" className="section-shell hero-shell relative">
-          <div className="section-container max-w-4xl space-y-10">
-            <div className="reveal" style={{ animationDelay: '80ms' }}>
-              <div className="mb-4">
+          <div className="section-container max-w-5xl space-y-10">
+            <div className="reveal text-center flex flex-col items-center" style={{ animationDelay: '80ms' }}>
+              <div className="mb-4 mx-auto">
                 <img src="/turtle-logo.png" alt="Super Turtle" width={72} height={72} />
               </div>
               <h1 className="headline">
@@ -84,7 +101,7 @@ export default function Home() {
                 Code from anywhere with your voice.
               </p>
 
-              <div className="mt-7 flex flex-wrap gap-3">
+              <div className="mt-7 flex flex-wrap justify-center gap-3">
                 <a
                   href={githubUrl}
                   className="btn-primary"
@@ -100,14 +117,14 @@ export default function Home() {
             </div>
 
             <div className="reveal" style={{ animationDelay: '220ms' }}>
-              <div className="grid gap-4">
-                {topThree.map((item, index) => (
+              <div className="grid gap-4 md:grid-cols-3">
+                {heroHighlights.map((item, index) => (
                   <article
-                    className={`deck-card ${index === 0 ? 'olive' : index === 1 ? 'terracotta' : 'sage'}`}
+                    className={`deck-card hero-value-card ${index === 0 ? 'olive' : index === 1 ? 'terracotta' : 'sage'}`}
                     key={item.title}
                   >
                     <div className="deck-mark" />
-                    <h3>{item.title}</h3>
+                    <h3 className="hero-value-title">{item.title}</h3>
                     <p>{item.description}</p>
                   </article>
                 ))}
