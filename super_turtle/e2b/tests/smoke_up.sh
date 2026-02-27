@@ -113,8 +113,10 @@ case "${sub}" in
       echo "sandbox not found: ${sandbox_id}" >&2
       exit 1
     fi
-    if [ -t 0 ]; then
-      exit 0
+    if [[ "${E2B_FAKE_CONNECT_RAWMODE_ONCE:-0}" == "1" && ! -f "${STATE_DIR}/connect-rawmode-once.done" && ! -t 0 ]]; then
+      touch "${STATE_DIR}/connect-rawmode-once.done"
+      echo "TypeError: process.stdin.setRawMode is not a function" >&2
+      exit 1
     fi
     (
       cd "${sandbox_path}"
@@ -140,6 +142,7 @@ chmod +x "${FAKE_BIN_DIR}/e2b"
 export PATH="${FAKE_BIN_DIR}:${PATH}"
 export HOME="${TEST_HOME}"
 export FAKE_E2B_STATE_DIR
+export E2B_FAKE_CONNECT_RAWMODE_ONCE=1
 export E2B_STATE_FILE="${STATE_FILE}"
 export E2B_REMOTE_PROJECT_DIR="${REMOTE_PROJECT_DIR}"
 export E2B_REMOTE_LOG_PATH="${REMOTE_PROJECT_DIR}/.superturtle/bot.log"

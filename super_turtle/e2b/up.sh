@@ -210,7 +210,45 @@ sys.exit(1)
 
 connect_sandbox_probe() {
   local sandbox_id="${1:?sandbox id required}"
-  printf 'exit\n' | "${E2B_BIN}" sandbox connect "${sandbox_id}" >/dev/null 2>&1
+  printf 'exit\n' | sandbox_connect "${sandbox_id}" >/dev/null 2>&1
+}
+
+sandbox_connect() {
+  local sandbox_id="${1:?sandbox id required}"
+  local tmp_input
+  tmp_input="$(mktemp)"
+  local tmp_output
+  tmp_output="$(mktemp)"
+
+  cat > "${tmp_input}"
+
+  local max_retries="${E2B_CONNECT_RAWMODE_RETRIES:-3}"
+  local retry_delay_seconds="${E2B_CONNECT_RAWMODE_RETRY_DELAY_SECONDS:-1}"
+  local attempt=1
+
+  while true; do
+    if "${E2B_BIN}" sandbox connect "${sandbox_id}" <"${tmp_input}" >"${tmp_output}" 2>&1; then
+      cat "${tmp_output}"
+      rm -f "${tmp_input}" "${tmp_output}"
+      return 0
+    fi
+
+    if ! grep -q "process.stdin.setRawMode is not a function" "${tmp_output}"; then
+      break
+    fi
+
+    if (( attempt > max_retries )); then
+      break
+    fi
+
+    log "sandbox connect hit non-interactive raw-mode bug; retrying direct connect (${attempt}/${max_retries})"
+    sleep "${retry_delay_seconds}"
+    attempt=$((attempt + 1))
+  done
+
+  cat "${tmp_output}" >&2
+  rm -f "${tmp_input}" "${tmp_output}"
+  return 1
 }
 
 create_sandbox_legacy() {
@@ -484,7 +522,7 @@ run_remote_script() {
   if ! {
     cat "${tmp_script}"
     printf '\nexit\n'
-  } | "${E2B_BIN}" sandbox connect "${sandbox_id}" >"${tmp_output}" 2>&1; then
+  } | sandbox_connect "${sandbox_id}" >"${tmp_output}" 2>&1; then
     echo "[e2b-up] remote ${label} failed for sandbox ${sandbox_id}" >&2
     cat "${tmp_output}" >&2
     rm -f "${tmp_script}" "${tmp_output}"
@@ -570,7 +608,7 @@ rm -rf "${STAGE_DIR}"
 echo "__SUPERTURTLE_SYNC_OK__"
 EOF
     printf '\nexit\n'
-  } | "${E2B_BIN}" sandbox connect "${sandbox_id}" >"${tmp_output}" 2>&1; then
+  } | sandbox_connect "${sandbox_id}" >"${tmp_output}" 2>&1; then
     echo "[e2b-up] sync failed for sandbox ${sandbox_id}" >&2
     cat "${tmp_output}" >&2
     rm -f "${local_tar}" "${file_list}" "${raw_file_list}" "${tmp_output}"
