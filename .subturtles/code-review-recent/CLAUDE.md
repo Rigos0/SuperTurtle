@@ -1,13 +1,13 @@
 ## Current Task
-Review scoped areas for bugs, security issues, and regressions across stop-intents, openclaw-gap, and long-run tracking commits.
+Fix small issues from the review and document larger issues without risky behavior changes.
 
 ## End Goal with Specs
 Provide a review doc with top risks and implement small fixes. Call out larger issues without changing behavior unexpectedly.
 
 ## Backlog
 - [x] Identify recent commits and areas touched
-- [ ] Review for bugs, security issues, regressions <- current
-- [ ] Fix small issues; document larger ones
+- [x] Review for bugs, security issues, regressions
+- [ ] Fix small issues; document larger ones <- current
 - [ ] Update state and stop
 
 ## Notes
