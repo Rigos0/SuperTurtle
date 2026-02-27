@@ -123,7 +123,9 @@ body {
 }
 
 .turtle-sticker-button:focus-visible {
-  outline: none;
+  outline: 2px solid rgba(86, 108, 75, 0.45);
+  outline-offset: 4px;
+  border-radius: 0.75rem;
 }
 
 .turtle-sticker-image {
@@ -165,6 +167,27 @@ body {
   opacity: 1;
   visibility: visible;
   transform: translateX(-50%) translateY(0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turtle-sticker-button,
+  .turtle-sticker-image,
+  .turtle-tip-bubble {
+    transition: none;
+  }
+
+  .turtle-sticker-button:hover {
+    transform: none;
+  }
+
+  .turtle-sticker-button:hover .turtle-sticker-image,
+  .turtle-sticker-button:focus-visible .turtle-sticker-image {
+    transform: none;
+  }
+
+  .turtle-tip-bubble {
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
 }
 
 .pill {
