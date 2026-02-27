@@ -89,6 +89,12 @@ export type ClaudeStateSummary = {
   backlogCurrent: string;
 };
 
+export type ClaudeBacklogItem = {
+  text: string;
+  done: boolean;
+  current: boolean;
+};
+
 function extractMarkdownSection(content: string, headingPattern: string): string {
   const headingRegex = new RegExp(`^#{1,6}\\s*${headingPattern}\\s*$`, "im");
   const headingMatch = headingRegex.exec(content);
@@ -116,15 +122,11 @@ function truncateText(value: string, maxLength: number): string {
   return `${value.slice(0, maxLength - 3)}...`;
 }
 
-export function parseClaudeStateSummary(content: string): ClaudeStateSummary {
-  const currentTaskSection = extractMarkdownSection(content, "Current\\s+Task");
-  const currentTask = currentTaskSection
-    .split("\n")
-    .map((line) => sanitizeTaskLine(line))
-    .find((line) => line.length > 0) || "";
-
+export function parseClaudeBacklogItems(content: string): ClaudeBacklogItem[] {
   const backlogSection = extractMarkdownSection(content, "Backlog");
-  const backlogItems = backlogSection
+  if (!backlogSection) return [];
+
+  return backlogSection
     .split("\n")
     .map((line) => line.match(/^\s*-\s*\[([ xX])\]\s*(.+)$/))
     .filter((match): match is RegExpMatchArray => Boolean(match))
@@ -132,12 +134,22 @@ export function parseClaudeStateSummary(content: string): ClaudeStateSummary {
       const rawText = match[2] || "";
       const text = sanitizeTaskLine(rawText);
       return {
+        text,
         done: match[1]?.toLowerCase() === "x",
         current: /<-\s*current/i.test(rawText),
-        text,
       };
     })
     .filter((item) => item.text.length > 0);
+}
+
+export function parseClaudeStateSummary(content: string): ClaudeStateSummary {
+  const currentTaskSection = extractMarkdownSection(content, "Current\\s+Task");
+  const currentTask = currentTaskSection
+    .split("\n")
+    .map((line) => sanitizeTaskLine(line))
+    .find((line) => line.length > 0) || "";
+
+  const backlogItems = parseClaudeBacklogItems(content);
 
   const currentBacklogItem =
     backlogItems.find((item) => item.current && !item.done)?.text ||
@@ -159,6 +171,15 @@ export async function readClaudeStateSummary(path: string): Promise<ClaudeStateS
     return parseClaudeStateSummary(content);
   } catch {
     return null;
+  }
+}
+
+export async function readClaudeBacklogItems(path: string): Promise<ClaudeBacklogItem[]> {
+  try {
+    const content = await Bun.file(path).text();
+    return parseClaudeBacklogItems(content);
+  } catch {
+    return [];
   }
 }
 

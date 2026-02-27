@@ -19,6 +19,7 @@ import {
   buildSessionOverviewLines,
   resetAllDriverSessions,
   readClaudeStateSummary,
+  readClaudeBacklogItems,
   formatBacklogSummary,
 } from "./commands";
 
@@ -351,10 +352,9 @@ async function handleSubturtleLogsCallback(
 
   try {
     const turtleStatePath = `${WORKING_DIR}/.subturtles/${name}/CLAUDE.md`;
-    const rootStatePath = `${WORKING_DIR}/CLAUDE.md`;
-    const [turtleSummary, rootSummary] = await Promise.all([
+    const [turtleSummary, turtleBacklog] = await Promise.all([
       readClaudeStateSummary(turtleStatePath),
-      readClaudeStateSummary(rootStatePath),
+      readClaudeBacklogItems(turtleStatePath),
     ]);
 
     if (!turtleSummary) {
@@ -365,13 +365,15 @@ async function handleSubturtleLogsCallback(
     const lines: string[] = [`📋 <b>State for ${escapeHtml(name)}</b>\n`];
     const turtleTask = turtleSummary.currentTask || "No current task in CLAUDE.md";
     lines.push(`🧩 <b>Task:</b> ${escapeHtml(turtleTask)}`);
-    lines.push(`📌 <b>Backlog:</b> ${escapeHtml(formatBacklogSummary(turtleSummary))}`);
-
-    if (rootSummary) {
-      const rootTask = rootSummary.currentTask || "No current task in root CLAUDE.md";
-      lines.push("");
-      lines.push(`🧭 <b>Root task:</b> ${escapeHtml(rootTask)}`);
-      lines.push(`📌 <b>Root backlog:</b> ${escapeHtml(formatBacklogSummary(rootSummary))}`);
+    if (turtleBacklog.length === 0) {
+      lines.push(`📌 <b>Backlog:</b> ${escapeHtml(formatBacklogSummary(turtleSummary))}`);
+    } else {
+      lines.push(`📌 <b>Backlog:</b>`);
+      for (const item of turtleBacklog) {
+        const status = item.done ? "✅" : "⬜";
+        const currentTag = item.current ? " <- current" : "";
+        lines.push(`${status} ${escapeHtml(item.text)}${currentTag}`);
+      }
     }
 
     await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
