@@ -19,10 +19,10 @@ import {
   isActiveDriverSessionActive,
   isAnyDriverRunning,
   runMessageWithActiveDriver,
-  stopActiveDriverQuery,
 } from "./driver-routing";
 import { StreamingState, createStatusCallback } from "./streaming";
 import { drainDeferredQueue, enqueueDeferredMessage } from "../deferred-queue";
+import { stopAllRunningWork } from "./stop";
 
 /**
  * Handle incoming voice messages.
@@ -110,8 +110,7 @@ export async function handleVoice(ctx: Context): Promise<void> {
 
     // 9. Voice stop intent should interrupt active runs immediately.
     if (isStopIntent(transcript)) {
-      session.stopTyping();
-      await stopActiveDriverQuery();
+      await stopAllRunningWork();
       await ctx.reply("🛑 Stopped.");
       return;
     }

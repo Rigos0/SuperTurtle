@@ -36,6 +36,7 @@ import { isAnyDriverRunning, isLikelyQuotaOrLimitError, runMessageWithDriver } f
 import { StreamingState, createSilentStatusCallback, createStatusCallback } from "./handlers/streaming";
 import { getSilentNotificationText } from "./silent-notifications";
 import type { DriverId } from "./drivers/types";
+import { isStopIntent } from "./utils";
 import {
   dequeuePreparedSnapshot,
   enqueuePreparedSnapshot,
@@ -349,8 +350,8 @@ bot.use(
     if (ctx.message?.text?.startsWith("!")) {
       return undefined;
     }
-    // Messages starting with "stop" bypass queue (acts like /stop)
-    if (ctx.message?.text?.toLowerCase().trimStart().startsWith("stop")) {
+    // Stop intents bypass queue so they can cancel work immediately
+    if (ctx.message?.text && isStopIntent(ctx.message.text)) {
       return undefined;
     }
     // Voice notes bypass queue so they can transcribe/interrupt while a turn is running

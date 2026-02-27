@@ -15,6 +15,7 @@ import {
   startTypingIndicator,
 } from "../utils";
 import { drainDeferredQueue } from "../deferred-queue";
+import { stopAllRunningWork } from "./stop";
 import {
   StreamingState,
   createSilentStatusCallback,
@@ -81,9 +82,7 @@ export async function handleText(
 
   // 1.5. Bare "stop" — intercept and abort (acts like /stop)
   if (isStopIntent(message)) {
-    // Kill typing indicator immediately so the bot stops showing "typing..."
-    session.stopTyping();
-    await getCurrentDriver().stop();
+    await stopAllRunningWork();
     // Don't send "stop" to Claude — just swallow it
     return;
   }
