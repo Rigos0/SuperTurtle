@@ -1,5 +1,5 @@
 ## Current task
-Implement `up` flow in `super_turtle/e2b/up.sh`: create/resume sandbox, copy repo, install deps, start remote bot process, persist metadata.
+Implement lifecycle commands in `super_turtle/e2b/lifecycle.sh`: status/pause/resume/stop using E2B APIs/CLI.
 
 ## End goal with specs
 From this repo, a user can provision or resume an E2B sandbox, sync project code, start Super Turtle remotely, and manage lifecycle (`status`, `pause`, `resume`, `stop`) via scripts in `super_turtle/e2b/`.
@@ -31,8 +31,8 @@ Acceptance criteria:
 - [x] Research current E2B capabilities and official APIs for persistent sandboxes + pause/resume + templates (Codex/Claude); summarize in `docs/e2b-remote-runbook.md` with concrete links
 - [x] Create `super_turtle/e2b/remote.sh` command router (`up|status|pause|resume|stop|sync|reconcile-cron`) with strict error handling
 - [x] Implement sandbox state manager in `super_turtle/e2b/state.sh` (read/write `super_turtle/e2b/.state.json`, validation, stale-state recovery)
-- [ ] Implement `up` flow in `super_turtle/e2b/up.sh`: create/resume sandbox, copy repo, install deps, start remote bot process, persist metadata <- current
-- [ ] Implement lifecycle commands in `super_turtle/e2b/lifecycle.sh`: status/pause/resume/stop using E2B APIs/CLI
+- [x] Implement `up` flow in `super_turtle/e2b/up.sh`: create/resume sandbox, copy repo, install deps, start remote bot process, persist metadata
+- [ ] Implement lifecycle commands in `super_turtle/e2b/lifecycle.sh`: status/pause/resume/stop using E2B APIs/CLI <- current
 - [ ] Implement cron pause/resume policy helper in `super_turtle/e2b/reconcile-cron.sh` against `super_turtle/claude-telegram-bot/cron-jobs.json` (documented behavior for missed windows)
 - [ ] Wire docs updates in `README.md` and `docs/e2b-remote-runbook.md` with exact setup env vars (`E2B_API_KEY`, template info, expected caveats)
 - [ ] Run smoke tests (at least script-level and one end-to-end dry run path), then commit in focused steps
