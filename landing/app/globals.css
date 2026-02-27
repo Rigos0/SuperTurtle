@@ -144,9 +144,9 @@ body {
 
 .turtle-tip-bubble {
   position: absolute;
-  left: 50%;
-  top: -2.2rem;
-  transform: translateX(-50%) translateY(6px) scale(0.96);
+  left: -120px;
+  top: 50%;
+  transform: translateY(-56%) translateX(8px) scale(0.96);
   padding: 0.35rem 0.65rem;
   border-radius: 999px;
   background: #fff;
@@ -159,14 +159,48 @@ body {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity 0.22s ease, transform 0.22s ease;
+  transition: opacity 0.26s ease, transform 0.26s ease, visibility 0.26s ease;
   z-index: 2;
 }
 
 .turtle-tip-bubble.active {
   opacity: 1;
   visibility: visible;
-  transform: translateX(-50%) translateY(0) scale(1);
+  transform: translateY(-56%) translateX(0) scale(1);
+}
+
+.turtle-tip-word {
+  display: inline-block;
+  animation: turtle-tip-word-fade 780ms ease-in-out both;
+}
+
+@keyframes turtle-tip-word-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  20% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  78% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+
+@media (max-width: 640px) {
+  .turtle-tip-bubble {
+    left: -92px;
+    top: 48%;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -186,7 +220,11 @@ body {
   }
 
   .turtle-tip-bubble {
-    transform: translateX(-50%) translateY(0) scale(1);
+    transform: translateY(-56%) translateX(0) scale(1);
+  }
+
+  .turtle-tip-word {
+    animation: none;
   }
 }
 

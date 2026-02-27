@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StickyNav } from '@/components/StickyNav';
 import { SectionDivider } from '@/components/SectionDivider';
 
@@ -85,12 +85,50 @@ const executionFlow = [
 
 export default function Home() {
   const [hasClickedTurtleTip, setHasClickedTurtleTip] = useState(false);
+  const [turtleBubbleStep, setTurtleBubbleStep] = useState(0);
+  const [bubbleHideTimeout, setBubbleHideTimeout] = useState<number | null>(null);
   const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL ?? "/docs";
   const githubUrl = "https://github.com/Rigos0/superturtle";
+  const turtleBubbleWords = ['step', 'by', 'step'];
 
   const handleTurtleClick = () => {
     setHasClickedTurtleTip(true);
+    setTurtleBubbleStep(0);
+
+    if (bubbleHideTimeout !== null) {
+      window.clearTimeout(bubbleHideTimeout);
+    }
+
+    const nextHideTimeout = window.setTimeout(() => {
+      setHasClickedTurtleTip(false);
+      setTurtleBubbleStep(3);
+      setBubbleHideTimeout(null);
+    }, 3500);
+
+    setBubbleHideTimeout(nextHideTimeout);
   };
+
+  useEffect(() => {
+    if (!hasClickedTurtleTip || turtleBubbleStep >= 2) {
+      return;
+    }
+
+    const stepTimeout = window.setTimeout(() => {
+      setTurtleBubbleStep((currentStep) => currentStep + 1);
+    }, 800);
+
+    return () => {
+      window.clearTimeout(stepTimeout);
+    };
+  }, [hasClickedTurtleTip, turtleBubbleStep]);
+
+  useEffect(() => {
+    return () => {
+      if (bubbleHideTimeout !== null) {
+        window.clearTimeout(bubbleHideTimeout);
+      }
+    };
+  }, [bubbleHideTimeout]);
 
   return (
     <div className="landing-root">
@@ -101,7 +139,9 @@ export default function Home() {
             <div className="reveal text-center flex flex-col items-center" style={{ animationDelay: '80ms' }}>
               <div className="mx-auto turtle-sticker-wrap">
                 <div className={`turtle-tip-bubble ${hasClickedTurtleTip ? 'active' : ''}`} aria-hidden={!hasClickedTurtleTip}>
-                  step by step
+                  <span className="turtle-tip-word" key={turtleBubbleStep}>
+                    {turtleBubbleWords[Math.min(turtleBubbleStep, 2)]}
+                  </span>
                 </div>
                 <button
                   type="button"
