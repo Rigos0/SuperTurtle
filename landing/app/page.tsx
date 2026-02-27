@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { StickyNav } from '@/components/StickyNav';
 import { SectionDivider } from '@/components/SectionDivider';
 
@@ -83,8 +84,15 @@ const executionFlow = [
 ];
 
 export default function Home() {
+  const [showTurtleTip, setShowTurtleTip] = useState(false);
   const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL ?? "/docs";
   const githubUrl = "https://github.com/Rigos0/superturtle";
+
+  const handleTurtleClick = () => {
+    setShowTurtleTip(true);
+    window.setTimeout(() => setShowTurtleTip(false), 2200);
+  };
+
   return (
     <div className="landing-root">
       <StickyNav />
@@ -92,8 +100,20 @@ export default function Home() {
         <section id="hero" className="section-shell hero-shell relative">
           <div className="section-container max-w-5xl space-y-10">
             <div className="reveal text-center flex flex-col items-center" style={{ animationDelay: '80ms' }}>
-              <div className="mb-4 mx-auto">
-                <img src="/turtle-logo.png" alt="Super Turtle" width={104} height={104} />
+              <div className="mb-4 mx-auto turtle-sticker-wrap">
+                {showTurtleTip && (
+                  <div className="turtle-tip-bubble" role="status" aria-live="polite">
+                    step by step
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="turtle-sticker-button"
+                  onClick={handleTurtleClick}
+                  aria-label="Show step by step message"
+                >
+                  <img src="/turtle-logo.png" alt="Super Turtle" width={104} height={104} />
+                </button>
               </div>
               <h1 className="headline">
                 Super Turtle

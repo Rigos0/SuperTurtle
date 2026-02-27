@@ -105,6 +105,59 @@ body {
   pointer-events: none;
 }
 
+.turtle-sticker-wrap {
+  position: relative;
+}
+
+.turtle-sticker-button {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  padding: 0.25rem;
+  background: transparent;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  cursor: pointer;
+}
+
+.turtle-sticker-button:hover {
+  transform: translateY(-2px) scale(1.02);
+  border-color: rgba(182, 109, 75, 0.55);
+  box-shadow: 0 10px 24px -16px rgba(182, 109, 75, 0.85);
+}
+
+.turtle-sticker-button:focus-visible {
+  outline: none;
+  border-color: rgba(86, 108, 75, 0.75);
+  box-shadow: 0 0 0 4px rgba(138, 166, 124, 0.2);
+}
+
+.turtle-tip-bubble {
+  position: absolute;
+  left: 50%;
+  top: -2.2rem;
+  transform: translateX(-50%);
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid rgba(86, 108, 75, 0.28);
+  color: var(--text-heading);
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 10px 24px -20px rgba(0, 0, 0, 0.45);
+  animation: turtle-tip-in 0.24s ease;
+}
+
+@keyframes turtle-tip-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
 .pill {
   @apply inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold;
   color: var(--accent-olive);
