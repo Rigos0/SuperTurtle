@@ -1,313 +1,299 @@
- "use client";
+'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { TypedTerminal } from '@/components/TypedTerminal';
+import { StickyNav } from '@/components/StickyNav';
+import { SectionDivider } from '@/components/SectionDivider';
 
-type Direction = "up" | "down" | "left" | "right";
-type Point = { x: number; y: number };
+const terminalLines = [
+  { text: '$ ./ctl spawn api-hardening --type yolo-codex --timeout 2h', isCommand: true },
+  { text: 'Spawning SubTurtle "api-hardening"...', isOutput: true },
+  { text: 'Writing state to .subturtles/api-hardening/CLAUDE.md', isOutput: true },
+  { text: 'Registering autonomous loop: yolo-codex', isOutput: true },
+  { text: '', isOutput: true },
+  { text: 'Started (PID 42891) | timeout: 2h', isOutput: true },
+  { text: 'Cron supervision interval set to 5m', isOutput: true },
+  { text: '', isOutput: true },
+  { text: 'Task execution: Phase 1/4 complete', isOutput: true },
+  { text: 'Task execution: Drafting patch for target module', isOutput: true },
+];
 
-type GameState = {
-  snake: Point[];
-  food: Point;
-  direction: Direction;
-  nextDirection: Direction;
-  score: number;
-  running: boolean;
-  gameOver: boolean;
-};
+const operatingPillars = [
+  {
+    title: 'Launch',
+    description:
+      'Spawn autonomous SubTurtles with isolated workspaces and scoped state so they can act immediately without setup friction.',
+    accent: 'olive',
+  },
+  {
+    title: 'Supervise',
+    description:
+      'Cron-based supervision keeps loops healthy, applies timeouts, and self-repairs stalled workers without your intervention.',
+    accent: 'terracotta',
+  },
+  {
+    title: 'Scale',
+    description:
+      'Coordinate many tasks as a fleet, track each run in its CLAUDE.md log, and keep a clean commit history of every move.',
+    accent: 'sage',
+  },
+];
 
-const GRID_SIZE = 16;
-const TICK_MS = 130;
-const COLORS = {
-  head: "#ff2f2f",
-  headGoggle: "#ffdfe6",
-  headGoggleRing: "#ffe5c9",
-  body: "#ff6a5d",
-  tail: "#c92f25",
-  food: "#ffbe73",
-};
+const workflowSteps = [
+  {
+    title: 'Request',
+    description: 'You send one instruction to Meta Turtle. The task gets decomposed and assigned to SubTurtles.',
+  },
+  {
+    title: 'Deploy',
+    description: 'Agents receive dedicated state files and loop controls, then execute with the loop strategy you chose.',
+  },
+  {
+    title: 'Inspect',
+    description: 'Progress is reported in periodic check-ins with actionable summaries and safe recovery hooks.',
+  },
+  {
+    title: 'Deliver',
+    description: 'Each agent commits outputs autonomously and hands control back only when complete or blocked.',
+  },
+];
 
-function getRandomPoint(): Point {
-  return {
-    x: Math.floor(Math.random() * GRID_SIZE),
-    y: Math.floor(Math.random() * GRID_SIZE),
-  };
-}
-
-function generateFood(snake: Point[]): Point {
-  const occupied = new Set(snake.map((segment) => `${segment.x},${segment.y}`));
-
-  let food = getRandomPoint();
-  while (occupied.has(`${food.x},${food.y}`)) {
-    food = getRandomPoint();
-  }
-  return food;
-}
-
-function initialSnake(): Point[] {
-  return [
-    { x: 7, y: 8 },
-    { x: 6, y: 8 },
-    { x: 5, y: 8 },
-  ];
-}
-
-function initialState(): GameState {
-  const snake = initialSnake();
-  return {
-    snake,
-    food: generateFood(snake),
-    direction: "right",
-    nextDirection: "right",
-    score: 0,
-    running: true,
-    gameOver: false,
-  };
-}
-
-function moveOne(step: Direction, point: Point): Point {
-  switch (step) {
-    case "up":
-      return { ...point, y: point.y - 1 };
-    case "down":
-      return { ...point, y: point.y + 1 };
-    case "left":
-      return { ...point, x: point.x - 1 };
-    case "right":
-      return { ...point, x: point.x + 1 };
-  }
-}
-
-function isOpposite(a: Direction, b: Direction) {
-  return (
-    (a === "up" && b === "down") ||
-    (a === "down" && b === "up") ||
-    (a === "left" && b === "right") ||
-    (a === "right" && b === "left")
-  );
-}
-
-function collide(point: Point, snake: Point[]) {
-  const hitWall = point.x < 0 || point.x >= GRID_SIZE || point.y < 0 || point.y >= GRID_SIZE;
-  const hitSelf = snake.some((segment) => segment.x === point.x && segment.y === point.y);
-  return hitWall || hitSelf;
-}
+const loopModes = [
+  {
+    title: 'slow',
+    cadence: 'Thorough mode',
+    copy: 'Plan → Groom → Execute → Review loop. Best for complex refactors or sensitive changes.',
+    budget: 'Highest quality, highest cost',
+    tone: 'olive',
+  },
+  {
+    title: 'yolo',
+    cadence: 'Direct mode',
+    copy: 'One-shot execution with minimal overhead. Best for quick fixes and simple improvements.',
+    budget: 'Fast, focused',
+    tone: 'terracotta',
+  },
+  {
+    title: 'yolo-codex',
+    cadence: 'Cost-aware mode',
+    copy: 'Cost-optimized Codex path for bulk work and steady, repeatable operations.',
+    budget: 'Balanced speed and budget',
+    tone: 'sage',
+  },
+];
 
 export default function Home() {
-  const [state, setState] = useState<GameState>(() => initialState());
-
-  const head = state.snake[0];
-  const tail = state.snake[state.snake.length - 1];
-  const snakeBody = useMemo(
-    () => new Set(state.snake.map((segment) => `${segment.x},${segment.y}`)),
-    [state.snake],
-  );
-
-  useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => {
-      const directionMap: Record<string, Direction> = {
-        ArrowUp: "up",
-        ArrowDown: "down",
-        ArrowLeft: "left",
-        ArrowRight: "right",
-        w: "up",
-        W: "up",
-        s: "down",
-        S: "down",
-        a: "left",
-        A: "left",
-        d: "right",
-        D: "right",
-      };
-
-      const direction = directionMap[event.key];
-      if (!direction) return;
-
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
-        event.preventDefault();
-      }
-
-      setState((prev) => {
-        if (prev.gameOver) return prev;
-        if (isOpposite(prev.direction, direction)) return prev;
-        return { ...prev, nextDirection: direction };
-      });
-    };
-
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, []);
-
-  useEffect(() => {
-    if (!state.running || state.gameOver) return;
-    const interval = window.setInterval(() => {
-      setState((prev) => {
-        if (!prev.running || prev.gameOver) return prev;
-
-        const direction = prev.nextDirection;
-        const nextHead = moveOne(direction, prev.snake[0]);
-
-        if (collide(nextHead, prev.snake)) {
-          return { ...prev, running: false, gameOver: true };
-        }
-
-        const eatsFood = nextHead.x === prev.food.x && nextHead.y === prev.food.y;
-        const nextSnake = [nextHead, ...prev.snake];
-        if (!eatsFood) {
-          nextSnake.pop();
-        }
-
-        return {
-          ...prev,
-          snake: nextSnake,
-          food: eatsFood ? generateFood(nextSnake) : prev.food,
-          direction,
-          score: prev.score + (eatsFood ? 1 : 0),
-        };
-      });
-    }, TICK_MS);
-
-    return () => window.clearInterval(interval);
-  }, [state.running, state.gameOver]);
-
-  const toggleRun = () => {
-    setState((prev) => {
-      if (prev.gameOver) {
-        return initialState();
-      }
-
-      return { ...prev, running: !prev.running };
-    });
-  };
-
-  const statusText = state.gameOver ? "Restart" : state.running ? "Stop" : "Resume";
-
   return (
-    <main className="meetup-page">
-      <div className="background-grid" aria-hidden="true" />
+    <div className="landing-root">
+      <StickyNav />
+      <main>
+        <section id="hero" className="section-shell hero-shell relative">
+          <div className="section-container grid gap-10 xl:gap-16 items-start xl:items-center xl:grid-cols-[1.05fr_0.95fr]">
+            <div className="reveal" style={{ animationDelay: '80ms' }}>
+              <p className="pill">Super Turtle System</p>
+              <h1 className="headline mt-4">
+                Build in silence, ship in waves
+              </h1>
+              <p className="lead max-w-2xl">
+                Super Turtle orchestrates autonomous SubTurtles to execute multi-step work with
+                structured supervision and audit-ready commits.
+              </p>
 
-      <section className="hero-card">
-        <p className="eyebrow">Epify Puzlo</p>
-        <h1>Snake Sprint</h1>
-        <div className="hero-badge-row">
-          <span className="hero-badge">Red-forward</span>
-          <span className="hero-badge hero-badge--soft">Score only</span>
-        </div>
+              <ul className="mt-8 space-y-2 text-sm">
+                <li className="feature-chip"><span className="feature-dot" /> No babysitting loops</li>
+                <li className="feature-chip"><span className="feature-dot" /> Self-healing check-ins and restarts</li>
+                <li className="feature-chip"><span className="feature-dot" /> CLI-first control with clear progress signals</li>
+              </ul>
 
-        <p className="status-row" style={{ color: "#ffdfd9", marginTop: "0.9rem", marginBottom: "0.9rem", justifyContent: "space-between" }}>
-          <span style={{ fontSize: "1.2rem", fontWeight: 700 }}>Score: {state.score}</span>
-          <button
-            type="button"
-            onClick={toggleRun}
-            className="cta-secondary"
-            style={{ padding: "0.55rem 0.9rem", fontWeight: 800 }}
-          >
-            {statusText}
-          </button>
-        </p>
-
-        <div
-          aria-label="Snake game board"
-          className="panel"
-          style={{
-            marginTop: "0.9rem",
-            display: "grid",
-            gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`,
-            gap: "3px",
-            padding: "0.7rem",
-            backgroundColor: "rgba(22, 8, 12, 0.84)",
-            borderColor: "rgba(255, 132, 116, 0.45)",
-            maxWidth: "min(92vw, 420px)",
-            marginLeft: "auto",
-            marginRight: "auto",
-          }}
-        >
-          {Array.from({ length: GRID_SIZE * GRID_SIZE }).map((_, index) => {
-            const x = index % GRID_SIZE;
-            const y = Math.floor(index / GRID_SIZE);
-            const isFood = state.food.x === x && state.food.y === y;
-            const isHead = head.x === x && head.y === y;
-            const isTail = tail.x === x && tail.y === y && !isHead;
-            const isBody = snakeBody.has(`${x},${y}`);
-
-            const cellClass = isHead
-              ? "snake-head"
-              : isTail
-                ? "snake-tail"
-                : isBody
-                  ? "snake-body"
-                  : "snake-empty";
-
-            return (
-              <div
-                key={`${x}-${y}`}
-                className={cellClass}
-                style={{
-                  aspectRatio: "1 / 1",
-                  borderRadius: isHead || isTail || isBody ? "0.4rem" : "0.2rem",
-                  position: "relative",
-                  backgroundColor: isHead
-                    ? COLORS.head
-                    : isTail
-                      ? COLORS.tail
-                      : isBody
-                        ? COLORS.body
-                        : isFood
-                          ? COLORS.food
-                          : "rgba(24, 10, 14, 0.9)",
-                  boxShadow: isHead || isBody || isTail
-                    ? "inset 0 -3px 0 rgba(0,0,0,0.24)"
-                    : isFood
-                      ? "0 0 0 1px rgba(255, 190, 115, 0.46) inset"
-                      : "none",
-                }}
-              >
-                {isHead && (
-                  <>
-                    <span
-                      style={{
-                        position: "absolute",
-                        width: "0.34rem",
-                        height: "0.34rem",
-                        borderRadius: "9999px",
-                        left: "0.3rem",
-                        top: "0.33rem",
-                        background: COLORS.headGoggleRing,
-                        boxShadow: `inset 0 0 0 2px ${COLORS.headGoggle}`,
-                      }}
-                      aria-hidden="true"
-                    />
-                    <span
-                      style={{
-                        position: "absolute",
-                        width: "0.34rem",
-                        height: "0.34rem",
-                        borderRadius: "9999px",
-                        right: "0.3rem",
-                        top: "0.33rem",
-                        background: COLORS.headGoggleRing,
-                        boxShadow: `inset 0 0 0 2px ${COLORS.headGoggle}`,
-                      }}
-                      aria-hidden="true"
-                    />
-                  </>
-                )}
-                {isFood && !isBody && !isHead && !isTail && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      inset: "28%",
-                      borderRadius: "9999px",
-                      background: "#ffebd8",
-                      boxShadow: "0 0 8px rgba(255, 190, 115, 0.65)",
-                    }}
-                    aria-hidden="true"
-                  />
-                  )}
+              <div className="mt-8 flex flex-wrap gap-3">
+                <a
+                  href="https://github.com/anthropics/super-turtle"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-primary"
+                >
+                  Open on GitHub
+                </a>
+                <a href="#loop-types" className="btn-ghost">
+                  Explore loop types
+                </a>
               </div>
-            );
-          })}
+            </div>
+
+            <div className="reveal" style={{ animationDelay: '220ms' }}>
+              <div className="control-dash">
+                <div className="control-dash-head">
+                  <span>Autonomy command console</span>
+                </div>
+                <div className="p-2 sm:p-3">
+                  <TypedTerminal lines={terminalLines} speed={20} />
+                </div>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-3 text-xs md:text-sm">
+                <span className="metric-pill">24/7 supervision</span>
+                <span className="metric-pill">3 loop strategies</span>
+                <span className="metric-pill">Commit-per-sprint</span>
+              </div>
+            </div>
+          </div>
+          <div className="hero-glow" />
+        </section>
+
+        <SectionDivider />
+
+        <section id="what-it-does" className="section-shell alt-shell">
+          <div className="section-container">
+            <div className="section-head reveal">
+              <p className="eyebrow">What it is</p>
+              <h2>The autonomous operating model</h2>
+              <p>
+                A single message turns into a coordinated set of autonomous workers. Super Turtle keeps execution
+                visible, recoverable, and tuned for cost.
+              </p>
+            </div>
+
+            <div className="mt-10 grid gap-4 sm:gap-6 lg:gap-8 sm:grid-cols-2 xl:grid-cols-3">
+              {operatingPillars.map((pillar, index) => (
+                <article
+                  className={`reveal deck-card ${index === 0 ? 'olive' : index === 1 ? 'terracotta' : 'sage'}`}
+                  key={pillar.title}
+                  style={{ animationDelay: `${320 + index * 120}ms` }}
+                >
+                  <div className="deck-mark" />
+                  <h3>{pillar.title}</h3>
+                  <p>{pillar.description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <SectionDivider />
+
+        <section id="how-it-works" className="section-shell">
+          <div className="section-container">
+            <div className="section-head reveal">
+              <p className="eyebrow">How it works</p>
+              <h2>From message to merged result</h2>
+              <p>A dependable cycle that keeps noisy work from becoming noisy coordination.</p>
+            </div>
+
+            <div className="mt-10 grid gap-4 lg:grid-cols-[1fr_1fr] lg:items-start">
+              <div className="space-y-4">
+                {workflowSteps.map((step, index) => (
+                  <div
+                    className="reveal flow-step"
+                    key={step.title}
+                    style={{ animationDelay: `${200 + index * 110}ms` }}
+                  >
+                    <div className="flow-step-index">0{index + 1}</div>
+                    <div>
+                      <h3>{step.title}</h3>
+                      <p>{step.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <article className="reveal control-pane" style={{ animationDelay: '560ms' }}>
+                <h3>What you gain by default</h3>
+                <ul className="space-y-3 text-sm">
+                  <li className="check-row">
+                    <span className="check-dot" /> Safe checkpointing between loop phases
+                  </li>
+                  <li className="check-row">
+                    <span className="check-dot" /> Automatic logs + resumable progress in one place
+                  </li>
+                  <li className="check-row">
+                    <span className="check-dot" /> Clean commit flow with auditable state artifacts
+                  </li>
+                  <li className="check-row">
+                    <span className="check-dot" /> Explicit exits when tasks finish or need human input
+                  </li>
+                </ul>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <SectionDivider />
+
+        <section id="loop-types" className="section-shell alt-shell">
+          <div className="section-container">
+            <div className="section-head reveal">
+              <p className="eyebrow">Loop configuration</p>
+              <h2>Choose the execution profile</h2>
+              <p>Shift quality, speed, and cost from one command.</p>
+            </div>
+
+            <div className="mt-10 grid gap-4 lg:gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              {loopModes.map((mode, index) => (
+                <article
+                  className={`reveal mode-card ${mode.tone}`}
+                  key={mode.title}
+                  style={{ animationDelay: `${260 + index * 130}ms` }}
+                >
+                  <div className="mode-head">
+                    <h3 className="text-xl">--type {mode.title}</h3>
+                    <p>{mode.cadence}</p>
+                  </div>
+                  <p>{mode.copy}</p>
+                  <p className="muted-label">{mode.budget}</p>
+                  <div className="mode-strip" />
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <SectionDivider />
+
+        <section id="getting-started" className="section-shell">
+          <div className="section-container">
+            <div className="section-head reveal">
+              <p className="eyebrow">Quick start</p>
+              <h2>Get your first SubTurtle running</h2>
+              <p>Four steps, one predictable path.</p>
+            </div>
+
+            <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                'git clone https://github.com/anthropics/super-turtle',
+                'cd super-turtle',
+                './super_turtle/subturtle/ctl spawn my-task --type yolo-codex --timeout 1h',
+                'tail -f .subturtles/my-task/subturtle.log',
+              ].map((command, index) => (
+                <div className="reveal step-card" key={command} style={{ animationDelay: `${280 + index * 100}ms` }}>
+                  <div className="step-label">Step {index + 1}</div>
+                  <div className="step-code">{command}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 reveal" style={{ animationDelay: '700ms' }}>
+              <p className="text-sm text-[var(--text-muted)] text-center">Ready for autonomy without the noise?</p>
+              <div className="mt-4 text-center">
+                <a href="#hero" className="btn-primary">
+                  Try Super Turtle now
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="relative section-shell footer-shell">
+        <div className="section-container text-center">
+          <p className="text-sm text-[var(--text-muted)]">
+            © {new Date().getFullYear()} Super Turtle • Built for autonomous coordination, open-source, MIT
+          </p>
+          <nav className="mt-4 flex items-center justify-center gap-6 text-sm">
+            <a href="#hero">Home</a>
+            <a href="#what-it-does">Features</a>
+            <a href="#how-it-works">How it works</a>
+            <a href="#getting-started">Get started</a>
+          </nav>
         </div>
-      </section>
-    </main>
+      </footer>
+    </div>
   );
 }
