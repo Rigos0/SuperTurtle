@@ -11,21 +11,21 @@ const chatMessages = [
 
 const pillars = [
   {
-    title: 'Your subscription, not API tokens',
+    title: 'Use the seats you already pay for',
     description:
-      'Wraps Claude Code or Codex — whichever you have. No API keys, no per-token billing, no surprise invoices.',
+      'Connect your existing Claude Code or Codex subscription. No API token setup and no token-meter billing.',
     accent: 'olive',
   },
   {
-    title: 'Claude or Codex, one interface',
+    title: 'Provider-agnostic from day one',
     description:
-      'Works with either provider. Switch between Claude Code (deep reasoning) and Codex (fast, cheap) per task, or let the system pick based on quota and complexity.',
+      'Run Claude or Codex through one interface. Super Turtle picks the right one per task based on complexity and quota.',
     accent: 'terracotta',
   },
   {
-    title: 'Quiet unless there is news',
+    title: 'Milestones, not noise',
     description:
-      'No progress spam. You get milestones, completions, and errors. Silence means everything is working.',
+      'You get meaningful updates only: milestone reached, blocker found, or work complete. Silence means it is still running.',
     accent: 'sage',
   },
 ];
