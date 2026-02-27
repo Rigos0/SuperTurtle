@@ -23,6 +23,7 @@ import {
 } from "./commands";
 
 const SAFE_CALLBACK_ID = /^[A-Za-z0-9_-]+$/;
+const SAFE_CALLBACK_OPTION_INDEX = /^\d+$/;
 
 function isSafeCallbackId(value: string): boolean {
   return SAFE_CALLBACK_ID.test(value);
@@ -221,11 +222,16 @@ export async function handleCallback(ctx: Context): Promise<void> {
   }
 
   const requestId = parts[1]!;
-  const optionIndex = parseInt(parts[2]!, 10);
+  const optionIndexRaw = parts[2]!;
   if (!isSafeCallbackId(requestId)) {
     await ctx.answerCallbackQuery({ text: "Invalid request ID" });
     return;
   }
+  if (!SAFE_CALLBACK_OPTION_INDEX.test(optionIndexRaw)) {
+    await ctx.answerCallbackQuery({ text: "Invalid option" });
+    return;
+  }
+  const optionIndex = Number.parseInt(optionIndexRaw, 10);
 
   // 9. Load request file
   const requestFile = `/tmp/ask-user-${requestId}.json`;
