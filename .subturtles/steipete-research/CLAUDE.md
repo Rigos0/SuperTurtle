@@ -1,6 +1,6 @@
 # Current Task
 
-Review OpenClaw's skills/ClawHub system vs our skills loader: compare architecture and identify any patterns we should adopt.
+Check VibeTunnel architecture vs our cloudflared approach: evaluate if their tunnel abstraction is superior.
 
 # End Goal with Specs
 
@@ -82,8 +82,8 @@ Produce a comprehensive research document at `docs/steipete-research.md` that:
 - [x] Deep-dive mcporter: evaluate if we should use it for MCP tool management
 - [x] Review agent-scripts repo: identify scripts we should adopt/port
 - [x] Evaluate Poltergeist for our dev server / file watching needs
-- [ ] Review OpenClaw's skills/ClawHub system vs our skills loader <- current
-- [ ] Check VibeTunnel architecture vs our cloudflared approach
+- [x] Review OpenClaw's skills/ClawHub system vs our skills loader
+- [ ] Check VibeTunnel architecture vs our cloudflared approach <- current
 - [ ] Look at OpenClaw's Telegram integration specifically
 - [ ] Write final research document to docs/steipete-research.md with recommendations
 - [ ] Commit the research document

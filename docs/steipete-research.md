@@ -1326,6 +1326,405 @@ agent-scripts is fundamentally about **encoding guardrails as code** rather than
 
 ---
 
+## Deep Dive: OpenClaw's Skills/ClawHub System vs. Our Custom Skills Loader
+
+**Date**: 2026-02-27
+**Focus**: Comparing OpenClaw's sophisticated skills architecture with our Claude Code native skills approach
+
+### 1. Skill Definition & File Format
+
+#### OpenClaw: SKILL.md with YAML Frontmatter
+
+Each OpenClaw skill is a directory containing:
+- **SKILL.md** — Markdown file with YAML frontmatter metadata
+- Supporting files (docs, examples, scripts, etc. — max 50MB total)
+- `.clawhubignore` — Patterns excluded from registry publish
+- `.gitignore` — Also honored during publish
+
+**YAML Metadata Structure** (at top of SKILL.md):
+
+```yaml
+---
+name: frontend-design
+description: Create distinctive, production-grade frontend interfaces
+version: 1.0.0
+homepage: https://example.com
+license: MIT
+user-invocable: true
+disable-model-invocation: false
+metadata: {
+  "openclaw": {
+    "emoji": "🎨",
+    "requires": {
+      "bins": ["npm", "node"],
+      "env": ["API_KEY"],
+      "anyBins": ["node", "bun"],
+      "config": ["browser.enabled"]
+    },
+    "os": ["darwin", "linux"],
+    "primaryEnv": "API_KEY",
+    "install": [{
+      "kind": "node",
+      "package": "typescript",
+      "bins": ["tsc"]
+    }]
+  }
+}
+---
+## Skill Instructions (Markdown content below)
+...
+```
+
+#### Our System: Claude Code Native Skills
+
+Our skills leverage Claude Code's **native skill system**:
+- Each skill is a folder with `SKILL.md` (Claude's standard format)
+- Skills live in `~/.claude/skills/` (system-wide) or `super_turtle/skills/` (project-specific)
+- Loaded automatically by Claude Code at session start
+- No custom metadata structure — relies on Claude Code's SKILL.md parser
+
+**Current Limitations**:
+- No structured gating system (no `requires`, `os`, `primaryEnv` fields)
+- No semantic versioning control
+- No registry or discovery mechanism
+- No environment variable injection metadata
+- All skills treated equally — no priority or conditional loading
+
+### 2. Three-Tier Loading Hierarchy
+
+#### OpenClaw Model
+
+Skills are loaded with explicit priority:
+
+1. **Workspace Skills** (`<workspace>/skills/`) — Highest priority
+   - Per-agent customizations
+   - Overrides managed and bundled skills
+
+2. **Managed Skills** (`~/.openclaw/skills/`) — Medium priority
+   - User-installed via ClawHub
+   - Shared across all agents
+
+3. **Bundled Skills** — Lowest priority
+   - Shipped with OpenClaw
+   - Fallback defaults
+
+**Conflict Resolution**: If same skill name in multiple tiers, workspace > managed > bundled
+
+#### Our System: Implicit Single-Tier
+
+- Skills are searched in `~/.claude/skills/` (system)
+- Project-specific skills can be symlinked or copied
+- No explicit loading hierarchy
+- No conflict resolution strategy (first-found wins)
+
+### 3. Skill Gating & Dependency Management
+
+#### OpenClaw: Comprehensive Gating System
+
+Skills are filtered at session startup based on **metadata.openclaw.requires**:
+
+```json
+{
+  "requires": {
+    "bins": ["python3", "uv"],      // ALL must exist
+    "env": ["API_KEY"],              // ALL must exist or be configured
+    "anyBins": ["node", "bun"],      // At least ONE must exist
+    "config": ["browser.enabled"]    // Config flags must be truthy
+  },
+  "os": ["darwin", "linux"],         // Platform allowlist
+  "always": false                    // Override gating (force inclusion)
+}
+```
+
+**Filtering Behavior**:
+- Missing binary → skill hidden from prompt and slash commands
+- Missing env var → skill hidden unless injected in config
+- Wrong OS → skill hidden on that platform
+- `always: true` → skill included regardless of gates
+
+#### Our System: No Gating
+
+- All skills loaded regardless of availability
+- No binary/env/OS checks
+- If skill requires unavailable tools, it must gracefully degrade or fail at runtime
+- No metadata to declare dependencies
+
+**Risk**: Agents may receive unavailable skills in prompt, leading to ineffective suggestions
+
+### 4. Visibility Control: User-Invocable vs Model-Invocation
+
+#### OpenClaw Model
+
+Two independent boolean flags:
+
+- **`user-invocable` (default: true)** — Controls slash command menu visibility
+  - When false: skill hidden from UI but model can still invoke it
+  - Use case: Hide non-essential skills from user menu
+
+- **`disable-model-invocation` (default: false)** — Controls prompt inclusion
+  - When true: skill excluded from model context
+  - Use case: Make sensitive/expensive skills user-only
+
+#### Our System: No Visibility Control
+
+- All skills available to models and users equally
+- No way to hide sensitive/expensive skills from model
+- No way to make internal helper skills invisible to users
+
+### 5. Context Cost & Prompt Injection
+
+#### OpenClaw Strategy
+
+Skills are included in prompt as compact XML:
+
+```
+Available skills:
+<skill name="frontend-design" emoji="🎨" desc="..." path="./skills/..." />
+<skill name="sag" emoji="🗣️" desc="..." path="./skills/..." />
+```
+
+**Token Budget**:
+- Base overhead: ~195 characters when ≥1 skill present (~5 tokens)
+- Per skill: ~97 characters + name/desc length (~24 tokens per skill)
+- Just-in-time loading: Full instructions only loaded when model explicitly requests
+
+**Our System**: Likely similar cost but depends on Claude Code's implementation
+
+#### Security Concern (Both Systems)
+
+OpenClaw research highlighted **prompt injection vulnerabilities**:
+- Skills with HTML comments: `<!-- malicious code -->`
+- External content (web searches, emails) can trigger injection
+- Source review needed — rendered output may hide attack vectors
+
+**Recommendation**: Both systems should validate skill content before injection
+
+### 6. Environment Variable Injection
+
+#### OpenClaw: Structured Injection
+
+OpenClaw config allows per-skill environment variable setup:
+
+```json
+{
+  "skills": {
+    "entries": {
+      "sag": {
+        "enabled": true,
+        "apiKey": {
+          "source": "env",
+          "provider": "default",
+          "id": "ELEVENLABS_API_KEY"
+        },
+        "env": {
+          "ELEVENLABS_API_KEY": "sk-...",
+          "CUSTOM_SETTING": "value"
+        }
+      }
+    }
+  }
+}
+```
+
+**Key Feature**: Environment variables are **scoped to agent run only** — not global shell modification
+
+#### Our System: Manual Management
+
+- Skills access environment via `process.env` or Python `os.environ`
+- No centralized configuration mechanism
+- Agent must handle missing env vars gracefully
+- No "per-skill env injection" concept
+
+### 7. Skill Versioning & Dependencies
+
+#### OpenClaw: Semantic Versioning + Registry
+
+- Each skill publishes with semantic version: `1.0.0`, `2.1.3-alpha`, etc.
+- Version ranges supported: `@latest`, `@^2.0.0`, `@1.2.3`
+- Dependencies can be declared (RFC in progress):
+
+```yaml
+requires:
+  skills:
+    - video-frames
+    - "sag@^2.0"           # version constraint
+optionalSkills:
+  - memory-persistent
+provides:
+  - tts
+  - narrative-summary
+extends: base-summarizer   # single inheritance
+mixins:
+  - shell-security         # composable instructions
+```
+
+**Dependency Resolution**:
+- Topological sort for proper ordering
+- Cycle detection
+- Depth caps to prevent explosion
+
+#### Our System: No Versioning
+
+- Skills are whatever's in the directory
+- No version tracking or compatibility constraints
+- No way to depend on specific versions of other skills
+- No version upgrade mechanism
+
+### 8. ClawHub Registry vs. No Registry
+
+#### OpenClaw: ClawHub Ecosystem
+
+ClawHub is a **Convex-backed registry** with:
+
+**Technology**:
+- Frontend: TanStack Start (React + Vite/Nitro)
+- Backend: Convex database + file storage
+- Search: OpenAI embeddings + vector search
+- Auth: GitHub OAuth
+
+**Capabilities**:
+- **Discovery**: Vector semantic search (not just keyword)
+- **Publishing**: `clawhub publish` validates metadata and publishes new versions
+- **Installation**: `clawhub install <skill>` downloads and installs
+- **Updates**: `clawhub update --all` syncs to latest versions
+- **Community**: Stars, downloads, comments, user reviews
+- **Security**: GitHub account age gate, community reporting, moderation queue
+
+**CLI Commands**:
+```bash
+clawhub search "postgres backups"
+clawhub install my-skill
+clawhub install my-skill@1.2.3
+clawhub update my-skill
+clawhub publish
+clawhub list --installed
+```
+
+#### Our System: No Registry
+
+- Skills must be manually shared via Git
+- No discovery mechanism
+- No version management
+- No centralized repository
+- Agents must know skill names explicitly
+
+### 9. Skills vs MCP Tools: Key Distinction
+
+#### OpenClaw Model
+
+| Aspect | Skills | MCP Tools |
+|--------|--------|-----------|
+| **Format** | Markdown + YAML frontmatter | JSON-RPC protocol schema |
+| **Loading** | Runtime at session start | External process (stdio/HTTP) |
+| **Integration** | Deep — metadata, versioning, env | Shallow — standard interface |
+| **Portability** | OpenClaw-specific | Multi-host (Claude, ChatGPT, VS Code) |
+| **Context Cost** | ~24 tokens per skill | ~8,000+ tokens per request |
+| **Purpose** | Knowledge/instructions | External capabilities/services |
+| **Relationship** | Skills give knowledge, MCP tools give real-world access |
+
+#### Our System
+
+- We use Claude Code's native skills (knowledge-based)
+- We use Claude Agent SDK's MCP integration (capability-based)
+- No explicit distinction in metadata or loading strategy
+
+### 10. Comparative Analysis Table
+
+| Feature | OpenClaw Skills | Our Claude Code Skills |
+|---------|---|---|
+| **File Format** | SKILL.md + YAML frontmatter | SKILL.md (Claude's format) |
+| **Metadata Structure** | `metadata.openclaw` JSON | None — implicit in content |
+| **Gating System** | `requires.bins`, `env`, `os` | None |
+| **Loading Hierarchy** | 3-tier (workspace → managed → bundled) | Single-tier (system + project) |
+| **Environment Injection** | Structured per-skill config | Manual in skill content |
+| **Versioning** | Semantic versions + ranges | None |
+| **Registry** | ClawHub with vector search | None |
+| **Dependency System** | RFC-proposed with topological sort | None |
+| **Visibility Control** | `user-invocable`, `disable-model-invocation` | None |
+| **Context Cost** | ~24 tokens per skill | Depends on Claude Code |
+| **CLI Management** | `clawhub` commands | Manual directory management |
+| **Publishing** | One-command publish to registry | Manual Git sharing |
+| **Discovery** | Semantic search in registry | Manual by name |
+| **Updates** | `clawhub update --all` | Manual Git pull |
+
+### 11. Recommendations for Agentic System
+
+#### What OpenClaw Does Better
+
+1. **Structured Gating** — Declare dependencies upfront, not discovered at runtime
+2. **Environment Isolation** — Per-skill env injection, scoped to agent run
+3. **Version Management** — Semantic versioning prevents unexpected behavior changes
+4. **Registry & Discovery** — Vector search beats manual skill name knowledge
+5. **Dependency Composition** — Skills can depend on other skills cleanly
+
+#### What Our System Does Better
+
+1. **Simplicity** — Claude Code's native system requires zero custom infrastructure
+2. **Cost Efficiency** — No external registry/discovery overhead
+3. **Language Flexibility** — Not locked to OpenClaw's runtime
+4. **Minimal Metadata** — Markdown-native, no JSON parsing needed
+
+#### Adoption Path (Priority Order)
+
+**Phase 1: Immediate (1 week)**
+1. ✅ Document skill format expectations in `super_turtle/skills/README.md`
+2. ✅ Add metadata section to SKILL.md template (optional fields)
+3. ✅ Create `super_turtle/skills/GATING.md` documenting expected binary/env dependencies
+
+**Phase 2: Short-term (2-4 weeks)**
+1. Build simple local skill registry (JSON file listing available skills with descriptions)
+2. Add gating validation to agent startup (check bins/env before loading)
+3. Implement environment injection mechanism (per-skill config in CLAUDE.md)
+
+**Phase 3: Medium-term (Q2 2026)**
+1. Evaluate OpenClaw's ClawHub approach — consider building lightweight registry if portfolio grows
+2. Add semantic versioning to skills (track version in SKILL.md)
+3. Implement skill dependency declarations (optional `requires-skills` field)
+
+**Phase 4: Long-term**
+1. Full ClawHub-style registry if skills become critical asset
+2. Cross-agent skill sharing via registry
+3. Community-driven skill marketplace
+
+#### Risks of NOT Adopting
+
+- **Skill Bloat**: Agents receive unavailable skills in prompt, wastes context
+- **Failed Invocations**: Agents attempt to use skills missing binary/env dependency
+- **No Discovery**: New team members/agents don't know what skills exist
+- **Version Conflicts**: Updates to skills can break downstream agents unexpectedly
+
+#### Minimal Viable Implementation
+
+For immediate use without full ClawHub:
+
+```yaml
+# SKILL.md Frontmatter (Proposed Template)
+---
+name: skill-name
+description: What this skill does
+version: 1.0.0
+# GATING (optional, document expected availability)
+requires:
+  bins: [python3, ffmpeg]
+  env: [API_KEY]
+  os: [darwin, linux]
+---
+```
+
+Then document in `super_turtle/skills/README.md` how agents should check for availability before using.
+
+### 12. Key Takeaway
+
+OpenClaw's skills system is **production-grade infrastructure** for skill management at scale. Our Claude Code approach is **pragmatically sufficient** for current scope. The 80/20 adoption point:
+
+1. **Add structured metadata to SKILL.md** (one-time 30-min effort per skill)
+2. **Document gating requirements** (prevents agent failures)
+3. **Implement local registry** (enables skill discovery)
+
+This gives us **80% of OpenClaw's benefits with 20% of the complexity**, fitting our philosophy of pragmatic autonomy.
+
+---
+
 ## Summary: Key Takeaways
 
 **steipete is to "agent tooling" what Django is to web frameworks** — a pragmatic, opinionated collection of utilities that solve real problems agents face. His work is characterized by:
