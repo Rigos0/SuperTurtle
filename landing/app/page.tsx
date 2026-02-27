@@ -111,6 +111,9 @@ export default function Home() {
                 >
                   GitHub
                 </a>
+                <a href="/docs" className="btn-ghost">
+                  Docs
+                </a>
                 <a href="#how-it-works" className="btn-ghost">
                   How it works
                 </a>

@@ -1,5 +1,5 @@
 ## Current Task
-Add Docs link/button on landing page next to GitHub button (landing/app/page.tsx + any needed styles in landing/app/globals.css).
+Update root README.md with matching Setup section and docs link; remove/adjust any non-clone-compatible claims.
 
 ## End Goal with Specs
 - Documentation site in /docs using a standard free framework (prefer VitePress unless existing system is already set up).
@@ -12,8 +12,8 @@ Add Docs link/button on landing page next to GitHub button (landing/app/page.tsx
 ## Backlog
 - [x] Inspect docs/ and super_turtle/claude-telegram-bot/README.md for current setup guidance + any video link (search for "video", "loom", "youtube").
 - [x] Initialize docs site under docs/ (VitePress) or extend existing system; create docs index page with Overview + Setup + Run sections.
-- [ ] Add Docs link/button on landing page next to GitHub button (landing/app/page.tsx + any needed styles in landing/app/globals.css). <- current
-- [ ] Update root README.md with matching Setup section and docs link; remove/adjust any non-clone-compatible claims.
+- [x] Add Docs link/button on landing page next to GitHub button (landing/app/page.tsx + any needed styles in landing/app/globals.css).
+- [ ] Update root README.md with matching Setup section and docs link; remove/adjust any non-clone-compatible claims. <- current
 - [ ] Commit.
 
 ## Notes
