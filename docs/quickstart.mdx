@@ -5,29 +5,19 @@ description: Get Super Turtle running in 5 minutes
 
 # Quickstart
 
-Set up Super Turtle and start coding from Telegram. The setup is AI-guided — you provide secrets, the system does the rest.
+Set up Super Turtle and start coding from Telegram. The setup is AI-guided: you provide credentials and the system handles install and configuration.
 
 ## Prerequisites
 
-Before starting, ensure you have:
+Before you start:
 
-- **Git** — to clone the repo
-- **Bun 1.0+** — [Install Bun](https://bun.sh/) (lightweight JavaScript runtime)
-- **Claude Code or Codex CLI** — Either is fine; the system auto-detects
-  - Claude Code: [Install from claude.com](https://claude.com/download)
-  - Codex: [Install from codeium.com](https://www.codeium.com/download)
-- **Telegram bot token** — Created via [@BotFather](https://t.me/BotFather)
-- **Your Telegram user ID** — Available from [@userinfobot](https://t.me/userinfobot)
-- **OpenAI API key** (optional) — Only needed if you want voice transcription
+- `bun` installed ([bun.sh](https://bun.sh/))
+- Claude Code or Codex CLI installed and authenticated
+- A Telegram bot token from [@BotFather](https://t.me/BotFather)
+- Your Telegram user ID (used for `TELEGRAM_ALLOWED_USERS`)
+- Optional `OPENAI_API_KEY` if you want voice transcription
 
-<Tip>
-Don't have a Telegram bot token yet? Create one now in 30 seconds:
-1. Open [@BotFather](https://t.me/BotFather) on Telegram
-2. Send `/newbot` and follow the prompts
-3. Save the token (looks like `123456:ABCdefGHIjklmnoPQRstuvWXYZ`)
-</Tip>
-
-## Setup Steps
+## Setup
 
 <Steps>
   <Step title="Clone the repository">
@@ -39,44 +29,25 @@ Don't have a Telegram bot token yet? Create one now in 30 seconds:
 
   <Step title="Open Claude Code or Codex at repo root">
     ```bash
-    # Open Claude Code
     claude
 
-    # OR open Codex
+    # or
     codex
     ```
-
-    You should see the repo root in your editor, with `CLAUDE.md` and `AGENTS.md` visible in the file tree.
   </Step>
 
   <Step title="Say the setup prompt">
-    In the chat, send:
+    In Claude Code or Codex, send:
     ```
     Set up Super Turtle on this machine.
     ```
-
-    Claude will guide you through the setup wizard.
   </Step>
 
-  <Step title="Provide your credentials">
-    When Claude asks, provide:
-    - `TELEGRAM_BOT_TOKEN` — From [@BotFather](https://t.me/BotFather)
-    - `TELEGRAM_ALLOWED_USERS` — Your Telegram user ID (find it via [@userinfobot](https://t.me/userinfobot))
-    - `OPENAI_API_KEY` (optional) — Only if you want voice transcription
-
-    <Note>
-    The setup wizard will NOT ask for these in the chat. Instead, it will run a terminal command that opens a setup dialog where you enter them securely.
-    </Note>
-  </Step>
-
-  <Step title="Wait for setup to complete">
-    The setup wizard will:
-    - Install dependencies (via Bun)
-    - Create `.env` file with your credentials
-    - Configure the bot's default driver (Claude Code or Codex)
-    - Register cron jobs for supervision
-
-    This takes 1-2 minutes. Let it finish without interrupting.
+  <Step title="Provide required values">
+    Share the values requested by the setup wizard:
+    - `TELEGRAM_BOT_TOKEN`
+    - `TELEGRAM_ALLOWED_USERS`
+    - Optional `OPENAI_API_KEY`
   </Step>
 
   <Step title="Start the Telegram bot">
@@ -84,57 +55,29 @@ Don't have a Telegram bot token yet? Create one now in 30 seconds:
     cd super_turtle/claude-telegram-bot
     bun run start
     ```
-
-    You should see output like:
-    ```
-    ✓ Bot started
-    ✓ Listening for messages
-    ```
-
-    The bot is now running. You can minimize this terminal — it will keep running in the background via `tmux`.
   </Step>
 
   <Step title="Message your bot on Telegram">
-    Open Telegram, find your bot (you named it in step 1 with BotFather), and send a message:
+    Open Telegram, find your bot, and send:
     ```
     /start
     ```
-
-    You should see your user ID and bot status. If that works, try:
-    ```
-    Build me a simple HTML landing page.
-    ```
-
-    Watch as the system decomposes the task, spawns workers, and delivers results.
   </Step>
 </Steps>
 
-## Bot Commands
+<Info>
+The setup flow writes `super_turtle/claude-telegram-bot/.env`, installs dependencies, and sets the default driver automatically.
+</Info>
 
-Once the bot is running, these commands are available:
+## BotFather Setup
 
-| Command | Purpose |
-|---------|---------|
-| `/start` | Show status and confirm your user ID |
-| `/new` | Start a fresh conversation |
-| `/resume` | Pick from recent sessions to continue where you left off |
-| `/context` | Show how much of your context quota you've used |
-| `/stop` | Stop the current task (or just type `stop`) |
-| `/status` | Check what Claude is doing right now |
-| `/looplogs` | Show the last 50 lines of bot logs |
-| `/restart` | Restart the bot |
+Use [@BotFather](https://t.me/BotFather) to create and configure your bot:
 
-## BotFather Configuration (Optional)
+1. Run `/newbot` and finish the prompts.
+2. Save the generated token as `TELEGRAM_BOT_TOKEN`.
+3. Run `/setcommands` and paste:
 
-To add command hints to your bot's Telegram UI, go back to [@BotFather](https://t.me/BotFather) and send:
-
-```
-/setcommands
-```
-
-Then paste this list:
-
-```
+```text
 start - Show status and user ID
 new - Start a fresh session
 resume - Pick from recent sessions
@@ -145,44 +88,21 @@ looplogs - Show bot logs
 restart - Restart the bot
 ```
 
-This makes the commands appear as suggestions when you tap `/` in the Telegram chat.
+## Getting Your Telegram User ID
+
+Use one of these:
+
+- Message [@userinfobot](https://t.me/userinfobot) and copy your numeric ID.
+- Or run `/start` in your bot chat and read the ID in the response.
+
+Set that value as `TELEGRAM_ALLOWED_USERS`.
 
 ## What's Next
 
-✅ **Now that Super Turtle is running:**
-
-- Try building something simple (a function, a script, a webpage)
-- Use `/status` to check progress on longer tasks
-- Message with `/stop` if you want to interrupt a task
-- Check `/context` to see your quota usage
-
-📖 **To understand how the system works:**
-- Read [Architecture](/docs/architecture) for details on Meta Agents, SubTurtles, and supervision
-- See [Bot Features](/docs/bot/overview) for command details and advanced options
-- Check [SubTurtle Loop Types](/docs/subturtles/loop-types) to understand the different worker strategies
+- Read [Architecture](/architecture) for the system model.
+- Review [Telegram Bot Overview](/bot/overview) for commands and behavior.
+- Learn worker modes in [SubTurtle Loop Types](/subturtles/loop-types).
 
 <Warning>
-**First run:** The setup wizard will create `.env` in `super_turtle/claude-telegram-bot/`. This file contains your Telegram token and is **gitignored** for security. Never commit it.
+Do not commit `super_turtle/claude-telegram-bot/.env`. It contains your credentials and is local-only.
 </Warning>
-
-## Troubleshooting
-
-**Bot doesn't respond to messages**
-- Verify your Telegram user ID is correct: send `/start` and check the ID shown
-- Confirm the bot token was set correctly in `.env`
-- Restart the bot: Ctrl+C in the terminal, then `bun run start` again
-- Check logs: `tail -f /tmp/claude-telegram-bot-ts.log`
-
-**Claude authentication fails**
-- For Claude Code: run `claude` in a terminal and verify you're logged in
-- For Codex: run `codex` and verify you're logged in
-- Check that your subscription is active
-
-**Voice messages fail**
-- Ensure `OPENAI_API_KEY` is set in `.env`
-- Verify the key is valid at [OpenAI console](https://platform.openai.com/)
-
-**Setup wizard got stuck**
-- Press Ctrl+C to exit and try again
-- Verify Bun is installed: `bun --version`
-- Check that Claude/Codex CLI is in your PATH: `which claude` or `which codex`
