@@ -7,7 +7,14 @@
 
 import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
-import { WORKING_DIR, META_PROMPT, MCP_SERVERS } from "./config";
+import {
+  WORKING_DIR,
+  META_PROMPT,
+  MCP_SERVERS,
+  META_CODEX_APPROVAL_POLICY,
+  META_CODEX_NETWORK_ACCESS,
+  META_CODEX_SANDBOX_MODE,
+} from "./config";
 import { formatCodexToolStatus } from "./formatting";
 import type { StatusCallback, McpCompletionCallback, SavedSession, SessionHistory } from "./types";
 
@@ -153,6 +160,7 @@ type CodexClient = {
     workingDirectory?: string;
     skipGitRepoCheck?: boolean;
     sandboxMode?: "read-only" | "workspace-write" | "danger-full-access";
+    networkAccessEnabled?: boolean;
     approvalPolicy?: "never" | "on-request" | "on-failure" | "untrusted";
     model?: string;
     modelReasoningEffort?: string;
@@ -161,6 +169,7 @@ type CodexClient = {
     workingDirectory?: string;
     skipGitRepoCheck?: boolean;
     sandboxMode?: "read-only" | "workspace-write" | "danger-full-access";
+    networkAccessEnabled?: boolean;
     approvalPolicy?: "never" | "on-request" | "on-failure" | "untrusted";
     model?: string;
     modelReasoningEffort?: string;
@@ -671,9 +680,10 @@ export class CodexSession {
       this.thread = await this.codex.startThread({
         workingDirectory: WORKING_DIR,
         skipGitRepoCheck: true,
-        // Meta agent must be able to orchestrate freely (equivalent to CLI --yolo).
-        sandboxMode: "danger-full-access",
-        approvalPolicy: "never",
+        // Runtime policy defaults to SubTurtle parity, but stays overrideable via env.
+        sandboxMode: META_CODEX_SANDBOX_MODE,
+        approvalPolicy: META_CODEX_APPROVAL_POLICY,
+        networkAccessEnabled: META_CODEX_NETWORK_ACCESS,
         model: threadModel,
         modelReasoningEffort: threadEffort,
       });
@@ -721,9 +731,10 @@ export class CodexSession {
       this.thread = await this.codex.resumeThread(threadId, {
         workingDirectory: WORKING_DIR,
         skipGitRepoCheck: true,
-        // Keep resumed threads on the same unrestricted policy as new threads.
-        sandboxMode: "danger-full-access",
-        approvalPolicy: "never",
+        // Keep resumed threads on the same policy as newly created threads.
+        sandboxMode: META_CODEX_SANDBOX_MODE,
+        approvalPolicy: META_CODEX_APPROVAL_POLICY,
+        networkAccessEnabled: META_CODEX_NETWORK_ACCESS,
         model: threadModel,
         modelReasoningEffort: threadEffort,
       });

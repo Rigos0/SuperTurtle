@@ -122,9 +122,19 @@ Enable Codex usage reporting in `/usage` by setting:
 CODEX_ENABLED=true
 ```
 
+Meta-agent Codex sessions use a runtime policy that is configurable via env vars:
+
+```bash
+# Defaults shown below (SubTurtle parity)
+META_CODEX_SANDBOX_MODE=danger-full-access
+META_CODEX_APPROVAL_POLICY=never
+META_CODEX_NETWORK_ACCESS=true
+```
+
 Notes:
 
 - `CODEX_ENABLED` defaults to `false`, so Claude usage remains the only section shown in `/usage` unless you explicitly enable Codex.
+- `META_CODEX_SANDBOX_MODE`, `META_CODEX_APPROVAL_POLICY`, and `META_CODEX_NETWORK_ACCESS` default to SubTurtle-equivalent values (`danger-full-access`, `never`, network enabled).
 - Codex usage stats are fetched from a local Codex CLI instance (`codex` must be installed and available in PATH).
 - The bot parses local Codex history to extract usage data (requests and estimated token counts over the last 7 days).
 - No API keys required for Codex usage reporting — only the local `codex` CLI tool.

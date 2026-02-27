@@ -47,6 +47,54 @@ export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 export const CODEX_ENABLED =
   (process.env.CODEX_ENABLED || "false").toLowerCase() === "true";
 
+export type CodexSandboxMode = "read-only" | "workspace-write" | "danger-full-access";
+export type CodexApprovalPolicy = "never" | "on-request" | "on-failure" | "untrusted";
+
+function parseCodexSandboxMode(raw: string | undefined): CodexSandboxMode {
+  const value = (raw || "danger-full-access").toLowerCase();
+  if (value === "read-only" || value === "workspace-write" || value === "danger-full-access") {
+    return value;
+  }
+  console.warn(
+    `Invalid META_CODEX_SANDBOX_MODE="${raw}". Falling back to "danger-full-access".`
+  );
+  return "danger-full-access";
+}
+
+function parseCodexApprovalPolicy(raw: string | undefined): CodexApprovalPolicy {
+  const value = (raw || "never").toLowerCase();
+  if (value === "never" || value === "on-request" || value === "on-failure" || value === "untrusted") {
+    return value;
+  }
+  console.warn(
+    `Invalid META_CODEX_APPROVAL_POLICY="${raw}". Falling back to "never".`
+  );
+  return "never";
+}
+
+function parseMetaCodexNetworkAccess(raw: string | undefined): boolean {
+  if (raw === undefined || raw.trim() === "") {
+    return true;
+  }
+  const value = raw.toLowerCase();
+  if (value === "true") return true;
+  if (value === "false") return false;
+  console.warn(
+    `Invalid META_CODEX_NETWORK_ACCESS="${raw}". Falling back to "true".`
+  );
+  return true;
+}
+
+export const META_CODEX_SANDBOX_MODE = parseCodexSandboxMode(
+  process.env.META_CODEX_SANDBOX_MODE
+);
+export const META_CODEX_APPROVAL_POLICY = parseCodexApprovalPolicy(
+  process.env.META_CODEX_APPROVAL_POLICY
+);
+export const META_CODEX_NETWORK_ACCESS = parseMetaCodexNetworkAccess(
+  process.env.META_CODEX_NETWORK_ACCESS
+);
+
 // ============== Claude CLI Path ==============
 
 // Auto-detect from PATH, or use environment override

@@ -7,12 +7,23 @@ type ConfigProbeResult = {
   stderr: string;
 };
 
-const configPath = resolve(import.meta.dir, "config.ts");
-const marker = "__CODEX_ENABLED__=";
+type ConfigProbeOverrides = {
+  codexEnabled?: string | undefined;
+  metaCodexSandboxMode?: string | undefined;
+  metaCodexApprovalPolicy?: string | undefined;
+  metaCodexNetworkAccess?: string | undefined;
+};
 
-async function probeCodexEnabled(
-  codexEnabled: string | undefined
-): Promise<ConfigProbeResult> {
+const configPath = resolve(import.meta.dir, "config.ts");
+
+const MARKERS = {
+  codexEnabled: "__CODEX_ENABLED__=",
+  sandboxMode: "__META_CODEX_SANDBOX_MODE__=",
+  approvalPolicy: "__META_CODEX_APPROVAL_POLICY__=",
+  networkAccess: "__META_CODEX_NETWORK_ACCESS__=",
+} as const;
+
+async function probeConfig(overrides: ConfigProbeOverrides): Promise<ConfigProbeResult> {
   const env: Record<string, string> = {
     ...process.env,
     TELEGRAM_BOT_TOKEN: "test-token",
@@ -20,15 +31,25 @@ async function probeCodexEnabled(
     CLAUDE_WORKING_DIR: process.cwd(),
   };
 
-  if (codexEnabled === undefined) {
-    delete env.CODEX_ENABLED;
-  } else {
-    env.CODEX_ENABLED = codexEnabled;
-  }
+  const applyOverride = (envKey: string, value: string | undefined) => {
+    if (value === undefined) {
+      delete env[envKey];
+      return;
+    }
+    env[envKey] = value;
+  };
+
+  applyOverride("CODEX_ENABLED", overrides.codexEnabled);
+  applyOverride("META_CODEX_SANDBOX_MODE", overrides.metaCodexSandboxMode);
+  applyOverride("META_CODEX_APPROVAL_POLICY", overrides.metaCodexApprovalPolicy);
+  applyOverride("META_CODEX_NETWORK_ACCESS", overrides.metaCodexNetworkAccess);
 
   const script = `
     const config = await import(${JSON.stringify(configPath)});
-    console.log(${JSON.stringify(marker)} + String(config.CODEX_ENABLED));
+    console.log(${JSON.stringify(MARKERS.codexEnabled)} + String(config.CODEX_ENABLED));
+    console.log(${JSON.stringify(MARKERS.sandboxMode)} + String(config.META_CODEX_SANDBOX_MODE));
+    console.log(${JSON.stringify(MARKERS.approvalPolicy)} + String(config.META_CODEX_APPROVAL_POLICY));
+    console.log(${JSON.stringify(MARKERS.networkAccess)} + String(config.META_CODEX_NETWORK_ACCESS));
   `;
 
   const proc = Bun.spawn({
@@ -47,7 +68,7 @@ async function probeCodexEnabled(
   return { exitCode, stdout, stderr };
 }
 
-function extractCodexEnabled(stdout: string): string | null {
+function extractMarker(stdout: string, marker: string): string | null {
   const line = stdout
     .split("\n")
     .map((entry) => entry.trim())
@@ -56,22 +77,49 @@ function extractCodexEnabled(stdout: string): string | null {
   return line ? line.slice(marker.length) : null;
 }
 
-describe("config CODEX_ENABLED", () => {
-  it("defaults to false when CODEX_ENABLED is unset", async () => {
-    const result = await probeCodexEnabled(undefined);
+describe("config defaults", () => {
+  it("uses expected default runtime values when env vars are unset", async () => {
+    const result = await probeConfig({
+      codexEnabled: undefined,
+      metaCodexSandboxMode: undefined,
+      metaCodexApprovalPolicy: undefined,
+      metaCodexNetworkAccess: undefined,
+    });
+
     expect(result.exitCode).toBe(0);
-    expect(extractCodexEnabled(result.stdout)).toBe("false");
+    expect(extractMarker(result.stdout, MARKERS.codexEnabled)).toBe("false");
+    expect(extractMarker(result.stdout, MARKERS.sandboxMode)).toBe("danger-full-access");
+    expect(extractMarker(result.stdout, MARKERS.approvalPolicy)).toBe("never");
+    expect(extractMarker(result.stdout, MARKERS.networkAccess)).toBe("true");
+  });
+});
+
+describe("config overrides", () => {
+  it("accepts explicit valid Codex runtime policy values", async () => {
+    const result = await probeConfig({
+      codexEnabled: "true",
+      metaCodexSandboxMode: "workspace-write",
+      metaCodexApprovalPolicy: "on-request",
+      metaCodexNetworkAccess: "false",
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(extractMarker(result.stdout, MARKERS.codexEnabled)).toBe("true");
+    expect(extractMarker(result.stdout, MARKERS.sandboxMode)).toBe("workspace-write");
+    expect(extractMarker(result.stdout, MARKERS.approvalPolicy)).toBe("on-request");
+    expect(extractMarker(result.stdout, MARKERS.networkAccess)).toBe("false");
   });
 
-  it("loads true when CODEX_ENABLED=true", async () => {
-    const result = await probeCodexEnabled("true");
-    expect(result.exitCode).toBe(0);
-    expect(extractCodexEnabled(result.stdout)).toBe("true");
-  });
+  it("falls back to safe defaults for invalid policy values", async () => {
+    const result = await probeConfig({
+      metaCodexSandboxMode: "invalid-mode",
+      metaCodexApprovalPolicy: "always-ask",
+      metaCodexNetworkAccess: "maybe",
+    });
 
-  it("loads false when CODEX_ENABLED=false", async () => {
-    const result = await probeCodexEnabled("false");
     expect(result.exitCode).toBe(0);
-    expect(extractCodexEnabled(result.stdout)).toBe("false");
+    expect(extractMarker(result.stdout, MARKERS.sandboxMode)).toBe("danger-full-access");
+    expect(extractMarker(result.stdout, MARKERS.approvalPolicy)).toBe("never");
+    expect(extractMarker(result.stdout, MARKERS.networkAccess)).toBe("true");
   });
 });
