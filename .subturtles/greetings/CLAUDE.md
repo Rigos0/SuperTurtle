@@ -1,5 +1,5 @@
 ## Current Task
-Verify `/cron` does not show the greeting jobs.
+All greeting backlog items are complete.
 
 ## End Goal with Specs
 
@@ -83,7 +83,7 @@ File to modify: `super_turtle/claude-telegram-bot/src/index.ts`
 - [x] Create `turtle-greetings.ts` with message/sticker pools, timezone-aware scheduling, and direct bot.api sending
 - [x] Wire into `index.ts` startup with env var gate
 - [x] Test that stickers render correctly (not as photos)
-- [ ] Verify `/cron` does not show the greeting jobs <- current
+- [x] Verify `/cron` does not show the greeting jobs
 - [x] Commit
 
 ## Notes
@@ -92,3 +92,6 @@ File to modify: `super_turtle/claude-telegram-bot/src/index.ts`
 - The bot instance type is `Bot` from grammy — use `bot.api.sendSticker(chatId, inputFile)` and `bot.api.sendMessage(chatId, text)`
 - ALLOWED_USERS is an array of numbers — use `ALLOWED_USERS[0]` for the chat ID
 - Europe/Prague timezone: UTC+1 (winter) / UTC+2 (summer). Use Intl.DateTimeFormat or manual offset calculation.
+
+## Loop Control
+STOP

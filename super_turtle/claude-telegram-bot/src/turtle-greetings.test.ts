@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { InputFile } from "grammy";
+import { getJobs } from "./cron";
 import { startTurtleGreetings } from "./turtle-greetings";
 
 describe("turtle greetings sticker delivery", () => {
@@ -76,5 +77,55 @@ describe("turtle greetings sticker delivery", () => {
     expect(stickerFile.filename).toBe("turtle.webp");
 
     expect(sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not register greeting timers as /cron jobs", async () => {
+    const scheduledCallbacks: Array<() => void> = [];
+
+    globalThis.setTimeout = ((handler: unknown) => {
+      if (typeof handler === "function") {
+        scheduledCallbacks.push(handler as () => void);
+      }
+      return undefined as unknown as ReturnType<typeof setTimeout>;
+    }) as typeof setTimeout;
+
+    globalThis.setInterval = (() => {
+      return undefined as unknown as ReturnType<typeof setInterval>;
+    }) as typeof setInterval;
+
+    const sendSticker = mock(async (_chatId: number, _sticker: InputFile) => {});
+    const sendMessage = mock(async (_chatId: number, _message: string) => {});
+
+    const fetchMock = mock(async () => {
+      return new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: {
+          "content-type": "image/webp",
+        },
+      });
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    Math.random = () => 0;
+
+    const beforeCronJobs = JSON.stringify(getJobs());
+    const bot = {
+      api: {
+        sendSticker,
+        sendMessage,
+      },
+    } as any;
+
+    startTurtleGreetings(bot, 12345);
+    const afterStartCronJobs = JSON.stringify(getJobs());
+
+    expect(afterStartCronJobs).toBe(beforeCronJobs);
+    expect(scheduledCallbacks.length).toBe(2);
+
+    scheduledCallbacks[0]!();
+    await Bun.sleep(0);
+
+    const afterFireCronJobs = JSON.stringify(getJobs());
+    expect(afterFireCronJobs).toBe(beforeCronJobs);
   });
 });
