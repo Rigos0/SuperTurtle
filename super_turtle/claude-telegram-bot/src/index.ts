@@ -450,10 +450,12 @@ const startCronTimer = () => {
               resolvedChatId,
               subturtleNameForPrep
             );
-            await bot.api.sendMessage(
-              resolvedChatId,
-              `🔄 Background check prepared for ${subturtleNameForPrep} (snapshot #${snapshot.snapshotSeq}, queue=${getPreparedSnapshotCount()}). I will process it when the current reply is idle.`
-            );
+            if (!job.silent) {
+              await bot.api.sendMessage(
+                resolvedChatId,
+                `🔄 Background check prepared for ${subturtleNameForPrep} (snapshot #${snapshot.snapshotSeq}, queue=${getPreparedSnapshotCount()}). I will process it when the current reply is idle.`
+              );
+            }
             continue;
           }
 

@@ -217,7 +217,7 @@ export async function resetAllDriverSessions(opts?: { stopRunning?: boolean }): 
 
 
 /**
- * /status - Show detailed status.
+ * /status - Show status. Same screen as /new but without resetting sessions.
  */
 export async function handleStatus(ctx: Context): Promise<void> {
   const userId = ctx.from?.id;
@@ -227,139 +227,7 @@ export async function handleStatus(ctx: Context): Promise<void> {
     return;
   }
 
-  const lines: string[] = ["📊 <b>Bot Status</b>\n"];
-
-  const abstractionDriver = (await import("../drivers/registry")).getCurrentDriver();
-  const abstractionSnapshot = abstractionDriver.getStatusSnapshot();
-
-  // Session status (driver-specific)
-  if (abstractionSnapshot.isActive) {
-    lines.push(
-      `✅ ${abstractionSnapshot.driverName} Session: Active (${abstractionSnapshot.sessionId?.slice(0, 8)}...)`
-    );
-  } else {
-    lines.push(`⚪ ${abstractionSnapshot.driverName} Session: None`);
-  }
-
-  // Query status
-  if (isAnyDriverRunning()) {
-    if (session.activeDriver === "codex" && codexSession.isRunning) {
-      const elapsed = codexSession.runningSince
-        ? Math.floor((Date.now() - codexSession.runningSince.getTime()) / 1000)
-        : 0;
-      lines.push(`🔄 Query: Running (${elapsed}s)`);
-    } else {
-      const elapsed = session.queryStarted
-        ? Math.floor((Date.now() - session.queryStarted.getTime()) / 1000)
-        : 0;
-      lines.push(`🔄 Query: Running (${elapsed}s)`);
-      if (session.currentTool) {
-        lines.push(`   └─ ${session.currentTool}`);
-      }
-    }
-  } else {
-    lines.push("⚪ Query: Idle");
-    if (session.lastTool) {
-      lines.push(`   └─ Last: ${session.lastTool}`);
-    }
-  }
-
-  // Last activity
-  const lastActivity = abstractionSnapshot.lastActivity || session.lastActivity;
-  if (lastActivity) {
-    const ago = Math.floor(
-      (Date.now() - lastActivity.getTime()) / 1000
-    );
-    lines.push(`\n⏱️ Last activity: ${ago}s ago`);
-  }
-
-  // Usage stats (driver-specific)
-  const usage = abstractionSnapshot.lastUsage;
-  if (usage) {
-    const usageLabel =
-      abstractionSnapshot.driverName === "Codex" ? " (Codex)" : "";
-    lines.push(
-      `\n📈 Last query usage${usageLabel}:`,
-      `   Input: ${usage.inputTokens.toLocaleString()} tokens`,
-      `   Output: ${usage.outputTokens.toLocaleString()} tokens`
-    );
-    if (usage.cacheReadInputTokens) {
-      lines.push(`   Cache read: ${usage.cacheReadInputTokens.toLocaleString()}`);
-    }
-  }
-
-  // Error status
-  const lastError = abstractionSnapshot.lastError || session.lastError;
-  const lastErrorTime = abstractionSnapshot.lastErrorTime || session.lastErrorTime;
-  if (lastError) {
-    const ago = lastErrorTime
-      ? Math.floor((Date.now() - lastErrorTime.getTime()) / 1000)
-      : "?";
-    lines.push(`\n⚠️ Last error (${ago}s ago):`, `   ${lastError}`);
-  }
-
-  // Working directory
-  lines.push(`\n📁 Working dir: <code>${WORKING_DIR}</code>`);
-
-  // SubTurtle status from ctl list
-  lines.push(`\n🐢 <b>SubTurtles</b>`);
-  try {
-    const ctlPath = `${WORKING_DIR}/super_turtle/subturtle/ctl`;
-    const proc = Bun.spawnSync([ctlPath, "list"], { cwd: WORKING_DIR });
-    const output = proc.stdout.toString().trim();
-    const allTurtles = parseCtlListOutput(output);
-    const runningTurtles = allTurtles.filter((turtle) => turtle.status === "running");
-
-    if (runningTurtles.length === 0) {
-      lines.push(`   None running`);
-    } else {
-      const elapsedEntries = await Promise.all(
-        runningTurtles.map(async (turtle) => [turtle.name, await getSubTurtleElapsed(turtle.name)] as const)
-      );
-      const elapsedByName = new Map(elapsedEntries);
-
-      for (const turtle of runningTurtles) {
-        const type = turtle.type || "unknown";
-        const elapsed = elapsedByName.get(turtle.name) || "unknown";
-        const remaining = turtle.timeRemaining || "unknown";
-        lines.push(`🟢 <b>${escapeHtml(turtle.name)}</b> <code>${escapeHtml(type)}</code>`);
-        lines.push(`   ⏱️ elapsed: ${escapeHtml(elapsed)} • remaining: ${escapeHtml(remaining)}`);
-        if (turtle.task) {
-          lines.push(`   📌 ${escapeHtml(turtle.task)}`);
-        }
-        if (turtle.tunnelUrl) {
-          const safeUrl = escapeHtml(turtle.tunnelUrl);
-          lines.push(`   🔗 <a href="${safeUrl}">${safeUrl}</a>`);
-        }
-      }
-    }
-  } catch {
-    lines.push(`   <i>Unavailable (ctl list failed)</i>`);
-  }
-
-  // Last 3 git commits
-  lines.push(`\n🧾 <b>Recent Commits</b>`);
-  try {
-    const gitProc = Bun.spawnSync(["git", "log", "--oneline", "-3"], { cwd: WORKING_DIR });
-    const gitOutput = gitProc.stdout.toString().trim();
-    if (!gitOutput) {
-      lines.push(`   <i>No commits found</i>`);
-    } else {
-      for (const commitLine of gitOutput.split("\n")) {
-        if (!commitLine.trim()) continue;
-        lines.push(`   <code>${escapeHtml(commitLine)}</code>`);
-      }
-    }
-  } catch {
-    lines.push(`   <i>Unavailable</i>`);
-  }
-
-  // Usage and quota summary
-  const [usageLines, codexQuotaLines] = await Promise.all([
-    getUsageLines(),
-    CODEX_ENABLED ? getCodexQuotaLines() : Promise.resolve<string[]>([]),
-  ]);
-  lines.push(`\n${formatUnifiedUsage(usageLines, codexQuotaLines, CODEX_ENABLED)}`);
+  const lines = await buildSessionOverviewLines("Status");
 
   await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
 }
