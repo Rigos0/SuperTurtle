@@ -30,25 +30,6 @@ const pillars = [
   },
 ];
 
-const workflowSteps = [
-  {
-    title: 'You describe what you want',
-    description: 'Type or use voice on Telegram. "Build me X" is enough.',
-  },
-  {
-    title: 'It decomposes the work',
-    description: 'The meta agent breaks the ask into scoped subtasks and starts multiple workers at once.',
-  },
-  {
-    title: 'Workers loop autonomously',
-    description: 'Each worker reads state, implements, verifies, and commits. Isolated workspace, own state file, own logs.',
-  },
-  {
-    title: 'Results ship to your repo',
-    description: 'Every change is a git commit with a clear message. Frontend work gets a live Cloudflare tunnel preview link.',
-  },
-];
-
 const loopModes = [
   {
     title: 'slow',
@@ -81,6 +62,7 @@ const loopModes = [
 ];
 
 export default function Home() {
+  const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL ?? "/docs";
   return (
     <div className="landing-root">
       <StickyNav />
@@ -111,11 +93,8 @@ export default function Home() {
                 >
                   GitHub
                 </a>
-                <a href="/docs" className="btn-ghost">
+                <a href={docsUrl} className="btn-ghost">
                   Docs
-                </a>
-                <a href="#how-it-works" className="btn-ghost">
-                  How it works
                 </a>
               </div>
             </div>
@@ -168,57 +147,6 @@ export default function Home() {
                   <p>{pillar.description}</p>
                 </article>
               ))}
-            </div>
-          </div>
-        </section>
-
-        <SectionDivider />
-
-        <section id="how-it-works" className="section-shell">
-          <div className="section-container">
-            <div className="section-head reveal">
-              <p className="eyebrow">How it works</p>
-              <h2>Two layers</h2>
-              <p>A Meta Agent that handles conversation, and SubTurtles that do the coding.</p>
-            </div>
-
-            <div className="mt-10 grid gap-4 lg:grid-cols-[1fr_1fr] lg:items-start">
-              <div className="space-y-4">
-                {workflowSteps.map((step, index) => (
-                  <div
-                    className="reveal flow-step"
-                    key={step.title}
-                    style={{ animationDelay: `${200 + index * 110}ms` }}
-                  >
-                    <div className="flow-step-index">0{index + 1}</div>
-                    <div>
-                      <h3>{step.title}</h3>
-                      <p>{step.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <article className="reveal control-pane" style={{ animationDelay: '560ms' }}>
-                <h3>Skills, supervision, and previews</h3>
-                <ul className="space-y-3 text-sm">
-                  <li className="check-row">
-                    <span className="check-dot" /> Skills loaded on demand per worker so expertise stays scoped to the task
-                  </li>
-                  <li className="check-row">
-                    <span className="check-dot" /> Cron supervision monitors milestones, stalls, and failures automatically
-                  </li>
-                  <li className="check-row">
-                    <span className="check-dot" /> Frontend workers publish Cloudflare tunnel links for live previews
-                  </li>
-                  <li className="check-row">
-                    <span className="check-dot" /> Playwright screenshots for visual QA without leaving the terminal
-                  </li>
-                  <li className="check-row">
-                    <span className="check-dot" /> Workers self-stop when done, no orphan processes
-                  </li>
-                </ul>
-              </article>
             </div>
           </div>
         </section>
