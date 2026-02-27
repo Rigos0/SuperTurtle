@@ -1,5 +1,5 @@
 ## Current task
-Implement a stable non-interactive sandbox creation/reuse path in `super_turtle/e2b/up.sh` (avoid interactive `sandbox create` dependency).
+Validate full `up` flow on real E2B (create/reuse -> sync -> install -> start), persist state, and patch regressions.
 
 ## End goal with specs
 `bash super_turtle/e2b/remote.sh up` works reliably in non-interactive automation, and official E2B docs used by this integration are mirrored under `docs/external/e2b/` with an index + refresh script.
@@ -25,8 +25,8 @@ Acceptance criteria:
 
 ## Backlog
 - [x] Reproduce current `remote.sh up` failure path and document exact root cause in `docs/e2b-up-known-issues.md`
-- [ ] Implement a stable non-interactive sandbox creation/reuse path in `super_turtle/e2b/up.sh` (avoid interactive `sandbox create` dependency) <- current
-- [ ] Validate full `up` flow on real E2B (create/reuse -> sync -> install -> start), persist state, and patch regressions
+- [x] Implement a stable non-interactive sandbox creation/reuse path in `super_turtle/e2b/up.sh` (avoid interactive `sandbox create` dependency)
+- [ ] Validate full `up` flow on real E2B (create/reuse -> sync -> install -> start), persist state, and patch regressions <- current
 - [ ] Add local E2B docs mirror under `docs/external/e2b/` with `index.md` + snapshots of official pages referenced in runbook
 - [ ] Add `docs/external/e2b/refresh.sh` (or equivalent) so mirror can be updated reproducibly
 - [ ] Update `docs/e2b-remote-runbook.md` and `README.md` to point agents to local mirror first, web as fallback

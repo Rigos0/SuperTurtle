@@ -37,6 +37,8 @@ Environment:
   E2B_REMOTE_PROJECT_DIR    Default remote project directory
   E2B_REMOTE_LOG_PATH       Remote log file for run-loop output
   E2B_SKIP_AUTH_CHECK=1     Skip 'e2b auth info' preflight
+  E2B_ALLOW_LEGACY_CREATE_FALLBACK=1
+                             Allow interactive `e2b sandbox create` fallback
 EOF
 }
 
@@ -190,6 +192,7 @@ if parsed is not None:
 
 patterns = (
     r"connected to sandbox\s+([A-Za-z0-9._:-]{6,})",
+    r"sandbox\s+id\s+([A-Za-z0-9._:-]{6,})",
     r"sandbox(?:\s+id)?\s*[:=]\s*([A-Za-z0-9._:-]{6,})",
     r"\b(sbx_[A-Za-z0-9._:-]{4,})\b",
     r"\b([0-9a-f]{8}-[0-9a-f-]{27,})\b",
@@ -210,12 +213,22 @@ connect_sandbox_probe() {
   printf 'exit\n' | "${E2B_BIN}" sandbox connect "${sandbox_id}" >/dev/null 2>&1
 }
 
-create_sandbox() {
+create_sandbox_legacy() {
   local template="${1:?template required}"
   local create_out
   if ! create_out="$(printf 'exit\n' | "${E2B_BIN}" sandbox create "${template}" 2>&1)"; then
-    echo "${create_out}" >&2
-    return 1
+    # E2B CLI 2.4.x can crash in non-interactive shells with:
+    # "process.stdin.setRawMode is not a function".
+    # Retry via `script` to provide a pseudo-tty for sandbox creation.
+    if grep -q "process.stdin.setRawMode is not a function" <<<"${create_out}" && command -v script >/dev/null 2>&1; then
+      if ! create_out="$(printf 'exit\n' | script -q /dev/null "${E2B_BIN}" sandbox create "${template}" 2>&1)"; then
+        echo "${create_out}" >&2
+        return 1
+      fi
+    else
+      echo "${create_out}" >&2
+      return 1
+    fi
   fi
 
   local parsed_id=""
@@ -225,6 +238,129 @@ create_sandbox() {
   fi
 
   echo "${create_out}" >&2
+  return 1
+}
+
+create_sandbox_via_api() {
+  local template="${1:?template required}"
+  "${PYTHON_BIN}" - "${template}" <<'PY'
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+template = sys.argv[1]
+
+config_path = Path.home() / ".e2b" / "config.json"
+config = {}
+if config_path.is_file():
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except Exception:
+        config = {}
+
+api_key = (os.getenv("E2B_API_KEY") or "").strip() or str(config.get("teamApiKey") or "").strip()
+access_token = (os.getenv("E2B_ACCESS_TOKEN") or "").strip() or str(config.get("accessToken") or "").strip()
+
+if not api_key and not access_token:
+    print(
+        "missing E2B credentials for non-interactive sandbox create "
+        "(set E2B_API_KEY/E2B_ACCESS_TOKEN or run `e2b auth login`)",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+
+api_url = (os.getenv("E2B_API_URL") or "").strip()
+if not api_url:
+    domain = (os.getenv("E2B_DOMAIN") or "e2b.app").strip()
+    api_url = f"https://api.{domain}"
+
+timeout_seconds = int((os.getenv("E2B_CREATE_API_TIMEOUT_SECONDS") or "60").strip())
+endpoint = f"{api_url.rstrip('/')}/sandboxes"
+
+headers = {"Content-Type": "application/json"}
+if api_key:
+    headers["X-API-KEY"] = api_key
+if access_token:
+    headers["Authorization"] = f"Bearer {access_token}"
+
+payload = {"templateID": template}
+request = urllib.request.Request(
+    endpoint,
+    data=json.dumps(payload).encode("utf-8"),
+    headers=headers,
+    method="POST",
+)
+
+try:
+    with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+        raw_body = response.read().decode("utf-8", errors="replace")
+except urllib.error.HTTPError as exc:
+    body = exc.read().decode("utf-8", errors="replace")
+    print(
+        f"non-interactive create failed with HTTP {exc.code}: {body or exc.reason}",
+        file=sys.stderr,
+    )
+    sys.exit(3)
+except Exception as exc:  # noqa: BLE001
+    print(f"non-interactive create request failed: {exc}", file=sys.stderr)
+    sys.exit(4)
+
+try:
+    parsed = json.loads(raw_body)
+except json.JSONDecodeError:
+    print(f"non-interactive create returned non-JSON payload: {raw_body}", file=sys.stderr)
+    sys.exit(5)
+
+sandbox_id = ""
+if isinstance(parsed, dict):
+    for key in ("sandboxID", "sandboxId", "sandbox_id", "id"):
+        candidate = parsed.get(key)
+        if isinstance(candidate, str) and candidate.strip():
+            sandbox_id = candidate.strip()
+            break
+
+if not sandbox_id:
+    print(f"non-interactive create response did not include sandbox id: {raw_body}", file=sys.stderr)
+    sys.exit(6)
+
+print(sandbox_id)
+PY
+}
+
+create_sandbox() {
+  local template="${1:?template required}"
+
+  if create_sandbox_via_api "${template}"; then
+    return 0
+  fi
+
+  if [[ "${E2B_ALLOW_LEGACY_CREATE_FALLBACK:-0}" == "1" ]]; then
+    echo "[e2b-up] falling back to legacy interactive sandbox create" >&2
+    create_sandbox_legacy "${template}"
+    return $?
+  fi
+
+  echo "[e2b-up] non-interactive sandbox create failed and legacy fallback is disabled" >&2
+  return 1
+}
+
+wait_for_sandbox_connectable() {
+  local sandbox_id="${1:?sandbox id required}"
+  local max_attempts="${2:-20}"
+  local sleep_seconds="${3:-2}"
+  local attempt=1
+
+  while (( attempt <= max_attempts )); do
+    if connect_sandbox_probe "${sandbox_id}"; then
+      return 0
+    fi
+    sleep "${sleep_seconds}"
+    attempt=$((attempt + 1))
+  done
+
   return 1
 }
 
@@ -505,6 +641,8 @@ main() {
     created_new=1
     resumed_existing=0
     log "created sandbox ${sandbox_id}"
+    log "waiting for sandbox ${sandbox_id} to become connectable..."
+    wait_for_sandbox_connectable "${sandbox_id}" || die "sandbox '${sandbox_id}' is not connectable after create"
   fi
 
   local created_at="${stored_created_at}"
