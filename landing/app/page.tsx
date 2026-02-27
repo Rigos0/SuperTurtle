@@ -12,8 +12,8 @@ const chatMessages = [
 
 const heroHighlights = [
   {
-    title: 'Uses your Claude Code or Codex subscription*',
-    description: 'No extra API-token workflow for core use.',
+    title: 'Wraps your Claude Code or Codex subscription*',
+    description: 'No extra API tokens needed.',
     accent: 'olive',
   },
   {
@@ -31,8 +31,8 @@ const heroHighlights = [
 
 const valueProps = [
   {
-    title: 'Uses your Claude Code or Codex subscription',
-    description: 'No extra API-token workflow for core use.',
+    title: 'Wraps your Claude Code or Codex subscription',
+    description: 'No extra API tokens needed.',
     accent: 'olive',
   },
   {
@@ -132,7 +132,7 @@ export default function Home() {
                   onClick={handleTurtleClick}
                   aria-label="Show turtle message"
                 >
-                  <img className="turtle-sticker-image" src="/turtle-logo.png" alt="Super Turtle" width={104} height={104} />
+                  <img className="turtle-sticker-image" src="/turtle-logo.png" alt="Super Turtle" width={104} height={104} style={{ width: 'var(--turtle-size)', height: 'var(--turtle-size)' }} />
                 </div>
               </div>
               <h1 className="headline mt-6 sm:mt-7 md:mt-8">
@@ -142,7 +142,7 @@ export default function Home() {
                 Code from anywhere with your voice
               </p>
 
-              <div className="mt-7 flex flex-wrap justify-center gap-3">
+              <div className="mt-7 flex flex-wrap justify-center gap-2 sm:gap-3">
                 <a
                   href={githubUrl}
                   className="btn-primary"
@@ -158,7 +158,7 @@ export default function Home() {
             </div>
 
             <div className="reveal" style={{ animationDelay: '220ms' }}>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-1.5 sm:gap-4 md:grid-cols-3">
                 {heroHighlights.map((item, index) => (
                   <article
                     className={`deck-card hero-value-card ${index === 0 ? 'olive' : index === 1 ? 'terracotta' : 'sage'}`}
@@ -170,7 +170,7 @@ export default function Home() {
                   </article>
                 ))}
               </div>
-              <p className="mt-4 text-xs text-[var(--text-muted)]">
+              <p className="mt-10 sm:mt-10 pr-12 sm:pr-32 text-[0.5rem] sm:text-xs leading-snug text-[var(--text-muted)]">
                 * Uses official Claude Code/Codex CLI authentication flows in headless mode. This wrapper approach is compliant with provider terms.
               </p>
             </div>
@@ -188,7 +188,7 @@ export default function Home() {
               <p>Clear priorities, in the order users care about.</p>
             </div>
 
-            <div className="mt-10 grid gap-4 sm:gap-6">
+            <div className="mt-10 grid gap-1 sm:gap-6">
               {valueProps.map((item, index) => (
                 <article
                   className={`reveal deck-card ${index % 3 === 0 ? 'olive' : index % 3 === 1 ? 'terracotta' : 'sage'}`}

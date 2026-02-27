@@ -1,6 +1,6 @@
 export function SectionDivider() {
   return (
-    <div className="relative w-full h-16 flex items-center justify-center overflow-hidden" style={{ backgroundColor: '#faf8f5' }}>
+    <div className="relative w-full h-8 sm:h-16 flex items-center justify-center overflow-hidden" style={{ backgroundColor: '#faf8f5' }}>
       <svg
         className="w-full h-full"
         viewBox="0 0 1440 60"
