@@ -103,7 +103,7 @@ export default function Home() {
     const nextHideTimeout = window.setTimeout(() => {
       setHasClickedTurtleTip(false);
       setBubbleHideTimeout(null);
-    }, 2700);
+    }, 1500);
 
     setBubbleHideTimeout(nextHideTimeout);
   };
