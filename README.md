@@ -58,49 +58,6 @@ Required values to provide:
 - `TELEGRAM_ALLOWED_USERS`
 - Optional `OPENAI_API_KEY`
 
-## E2B Remote (beta)
-
-Use E2B when you want Super Turtle to run outside your local machine.
-
-### Required setup
-
-1. Install E2B CLI and authenticate (`e2b auth login`) or export `E2B_API_KEY`.
-2. Ensure `super_turtle/claude-telegram-bot/.env` exists with:
-   - `TELEGRAM_BOT_TOKEN`
-   - `TELEGRAM_ALLOWED_USERS`
-   - Optional `OPENAI_API_KEY`
-3. Run remote lifecycle commands from repo root:
-
-```bash
-bash super_turtle/e2b/remote.sh up
-bash super_turtle/e2b/remote.sh status
-bash super_turtle/e2b/remote.sh pause
-bash super_turtle/e2b/remote.sh resume
-bash super_turtle/e2b/remote.sh stop
-```
-
-### E2B env vars
-
-- Required: `E2B_API_KEY` (unless you already ran `e2b auth login`)
-- Optional: `E2B_TEMPLATE` (default: `base`)
-- Optional: `E2B_REMOTE_PROJECT_DIR` (default: `/home/user/agentic`)
-- Optional: `E2B_REMOTE_LOG_PATH` (default: `/tmp/superturtle-remote.log`)
-- Optional: `E2B_STATE_FILE` (default: `super_turtle/e2b/.state.json`)
-- Optional: `E2B_SKIP_AUTH_CHECK=1` (for CI/fake CLI smoke tests)
-
-### Template notes
-
-- `up` defaults to `base` unless `--template` or `E2B_TEMPLATE` is set.
-- The selected template is persisted in `super_turtle/e2b/.state.json` and reused on future `up`.
-- E2B first-party templates (`codex`, `claude`) are supported if your workflow needs those CLIs preinstalled.
-
-### Current caveats
-
-- Repo sync pushes tracked files plus `super_turtle/claude-telegram-bot/.env`; extra untracked files are not synced.
-- `pause`/`resume` affect sandbox lifecycle only; after resume, run `bash super_turtle/e2b/remote.sh reconcile-cron` to defer overdue cron jobs safely.
-- `up` requires `bun` in the sandbox (script attempts install via `curl` fallback, then fails fast if unavailable).
-- `status` uses local state if remote E2B access is unavailable.
-
 <p align="center">
   <img src="assets/readme-stickers/architecture-gear-turtle.png" width="108" alt="Architecture turtle sticker" />
 </p>

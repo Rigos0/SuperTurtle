@@ -121,13 +121,13 @@ Super Turtle repository — autonomous agent coordination system (SubTurtles). C
 - Codex parity gap audit (Claude vs Codex flows)
 - Implement missing Codex driver/session/command features
 - Harden restart behavior to avoid unsafe self-termination during autonomous runs
-- Cloud deployment option (currently local-only, runs on your machine)
+- Cloud deployment option (E2B integration on `e2b` branch, needs stabilization)
 - End-to-end parity testing and overnight supervision validation
 - Update docs with parity completion status and residual limitations
 
 # Backlog
 
-- [ ] Telegram security review (leak/attack surface) + fixes <- current
+- [ ] Telegram security review (leak/attack surface) + fixes
 - [ ] Cloudflare tunnel security review + fixes
 - [ ] `/sub` command: aliases `/subs` + `/subtitles`, backlog-focused output, Codex/Claude parity
 - [ ] Codex meta-agent stop-until-prompt issue: root cause + fix
