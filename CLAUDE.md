@@ -54,7 +54,13 @@ An autonomous coding system you talk to on Telegram. You describe what you want 
 
 # Current task
 
-Refresh the `landing/` page visual palette to align with Epify Puzlo branding (red-forward), while preserving polished responsive UX.
+Parallel system hardening and UX improvements:
+- Telegram security review
+- Cloudflare tunnel security review
+- `/sub` command UX + parity (aliases, backlog-focused output)
+- Codex meta-agent “stops until prompted” investigation
+- Peekaboo-based screenshot tooling
+- Long-run tracking + handoff state
 
 # End goal with specs
 
@@ -100,14 +106,20 @@ Agentic repository — autonomous agent coordination system (SubTurtles). Core i
 - Codex parity gap audit (Claude vs Codex flows)
 - Implement missing Codex driver/session/command features
 - Harden restart behavior to avoid unsafe self-termination during autonomous runs
+- Cloud deployment option (currently local-only, runs on your machine)
 - End-to-end parity testing and overnight supervision validation
 - Update docs with parity completion status and residual limitations
 
 # Backlog
 
-- [ ] Update landing page palette to Epify Puzlo red-forward brand direction and verify mobile/desktop contrast/accessibility <- current
-- [x] Fix `/restart` command (self-re-exec instead of bare process.exit)
-- [x] Build a polished landing page for `landing/app/page.tsx` and `landing/app/globals.css`
+- [ ] Telegram security review (leak/attack surface) + fixes <- current
+- [ ] Cloudflare tunnel security review + fixes
+- [ ] `/sub` command: aliases `/subs` + `/subtitles`, backlog-focused output, Codex/Claude parity
+- [ ] Codex meta-agent stop-until-prompt issue: root cause + fix
+- [ ] Peekaboo screenshot tooling wired into frontend guidance
+- [ ] Long-run tracking: runs.jsonl + handoff.md (done; verify smoke test)
+- [ ] Memory handling for “remember this” (small, explainable, meta-only)
+- [ ] Update landing page palette to Epify Puzlo red-forward brand direction and verify mobile/desktop contrast/accessibility
 - [ ] Investigate iOS Telegram inline button disappearance (ask_user + command buttons)
 - [ ] Build Codex-vs-Claude parity checklist from current code/tests
 - [ ] Implement Codex parity fixes in driver/session/handlers

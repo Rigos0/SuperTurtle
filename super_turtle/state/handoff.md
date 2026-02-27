@@ -1,12 +1,12 @@
 # SubTurtle Long-Run Handoff
 
-Last updated: not yet
+Last updated: 2026-02-27T08:17:00Z
 
 ## Active Runs
-- None yet.
+- copywriter (last event: spawn at 2026-02-27T08:06:50Z)
 
 ## Recent Milestones
 - None yet.
 
 ## Notes
-- This summary is refreshed by supervision flows.
+- Auto-refreshed by cron check-ins from runs.jsonl.

@@ -63,7 +63,8 @@ You're a player-coach — you can both code directly and delegate to SubTurtles.
 
 ## Research before building
 
-**Before spawning a SubTurtle for any non-trivial feature, research first.** Search GitHub, npm, PyPI, or the web for existing implementations, libraries, or patterns that solve the same problem. Don't reinvent what already exists.
+**Before committing to any non-trivial feature or big engineering decision, the meta agent must research first.** Search GitHub, npm, PyPI, or the web for existing implementations, libraries, or patterns that solve the same problem. Don't reinvent what already exists.  
+The meta agent decides whether to do research itself or spawn a SubTurtle dedicated to research; for larger decisions, research is mandatory.
 
 **When to research:**
 - Integrating with an external tool/API (e.g., Codex CLI, cloudflared, any SDK)
@@ -241,19 +242,22 @@ This keeps preview links clean and automatic — the human just gets the link wh
 When frontend work needs visual QA, use the screenshot helper script:
 
 - Script path: `super_turtle/subturtle/browser-screenshot.sh`
+- Engine: **Playwright CLI** (`npx playwright screenshot`) — headless Chromium, no GUI or macOS permissions needed
 - Basic usage:
   - `bash super_turtle/subturtle/browser-screenshot.sh http://localhost:3000`
-  - `bash super_turtle/subturtle/browser-screenshot.sh "$TUNNEL_URL" ".subturtles/<name>/screenshots/home.png" --app "Google Chrome" --mode window`
+  - `bash super_turtle/subturtle/browser-screenshot.sh "$TUNNEL_URL" ".subturtles/<name>/screenshots/home.png"`
+  - `bash super_turtle/subturtle/browser-screenshot.sh http://localhost:3000 --viewport 1440x900`
 - Defaults:
   - Output path omitted -> writes to `.tmp/screenshots/screenshot-<timestamp>.png`
-  - Browser app: `"Google Chrome"`
-  - Capture mode: `window`
+  - Full-page capture: enabled by default (use `--no-full-page` for viewport-only)
   - Wait before capture: `1200ms`
 - Useful flags:
   - `--wait-ms 2000` to let data-heavy pages settle before capture
-  - `--retina` for 2x captures
-  - `--capture-focus foreground` when an app must be frontmost to render correctly
-  - `--mode frontmost|screen|multi` for alternate capture targets
+  - `--viewport 1440x900` to set a specific viewport size
+  - `--no-full-page` to capture only the visible viewport
+  - `--wait-selector ".loaded"` to wait for a CSS selector before capture
+  - `--timeout-ms 60000` for slow-loading pages
+- Legacy Peekaboo flags (`--app`, `--mode`, `--capture-focus`, `--retina`, `--json-output`) are accepted but ignored for backward compatibility
 
 For frontend SubTurtles, include screenshot capture in the backlog before final completion so milestone updates can reference concrete visual verification artifacts.
 
@@ -328,6 +332,10 @@ This creates an autonomous conveyor belt: the human kicks off work once, and you
 **When everything is done:**
 
 When the full roadmap is complete, stop the last SubTurtle with `ctl stop` (cron cleanup is automatic), update root CLAUDE.md, and message the human: *"Everything on the roadmap is shipped. Here's what got done: …"*
+
+## Commit hygiene
+
+When a SubTurtle completes a task, ensure the work is committed before reporting completion. If no commit exists, create a clear, scoped commit message. Avoid batching unrelated changes; each backlog item should map to one commit when practical.
 
 ## Usage-aware resource management
 

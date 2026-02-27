@@ -11,41 +11,41 @@ const chatMessages = [
 
 const pillars = [
   {
-    title: 'Use the seats you already pay for',
+    title: 'Player-coach model',
     description:
-      'Connect your existing Claude Code or Codex subscription. No API token setup and no token-meter billing.',
+      'The Meta Agent is your conversational interface and project coach. It can code directly for quick tasks, and delegates bigger work to SubTurtles.',
     accent: 'olive',
   },
   {
-    title: 'Provider-agnostic from day one',
+    title: 'Milestone-driven',
     description:
-      'Run Claude or Codex through one interface. Super Turtle picks the right one per task based on complexity and quota.',
+      'Updates only when there is meaningful news. Milestone reached, blocker found, or work complete.',
     accent: 'terracotta',
   },
   {
-    title: 'Milestones, not noise',
+    title: 'Self-improving',
     description:
-      'You get meaningful updates only: milestone reached, blocker found, or work complete. Silence means it is still running.',
+      'Super Turtle builds and maintains itself. The system develops its own features, supervises its own improvements, and commits its own code.',
     accent: 'sage',
   },
 ];
 
 const workflowSteps = [
   {
-    title: 'Define the outcome',
-    description: 'Give one clear request with acceptance criteria and repo context.',
+    title: 'You describe what you want',
+    description: 'Type or use voice on Telegram. "Build me X" is enough.',
   },
   {
-    title: 'Split into parallel tracks',
+    title: 'It decomposes the work',
     description: 'The meta agent breaks the ask into scoped subtasks and starts multiple workers at once.',
   },
   {
-    title: 'Run the worker loop',
-    description: 'Each worker loops state -> code -> test -> commit until done, with clear commit messages in your repo.',
+    title: 'Workers loop autonomously',
+    description: 'Each worker reads state, implements, verifies, and commits. Isolated workspace, own state file, own logs.',
   },
   {
-    title: 'Supervise and advance',
-    description: 'Watchdogs monitor progress and restart stuck runs automatically.',
+    title: 'Results ship to your repo',
+    description: 'Every change is a git commit with a clear message. Frontend work gets a live Cloudflare tunnel preview link.',
   },
 ];
 
@@ -53,29 +53,29 @@ const loopModes = [
   {
     title: 'slow',
     cadence: 'Plan → Groom → Execute → Review',
-    copy: 'Runs a full four-step pass each cycle. Use it for ambiguous requirements, refactors, or architecture changes.',
-    budget: 'Deepest review',
+    copy: 'Full four-step pass each cycle. For ambiguous requirements, refactors, or architecture changes.',
+    budget: '4 calls/iteration',
     tone: 'olive',
   },
   {
     title: 'yolo',
     cadence: 'Single Claude call per iteration',
-    copy: 'Makes one Claude pass per loop. Use it when the task needs stronger reasoning without the full slow cycle.',
-    budget: 'Balanced speed',
+    copy: 'One Claude pass per loop. For tasks that need stronger reasoning without the full slow cycle.',
+    budget: '1 call/iteration',
     tone: 'terracotta',
   },
   {
     title: 'yolo-codex',
     cadence: 'Single Codex call per iteration',
-    copy: 'Default path for day-to-day tickets. Keeps costs low on routine implementation, tests, and cleanup.',
-    budget: 'Default — lowest cost',
+    copy: 'Default. Keeps costs low on routine implementation, tests, and cleanup.',
+    budget: '1 call/iteration (default)',
     tone: 'sage',
   },
   {
     title: 'yolo-codex-spark',
     cadence: 'Single Codex Spark call per iteration',
-    copy: 'Shortest loop for tiny edits and rapid retries. Best for quick frontend tweaks, docs, and follow-up fixes.',
-    budget: 'Highest throughput',
+    copy: 'Shortest loop for tiny edits and rapid retries. Quick frontend tweaks, docs, follow-up fixes.',
+    budget: 'Fastest iteration',
     tone: 'sage',
   },
 ];
@@ -95,13 +95,13 @@ export default function Home() {
                 Super Turtle
               </h1>
               <p className="lead max-w-2xl">
-                One chat for autonomous software delivery.
+                An autonomous coding system you talk to on Telegram. You describe what you want built, by typing or voice, and it decomposes the work, runs autonomous workers, supervises progress, and ships results.
               </p>
 
               <ul className="mt-6 space-y-2 text-sm">
-                <li className="feature-chip"><span className="feature-dot" /> Send voice or text in Telegram to start work</li>
-                <li className="feature-chip"><span className="feature-dot" /> Ask for features, fixes, or cleanup in plain language</li>
-                <li className="feature-chip"><span className="feature-dot" /> Keep working while tasks run in the background</li>
+                <li className="feature-chip"><span className="feature-dot" /> Voice-first: talk to it naturally, it handles transcription quirks and infers intent</li>
+                <li className="feature-chip"><span className="feature-dot" /> Usage-aware: monitors your Claude Code and Codex quota in real time, defaults to cheapest execution</li>
+                <li className="feature-chip"><span className="feature-dot" /> Runs on your machine, your hardware, your existing subscriptions</li>
               </ul>
 
               <div className="mt-7 flex flex-wrap gap-3">
@@ -146,10 +146,10 @@ export default function Home() {
         <section id="what-it-does" className="section-shell alt-shell">
           <div className="section-container">
             <div className="section-head reveal">
-              <p className="eyebrow">What it is</p>
-              <h2>Autonomous coding without orchestration overhead</h2>
+              <p className="eyebrow">Philosophy</p>
+              <h2>Say what, get results</h2>
               <p>
-                You describe the outcome. The system plans, executes, and reports progress while you stay focused on priorities.
+                You should not think about infrastructure, loop orchestration, or process management. It runs on your Claude Code or Codex subscription, no API tokens needed.
               </p>
             </div>
 
@@ -175,7 +175,8 @@ export default function Home() {
           <div className="section-container">
             <div className="section-head reveal">
               <p className="eyebrow">How it works</p>
-              <h2>Message in, work shipped</h2>
+              <h2>Two layers</h2>
+              <p>A Meta Agent that handles conversation, and SubTurtles that do the coding.</p>
             </div>
 
             <div className="mt-10 grid gap-4 lg:grid-cols-[1fr_1fr] lg:items-start">
@@ -196,22 +197,22 @@ export default function Home() {
               </div>
 
               <article className="reveal control-pane" style={{ animationDelay: '560ms' }}>
-                <h3>Under the hood</h3>
+                <h3>Skills, supervision, and previews</h3>
                 <ul className="space-y-3 text-sm">
                   <li className="check-row">
-                    <span className="check-dot" /> Every task runs in its own workspace with a dedicated state file
+                    <span className="check-dot" /> Skills loaded on demand per worker so expertise stays scoped to the task
                   </li>
                   <li className="check-row">
-                    <span className="check-dot" /> Frontend tasks can capture Playwright screenshots for visual QA
+                    <span className="check-dot" /> Cron supervision monitors milestones, stalls, and failures automatically
                   </li>
                   <li className="check-row">
-                    <span className="check-dot" /> Frontend work gets a live Cloudflare tunnel preview link
+                    <span className="check-dot" /> Frontend workers publish Cloudflare tunnel links for live previews
                   </li>
                   <li className="check-row">
-                    <span className="check-dot" /> Task files carry context forward between passes
+                    <span className="check-dot" /> Playwright screenshots for visual QA without leaving the terminal
                   </li>
                   <li className="check-row">
-                    <span className="check-dot" /> Workers self-stop when done — no orphan processes
+                    <span className="check-dot" /> Workers self-stop when done, no orphan processes
                   </li>
                 </ul>
               </article>
@@ -225,8 +226,8 @@ export default function Home() {
           <div className="section-container">
             <div className="section-head reveal">
               <p className="eyebrow">Execution modes</p>
-              <h2>Four ways to run a worker</h2>
-              <p>Pick the right tradeoff between depth, speed, and cost for each task.</p>
+              <h2>Four loop types</h2>
+              <p>Trade off depth, speed, and cost per task.</p>
             </div>
 
             <div className="mt-10 grid gap-4 lg:gap-6 sm:grid-cols-2 xl:grid-cols-4">

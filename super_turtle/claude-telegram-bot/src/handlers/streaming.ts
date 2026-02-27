@@ -317,10 +317,26 @@ async function executeBotControlAction(
       if (driver === "codex") {
         await codexSession.startNewThread();
         session.activeDriver = "codex";
+        if (chatId) {
+          try {
+            const lines = await buildSessionOverviewLines("Switched to Codex 🟢");
+            await bot.api.sendMessage(chatId, lines.join("\n"), { parse_mode: "HTML" });
+          } catch (err) {
+            console.warn("Failed to send switch overview (Codex):", err);
+          }
+        }
         return "Switched to Codex";
       }
 
       session.activeDriver = "claude";
+      if (chatId) {
+        try {
+          const lines = await buildSessionOverviewLines("Switched to Claude Code 🔵");
+          await bot.api.sendMessage(chatId, lines.join("\n"), { parse_mode: "HTML" });
+        } catch (err) {
+          console.warn("Failed to send switch overview (Claude):", err);
+        }
+      }
       return "Switched to Claude Code";
     }
 

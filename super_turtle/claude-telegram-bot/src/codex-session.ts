@@ -24,6 +24,12 @@ const CODEX_SESSION_FILE = "/tmp/codex-telegram-session.json";
 const MAX_CODEX_SESSIONS = 5;
 const APP_SERVER_TIMEOUT_MS = 6000;
 const MODEL_CACHE_TTL_MS = 60_000;
+const EVENT_STREAM_STALL_TIMEOUT_MS = (() => {
+  const raw = process.env.CODEX_EVENT_STREAM_STALL_TIMEOUT_MS;
+  if (!raw) return 120_000;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed >= 1_000 ? parsed : 120_000;
+})();
 
 interface CodexPrefs {
   threadId?: string;
@@ -824,6 +830,9 @@ ${messageToSend}`;
       let nextSegmentId = 0;
       let lastTextUpdate = 0;
       let askUserTriggered = false;
+      let queryCompleted = false;
+      let stalled = false;
+      const stallTimeoutSentinel = Symbol("event-stream-stall-timeout");
 
       const getOrCreateSegment = (itemId: string): number => {
         const existing = segmentByItemId.get(itemId);
@@ -851,7 +860,42 @@ ${messageToSend}`;
       const isItemCompleted = (type: ThreadEvent["type"]): boolean =>
         type === "item.completed" || type === "item_completed";
 
-      for await (const event of streamedTurn.events) {
+      const eventsIterator = streamedTurn.events[Symbol.asyncIterator]();
+      while (true) {
+        let stallTimer: ReturnType<typeof setTimeout> | null = null;
+        const nextResult:
+          | IteratorResult<ThreadEvent>
+          | typeof stallTimeoutSentinel = await Promise.race([
+          eventsIterator.next(),
+          new Promise<typeof stallTimeoutSentinel>((resolve) => {
+            stallTimer = setTimeout(
+              () => resolve(stallTimeoutSentinel),
+              EVENT_STREAM_STALL_TIMEOUT_MS
+            );
+          }),
+        ]);
+
+        if (stallTimer) {
+          clearTimeout(stallTimer);
+        }
+
+        if (nextResult === stallTimeoutSentinel) {
+          stalled = true;
+          console.warn(
+            `Codex event stream stalled for ${EVENT_STREAM_STALL_TIMEOUT_MS}ms; aborting stream`
+          );
+          this.stopRequested = true;
+          if (this.abortController) {
+            this.abortController.abort();
+          }
+          break;
+        }
+
+        if (nextResult.done) {
+          break;
+        }
+
+        const event = nextResult.value;
         // Check for abort
         if (this.stopRequested) {
           console.log("Codex query aborted by user");
@@ -980,6 +1024,7 @@ ${messageToSend}`;
           console.log(
             `Codex usage: in=${event.usage.input_tokens} out=${event.usage.output_tokens}`
           );
+          queryCompleted = true;
         }
 
         // Handle errors
@@ -997,6 +1042,15 @@ ${messageToSend}`;
           const errorMsg = event.error || "Unknown error";
           throw new Error(`Codex event error: ${errorMsg}`);
         }
+      }
+
+      if (stalled && !queryCompleted && !askUserTriggered) {
+        const stallError = new Error(
+          `Codex event stream stalled for ${EVENT_STREAM_STALL_TIMEOUT_MS}ms before completion`
+        );
+        this.lastError = stallError.message.slice(0, 100);
+        this.lastErrorTime = new Date();
+        throw stallError;
       }
 
       // Emit any segments that did not get an explicit item.completed event

@@ -88,7 +88,7 @@ body {
 }
 
 .hero-shell {
-  padding-top: clamp(5.5rem, 10vw, 8rem);
+  padding-top: clamp(3rem, 6vw, 5rem);
 }
 
 .hero-glow {
@@ -296,6 +296,59 @@ body {
   color: var(--terminal-text);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Telegram chat preview */
+.tg-chat {
+  @apply rounded-2xl overflow-hidden;
+  border: 1px solid rgba(86, 108, 75, 0.2);
+  box-shadow: var(--surface-shadow);
+  background: #e7e3dc;
+}
+
+.tg-chat-head {
+  @apply flex items-center gap-3 px-4 py-3;
+  background: linear-gradient(135deg, var(--accent-olive), #6b8560);
+  color: #fff;
+}
+
+.tg-avatar {
+  @apply w-10 h-10 rounded-full flex items-center justify-center text-lg;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.tg-name {
+  @apply text-sm font-semibold;
+  color: #fff;
+}
+
+.tg-status {
+  @apply text-xs;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.tg-chat-body {
+  @apply p-4 space-y-3;
+  min-height: 10rem;
+  background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+.tg-bubble {
+  @apply text-sm leading-relaxed px-3 py-2 max-w-[85%];
+  border-radius: 0.9rem;
+}
+
+.tg-bubble-user {
+  @apply ml-auto;
+  background: #dcf8c6;
+  color: #1a1a1a;
+  border-bottom-right-radius: 0.3rem;
+}
+
+.tg-bubble-bot {
+  background: #fff;
+  color: #1a1a1a;
+  border-bottom-left-radius: 0.3rem;
 }
 
 .footer-shell {

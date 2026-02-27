@@ -1,24 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# browser-screenshot.sh — capture a page screenshot via Peekaboo CLI
+# browser-screenshot.sh — capture a page screenshot via Playwright CLI
 #
 # Usage:
 #   ./super_turtle/subturtle/browser-screenshot.sh <url> [output.png] [options]
 #
 # Examples:
 #   ./super_turtle/subturtle/browser-screenshot.sh http://localhost:3000
-#   ./super_turtle/subturtle/browser-screenshot.sh https://example.com ./tmp/example.png --retina
+#   ./super_turtle/subturtle/browser-screenshot.sh https://example.com ./tmp/example.png --full-page
+#   ./super_turtle/subturtle/browser-screenshot.sh http://localhost:3000 --viewport 1440x900
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-DEFAULT_APP="Google Chrome"
-DEFAULT_MODE="window"
 DEFAULT_WAIT_MS="1200"
-DEFAULT_CAPTURE_FOCUS="auto"
 DEFAULT_FORMAT="png"
-PEEKABOO_BIN="${PEEKABOO_BIN:-peekaboo}"
+DEFAULT_VIEWPORT=""
 
 usage() {
   cat <<'EOF'
@@ -26,24 +24,22 @@ Usage:
   ./super_turtle/subturtle/browser-screenshot.sh <url> [output.png] [options]
 
 Options:
-  --app <name>                Target browser app (default: "Google Chrome")
-  --mode <name>               Peekaboo image mode: window|frontmost|screen|multi
-                              (default: window)
-  --capture-focus <name>      Focus mode: auto|background|foreground (default: auto)
+  --full-page                 Capture the full scrollable page (default: true)
+  --no-full-page              Capture only the viewport
+  --viewport <WxH>            Set viewport size, e.g. 1440x900
+  --wait-ms <milliseconds>    Wait before capture (default: 1200)
   --format <name>             Output format: png|jpg (default: png)
-  --retina                    Capture at 2x Retina scale
-  --wait-ms <milliseconds>    Delay before capture after opening URL (default: 1200)
-  --json-output               Pass through Peekaboo JSON output
+  --timeout-ms <milliseconds> Navigation timeout (default: 30000)
+  --wait-selector <selector>  Wait for a CSS selector before capture
   --help                      Show this help
 
-Environment:
-  PEEKABOO_BIN                Peekaboo executable path (default: peekaboo)
+Legacy flags (accepted, ignored):
+  --app, --mode, --capture-focus, --retina, --json-output
 
 Notes:
   - If output path is omitted, image is written under .tmp/screenshots/ in repo root.
-  - URL is opened in the selected app via "peekaboo app launch --open <url>".
-  - Compatibility flags from the old Playwright wrapper (--browser, --viewport,
-    --timeout-ms, --wait-selector, --full-page) are accepted but ignored.
+  - Uses `npx playwright screenshot` under the hood.
+  - Requires playwright to be installed (npm i -D playwright or npx handles it).
 EOF
 }
 
@@ -52,31 +48,8 @@ die() {
   exit 1
 }
 
-require_command() {
-  local cmd="$1"
-  command -v "$cmd" >/dev/null 2>&1 || die "required command not found: ${cmd}"
-}
-
 is_integer() {
   [[ "$1" =~ ^[0-9]+$ ]]
-}
-
-map_browser_app() {
-  local browser="$1"
-  case "$browser" in
-    cr|chromium|chrome|google-chrome)
-      echo "Google Chrome"
-      ;;
-    ff|firefox)
-      echo "Firefox"
-      ;;
-    wk|webkit|safari)
-      echo "Safari"
-      ;;
-    *)
-      die "unsupported --browser value: ${browser}"
-      ;;
-  esac
 }
 
 warn() {
@@ -85,13 +58,12 @@ warn() {
 
 url=""
 output=""
-app="${DEFAULT_APP}"
-mode="${DEFAULT_MODE}"
+full_page="true"
+viewport="${DEFAULT_VIEWPORT}"
 wait_ms="${DEFAULT_WAIT_MS}"
-capture_focus="${DEFAULT_CAPTURE_FOCUS}"
 format="${DEFAULT_FORMAT}"
-retina="false"
-json_output="false"
+timeout_ms="30000"
+wait_selector=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -99,19 +71,22 @@ while [[ $# -gt 0 ]]; do
       usage
       exit 0
       ;;
-    --app)
-      app="${2:-}"
-      [[ -n "$app" ]] || die "--app requires a value"
+    --full-page)
+      full_page="true"
+      shift
+      ;;
+    --no-full-page)
+      full_page="false"
+      shift
+      ;;
+    --viewport)
+      viewport="${2:-}"
+      [[ -n "$viewport" ]] || die "--viewport requires a value (e.g. 1440x900)"
       shift 2
       ;;
-    --mode)
-      mode="${2:-}"
-      [[ -n "$mode" ]] || die "--mode requires a value"
-      shift 2
-      ;;
-    --capture-focus)
-      capture_focus="${2:-}"
-      [[ -n "$capture_focus" ]] || die "--capture-focus requires a value"
+    --wait-ms)
+      wait_ms="${2:-}"
+      [[ -n "$wait_ms" ]] || die "--wait-ms requires a value"
       shift 2
       ;;
     --format)
@@ -119,41 +94,27 @@ while [[ $# -gt 0 ]]; do
       [[ -n "$format" ]] || die "--format requires a value"
       shift 2
       ;;
-    --retina)
-      retina="true"
-      shift
-      ;;
-    --json-output)
-      json_output="true"
-      shift
-      ;;
-    --browser|-b)
-      app="$(map_browser_app "${2:-}")"
-      warn "--browser is deprecated; use --app instead"
-      shift 2
-      ;;
-    --viewport)
-      [[ -n "${2:-}" ]] || die "--viewport requires a value"
-      warn "--viewport is not supported by Peekaboo CLI and will be ignored"
-      shift 2
-      ;;
     --timeout-ms)
-      [[ -n "${2:-}" ]] || die "--timeout-ms requires a value"
-      warn "--timeout-ms is not supported by Peekaboo CLI and will be ignored"
+      timeout_ms="${2:-}"
+      [[ -n "$timeout_ms" ]] || die "--timeout-ms requires a value"
       shift 2
       ;;
     --wait-selector)
-      [[ -n "${2:-}" ]] || die "--wait-selector requires a value"
-      warn "--wait-selector is not supported by Peekaboo CLI and will be ignored"
+      wait_selector="${2:-}"
+      [[ -n "$wait_selector" ]] || die "--wait-selector requires a value"
       shift 2
       ;;
-    --full-page)
-      warn "--full-page is not supported by Peekaboo CLI and will be ignored"
+    # Legacy Peekaboo flags — accept and ignore
+    --app|--mode|--capture-focus)
+      warn "$1 is a legacy Peekaboo flag and will be ignored"
+      shift 2
+      ;;
+    --retina|--json-output)
+      warn "$1 is a legacy Peekaboo flag and will be ignored"
       shift
       ;;
-    --wait-ms)
-      wait_ms="${2:-}"
-      [[ -n "$wait_ms" ]] || die "--wait-ms requires a value"
+    --browser|-b)
+      warn "--browser is ignored; Playwright uses Chromium by default"
       shift 2
       ;;
     --*)
@@ -177,10 +138,9 @@ done
   die "missing required <url> argument"
 }
 
-[[ "$mode" =~ ^(window|frontmost|screen|multi)$ ]] || die "invalid --mode: ${mode}"
-[[ "$capture_focus" =~ ^(auto|background|foreground)$ ]] || die "invalid --capture-focus: ${capture_focus}"
 [[ "$format" =~ ^(png|jpg)$ ]] || die "invalid --format: ${format}"
 is_integer "$wait_ms" || die "--wait-ms must be an integer"
+is_integer "$timeout_ms" || die "--timeout-ms must be an integer"
 
 if [[ -z "$output" ]]; then
   stamp="$(date +%Y%m%d-%H%M%S)"
@@ -190,43 +150,45 @@ fi
 output_dir="$(dirname "$output")"
 mkdir -p "$output_dir"
 
-require_command "${PEEKABOO_BIN}"
+# Verify npx/playwright is available
+command -v npx >/dev/null 2>&1 || die "npx not found — install Node.js"
 
-if [[ "$(uname -s)" != "Darwin" ]]; then
-  warn "Peekaboo works on macOS; current host is $(uname -s)"
-fi
-
-echo "[browser-screenshot] Opening: ${url} (app: ${app})"
-"${PEEKABOO_BIN}" app launch "${app}" --open "${url}" --wait-until-ready >/dev/null
-
-if (( wait_ms > 0 )); then
-  sleep_seconds="$(awk "BEGIN {printf \"%.3f\", ${wait_ms} / 1000}")"
-  sleep "${sleep_seconds}"
-fi
-
+# Build the playwright screenshot command
 capture_cmd=(
-  "${PEEKABOO_BIN}" image
-  "--app=${app}"
-  "--mode=${mode}"
-  "--capture-focus=${capture_focus}"
-  "--format=${format}"
-  "--path=${output}"
+  npx playwright screenshot
+  --timeout "$timeout_ms"
 )
 
-if [[ "${retina}" == "true" ]]; then
-  capture_cmd+=(--retina)
+if [[ "${full_page}" == "true" ]]; then
+  capture_cmd+=(--full-page)
 fi
 
-if [[ "${json_output}" == "true" ]]; then
-  capture_cmd+=(--json-output)
+if [[ -n "$viewport" ]]; then
+  # Playwright expects "width,height" — normalize "WxH" and "W,H" formats
+  normalized_vp="${viewport//x/,}"
+  normalized_vp="${normalized_vp//X/,}"
+  capture_cmd+=(--viewport-size "$normalized_vp")
 fi
 
-echo "[browser-screenshot] Capturing with Peekaboo (${mode}): ${url}"
+if [[ -n "$wait_selector" ]]; then
+  capture_cmd+=(--wait-for-selector "$wait_selector")
+fi
+
+# Add wait time if specified (Playwright uses --wait-for-timeout)
+if (( wait_ms > 0 )); then
+  capture_cmd+=(--wait-for-timeout "$wait_ms")
+fi
+
+# URL and output path are positional
+capture_cmd+=("$url" "$output")
+
+echo "[browser-screenshot] Capturing: ${url}"
+echo "[browser-screenshot] Output: ${output}"
 "${capture_cmd[@]}"
 
 if [[ -f "$output" ]]; then
   output_abs="$(cd "$output_dir" && pwd)/$(basename "$output")"
   echo "[browser-screenshot] Saved: ${output_abs}"
 else
-  die "peekaboo reported success but output file was not found at ${output}"
+  die "playwright command completed but output file was not found at ${output}"
 fi

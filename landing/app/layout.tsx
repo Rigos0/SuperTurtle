@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Apify Meetup with PostHog — Today",
-  description: "Mobile-first landing page for today's Apify Meetup featuring PostHog sessions, agenda, and venue details.",
+  title: "Super Turtle — Autonomous coding on your existing subscription",
+  description: "Message it on Telegram. It wraps Claude Code or Codex — your existing subscription, no API tokens. It writes code, runs tests, and commits while you do other things.",
 };
 
 export default function RootLayout({
