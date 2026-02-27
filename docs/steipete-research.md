@@ -1898,6 +1898,202 @@ The architecture, components, and design decisions are tailored to each use case
 
 ---
 
+## Deep Dive: OpenClaw's Telegram Integration vs. Our Telegram Bot
+
+**Date**: 2026-02-27
+**Focus**: Message handling, session isolation, streaming, multi-channel patterns
+
+### 1. Core Architecture Comparison
+
+#### OpenClaw Approach
+
+**Multi-Channel Unified Model:**
+- Single normalized message envelope (`MsgContext`) for all channels (Telegram, WhatsApp, Discord, Slack, Signal)
+- Gateway acts as central WebSocket RPC hub connecting channels, agents, and clients
+- Telegram is one channel adapter among many—shares message normalization, routing, and access control infrastructure
+- Hub-and-spoke topology enables scaling to new channels without core changes
+
+**Message Normalization Pipeline:**
+- Raw Telegram events → extract metadata (text, sender, media, thread info) → construct `MsgContext` object → route through Gateway
+- Uniform structure allows agents to process messages identically regardless of origin
+
+#### Our System Approach
+
+**Telegram-Focused Implementation:**
+- Single-channel design using grammY framework
+- Direct message handling with separate handlers per message type (text, voice, photo, document, audio, video)
+- No message normalization layer
+- Session-specific context construction on-the-fly in handlers
+
+### 2. Session Isolation Strategy
+
+#### OpenClaw Approach
+
+**Hierarchical Composite Keys:**
+- Standard group: `agent:{agentId}:telegram:{chatId}`
+- Forum topic groups: `agent:{agentId}:telegram:{chatId}:topic:{threadId}`
+- Direct messages: `agent:{agentId}:telegram:{chatId}` with optional `message_thread_id` support
+- Ensures group chats, forum topics, and DMs maintain **separate transcript histories and state**
+- DM threads can carry `message_thread_id` for thread-aware routing
+
+**Access Control Patterns:**
+- DM Policy: `pairing` (new users get code to approve), `allowlist`, or open
+- Group Policy: Requires bot mention or allowlist membership before responding
+- Per-account capability overrides for fine-grained control
+
+#### Our System Approach
+
+**Single Flat Session Model:**
+- All messages from a user go to the same driver/session
+- No thread isolation (groups and DMs share history)
+- No topic-level separation for forum supergroups
+- User-scoped sequentialization (messages queued per chat ID to prevent race conditions)
+
+### 3. Command & Button Handling
+
+#### OpenClaw Approach
+
+**Command Registration:**
+- Registers commands via Telegram's `setMyCommands` at startup
+- Native commands (`commands.native: "auto"`) auto-enabled: `/pair`, `/activation`, `/config`
+- Custom commands can be defined in configuration
+- Commands via regex pattern matching for flexible matching
+
+**Callback & Button Interactions:**
+- Inline buttons use configurable scope: `off`, `dm`, `group`, `all`, or `allowlist`
+- Button clicks pass `callback_data` as text to agents
+- Supports per-account capability overrides
+- Enables interactive workflows without custom handlers
+
+#### Our System Approach
+
+**Handler-Based Commands:**
+- Explicit `bot.command()` registrations for `/new`, `/status`, `/usage`, `/context`, `/model`, `/switch`, `/resume`, `/sub`, `/restart`, `/cron`
+- Each command maps to a handler function
+- Callback queries have dedicated handler (`handleCallback`)
+- Button interactions require custom callback logic in handlers
+
+### 4. Streaming & Response Delivery
+
+#### OpenClaw Approach
+
+**Live Preview Streaming:**
+- Sends temporary message with placeholder text
+- Edits message in real-time as text arrives (`streaming: partial`)
+- Supports multiple modes: `off`, `partial`, `block`, `progress`
+- Falls back to standard delivery for complex replies with media
+- Supports `/reasoning stream` command to surface model reasoning
+
+**Deduplication:**
+- Uses `createTelegramUpdateDedupe()` with `lastUpdateId` tracking
+- Prevents reprocessing of duplicate messages on reconnect
+- Protects against platform event replay and network-induced duplicates
+
+#### Our System Approach
+
+**Streaming with State Management:**
+- Uses `StreamingState` class to track streaming progress
+- Creates callbacks (`createStatusCallback`, `createSilentStatusCallback`) for streaming events
+- Message editing not explicitly implemented (streaming is unidirectional)
+- No deduplication strategy (relies on Telegram's atomicity)
+- Typing indicators loop every 4 seconds during processing
+
+### 5. Multi-Channel Routing
+
+#### OpenClaw Approach
+
+**Deterministic Routing:**
+- Telegram messages automatically reply through Telegram
+- Model cannot override channel selection
+- Shared access control and routing infrastructure across all channels
+- Enables consistent behavior across platforms
+
+**Group vs. DM Policies:**
+- Groups require mention or allowlist
+- DMs support pairing/allowlist/open modes
+- Mention patterns use configurable regex
+- Thread support for forum supergroups
+
+#### Our System Approach
+
+**Telegram-Only:**
+- No multi-channel routing needed
+- Direct context passing to handlers
+- All routing through single Telegram API
+- No mention/allowlist patterns
+
+### 6. Advanced Features
+
+#### OpenClaw Features We Don't Have
+
+1. **Message Threading**: Forum topic isolation with separate histories
+2. **Deduplication**: Explicit protection against message replay
+3. **Streaming with Editing**: Live message updates as responses arrive
+4. **Multi-Channel Architecture**: Unified gateway for WhatsApp, Discord, Slack, Signal
+5. **Pairing/Onboarding**: New users get pairing codes for access control
+6. **Reaction Events**: Configurable system events for emoji reactions
+7. **Access Control Tiers**: Pairing, allowlist, mention patterns, per-account overrides
+
+#### Our Features OpenClaw Emphasizes
+
+1. **Cron Jobs**: Scheduled/recurring work with silent/loud modes
+2. **Driver Routing**: Fallback between Claude and Codex models
+3. **SubTurtle Integration**: Spawning and monitoring child agents via Telegram
+4. **State Snapshots**: Prepared state context for silent cron checks
+5. **Interrupt Prioritization**: `!` prefix and "stop" bypass message queue
+
+### 7. Scalability Patterns
+
+#### OpenClaw's Multi-Channel Philosophy
+
+OpenClaw is designed to scale across messaging platforms. Key scalability patterns:
+1. **Normalized message envelope** decouples agents from channel specifics
+2. **Central Gateway** makes adding new channels straightforward
+3. **Composite session keys** enable arbitrary isolation levels (group/topic/thread/DM)
+4. **Access control as configuration** (pairing codes, allowlists, mention patterns)
+5. **Deduplication by platform** prevents state corruption
+
+### 8. Recommendations for Our System
+
+**High Priority (Future Multi-Channel):**
+- ✅ Adopt normalized `MsgContext` envelope if we expand to WhatsApp/Discord
+- ✅ Implement composite session keys for forum topic support
+- ✅ Add deduplication via `lastUpdateId` tracking
+- ✅ Study OpenClaw's access control patterns for user onboarding
+
+**Medium Priority (Current Telegram-Only):**
+- 🟡 Streaming with message editing for better UX
+- 🟡 Mention/allowlist patterns for group policies
+- 🟡 Reaction event handling
+
+**Low Priority (Out of Scope):**
+- ❌ Full multi-channel hub-and-spoke (Telegram-focused is fine)
+- ❌ Pairing codes (we have static ALLOWED_USERS list)
+
+### 9. Key Insight
+
+OpenClaw's Telegram integration is **part of a larger multi-channel philosophy**. The design choices (normalized messages, composite keys, deterministic routing) are optimized for scaling across platforms. Our system, by contrast, is **Telegram-first by design**, which is a valid trade-off:
+
+| Aspect | OpenClaw | Our System |
+|--------|----------|-----------|
+| **Primary Goal** | Multi-platform messaging | Telegram-exclusive control |
+| **Message Model** | Normalized envelope | Direct handlers |
+| **Session Keys** | Composite (hierarchical) | Flat (user ID) |
+| **Routing** | Deterministic, multi-channel | Direct Telegram |
+| **Access Control** | Pairing codes, allowlists, mentions | Static ALLOWED_USERS |
+| **Scaling Strategy** | Add new channel adapters | Not applicable |
+| **Deduplication** | Platform-specific handlers | None (Telegram handles it) |
+| **Streaming** | Live editing with fallback | Typing indicators + responses |
+
+**For our current needs**, our Telegram-focused implementation is simpler and sufficient. However, if we ever:
+1. **Add WhatsApp/Discord support** → adopt normalized `MsgContext` and composite keys
+2. **Support forum topics** → implement topic ID appending to session keys
+3. **Scale user base** → implement message deduplication + pairing codes
+
+...then OpenClaw's patterns become invaluable.
+
+---
+
 ## Summary: Key Takeaways
 
 **steipete is to "agent tooling" what Django is to web frameworks** — a pragmatic, opinionated collection of utilities that solve real problems agents face. His work is characterized by:
@@ -1908,17 +2104,70 @@ The architecture, components, and design decisions are tailored to each use case
 - ✅ **User-Centric** — Focuses on the experience (clausode-mcp as MCP embedding is brilliant)
 - ✅ **Agent-Native** — Every tool considers AI agents as first-class users
 
+### OpenClaw's Telegram Integration: Patterns for Future Growth
+
+OpenClaw's multi-channel philosophy offers valuable patterns for potential future expansion:
+
+**Current System vs. OpenClaw:**
+- **We**: Telegram-focused, direct handler routing, flat user-scoped sessions
+- **OpenClaw**: Multi-channel hub, normalized message envelopes, composite hierarchical keys
+- **Trade-off**: We've optimized for simplicity (Telegram-only), OpenClaw for scale (any messaging platform)
+
+**Adoptable Patterns (if we expand):**
+1. Normalized `MsgContext` envelope for multi-channel support
+2. Composite session keys (`chatId:topicId:threadId`) for forum/thread isolation
+3. Message deduplication via `lastUpdateId` tracking
+4. Access control patterns (pairing codes, allowlists, mention regex)
+5. Streaming with message editing for better UX
+
+**Current Strengths We Shouldn't Abandon:**
+- Cron jobs with silent/loud modes (OpenClaw doesn't have this)
+- SubTurtle integration and spawning via Telegram
+- Driver fallback (Claude ↔ Codex) for quota resilience
+- Interrupt prioritization (`!` prefix, "stop" bypass)
+
+### Immediate Action Items
+
 Our agentic system is already on a good track. The key adoptions are:
-1. **Peekaboo** for visual testing
+1. **Peekaboo** for visual testing (fills critical visual automation gap)
 2. **agent-scripts** components for operational discipline
 3. **MCP-based tools** (conduit-mcp, macos-automator-mcp) to expand agent capabilities
 4. **Study mcporter** to potentially simplify our tool integration layer
+5. **OpenClaw patterns** to reference if/when we pursue multi-channel expansion
 
-The biggest gap: **We lack visual testing automation for frontend work.** Peekaboo closes that gap immediately.
+**Immediate Gap**: We lack visual testing automation for frontend work. **Peekaboo closes that gap immediately.**
+
+### Not Worth Adopting (Now)
+
+- ❌ Full multi-channel hub-and-spoke (Telegram-focused is sufficient)
+- ❌ Pairing codes (static ALLOWED_USERS list fits our use case)
+- ❌ Forum/topic isolation (not a priority for current Telegram-only bot)
+- ❌ Message deduplication (Telegram's getUpdates handles this)
 
 ---
 
-**Document Version**: 1.0
+---
+
+**Document Version**: 2.0 (Updated with Telegram Integration Analysis)
 **Research Completed**: 2026-02-27
 **Researcher**: steipete-research SubTurtle
 **Catalog Completeness**: 92 repositories audited (82 original, 10 forks)
+**Deep Dives Completed**:
+- ✅ OpenClaw Architecture (subagent orchestration, workspace isolation, session model)
+- ✅ mcporter MCP Runtime & CLI
+- ✅ Poltergeist (dev server file watching)
+- ✅ OpenClaw Skills/ClawHub System
+- ✅ VibeTunnel vs. Cloudflared
+- ✅ OpenClaw Telegram Integration
+
+---
+
+## Sources Reviewed
+
+- [OpenClaw Documentation - Channels/Telegram](https://docs.openclaw.ai/channels/telegram)
+- [OpenClaw GitHub Repository](https://github.com/steipete/openclaw)
+- steipete GitHub Profile & Repository Catalog
+- OpenClaw Architecture Docs (Gateway, agents, skills, workspace isolation)
+- VibeTunnel Repository (Swift/Node.js multi-platform infrastructure)
+- mcporter MCP Runtime Documentation
+- agent-scripts Repository (committer, docs-list, browser-tools)

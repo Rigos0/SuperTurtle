@@ -1,6 +1,6 @@
 # Current Task
 
-Look at OpenClaw's Telegram integration specifically to identify patterns we can adopt.
+Write final research document to docs/steipete-research.md with recommendations and commit.
 
 # End Goal with Specs
 
@@ -84,6 +84,6 @@ Produce a comprehensive research document at `docs/steipete-research.md` that:
 - [x] Evaluate Poltergeist for our dev server / file watching needs
 - [x] Review OpenClaw's skills/ClawHub system vs our skills loader
 - [x] Check VibeTunnel architecture vs our cloudflared approach
-- [ ] Look at OpenClaw's Telegram integration specifically <- current
-- [ ] Write final research document to docs/steipete-research.md with recommendations
+- [x] Look at OpenClaw's Telegram integration specifically
+- [ ] Write final research document to docs/steipete-research.md with recommendations <- current
 - [ ] Commit the research document
