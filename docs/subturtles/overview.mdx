@@ -1,0 +1,258 @@
+---
+title: SubTurtles Overview
+description: Autonomous background coding agents that execute tasks in parallel
+---
+
+# SubTurtles Overview
+
+SubTurtles are lightweight autonomous agents spawned by the Meta Agent to execute coding tasks in the background. Each SubTurtle runs in its own isolated workspace, manages its own state, and reports progress silently until something important happens.
+
+## What is a SubTurtle?
+
+A SubTurtle is a **background worker** that:
+
+- Runs an **autonomous loop** — no human in the middle, no waiting for input
+- Has its own **workspace** (`.subturtles/<name>/`) with a state file, logs, and metadata
+- Executes one of **four loop types** (slow, yolo, yolo-codex, yolo-codex-spark)
+- **Self-stops** when done via the `## Loop Control\nSTOP` directive
+- **Respects timeouts** — a watchdog enforces hard deadlines to prevent runaway work
+- **Checks itself in** with the cron supervisor every 5 minutes (silent unless something notable happens)
+
+The human never interacts with SubTurtles directly. They talk to the Meta Agent, which decides whether to spawn a SubTurtle or do the work itself.
+
+## Workspace Structure
+
+When you spawn a SubTurtle named `my-feature`, it creates this directory:
+
+```
+.subturtles/my-feature/
+├── CLAUDE.md              # State file (task, goal, backlog, progress)
+├── AGENTS.md              # Symlink to CLAUDE.md (for AGENTS.md protocol)
+├── subturtle.pid          # Process ID
+├── subturtle.log          # Full execution log (stdout + stderr)
+├── subturtle.meta         # Metadata (timeout, loop type, watchdog PID, cron job ID)
+├── .tunnel-url            # (Optional) Preview URL if running a frontend dev server
+└── screenshots/           # (Optional) Visual verification artifacts
+```
+
+All files are in `.subturtles/` so the workspace is easy to find and clean up. The SubTurtle reads from repo root, so it can see and modify any file in the project.
+
+## State File: CLAUDE.md
+
+The most important file is `.subturtles/<name>/CLAUDE.md`. This is the SubTurtle's own task specification and progress log.
+
+### Format
+
+The state file follows this structure:
+
+```markdown
+## Current Task
+[One-sentence description of what the SubTurtle is doing right now]
+
+## End Goal with Specs
+[The north-star objective and acceptance criteria]
+
+## Roadmap (Completed)
+- ✓ [Milestone 1]
+- ✓ [Milestone 2]
+
+## Roadmap (Upcoming)
+- [ ] [Future milestone]
+
+## Backlog
+- [x] [Completed task 1]
+- [x] [Completed task 2]
+- [ ] [Current or next task] <- current
+- [ ] [Pending task]
+- [ ] [Another pending task]
+
+## Loop Control
+(empty while running, or "STOP" when done)
+```
+
+### Who Writes It?
+
+The **Meta Agent writes the initial state file** before spawning the SubTurtle. This is how the Meta Agent communicates context and direction to its worker.
+
+```bash
+# Meta Agent uses ctl spawn with a state file
+cat <<'EOF' | ./super_turtle/subturtle/ctl spawn my-feature --type yolo-codex --state-file -
+## Current Task
+Add user authentication to the dashboard
+
+## End Goal with Specs
+Users can log in with email/password. Session persists. Logout clears session.
+
+## Backlog
+- [ ] Design auth schema (user table, session tokens)
+- [ ] Implement login endpoint
+- [ ] Add login form to frontend
+- [ ] Test login/logout flow
+- [ ] Commit
+EOF
+```
+
+### SubTurtle Reads & Updates It
+
+During execution, the SubTurtle:
+1. **Reads** its own CLAUDE.md to understand what it's supposed to do
+2. **Does the work** — writing code, running tests, committing changes
+3. **Updates** the backlog as it completes items (marks `[ ]` as `[x]`)
+4. **Advances** the `<- current` marker to the next incomplete item
+5. **When finished**, appends `## Loop Control\nSTOP` to signal completion
+
+The Meta Agent's **cron supervisor** reads the state file every 5 minutes:
+- Detects which backlog items are done
+- Checks for the `STOP` marker to know when to clean up
+- Reports milestones to the human only when something notable happened
+
+## Self-Completion: Loop Control
+
+When a SubTurtle finishes all its backlog items, it **signals completion** by appending this directive:
+
+```markdown
+## Loop Control
+STOP
+```
+
+The SubTurtle's execution loop checks for this marker after each iteration. If present, it:
+1. Logs the completion event
+2. Stops the process gracefully (no forced kills)
+3. Exits with status 0
+
+This is **clean self-termination** — no external kill signal needed for normal completion.
+
+### Example Progression
+
+A SubTurtle working through a backlog:
+
+```markdown
+## Backlog
+- [x] Read user auth requirements
+- [x] Design database schema
+- [x] Implement login endpoint
+- [ ] Add login form to frontend <- current
+- [ ] Test login/logout flow
+
+# ... SubTurtle makes progress ...
+
+## Backlog
+- [x] Read user auth requirements
+- [x] Design database schema
+- [x] Implement login endpoint
+- [x] Add login form to frontend
+- [ ] Test login/logout flow <- current
+
+# ... and continues ...
+
+## Backlog
+- [x] Read user auth requirements
+- [x] Design database schema
+- [x] Implement login endpoint
+- [x] Add login form to frontend
+- [x] Test login/logout flow
+
+## Loop Control
+STOP
+```
+
+On the next cron check-in after STOP appears, the supervisor:
+1. Detects all backlog items are done
+2. Stops the SubTurtle's cron job
+3. Notifies the Meta Agent: `🎉 Finished: my-feature`
+4. Moves on to the next task in the queue
+
+## Timeout & Watchdog
+
+Every SubTurtle has a **hard deadline**. If work exceeds the timeout, the watchdog kills it.
+
+### How It Works
+
+When you spawn a SubTurtle, you specify a timeout duration:
+
+```bash
+./super_turtle/subturtle/ctl spawn my-task --type yolo-codex --timeout 30m
+```
+
+The timeout options are: `30m`, `1h`, `2h`, `4h` (configurable).
+
+The **watchdog process:**
+1. Records the SubTurtle's PID and the deadline in `.subturtles/<name>/subturtle.meta`
+2. Runs in the background, checking if the SubTurtle is still running
+3. If the SubTurtle exceeds its deadline:
+   - Sends `SIGTERM` (graceful shutdown signal)
+   - Waits 5 seconds for cleanup
+   - If still running, sends `SIGKILL` (force kill)
+4. Logs the timeout event to `.subturtles/<name>/subturtle.log`
+
+### Why Timeouts Matter
+
+Timeouts prevent **runaway work**:
+- A SubTurtle stuck in an infinite loop won't consume resources forever
+- If a cron check-in finds the SubTurtle timed out, it can respawn or escalate
+- The Meta Agent knows exactly how long each worker can run
+
+Typical timeout strategy:
+- **yolo-codex loops:** 30m (quick tasks)
+- **yolo loops:** 1h (moderate complexity)
+- **slow loops:** 2h (thorough planning + review cycles)
+
+## The Full Lifecycle
+
+Here's what happens when a SubTurtle runs:
+
+```
+1. Meta Agent decides to spawn a SubTurtle
+       ↓
+2. Meta Agent writes .subturtles/<name>/CLAUDE.md (state file)
+       ↓
+3. Meta Agent calls: ./super_turtle/subturtle/ctl spawn <name> --type <type> --timeout <dur>
+       ↓
+4. ctl spawn creates workspace, starts watchdog, registers cron job
+       ↓
+5. SubTurtle starts its loop:
+   - Read CLAUDE.md
+   - Do work
+   - Commit changes
+   - Update CLAUDE.md
+   - Repeat
+       ↓
+6. Cron supervisor (every 5 minutes):
+   - Check SubTurtle status
+   - Read progress from CLAUDE.md
+   - If STOP marker found → clean up
+   - If no progress → report "Stuck"
+   - Otherwise stay silent
+       ↓
+7. When SubTurtle finishes:
+   - Append "## Loop Control\nSTOP" to CLAUDE.md
+   - Exit gracefully
+       ↓
+8. Next cron check-in:
+   - Detects STOP marker
+   - Removes cron job
+   - Notifies Meta Agent
+       ↓
+9. Meta Agent:
+   - Stops the SubTurtle
+   - Reports completion to human
+   - Spawns next SubTurtle (if more work)
+```
+
+## Isolation & Safety
+
+Each SubTurtle:
+- **Works in isolation** — has its own workspace, logs, and state
+- **Can't interfere with other SubTurtles** — they don't share state files
+- **Can see the full repo** — they run from repo root and can modify any file
+- **Respects timeouts** — watchdog enforces hard deadlines
+- **Self-stops gracefully** — no force-kill unless timeout expires
+
+Multiple SubTurtles can run in parallel on different tasks. The cron supervisor checks all of them every 5 minutes.
+
+## Related Documentation
+
+- [Loop Types](/docs/subturtles/loop-types) — Understand the four loop modes and when to use each
+- [CTL Commands](/docs/subturtles/ctl-commands) — Full reference for spawning and managing SubTurtles
+- [State Files](/docs/subturtles/state-files) — Deep dive into CLAUDE.md format and conventions
+- [Meta Agent Supervision](/docs/meta/supervision) — How cron checks in and reports progress
