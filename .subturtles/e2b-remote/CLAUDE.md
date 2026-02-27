@@ -1,5 +1,5 @@
 ## Current task
-Run smoke tests (at least script-level and one end-to-end dry run path), then commit in focused steps.
+Backlog complete. Awaiting new task assignment.
 
 ## End goal with specs
 From this repo, a user can provision or resume an E2B sandbox, sync project code, start Super Turtle remotely, and manage lifecycle (`status`, `pause`, `resume`, `stop`) via scripts in `super_turtle/e2b/`.
@@ -35,10 +35,17 @@ Acceptance criteria:
 - [x] Implement lifecycle commands in `super_turtle/e2b/lifecycle.sh`: status/pause/resume/stop using E2B APIs/CLI
 - [x] Implement cron pause/resume policy helper in `super_turtle/e2b/reconcile-cron.sh` against `super_turtle/claude-telegram-bot/cron-jobs.json` (documented behavior for missed windows)
 - [x] Wire docs updates in `README.md` and `docs/e2b-remote-runbook.md` with exact setup env vars (`E2B_API_KEY`, template info, expected caveats)
-- [ ] Run smoke tests (at least script-level and one end-to-end dry run path), then commit in focused steps <- current
+- [x] Run smoke tests (at least script-level and one end-to-end dry run path), then commit in focused steps
 
 ## Notes
 - Prioritize existing code reuse; avoid rewriting existing SubTurtle control unless needed.
 - Keep changes backward-compatible for local-only users.
 - If E2B credentials are missing, implement commands so they fail fast with actionable messages and still allow static validation/tests.
 - For spawn/restart safety, avoid duplicate remote process start; check remote state before creating new long-running processes.
+- Smoke suite run on February 27, 2026:
+  - `bash super_turtle/e2b/tests/smoke_up.sh`
+  - `bash super_turtle/e2b/tests/smoke_reconcile_cron.sh`
+  - `bash super_turtle/e2b/tests/smoke_lifecycle.sh`
+
+## Loop Control
+STOP
