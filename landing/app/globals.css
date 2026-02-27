@@ -111,24 +111,33 @@ body {
 }
 
 .turtle-sticker-button {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  padding: 0.25rem;
+  border: 0;
+  padding: 0;
   background: transparent;
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: transform 0.18s ease;
   cursor: pointer;
 }
 
 .turtle-sticker-button:hover {
   transform: translateY(-2px) scale(1.02);
-  border-color: rgba(182, 109, 75, 0.55);
-  box-shadow: 0 10px 24px -16px rgba(182, 109, 75, 0.85);
 }
 
 .turtle-sticker-button:focus-visible {
   outline: none;
-  border-color: rgba(86, 108, 75, 0.75);
-  box-shadow: 0 0 0 4px rgba(138, 166, 124, 0.2);
+}
+
+.turtle-sticker-image {
+  display: block;
+  transition: filter 0.22s ease, transform 0.22s ease;
+}
+
+.turtle-sticker-button:hover .turtle-sticker-image,
+.turtle-sticker-button:focus-visible .turtle-sticker-image {
+  filter:
+    drop-shadow(0 0 0.55rem rgba(182, 109, 75, 0.42))
+    drop-shadow(0 0 0.9rem rgba(138, 166, 124, 0.22))
+    brightness(1.03);
+  transform: translateY(-1px);
 }
 
 .turtle-tip-bubble {
@@ -146,6 +155,7 @@ body {
   white-space: nowrap;
   box-shadow: 0 10px 24px -20px rgba(0, 0, 0, 0.45);
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
   transition: opacity 0.22s ease, transform 0.22s ease;
   z-index: 2;
@@ -153,6 +163,7 @@ body {
 
 .turtle-tip-bubble.active {
   opacity: 1;
+  visibility: visible;
   transform: translateX(-50%) translateY(0) scale(1);
 }
 

@@ -84,13 +84,12 @@ const executionFlow = [
 ];
 
 export default function Home() {
-  const [showTurtleTip, setShowTurtleTip] = useState(false);
+  const [hasClickedTurtleTip, setHasClickedTurtleTip] = useState(false);
   const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL ?? "/docs";
   const githubUrl = "https://github.com/Rigos0/superturtle";
 
   const handleTurtleClick = () => {
-    setShowTurtleTip(true);
-    window.setTimeout(() => setShowTurtleTip(false), 2200);
+    setHasClickedTurtleTip(true);
   };
 
   return (
@@ -100,8 +99,8 @@ export default function Home() {
         <section id="hero" className="section-shell hero-shell relative">
           <div className="section-container max-w-5xl space-y-10">
             <div className="reveal text-center flex flex-col items-center" style={{ animationDelay: '80ms' }}>
-              <div className="mb-4 mx-auto turtle-sticker-wrap">
-                <div className={`turtle-tip-bubble ${showTurtleTip ? 'active' : ''}`} aria-hidden={!showTurtleTip}>
+              <div className="mx-auto turtle-sticker-wrap">
+                <div className={`turtle-tip-bubble ${hasClickedTurtleTip ? 'active' : ''}`} aria-hidden={!hasClickedTurtleTip}>
                   step by step
                 </div>
                 <button
@@ -110,10 +109,10 @@ export default function Home() {
                   onClick={handleTurtleClick}
                   aria-label="Show step by step message"
                 >
-                  <img src="/turtle-logo.png" alt="Super Turtle" width={104} height={104} />
+                  <img className="turtle-sticker-image" src="/turtle-logo.png" alt="Super Turtle" width={104} height={104} />
                 </button>
               </div>
-              <h1 className="headline">
+              <h1 className="headline mt-6 sm:mt-7 md:mt-8">
                 Super Turtle
               </h1>
               <p className="lead max-w-2xl">
