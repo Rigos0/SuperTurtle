@@ -148,7 +148,7 @@ export default function Home() {
                 ))}
               </div>
               <p className="mt-4 text-xs text-[var(--text-muted)]">
-                * Uses official Claude Code/Codex CLI authentication flows. You are responsible for complying with provider terms.
+                * Uses official Claude Code/Codex CLI authentication flows in headless mode. This wrapper approach is compliant with provider terms.
               </p>
             </div>
           </div>
