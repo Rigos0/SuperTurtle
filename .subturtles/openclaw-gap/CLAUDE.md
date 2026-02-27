@@ -1,7 +1,7 @@
 # OpenClaw Gap Audit + Reliability Implementation
 
 ## Current Task
-Implement duplicate Telegram update suppression in our bot pipeline (messages + callback queries).
+Implement idempotent spawn orchestration guard so repeated handling cannot duplicate side effects.
 
 ## End Goal with Specs
 Ship concrete reliability upgrades in `super_turtle/claude-telegram-bot` based on verified OpenClaw patterns, with tests and docs updates. Focus on reducing duplicate side effects (especially repeated spawn workflows) and hardening session/update handling.
@@ -25,8 +25,8 @@ Acceptance criteria:
 ## Backlog
 - [x] Research first: verify OpenClaw patterns from primary sources (Telegram channel docs, session model, dedupe/update handling) and summarize what it does better than us
 - [x] Map each identified gap to exact files/functions in our bot and choose minimal safe implementation
-- [ ] Implement duplicate Telegram update suppression in our bot pipeline (messages + callback queries) <- current
-- [ ] Implement idempotent spawn orchestration guard so repeated handling cannot duplicate side effects
+- [x] Implement duplicate Telegram update suppression in our bot pipeline (messages + callback queries)
+- [ ] Implement idempotent spawn orchestration guard so repeated handling cannot duplicate side effects <- current
 - [ ] Add/extend tests for duplicate updates and spawn idempotency
 - [ ] Update docs with concise "OpenClaw parity improvements" note and what remains
 - [ ] Commit with clear message and include state-file progress updates

@@ -42,11 +42,13 @@ import {
   getPreparedSnapshotCount,
 } from "./cron-supervision-queue";
 import { buildCronScheduledPrompt } from "./cron-scheduled-prompt";
+import { UpdateDedupeCache } from "./update-dedupe";
 
 // Re-export for any existing consumers
 export { bot };
 
 const INSTANCE_LOCK_FILE = "/tmp/claude-telegram-bot.instance.lock";
+const telegramUpdateDedupe = new UpdateDedupeCache();
 
 function acquireInstanceLockOrExit(): () => void {
   const thisPid = process.pid;
@@ -318,6 +320,22 @@ async function drainPreparedSnapshotsWhenIdle(): Promise<void> {
     }
   }
 }
+
+// Drop duplicate Telegram updates before any handler side effects run.
+bot.use(async (ctx, next) => {
+  if (!telegramUpdateDedupe.isDuplicateUpdate(ctx.update)) {
+    await next();
+    return;
+  }
+
+  if (ctx.callbackQuery) {
+    try {
+      await ctx.answerCallbackQuery();
+    } catch {
+      // ignore duplicate callback ack errors
+    }
+  }
+});
 
 // Sequentialize non-command messages per user (prevents race conditions)
 // Commands bypass sequentialization so they work immediately
