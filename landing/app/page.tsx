@@ -32,20 +32,20 @@ const pillars = [
 
 const workflowSteps = [
   {
-    title: 'Say what you want',
-    description: 'Text or voice message on Telegram. "Build me X" is enough.',
+    title: 'Define the outcome',
+    description: 'Give one clear request with acceptance criteria and repo context.',
   },
   {
-    title: 'It decomposes and dispatches',
-    description: 'Breaks the work into parallel tasks, picks Claude or Codex for each, and starts autonomous workers.',
+    title: 'Split into parallel tracks',
+    description: 'The meta agent breaks the ask into scoped subtasks and starts multiple workers at once.',
   },
   {
-    title: 'Workers loop until done',
-    description: 'Each worker reads state → writes code → runs tests → commits. Supervision restarts stuck ones automatically.',
+    title: 'Run the worker loop',
+    description: 'Each worker follows state -> code -> test -> commit, then updates its task file for the next pass.',
   },
   {
-    title: 'Results land in your chat',
-    description: 'Commits ship. You get a summary, preview links for frontend work, and the next task starts automatically.',
+    title: 'Supervise and advance',
+    description: 'Watchdogs monitor progress, restart stuck runs, and post milestone updates as finished work lands.',
   },
 ];
 
