@@ -1,5 +1,5 @@
 ## Current Task
-Final pass: grep for repeated phrases, ensure each point appears exactly once.
+All backlog items complete.
 
 ## End Goal with Specs
 The landing page at `landing/app/page.tsx` has compelling, non-repetitive copy that highlights the project's real differentiators. Style: factual, simple, catchy. No marketing fluff.
@@ -61,11 +61,15 @@ The landing page at `landing/app/page.tsx` has compelling, non-repetitive copy t
 - [x] Draft new workflow steps — concrete, no overlap with pillars
 - [x] Rewrite "Under the hood" panel — unique points not covered elsewhere
 - [x] Review execution modes copy — make each card distinct and useful
-- [ ] Final pass: grep for repeated phrases, ensure each point appears exactly once <- current
-- [ ] Commit changes
+- [x] Final pass: grep for repeated phrases, ensure each point appears exactly once
+- [x] Commit changes
 
 ## Notes
 - The user specifically called out: "quiet unless there is news" appeared in hero bullets AND as a pillar card
 - The subscription/API tokens point was repeated in hero lead, hero bullets, section heading, AND first pillar
 - Missing features that should be mentioned: screenshots, built-with-itself, tunnels
 - Tone reference: the current style is "already pretty good" — keep it, just tighten and de-duplicate
+
+
+## Loop Control
+STOP

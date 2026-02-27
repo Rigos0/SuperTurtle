@@ -5,8 +5,8 @@ import { SectionDivider } from '@/components/SectionDivider';
 
 const chatMessages = [
   { from: 'user', text: 'build me an API client with tests' },
-  { from: 'bot', text: '🚀 On it. Starting worker "api-client" (yolo-codex, 2h timeout). I\'ll stay quiet unless there\'s news.' },
-  { from: 'bot', text: '🎉 Done. 4 files changed, 12 tests passing.\nCommitted: feat(api): add client with retry logic and test suite' },
+  { from: 'bot', text: '🚀 On it. Starting worker "api-client" (yolo-codex, 2h timeout).' },
+  { from: 'bot', text: '🎉 Done. 4 files changed, 12 tests passing.' },
 ];
 
 const pillars = [
@@ -41,11 +41,11 @@ const workflowSteps = [
   },
   {
     title: 'Run the worker loop',
-    description: 'Each worker follows state -> code -> test -> commit, then updates its task file for the next pass.',
+    description: 'Each worker loops state -> code -> test -> commit until done, with clear commit messages in your repo.',
   },
   {
     title: 'Supervise and advance',
-    description: 'Watchdogs monitor progress, restart stuck runs, and post milestone updates as finished work lands.',
+    description: 'Watchdogs monitor progress and restart stuck runs automatically.',
   },
 ];
 
@@ -95,13 +95,13 @@ export default function Home() {
                 Super Turtle
               </h1>
               <p className="lead max-w-2xl">
-                Super Turtle is an autonomous coding system you chat with on Telegram. You send a request, it runs workers that code, test, and commit in your repo.
+                One chat for autonomous software delivery.
               </p>
 
               <ul className="mt-6 space-y-2 text-sm">
-                <li className="feature-chip"><span className="feature-dot" /> Use the Claude Code or Codex subscription you already have</li>
                 <li className="feature-chip"><span className="feature-dot" /> Send voice or text in Telegram to start work</li>
-                <li className="feature-chip"><span className="feature-dot" /> Big asks get split into parallel workers automatically</li>
+                <li className="feature-chip"><span className="feature-dot" /> Ask for features, fixes, or cleanup in plain language</li>
+                <li className="feature-chip"><span className="feature-dot" /> Keep working while tasks run in the background</li>
               </ul>
 
               <div className="mt-7 flex flex-wrap gap-3">
@@ -147,9 +147,9 @@ export default function Home() {
           <div className="section-container">
             <div className="section-head reveal">
               <p className="eyebrow">What it is</p>
-              <h2>Your existing subscription, working autonomously</h2>
+              <h2>Autonomous coding without orchestration overhead</h2>
               <p>
-                You already pay for Claude Code or Codex. Super Turtle puts them to work as autonomous agents — no API tokens, no extra billing.
+                You describe the outcome. The system plans, executes, and reports progress while you stay focused on priorities.
               </p>
             </div>
 
@@ -175,7 +175,7 @@ export default function Home() {
           <div className="section-container">
             <div className="section-head reveal">
               <p className="eyebrow">How it works</p>
-              <h2>Message in, commits out</h2>
+              <h2>Message in, work shipped</h2>
             </div>
 
             <div className="mt-10 grid gap-4 lg:grid-cols-[1fr_1fr] lg:items-start">
@@ -208,7 +208,7 @@ export default function Home() {
                     <span className="check-dot" /> Frontend work gets a live Cloudflare tunnel preview link
                   </li>
                   <li className="check-row">
-                    <span className="check-dot" /> Completed changes land as normal git commits with clear messages
+                    <span className="check-dot" /> Task files carry context forward between passes
                   </li>
                   <li className="check-row">
                     <span className="check-dot" /> Workers self-stop when done — no orphan processes
@@ -226,7 +226,7 @@ export default function Home() {
             <div className="section-head reveal">
               <p className="eyebrow">Execution modes</p>
               <h2>Four ways to run a worker</h2>
-              <p>Trade off depth, speed, and cost. The system defaults to the cheapest mode and escalates when needed.</p>
+              <p>Pick the right tradeoff between depth, speed, and cost for each task.</p>
             </div>
 
             <div className="mt-10 grid gap-4 lg:gap-6 sm:grid-cols-2 xl:grid-cols-4">
