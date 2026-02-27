@@ -5,7 +5,8 @@
   "scripts": {
     "docs:dev": "vitepress dev .",
     "docs:build": "vitepress build .",
-    "docs:preview": "vitepress preview ."
+    "docs:preview": "vitepress preview .",
+    "docs:validate-core": "bash scripts/validate-core-pages.sh"
   },
   "devDependencies": {
     "vitepress": "^1.6.4"
