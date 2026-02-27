@@ -12,7 +12,7 @@ const chatMessages = [
 
 const heroHighlights = [
   {
-    title: 'Uses your Claude Code or Codex subscription',
+    title: 'Uses your Claude Code or Codex subscription*',
     description: 'No extra API-token workflow for core use.',
     accent: 'olive',
   },
@@ -147,6 +147,9 @@ export default function Home() {
                   </article>
                 ))}
               </div>
+              <p className="mt-4 text-xs text-[var(--text-muted)]">
+                * Uses official Claude Code/Codex CLI authentication flows. You are responsible for complying with provider terms.
+              </p>
             </div>
           </div>
           <div className="hero-glow" />

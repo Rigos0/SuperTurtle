@@ -16,12 +16,14 @@ Full docs: [docs/index.md](docs/index.md)
 
 ## Why Super Turtle
 
-1. SuperTurtle uses your Claude Code or Codex subscription.
+1. SuperTurtle uses your Claude Code or Codex subscription.*
 2. Mobile and voice control first: run everything from Telegram by text or voice.
 3. Autonomous execution: breaks work into tasks, runs sub-agents, can open/test webpages, and iterates until done.
 4. Runs on your machine (cloud deployment coming up).
 5. It tracks remaining usage and load-balances between Claude Code and Codex.
 6. Autonomous supervision: scheduled cron check-ins monitor progress in the background and send important updates.
+
+* Uses official Claude Code/Codex CLI authentication flows. No token reuse in third-party wrappers. You are responsible for complying with provider terms.
 
 <p align="center">
   <img src="assets/readme-stickers/setup-save-turtle.png" width="108" alt="Setup turtle sticker" />
