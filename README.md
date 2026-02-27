@@ -31,8 +31,8 @@ Full docs: [docs/index.md](docs/index.md)
 ### 1) Clone the repo
 
 ```bash
-git clone <your-fork-or-repo-url>
-cd <repo-directory>
+git clone https://github.com/Rigos0/superturtle.git
+cd superturtle
 ```
 
 You can ask Claude/Codex to clone it for you, then ensure you are in the repo root.
