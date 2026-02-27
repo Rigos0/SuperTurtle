@@ -1,5 +1,5 @@
 ## Current Task
-Test that turtle greeting stickers render correctly (not as photos).
+Verify `/cron` does not show the greeting jobs.
 
 ## End Goal with Specs
 
@@ -82,9 +82,9 @@ File to modify: `super_turtle/claude-telegram-bot/src/index.ts`
 ## Backlog
 - [x] Create `turtle-greetings.ts` with message/sticker pools, timezone-aware scheduling, and direct bot.api sending
 - [x] Wire into `index.ts` startup with env var gate
-- [ ] Test that stickers render correctly (not as photos) <- current
-- [ ] Verify `/cron` does not show the greeting jobs
-- [ ] Commit
+- [x] Test that stickers render correctly (not as photos)
+- [ ] Verify `/cron` does not show the greeting jobs <- current
+- [x] Commit
 
 ## Notes
 - InputFile import: `import { InputFile } from "grammy"`
