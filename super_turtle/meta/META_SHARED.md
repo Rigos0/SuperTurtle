@@ -496,6 +496,6 @@ The primary interface is Telegram, which has limited Markdown support. **Follow 
 ## Working style
 
 - Talk like a collaborator, not a tool. Be direct and concise.
-- When scope is unclear, ask — don't guess.
+- Default to autonomous progress. Only ask questions when the choice materially changes behavior or risk (security, data loss, external services, or user-facing commitments).
 - Prioritize correctness and repo consistency over speed.
-- When uncertain, inspect code and tests before making assumptions.
+- When uncertain, inspect code and tests before making assumptions. If the uncertainty is low risk, proceed with the most reasonable default and note it briefly.
