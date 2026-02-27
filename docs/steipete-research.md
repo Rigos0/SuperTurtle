@@ -218,7 +218,232 @@ Peter Steinberger (@steipete) is a prolific open-source developer with a strong 
 
 ---
 
+## Deep Dive: mcporter MCP Runtime vs. Manual MCP Registration
 
+**Date**: 2026-02-27
+**Focus**: Evaluating mcporter as a replacement for our manual MCP tool discovery and registration system
+
+### 1. Current System: Manual MCP Registration
+
+Our agentic system currently:
+1. **Defines MCP servers in `mcp-config.ts`**: A static TypeScript object maps server names to command/HTTP configurations
+2. **Dynamic import in `config.ts`**: Loads the MCP_SERVERS export at startup
+3. **Passes to Claude Agent SDK**: The `mcpServers` option in `query()` receives the configuration
+4. **Manual server definition**: Each new MCP server requires:
+   - Adding an entry to `mcp-config.ts` with command/args or HTTP URL
+   - Ensuring the referenced server file exists and is runnable
+   - Managing OAuth credentials via environment variables (e.g., TELEGRAM_CHAT_ID)
+   - Handling stdio/HTTP transport manually
+
+**Current Code Flow**:
+```
+mcp-config.ts (manual definition)
+    ↓
+config.ts (dynamic import + export)
+    ↓
+session.ts (passes MCP_SERVERS to query({options: {mcpServers}}))
+    ↓
+Claude Agent SDK (distributes tools to Claude)
+```
+
+**Strengths**:
+- Simple and transparent — easy to debug
+- Minimal dependencies — just the SDK
+- Full control over server lifecycle and configuration
+- Fast startup — no discovery overhead
+
+**Weaknesses**:
+- Manual effort to register each server
+- Duplicate definitions if same server used across projects
+- No automatic OAuth handling (must manage tokens manually)
+- No daemon mode support for stateful servers (chrome-devtools, etc.)
+- No CLI generation — servers are model-only, not shareable as CLI tools
+- No introspection — no way to discover available tools without server metadata
+
+### 2. mcporter: Zero-Config Discovery + CLI Generation
+
+mcporter provides:
+
+**Architecture**:
+- **Discovery Engine**: Auto-scans config files from home, project, and multiple editors (Cursor, Claude, Codex, Windsurf)
+- **Runtime API**: `createRuntime()` returns connection pool + `createServerProxy()` for typed tool calls
+- **CLI Generator**: `generate-cli` packages any MCP server as a standalone command-line tool
+- **TypeScript Codegen**: `emit-ts` produces `.d.ts` and client wrappers
+- **Transport Abstraction**: Unified interface for stdio, HTTP, SSE with OAuth caching
+- **Daemon Mode**: Auto-spawns persistent daemons for stateful servers (chrome-devtools, etc.)
+
+**Key Features**:
+
+1. **Zero-Config Discovery**:
+   ```typescript
+   // No config file needed — mcporter reads ~/.mcporter/mcporter.json
+   // Merges with $PROJECT/config/mcporter.json
+   // Expands ${ENV} placeholders
+   // Auto-imports from Cursor, Claude, Codex, Windsurf configs
+   const runtime = await createRuntime();
+   const chrome = createServerProxy(runtime, "chrome-devtools");
+   ```
+
+2. **Multiple Invocation Styles**:
+   ```bash
+   # CLI: colon-delimited
+   mcporter call linear.create_issue title:Bug team:ENG
+
+   # CLI: function-call style
+   mcporter call 'linear.create_issue(title: "Bug", team: "ENG")'
+
+   # TypeScript: camelCase proxy
+   const result = await server.createIssue({ title: "Bug", team: "ENG" });
+   ```
+
+3. **CLI Generation**:
+   ```bash
+   mcporter generate-cli linear --bundle dist/linear.js
+   # Creates shareable CLI tool from MCP server definition
+   ```
+
+4. **OAuth Auto-Handling**:
+   ```bash
+   mcporter auth vercel  # Interactive OAuth setup
+   # Token cached in ~/.mcporter/auth.json
+   # Automatically refreshed on next invocation
+   ```
+
+5. **Daemon Mode**:
+   ```bash
+   mcporter daemon status
+   mcporter daemon start|stop|restart
+   # Auto-spawns persistent process for stateful servers
+   ```
+
+### 3. Detailed Comparison
+
+| Aspect | Manual Registration | mcporter |
+|--------|-------------------|----------|
+| **Server Definition** | Static TypeScript objects | Auto-discovered from config files |
+| **Syntax** | `{ command: "bun", args: [...] }` | `mcpServers.{name}.command` + env expansion |
+| **Configuration Merging** | Single project file | Home + Project + Editor imports |
+| **OAuth Handling** | Manual (env vars) | Automatic with browser handshake + token cache |
+| **Token Management** | Per-project .env | Centralized ~/.mcporter/auth.json |
+| **CLI Support** | No | Yes (`generate-cli` + bundling) |
+| **TypeScript Generation** | No | Yes (`emit-ts` for `.d.ts` + client wrappers) |
+| **Daemon Mode** | Manual subprocess management | Automatic with lifecycle control |
+| **Environment Variables** | Plain `process.env` | `${VAR}` and `$env:VAR` interpolation |
+| **Discovery** | Manual | Automatic from 4+ config sources |
+| **Startup Overhead** | None | Discovery + config merge (~100ms) |
+| **Dependencies** | @modelcontextprotocol/sdk | mcporter + 10 deps (acorn, zod, rolldown, etc.) |
+| **Tool Introspection** | Via `ListToolsRequest` | Yes, plus schema export |
+
+### 4. Integration Scenarios
+
+**Scenario A: Minimal Integration** (keep current system)
+- No change to `mcp-config.ts`
+- Benefit: Zero risk, zero overhead
+- Cost: Manual registration continues, no CLI generation capability
+
+**Scenario B: mcporter for Discovery + CLI Generation** (hybrid)
+- Keep manual `mcp-config.ts` as primary source
+- Add `mcporter generate-cli` step in CI/CD to create shareable CLIs for each server
+- Gradually migrate to mcporter's config format
+- Benefits: CLI generation + auto-discovery within 1 project
+- Cost: Moderate refactor (2-3 hours), adds mcporter dependency
+
+**Scenario C: Full mcporter Adoption** (max benefit)
+- Replace `mcp-config.ts` with `config/mcporter.json`
+- Use `createRuntime()` API in Claude Agent SDK integration
+- Enable OAuth for API-based servers (linear, github, etc.)
+- Daemon mode for stateful servers
+- Generate CLIs for internal tools
+- Benefits: Unified config, OAuth support, CLI generation, daemon mode
+- Cost: Significant refactor (8-10 hours), breaking change to config format
+
+### 5. Architectural Constraints
+
+**Why mcporter might NOT fit our system perfectly**:
+
+1. **SDK Integration Mismatch**:
+   - Claude Agent SDK uses `mcpServers: Record<string, McpServerConfig>` directly
+   - mcporter's `createRuntime()` returns `ServerProxy` objects, not raw `McpServerConfig`
+   - Would need to bridge: `runtime.getConfig()` → `McpServerConfig` for SDK
+   - **Status**: Feasible but requires adapter layer
+
+2. **Codex Integration**:
+   - Codex runs as subprocess with environment injection
+   - mcporter expects environment already set or reads from file
+   - Would need wrapper: `MCPORTER_HOME=... codex query ...`
+   - **Status**: Doable with environment wiring
+
+3. **Static Config vs. Dynamic Discovery**:
+   - Our `mcp-config.ts` is TypeScript, evaluated at load time
+   - mcporter config is JSON, allowing dynamic updates
+   - Trade-off: TypeScript is more flexible, JSON is simpler
+   - **Status**: JSON approach is fine for our use case
+
+4. **Dependency Weight**:
+   - mcporter pulls in: rolldown (bundler), acorn (parser), zod, etc.
+   - Our current system has zero extra dependencies
+   - Adds ~5MB to node_modules
+   - **Status**: Acceptable if benefits justify it
+
+### 6. Cost-Benefit Analysis
+
+**Option A: Stay with Manual Registration**
+- Pro: Zero dependencies, simple, transparent
+- Pro: Fast startup, no discovery overhead
+- Con: No CLI generation, no OAuth support, no daemon mode
+- Con: Duplicate config across projects
+- **Effort to Maintain**: Low
+- **Recommendation**: ✅ **Viable if no external API servers**
+
+**Option B: Hybrid (mcporter for CLI gen + discovery in future)**
+- Pro: Keep current system, add CLI generation capability
+- Pro: Path toward full mcporter adoption
+- Con: Moderate complexity, mcporter dependency
+- Con: Config duplication (mcp-config.ts + config/mcporter.json)
+- **Effort to Integrate**: 2-3 hours
+- **Recommendation**: ✅ **Good middle ground**
+
+**Option C: Full Adoption**
+- Pro: Single config source, OAuth auto-handling, daemon mode, CLI generation
+- Pro: Aligns with broader ecosystem (Cursor, Claude)
+- Con: 8-10 hour refactor, breaking change
+- Con: SDK integration requires adapter layer
+- Con: Adds dependency weight
+- **Effort to Integrate**: 8-10 hours
+- **Recommendation**: ⏰ **Defer to Phase 2 if we add API-based tools (Linear, GitHub)**
+
+### 7. Decision & Recommendation
+
+**Verdict: KEEP MANUAL REGISTRATION for now, Plan Hybrid Adoption**
+
+**Immediate Action (Current Sprint)**:
+- ✅ No change to current system
+- Rationale: Our system works, adding mcporter now has no immediate ROI
+
+**Short-term (Next Month)**:
+- If we need to package our custom MCP servers as CLI tools → Implement `generate-cli` wrapper around each server
+- If we need OAuth for external APIs (Linear, GitHub, etc.) → Evaluate mcporter's OAuth handling
+- Prototype: Test mcporter's discovery with our current `mcp-config.ts` migration
+
+**Medium-term (Q2 2026)**:
+- Once API-based servers become critical, migrate to full mcporter + OAuth
+- Create `config/mcporter.json` as primary config
+- Update session.ts to use `createRuntime()` adapter
+- Migrate Codex integration to mcporter environment injection
+
+**Long-term (H2 2026)**:
+- If mcporter becomes standard in Claude/Cursor ecosystem, full adoption is natural
+- Could enable third-party agent MCP composition via `./mcporter call`
+
+### 8. Key Takeaway
+
+mcporter is **excellent for ecosystem integration**, but **our manual approach is sufficient for current scope**. It's a "nice-to-have" optimization, not a blocking gap. Priority should be:
+
+1. Ensuring our custom servers (ask-user, send-turtle, bot-control) work reliably ✅
+2. Adding external tools only when needed (Linear, GitHub, Slack)
+3. Then mcporter becomes a clear win for OAuth + CLI gen
+
+---
 
 ## Tier 1: Direct Agent Infrastructure (Highest Priority)
 
