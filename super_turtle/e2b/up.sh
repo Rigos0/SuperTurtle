@@ -37,6 +37,10 @@ Environment:
   E2B_REMOTE_PROJECT_DIR    Default remote project directory
   E2B_REMOTE_LOG_PATH       Remote log file for run-loop output
   E2B_SKIP_AUTH_CHECK=1     Skip 'e2b auth info' preflight
+  E2B_CONNECT_TIMEOUT_SECONDS
+                            Timeout per 'sandbox connect' attempt (default: 45)
+  E2B_CONNECT_TIMEOUT_RETRIES
+                            Retry count for timed-out connect attempts (default: 2)
   E2B_ALLOW_LEGACY_CREATE_FALLBACK=1
                              Allow interactive `e2b sandbox create` fallback
 EOF
@@ -223,27 +227,86 @@ sandbox_connect() {
   cat > "${tmp_input}"
 
   local max_retries="${E2B_CONNECT_RAWMODE_RETRIES:-3}"
+  local timeout_retries="${E2B_CONNECT_TIMEOUT_RETRIES:-2}"
+  local connect_timeout_seconds="${E2B_CONNECT_TIMEOUT_SECONDS:-45}"
   local retry_delay_seconds="${E2B_CONNECT_RAWMODE_RETRY_DELAY_SECONDS:-1}"
-  local attempt=1
+  local rawmode_attempt=1
+  local timeout_attempt=1
 
   while true; do
-    if "${E2B_BIN}" sandbox connect "${sandbox_id}" <"${tmp_input}" >"${tmp_output}" 2>&1; then
+    local connect_rc=0
+    if "${PYTHON_BIN}" - "${connect_timeout_seconds}" "${tmp_input}" "${tmp_output}" "${E2B_BIN}" "sandbox" "connect" "${sandbox_id}" <<'PY'
+import subprocess
+import sys
+
+timeout_raw = sys.argv[1]
+stdin_path = sys.argv[2]
+output_path = sys.argv[3]
+command = sys.argv[4:]
+
+try:
+    timeout_seconds = int(timeout_raw)
+except ValueError:
+    print(f"invalid E2B_CONNECT_TIMEOUT_SECONDS value: {timeout_raw}", file=sys.stderr)
+    sys.exit(2)
+
+if timeout_seconds <= 0:
+    print(f"E2B_CONNECT_TIMEOUT_SECONDS must be > 0: {timeout_seconds}", file=sys.stderr)
+    sys.exit(2)
+
+try:
+    with open(stdin_path, "rb") as stdin_file, open(output_path, "wb") as output_file:
+        try:
+            completed = subprocess.run(
+                command,
+                stdin=stdin_file,
+                stdout=output_file,
+                stderr=subprocess.STDOUT,
+                timeout=timeout_seconds,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            output_file.write(
+                f"[e2b-up] sandbox connect timed out after {timeout_seconds}s\n".encode("utf-8")
+            )
+            sys.exit(124)
+except OSError as exc:
+    print(f"failed to run sandbox connect: {exc}", file=sys.stderr)
+    sys.exit(2)
+
+sys.exit(completed.returncode)
+PY
+    then
       cat "${tmp_output}"
       rm -f "${tmp_input}" "${tmp_output}"
       return 0
+    else
+      connect_rc=$?
+    fi
+
+    if [[ "${connect_rc}" -eq 124 ]]; then
+      if (( timeout_attempt > timeout_retries )); then
+        break
+      fi
+
+      log "sandbox connect attempt timed out after ${connect_timeout_seconds}s; retrying (${timeout_attempt}/${timeout_retries})"
+      sleep "${retry_delay_seconds}"
+      timeout_attempt=$((timeout_attempt + 1))
+      continue
     fi
 
     if ! grep -q "process.stdin.setRawMode is not a function" "${tmp_output}"; then
       break
     fi
 
-    if (( attempt > max_retries )); then
+    if (( rawmode_attempt > max_retries )); then
       break
     fi
 
-    log "sandbox connect hit non-interactive raw-mode bug; retrying direct connect (${attempt}/${max_retries})"
+    log "sandbox connect hit non-interactive raw-mode bug; retrying direct connect (${rawmode_attempt}/${max_retries})"
     sleep "${retry_delay_seconds}"
-    attempt=$((attempt + 1))
+    rawmode_attempt=$((rawmode_attempt + 1))
+    continue
   done
 
   cat "${tmp_output}" >&2

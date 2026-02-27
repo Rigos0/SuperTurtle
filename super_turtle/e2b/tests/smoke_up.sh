@@ -113,6 +113,10 @@ case "${sub}" in
       echo "sandbox not found: ${sandbox_id}" >&2
       exit 1
     fi
+    if [[ "${E2B_FAKE_CONNECT_TIMEOUT_ONCE:-0}" == "1" && ! -f "${STATE_DIR}/connect-timeout-once.done" && ! -t 0 ]]; then
+      touch "${STATE_DIR}/connect-timeout-once.done"
+      sleep "${E2B_FAKE_CONNECT_TIMEOUT_SLEEP_SECONDS:-3}"
+    fi
     if [[ "${E2B_FAKE_CONNECT_RAWMODE_ONCE:-0}" == "1" && ! -f "${STATE_DIR}/connect-rawmode-once.done" && ! -t 0 ]]; then
       touch "${STATE_DIR}/connect-rawmode-once.done"
       echo "TypeError: process.stdin.setRawMode is not a function" >&2
@@ -142,7 +146,11 @@ chmod +x "${FAKE_BIN_DIR}/e2b"
 export PATH="${FAKE_BIN_DIR}:${PATH}"
 export HOME="${TEST_HOME}"
 export FAKE_E2B_STATE_DIR
+export E2B_FAKE_CONNECT_TIMEOUT_ONCE=1
+export E2B_FAKE_CONNECT_TIMEOUT_SLEEP_SECONDS=10
 export E2B_FAKE_CONNECT_RAWMODE_ONCE=1
+export E2B_CONNECT_TIMEOUT_SECONDS=8
+export E2B_CONNECT_TIMEOUT_RETRIES=3
 export E2B_STATE_FILE="${STATE_FILE}"
 export E2B_REMOTE_PROJECT_DIR="${REMOTE_PROJECT_DIR}"
 export E2B_REMOTE_LOG_PATH="${REMOTE_PROJECT_DIR}/.superturtle/bot.log"
@@ -182,5 +190,7 @@ second_pid="$(cat "${PID_FILE}")"
 
 resumed_after_second="$(bash "${STATE_SCRIPT}" get resumed_at)"
 [[ -n "${resumed_after_second}" ]] || { echo "resumed_at should be set after reusing sandbox" >&2; exit 1; }
+[[ -f "${FAKE_E2B_STATE_DIR}/connect-timeout-once.done" ]] || { echo "timeout retry path was not exercised" >&2; exit 1; }
+[[ -f "${FAKE_E2B_STATE_DIR}/connect-rawmode-once.done" ]] || { echo "raw-mode retry path was not exercised" >&2; exit 1; }
 
 echo "[smoke:e2b-up] pass"
