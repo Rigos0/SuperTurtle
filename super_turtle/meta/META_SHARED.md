@@ -236,6 +236,27 @@ When spawning a SubTurtle to work on a frontend project (Next.js, React app, etc
 
 This keeps preview links clean and automatic — the human just gets the link when it's ready, and cleanup is built-in.
 
+## Frontend visual verification screenshots
+
+When frontend work needs visual QA, use the screenshot helper script:
+
+- Script path: `super_turtle/subturtle/browser-screenshot.sh`
+- Basic usage:
+  - `bash super_turtle/subturtle/browser-screenshot.sh http://localhost:3000`
+  - `bash super_turtle/subturtle/browser-screenshot.sh "$TUNNEL_URL" ".subturtles/<name>/screenshots/home.png" --app "Google Chrome" --mode window`
+- Defaults:
+  - Output path omitted -> writes to `.tmp/screenshots/screenshot-<timestamp>.png`
+  - Browser app: `"Google Chrome"`
+  - Capture mode: `window`
+  - Wait before capture: `1200ms`
+- Useful flags:
+  - `--wait-ms 2000` to let data-heavy pages settle before capture
+  - `--retina` for 2x captures
+  - `--capture-focus foreground` when an app must be frontmost to render correctly
+  - `--mode frontmost|screen|multi` for alternate capture targets
+
+For frontend SubTurtles, include screenshot capture in the backlog before final completion so milestone updates can reference concrete visual verification artifacts.
+
 ## Autonomous supervision (cron check-ins)
 
 Every SubTurtle you spawn gets a recurring cron job that wakes you up to supervise it. This is **mandatory** and auto-registered by `ctl spawn` (default interval: 5 minutes).
