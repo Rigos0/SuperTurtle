@@ -11,6 +11,7 @@ FAKE_E2B_STATE_DIR="${TMP_DIR}/fake-e2b"
 REMOTE_PROJECT_DIR="${TMP_DIR}/remote-project"
 STATE_FILE="${TMP_DIR}/state.json"
 PID_FILE="${REMOTE_PROJECT_DIR}/.superturtle/bot.pid"
+TEST_HOME="${TMP_DIR}/home"
 
 cleanup() {
   trap - EXIT
@@ -27,6 +28,7 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "${FAKE_BIN_DIR}" "${FAKE_E2B_STATE_DIR}/sandboxes"
+mkdir -p "${TEST_HOME}"
 
 cat > "${FAKE_BIN_DIR}/bun" <<'SH'
 #!/usr/bin/env bash
@@ -136,6 +138,7 @@ SH
 chmod +x "${FAKE_BIN_DIR}/e2b"
 
 export PATH="${FAKE_BIN_DIR}:${PATH}"
+export HOME="${TEST_HOME}"
 export FAKE_E2B_STATE_DIR
 export E2B_STATE_FILE="${STATE_FILE}"
 export E2B_REMOTE_PROJECT_DIR="${REMOTE_PROJECT_DIR}"

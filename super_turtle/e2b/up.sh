@@ -164,7 +164,7 @@ clean = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", raw)
 
 def pick_from_obj(value):
     if isinstance(value, dict):
-        for key in ("sandboxId", "sandbox_id", "id"):
+        for key in ("sandboxID", "sandboxId", "sandbox_id", "id"):
             candidate = value.get(key)
             if isinstance(candidate, str) and candidate.strip():
                 return candidate.strip()
@@ -241,17 +241,11 @@ create_sandbox_legacy() {
   return 1
 }
 
-create_sandbox_via_api() {
-  local template="${1:?template required}"
-  "${PYTHON_BIN}" - "${template}" <<'PY'
+resolve_e2b_create_context() {
+  "${PYTHON_BIN}" - <<'PY'
 import json
 import os
-import sys
-import urllib.error
-import urllib.request
 from pathlib import Path
-
-template = sys.argv[1]
 
 config_path = Path.home() / ".e2b" / "config.json"
 config = {}
@@ -263,6 +257,111 @@ if config_path.is_file():
 
 api_key = (os.getenv("E2B_API_KEY") or "").strip() or str(config.get("teamApiKey") or "").strip()
 access_token = (os.getenv("E2B_ACCESS_TOKEN") or "").strip() or str(config.get("accessToken") or "").strip()
+api_url = (os.getenv("E2B_API_URL") or "").strip()
+if not api_url:
+    domain = (os.getenv("E2B_DOMAIN") or "e2b.app").strip()
+    api_url = f"https://api.{domain}"
+
+timeout_seconds = (os.getenv("E2B_CREATE_API_TIMEOUT_SECONDS") or "60").strip() or "60"
+
+print(api_key)
+print(access_token)
+print(api_url)
+print(timeout_seconds)
+PY
+}
+
+create_sandbox_via_api_curl() {
+  local template="${1:?template required}"
+  command -v curl >/dev/null 2>&1 || return 1
+
+  local context_raw=""
+  if ! context_raw="$(resolve_e2b_create_context)"; then
+    echo "failed to resolve E2B create context" >&2
+    return 1
+  fi
+
+  local api_key
+  local access_token
+  local api_url
+  local timeout_seconds
+  api_key="$(printf '%s\n' "${context_raw}" | sed -n '1p')"
+  access_token="$(printf '%s\n' "${context_raw}" | sed -n '2p')"
+  api_url="$(printf '%s\n' "${context_raw}" | sed -n '3p')"
+  timeout_seconds="$(printf '%s\n' "${context_raw}" | sed -n '4p')"
+  [[ -n "${timeout_seconds}" ]] || timeout_seconds="60"
+
+  if [[ -z "${api_key}" && -z "${access_token}" ]]; then
+    echo "missing E2B credentials for non-interactive sandbox create (set E2B_API_KEY/E2B_ACCESS_TOKEN or run \`e2b auth login\`)" >&2
+    return 2
+  fi
+
+  local endpoint="${api_url%/}/sandboxes"
+  local payload
+  payload="$("${PYTHON_BIN}" - "${template}" <<'PY'
+import json
+import sys
+
+print(json.dumps({"templateID": sys.argv[1]}))
+PY
+)"
+
+  local -a headers=(
+    "-H" "Content-Type: application/json"
+  )
+  if [[ -n "${api_key}" ]]; then
+    headers+=("-H" "X-API-KEY: ${api_key}")
+  fi
+  if [[ -n "${access_token}" ]]; then
+    headers+=("-H" "Authorization: Bearer ${access_token}")
+  fi
+
+  local raw_body=""
+  if ! raw_body="$(curl -fsS --connect-timeout "${timeout_seconds}" --max-time "${timeout_seconds}" "${headers[@]}" -d "${payload}" "${endpoint}" 2>&1)"; then
+    echo "non-interactive create failed via curl: ${raw_body}" >&2
+    return 3
+  fi
+
+  local parsed_id=""
+  if parsed_id="$(extract_sandbox_id "${raw_body}")"; then
+    printf '%s\n' "${parsed_id}"
+    return 0
+  fi
+
+  echo "non-interactive create response did not include sandbox id: ${raw_body}" >&2
+  return 4
+}
+
+create_sandbox_via_api_python() {
+  local template="${1:?template required}"
+
+  local context_raw=""
+  if ! context_raw="$(resolve_e2b_create_context)"; then
+    echo "failed to resolve E2B create context" >&2
+    return 1
+  fi
+
+  local api_key
+  local access_token
+  local api_url
+  local timeout_seconds
+  api_key="$(printf '%s\n' "${context_raw}" | sed -n '1p')"
+  access_token="$(printf '%s\n' "${context_raw}" | sed -n '2p')"
+  api_url="$(printf '%s\n' "${context_raw}" | sed -n '3p')"
+  timeout_seconds="$(printf '%s\n' "${context_raw}" | sed -n '4p')"
+  [[ -n "${timeout_seconds}" ]] || timeout_seconds="60"
+
+  "${PYTHON_BIN}" - "${template}" "${api_key}" "${access_token}" "${api_url}" "${timeout_seconds}" <<'PY'
+import json
+import sys
+import urllib.error
+import urllib.request
+
+template = sys.argv[1]
+api_key = sys.argv[2]
+access_token = sys.argv[3]
+api_url = sys.argv[4]
+timeout_value = sys.argv[5]
 
 if not api_key and not access_token:
     print(
@@ -272,12 +371,11 @@ if not api_key and not access_token:
     )
     sys.exit(2)
 
-api_url = (os.getenv("E2B_API_URL") or "").strip()
-if not api_url:
-    domain = (os.getenv("E2B_DOMAIN") or "e2b.app").strip()
-    api_url = f"https://api.{domain}"
-
-timeout_seconds = int((os.getenv("E2B_CREATE_API_TIMEOUT_SECONDS") or "60").strip())
+try:
+    timeout_seconds = int(timeout_value or "60")
+except ValueError:
+    print(f"invalid E2B_CREATE_API_TIMEOUT_SECONDS value: {timeout_value}", file=sys.stderr)
+    sys.exit(2)
 endpoint = f"{api_url.rstrip('/')}/sandboxes"
 
 headers = {"Content-Type": "application/json"}
@@ -328,6 +426,14 @@ if not sandbox_id:
 
 print(sandbox_id)
 PY
+}
+
+create_sandbox_via_api() {
+  local template="${1:?template required}"
+  if create_sandbox_via_api_curl "${template}"; then
+    return 0
+  fi
+  create_sandbox_via_api_python "${template}"
 }
 
 create_sandbox() {
