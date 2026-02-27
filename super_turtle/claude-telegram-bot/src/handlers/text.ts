@@ -124,118 +124,120 @@ export async function handleText(
   session.typingController = typing;
 
   // 8. Create streaming state and callback
-  let state = new StreamingState();
-  let statusCallback = silent
-    ? createSilentStatusCallback(ctx, state)
-    : createStatusCallback(ctx, state);
+  try {
+    let state = new StreamingState();
+    let statusCallback = silent
+      ? createSilentStatusCallback(ctx, state)
+      : createStatusCallback(ctx, state);
 
-  // 9. Driver abstraction path
-  const driver = getCurrentDriver();
-  const MAX_RETRIES = 1;
+    // 9. Driver abstraction path
+    const driver = getCurrentDriver();
+    const MAX_RETRIES = 1;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const response = await driver.runMessage({
-        message,
-        username,
-        userId,
-        chatId,
-        ctx,
-        statusCallback,
-      });
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const response = await driver.runMessage({
+          message,
+          username,
+          userId,
+          chatId,
+          ctx,
+          statusCallback,
+        });
 
-      await auditLog(userId, username, driver.auditEvent, message, response);
-      break;
-    } catch (error) {
-      const errorSummary = summarizeErrorMessage(error);
-      // Clean up any partial messages from this attempt
-      for (const toolMsg of state.toolMessages) {
-        if (isAskUserPromptMessage(toolMsg)) continue;
-        try {
-          await ctx.api.deleteMessage(toolMsg.chat.id, toolMsg.message_id);
-        } catch {
-          // Ignore cleanup errors
+        await auditLog(userId, username, driver.auditEvent, message, response);
+        break;
+      } catch (error) {
+        const errorSummary = summarizeErrorMessage(error);
+        // Clean up any partial messages from this attempt
+        for (const toolMsg of state.toolMessages) {
+          if (isAskUserPromptMessage(toolMsg)) continue;
+          try {
+            await ctx.api.deleteMessage(toolMsg.chat.id, toolMsg.message_id);
+          } catch {
+            // Ignore cleanup errors
+          }
         }
-      }
 
-      if (driver.isStallError(error) && attempt < MAX_RETRIES) {
-        if (state.sawSpawnOrchestration) {
+        if (driver.isStallError(error) && attempt < MAX_RETRIES) {
+          if (state.sawSpawnOrchestration) {
+            console.warn(
+              `${driver.displayName} stream stalled after spawn orchestration; skipping automatic retry to avoid duplicate side effects`
+            );
+            if (!silent) {
+              await ctx.reply(
+                `⚠️ ${driver.displayName} stream stalled after spawn orchestration. Automatic retry was skipped to avoid duplicate SubTurtle spawns.`
+              );
+            }
+            break;
+          }
+
           console.warn(
-            `${driver.displayName} stream stalled after spawn orchestration; skipping automatic retry to avoid duplicate side effects`
+            `${driver.displayName} stream stalled, running one continuation attempt (attempt ${attempt + 2}/${MAX_RETRIES + 1})`
           );
+
           if (!silent) {
             await ctx.reply(
-              `⚠️ ${driver.displayName} stream stalled after spawn orchestration. Automatic retry was skipped to avoid duplicate SubTurtle spawns.`
+              state.sawToolUse
+                ? `⚠️ ${driver.displayName} stream stalled mid-task, resuming from current state...`
+                : `⚠️ ${driver.displayName} stream stalled, retrying...`
             );
           }
-          break;
+
+          if (!state.sawToolUse) {
+            await driver.kill();
+          } else {
+            message = buildStallRecoveryPrompt(message);
+          }
+
+          state = new StreamingState();
+          statusCallback = silent
+            ? createSilentStatusCallback(ctx, state)
+            : createStatusCallback(ctx, state);
+          continue;
         }
 
-        console.warn(
-          `${driver.displayName} stream stalled, running one continuation attempt (attempt ${attempt + 2}/${MAX_RETRIES + 1})`
-        );
+        if (driver.isCrashError(error) && attempt < MAX_RETRIES && !state.sawToolUse) {
+          console.log(
+            `${driver.displayName} crashed, retrying (attempt ${attempt + 2}/${MAX_RETRIES + 1})...`
+          );
+          await driver.kill();
+          if (!silent) {
+            await ctx.reply(`⚠️ ${driver.displayName} crashed, retrying...`);
+          }
+          // Reset state for retry
+          state = new StreamingState();
+          statusCallback = silent
+            ? createSilentStatusCallback(ctx, state)
+            : createStatusCallback(ctx, state);
+          continue;
+        }
 
-        if (!silent) {
-          await ctx.reply(
-            state.sawToolUse
-              ? `⚠️ ${driver.displayName} stream stalled mid-task, resuming from current state...`
-              : `⚠️ ${driver.displayName} stream stalled, retrying...`
+        if (driver.isCrashError(error) && state.sawToolUse) {
+          console.warn(
+            `${driver.displayName} crashed after tool execution; skipping automatic retry to avoid replaying side effects`
           );
         }
 
-        if (!state.sawToolUse) {
-          await driver.kill();
-        } else {
-          message = buildStallRecoveryPrompt(message);
+        // Final attempt failed or non-retryable error
+        console.error(`Error processing message: ${errorSummary}`);
+
+        if (driver.isCancellationError(error)) {
+          const wasInterrupt = session.consumeInterruptFlag();
+          if (!silent && !wasInterrupt) {
+            await ctx.reply("🛑 Query stopped.");
+          }
+        } else if (!silent) {
+          await ctx.reply(`❌ Error: ${errorSummary.slice(0, 200)}`);
         }
-
-        state = new StreamingState();
-        statusCallback = silent
-          ? createSilentStatusCallback(ctx, state)
-          : createStatusCallback(ctx, state);
-        continue;
+        break;
       }
-
-      if (driver.isCrashError(error) && attempt < MAX_RETRIES && !state.sawToolUse) {
-        console.log(
-          `${driver.displayName} crashed, retrying (attempt ${attempt + 2}/${MAX_RETRIES + 1})...`
-        );
-        await driver.kill();
-        if (!silent) {
-          await ctx.reply(`⚠️ ${driver.displayName} crashed, retrying...`);
-        }
-        // Reset state for retry
-        state = new StreamingState();
-        statusCallback = silent
-          ? createSilentStatusCallback(ctx, state)
-          : createStatusCallback(ctx, state);
-        continue;
-      }
-
-      if (driver.isCrashError(error) && state.sawToolUse) {
-        console.warn(
-          `${driver.displayName} crashed after tool execution; skipping automatic retry to avoid replaying side effects`
-        );
-      }
-
-      // Final attempt failed or non-retryable error
-      console.error(`Error processing message: ${errorSummary}`);
-
-      if (driver.isCancellationError(error)) {
-        const wasInterrupt = session.consumeInterruptFlag();
-        if (!silent && !wasInterrupt) {
-          await ctx.reply("🛑 Query stopped.");
-        }
-      } else if (!silent) {
-        await ctx.reply(`❌ Error: ${errorSummary.slice(0, 200)}`);
-      }
-      break;
     }
+  } finally {
+    // Keep processing state consistent even if error-path notifications fail.
+    stopProcessing();
+    typing.stop();
+    session.typingController = null;
+    await drainDeferredQueue(ctx, chatId);
   }
-
-  // 11. Cleanup
-  stopProcessing();
-  typing.stop();
-  session.typingController = null;
-  await drainDeferredQueue(ctx, chatId);
 }
