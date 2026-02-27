@@ -136,7 +136,7 @@ export default function Home() {
                 </div>
               </div>
               <h1 className="headline mt-6 sm:mt-7 md:mt-8">
-                Super Turtle
+                Super Turtle!
               </h1>
               <p className="lead max-w-2xl">
                 Code from anywhere with your voice.
