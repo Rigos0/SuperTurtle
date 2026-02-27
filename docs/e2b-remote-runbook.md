@@ -101,6 +101,57 @@ Implementation meaning for Super Turtle:
 - For stable remote starts, a custom template can preinstall dependencies and prewarm runtime services, then publish a readiness gate.
 - This is useful if `up` currently spends too long in first-run dependency installation.
 
+## Current implementation contract (super_turtle/e2b/*.sh)
+
+### Supported command path
+
+```bash
+bash super_turtle/e2b/remote.sh up
+bash super_turtle/e2b/remote.sh status
+bash super_turtle/e2b/remote.sh pause
+bash super_turtle/e2b/remote.sh resume
+bash super_turtle/e2b/remote.sh stop
+bash super_turtle/e2b/remote.sh sync
+bash super_turtle/e2b/remote.sh reconcile-cron
+```
+
+### Setup env vars (exact)
+
+Remote control scripts:
+- `E2B_API_KEY`: required unless CLI already authenticated (`e2b auth login`).
+- `E2B_TEMPLATE`: optional default template for `up` (defaults to `base`).
+- `E2B_REMOTE_PROJECT_DIR`: optional remote checkout path (defaults to `/home/user/agentic`).
+- `E2B_REMOTE_LOG_PATH`: optional log path for remote run-loop output (defaults to `/tmp/superturtle-remote.log`).
+- `E2B_STATE_FILE`: optional local state override path (defaults to `super_turtle/e2b/.state.json`).
+- `E2B_SKIP_AUTH_CHECK=1`: optional bypass for auth preflight (intended for controlled CI/smoke tests).
+
+Bot runtime env (synced from repo):
+- `TELEGRAM_BOT_TOKEN`: required in `super_turtle/claude-telegram-bot/.env`.
+- `TELEGRAM_ALLOWED_USERS`: required in `super_turtle/claude-telegram-bot/.env`.
+- `OPENAI_API_KEY`: optional, only for voice transcription features.
+
+### Template behavior and Codex/Claude compatibility
+
+- `up` template resolution order:
+1. `--template <name>`
+2. stored `template` in `super_turtle/e2b/.state.json`
+3. `E2B_TEMPLATE`
+4. fallback `base`
+- Current implementation is shell-first and works with any E2B template that can run:
+  - `bash`, `tar`, `base64`, and `python3/python`
+  - `bun` (or ability to install `bun` via `curl`)
+- For agent CLI parity, E2B first-party templates (`codex`, `claude`) remain recommended when you need those CLIs preinstalled.
+
+### Expected caveats (current behavior)
+
+- Sync scope: tracked git files are synced, and `super_turtle/claude-telegram-bot/.env` is explicitly included; unrelated untracked files are not guaranteed to sync.
+- Resume semantics: `resume` is implemented through `e2b sandbox connect`, so external sessions must reconnect after pause/resume.
+- Cron pause policy: overdue jobs are not replayed in a burst. Run `reconcile-cron` after resume:
+  - one-shot overdue jobs are deferred to `as_of + grace`
+  - recurring overdue jobs are moved to `as_of + interval_ms` (missed windows skipped)
+- State semantics: local `super_turtle/e2b/.state.json` is authoritative for last known sandbox metadata, with stale-state recovery when remote sandbox is missing.
+- Status degradation: `status` reports from local state when E2B remote access is unavailable (auth/network/CLI issues).
+
 ## Recommended design constraints for upcoming implementation tasks
 
 - Treat pause/resume as explicit state transitions, not process stop/start hacks.
