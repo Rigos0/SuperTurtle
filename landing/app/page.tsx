@@ -113,7 +113,6 @@ export default function Home() {
                     key={item.title}
                   >
                     <div className="deck-mark" />
-                    <p className="eyebrow">Value {index + 1}</p>
                     <h3>{item.title}</h3>
                     <p>{item.description}</p>
                   </article>
@@ -130,8 +129,8 @@ export default function Home() {
           <div className="section-container">
             <div className="section-head reveal">
               <p className="eyebrow">Why Super Turtle</p>
-              <h2>Ordered value proposition</h2>
-              <p>This is the sequence users should read first.</p>
+              <h2>What you get</h2>
+              <p>Clear priorities, in the order users care about.</p>
             </div>
 
             <div className="mt-10 grid gap-4 sm:gap-6 lg:gap-8 sm:grid-cols-2">
@@ -142,7 +141,6 @@ export default function Home() {
                   style={{ animationDelay: `${220 + index * 90}ms` }}
                 >
                   <div className="deck-mark" />
-                  <p className="eyebrow">#{index + 1}</p>
                   <h3>{item.title}</h3>
                   <p>{item.description}</p>
                 </article>
