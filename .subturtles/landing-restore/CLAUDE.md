@@ -1,6 +1,6 @@
 # Current Task
 
-Verify terminal demo, loop types, and feature descriptions are accurate.
+All landing restoration backlog items are complete.
 
 # End Goal with Specs
 
@@ -55,5 +55,8 @@ Four loop types: slow (Plan→Groom→Execute→Review), yolo (single Claude cal
 - [x] Restore globals.css from commit a67778f: `git show a67778f:landing/app/globals.css > landing/app/globals.css`
 - [x] Update hero pill badge to "Super Turtle" (not "Super Turtle System")
 - [x] Replace any "agentic" references with "Super Turtle" in page.tsx
-- [ ] Verify terminal demo, loop types, and feature descriptions are accurate <- current
-- [ ] Commit the restored and updated landing page
+- [x] Verify terminal demo, loop types, and feature descriptions are accurate
+- [x] Commit the restored and updated landing page
+
+## Loop Control
+STOP

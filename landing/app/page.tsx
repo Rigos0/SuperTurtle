@@ -5,7 +5,7 @@ import { StickyNav } from '@/components/StickyNav';
 import { SectionDivider } from '@/components/SectionDivider';
 
 const terminalLines = [
-  { text: '$ ./ctl spawn api-hardening --type yolo-codex --timeout 2h', isCommand: true },
+  { text: '$ ./super_turtle/subturtle/ctl spawn api-hardening --type yolo-codex --timeout 2h', isCommand: true },
   { text: 'Spawning SubTurtle "api-hardening"...', isOutput: true },
   { text: 'Writing state to .subturtles/api-hardening/CLAUDE.md', isOutput: true },
   { text: 'Registering autonomous loop: yolo-codex', isOutput: true },
@@ -41,7 +41,7 @@ const operatingPillars = [
 const workflowSteps = [
   {
     title: 'Request',
-    description: 'You send one instruction to Meta Turtle. The task gets decomposed and assigned to SubTurtles.',
+    description: 'You send one instruction to Meta Turtle on Telegram. The task gets decomposed and assigned to SubTurtles.',
   },
   {
     title: 'Deploy',
@@ -49,7 +49,7 @@ const workflowSteps = [
   },
   {
     title: 'Inspect',
-    description: 'Progress is reported in periodic check-ins with actionable summaries and safe recovery hooks.',
+    description: 'Supervision stays quiet by default and reports only milestones, errors, or stuck states.',
   },
   {
     title: 'Deliver',
@@ -75,8 +75,15 @@ const loopModes = [
   {
     title: 'yolo-codex',
     cadence: 'Cost-aware mode',
-    copy: 'Cost-optimized Codex path for bulk work and steady, repeatable operations.',
-    budget: 'Balanced speed and budget',
+    copy: 'Single Codex call per iteration for cost-optimized bulk work and repeatable operations.',
+    budget: 'Default mode',
+    tone: 'sage',
+  },
+  {
+    title: 'yolo-codex-spark',
+    cadence: 'Fastest mode',
+    copy: 'Single Codex Spark call per iteration when speed matters most and iteration cycles need to stay short.',
+    budget: 'Highest speed, higher spend',
     tone: 'sage',
   },
 ];
@@ -106,9 +113,7 @@ export default function Home() {
 
               <div className="mt-8 flex flex-wrap gap-3">
                 <a
-                  href="https://github.com/anthropics/super-turtle"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="#"
                   className="btn-primary"
                 >
                   Open on GitHub
@@ -130,7 +135,7 @@ export default function Home() {
               </div>
               <div className="mt-5 flex flex-wrap gap-3 text-xs md:text-sm">
                 <span className="metric-pill">24/7 supervision</span>
-                <span className="metric-pill">3 loop strategies</span>
+                <span className="metric-pill">4 loop strategies</span>
                 <span className="metric-pill">Commit-per-sprint</span>
               </div>
             </div>
@@ -257,7 +262,7 @@ export default function Home() {
 
             <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {[
-                'git clone https://github.com/anthropics/super-turtle',
+                'git clone <your-super-turtle-repo>',
                 'cd super-turtle',
                 './super_turtle/subturtle/ctl spawn my-task --type yolo-codex --timeout 1h',
                 'tail -f .subturtles/my-task/subturtle.log',
