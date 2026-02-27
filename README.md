@@ -1,7 +1,7 @@
 # Super Turtle
 
 <p align="center">
-  <img src="landing/public/turtle-logo.png" width="128" alt="Super Turtle" />
+  <img src="landing/public/gemoji-turtle-turtle.png" width="128" alt="Super Turtle" />
 </p>
 
 Super Turtle is an autonomous coding system you talk to on Telegram. You describe what you want built — by typing or **voice** — and it decomposes the work, runs autonomous workers, supervises progress, and ships results.
@@ -10,7 +10,7 @@ Super Turtle is an autonomous coding system you talk to on Telegram. You describ
 
 Full docs: [docs/index.md](docs/index.md)
 
-## Philosophy
+## <img src="assets/readme-stickers/philosophy-thinking-turtle.png" width="28" alt="Thinking turtle sticker" /> Philosophy
 
 **Core experience: say what → get results.** The user should not think about infrastructure, loop orchestration, or process management.
 
@@ -25,7 +25,7 @@ The system is designed to be:
 - **Runs on your machine**: operates locally on your hardware, using your existing subscriptions. Cloud deployment is on the roadmap.
 - **Self-improving**: Super Turtle builds and maintains itself — dogfooding is a core design principle.
 
-## Architecture
+## <img src="assets/readme-stickers/architecture-gear-turtle.png" width="28" alt="Architecture turtle sticker" /> Architecture
 
 ```
 ┌────────────────────────────────────────┐
@@ -55,7 +55,7 @@ The system is designed to be:
                  commits/logs/state files
 ```
 
-### Two layers
+### <img src="assets/readme-stickers/layers-chat-turtle.png" width="24" alt="Layers turtle sticker" /> Two layers
 
 1. **Meta Agent (`super_turtle/meta/META_SHARED.md`)**
 - Handles conversation, status, direction, and coordination.
@@ -71,17 +71,17 @@ The system is designed to be:
   - `yolo-codex`: single Codex call/iteration (default)
   - `yolo-codex-spark`: single Codex Spark call/iteration
 
-### Skills, supervision, and previews
+### <img src="assets/readme-stickers/skills-idea-turtle.png" width="24" alt="Skills turtle sticker" /> Skills, supervision, and previews
 
 - **Skills**: loaded on demand per SubTurtle (`--skill frontend --skill testing`) so expertise stays scoped to the task.
 - **Cron supervision**: `ctl spawn` auto-registers recurring check-ins (default `10m`) to monitor milestones, stalls, and failures.
 - **Tunnel previews**: frontend workers can publish Cloudflare tunnel links; the Meta Agent surfaces the URL when ready.
 
-## Setup (AI-guided, clone-and-open)
+## <img src="assets/readme-stickers/setup-save-turtle.png" width="28" alt="Setup turtle sticker" /> Setup (AI-guided, clone-and-open)
 
 Super Turtle setup is designed to run through **Claude Code or Codex**. You should not need manual config editing.
 
-### 1) Clone and open the repo root
+### <img src="assets/readme-stickers/clone-laptop-turtle.png" width="24" alt="Clone turtle sticker" /> 1) Clone and open the repo root
 
 ```bash
 git clone <your-fork-or-repo-url>
@@ -96,7 +96,7 @@ Set up Super Turtle on this machine.
 
 The root `CLAUDE.md`/`AGENTS.md` instructions are loaded automatically and the agent should walk you through setup, run install commands, and configure project files.
 
-### 2) Manual info you must provide
+### <img src="assets/readme-stickers/manual-phone-turtle.png" width="24" alt="Manual info turtle sticker" /> 2) Manual info you must provide
 
 You only need to bring:
 
@@ -104,7 +104,7 @@ You only need to bring:
 - Your Telegram user/chat ID (`TELEGRAM_ALLOWED_USERS`) from [@userinfobot](https://t.me/userinfobot) or your bot's `/start`
 - Optional `OPENAI_API_KEY` for voice transcription
 
-### 3) What the setup agent runs
+### <img src="assets/readme-stickers/setup-run-chart-turtle.png" width="24" alt="Setup run turtle sticker" /> 3) What the setup agent runs
 
 The agent uses:
 
@@ -127,24 +127,24 @@ Optional flags:
 - `--driver codex` or `--driver claude` to force a driver
 - `--non-interactive` for CI scripts
 
-### 4) Subscription requirements
+### <img src="assets/readme-stickers/subscription-warning-turtle.png" width="24" alt="Subscription turtle sticker" /> 4) Subscription requirements
 
 - Use either local `codex` auth or local `claude` auth.
 - Optional: `OPENAI_API_KEY` for voice transcription.
 
-## Run
+## <img src="assets/readme-stickers/run-fire-turtle.png" width="28" alt="Run turtle sticker" /> Run
 
-### Start the Meta Agent (CLI)
+### <img src="assets/readme-stickers/clone-laptop-turtle.png" width="24" alt="CLI turtle sticker" /> Start the Meta Agent (CLI)
 
 ```bash
 ./super_turtle/meta/claude-meta
 ```
 
-### Talk through Telegram
+### <img src="assets/readme-stickers/telegram-phone-turtle.png" width="24" alt="Telegram turtle sticker" /> Talk through Telegram
 
 Run the bot and message it; the Meta Agent becomes your chat interface to the repo.
 
-### Run docs locally
+### <img src="assets/readme-stickers/docs-book-turtle.png" width="24" alt="Docs turtle sticker" /> Run docs locally
 
 ```bash
 cd docs
@@ -152,7 +152,7 @@ npm install
 npm run docs:dev
 ```
 
-### Manage SubTurtles
+### <img src="assets/readme-stickers/manage-ticket-turtle.png" width="24" alt="SubTurtle management sticker" /> Manage SubTurtles
 
 ```bash
 ./super_turtle/subturtle/ctl spawn [name] [--type TYPE] [--timeout DURATION] [--state-file PATH|-] [--cron-interval DURATION] [--skill NAME ...]
@@ -166,7 +166,7 @@ npm run docs:dev
 
 Use `ctl spawn` for normal work. It creates the workspace, seeds state from `--state-file` (or stdin), starts the worker, and registers cron supervision.
 
-### Capture Browser Screenshots (CLI)
+### <img src="assets/readme-stickers/screenshots-image-turtle.png" width="24" alt="Screenshot turtle sticker" /> Capture Browser Screenshots (CLI)
 
 For frontend visual verification, use:
 
@@ -183,12 +183,12 @@ bash super_turtle/subturtle/browser-screenshot.sh http://localhost:3000 .tmp/scr
 
 This wrapper uses Playwright CLI via `npx` and works without adding Playwright as a repo dependency.
 
-### Project intake docs
+### <img src="assets/readme-stickers/intake-book-turtle.png" width="24" alt="Intake docs turtle sticker" /> Project intake docs
 
 - `docs/NEXT_PROJECT_INTAKE_TEMPLATE.md`
 - `docs/NEXT_PROJECT_KICKOFF_RUNBOOK.md`
 
-## Bot Monitoring
+## <img src="assets/readme-stickers/monitoring-alarm-turtle.png" width="28" alt="Monitoring turtle sticker" /> Bot Monitoring
 
 Use the live launcher workflow so there is one visible bot session and no duplicate starts.
 
