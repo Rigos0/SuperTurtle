@@ -139,7 +139,7 @@ export default function Home() {
                 Super Turtle!
               </h1>
               <p className="lead max-w-2xl">
-                Code from anywhere with your voice.
+                Code from anywhere with your voice
               </p>
 
               <div className="mt-7 flex flex-wrap justify-center gap-3">
