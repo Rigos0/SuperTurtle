@@ -5,6 +5,8 @@
 
 **Turn [Claude Code](https://claude.com/product/claude-code) into your personal assistant, accessible from anywhere via Telegram.**
 
+For the full Super Turtle project, use the root setup flow first (AI-guided via `CLAUDE.md`/`AGENTS.md`).
+
 Send text, voice, photos, documents, audio, and video. See responses and tools usage in real-time.
 
 ![Demo](assets/demo.gif)
@@ -33,15 +35,25 @@ To achieve this, I set up a folder with a CLAUDE.md that teaches Claude about me
 - 🧠 **Extended thinking**: Trigger Claude's reasoning by using words like "think" or "reason" - you'll see its thought process as it works (configurable via `THINKING_TRIGGER_KEYWORDS`)
 - 🔘 **Interactive buttons**: Claude can present options as tappable inline buttons via the built-in `ask_user` MCP tool
 
-## Quick Start
+## Quick Start (Super Turtle repo)
 
 ```bash
-git clone https://github.com/linuz90/claude-telegram-bot?tab=readme-ov-file
-cd claude-telegram-bot-ts
+git clone <your-fork-or-repo-url>
+cd <repo-directory>
+# Open Claude Code or Codex here and ask:
+# "Set up Super Turtle on this machine."
+```
 
+The setup wizard runs `./super_turtle/setup`, installs dependencies, and configures `super_turtle/claude-telegram-bot/.env` for you.
+
+## Quick Start (standalone bot folder, manual)
+
+If you are only working on this bot module directly:
+
+```bash
+cd super_turtle/claude-telegram-bot
 cp .env.example .env
 # Edit .env with your credentials
-
 bun install
 bun run start
 ```

@@ -8,6 +8,21 @@ An autonomous coding system you talk to on Telegram. You describe what you want 
 
 **Say what → get results.** The user never thinks about processes, infrastructure, or agent orchestration. They say "build me X" and the system figures out how. The chat shows milestones, not machinery.
 
+## First-run setup for new installs (Claude Code / Codex)
+
+When this repo is opened for the first time in Claude Code or Codex, run setup as a guided wizard:
+
+1. Confirm the user already has:
+   - `TELEGRAM_BOT_TOKEN` from BotFather
+   - `TELEGRAM_ALLOWED_USERS` (their Telegram user ID)
+   - Optional `OPENAI_API_KEY` for voice transcription
+2. Run:
+   - `./super_turtle/setup --driver auto --telegram-token "<token>" --telegram-user "<id>"`
+   - Add `--openai-api-key "<key>"` only if provided
+3. Explain what was configured (`.env`, dependencies, default driver) and ask the user to start the bot.
+
+The goal is minimal manual setup: users provide keys/IDs, the agent does everything else.
+
 ## What the user sees
 
 | Event | User sees | User doesn't see |
@@ -64,7 +79,7 @@ Parallel system hardening and UX improvements:
 
 # End goal with specs
 
-Agentic repository — autonomous agent coordination system (SubTurtles). Core infrastructure is complete. Now improving the UX to make the system more autonomous and less noisy.
+Super Turtle repository — autonomous agent coordination system (SubTurtles). Core infrastructure is complete. Now improving the UX to make the system more autonomous and less noisy.
 
 **Core infrastructure (done):**
 - SubTurtle control (`ctl` command) — spawn, stop, monitor with timeouts

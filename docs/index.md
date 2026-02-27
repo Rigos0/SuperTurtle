@@ -1,6 +1,6 @@
 # Super Turtle Documentation
 
-Super Turtle is an autonomous coding system you control from Telegram. This setup is for **clone-and-run usage of this repository** on your own machine.
+Super Turtle is an autonomous coding system you control from Telegram. Setup is **AI-guided**: clone the repo, open Claude Code or Codex at root, and let it walk you through install.
 
 ## Overview
 
@@ -11,12 +11,20 @@ Super Turtle is an autonomous coding system you control from Telegram. This setu
 
 ## Setup
 
-### 1) Clone repo
+### 1) Clone and open in Claude Code or Codex
 
 ```bash
 git clone <your-fork-or-repo-url>
-cd agentic
+cd <repo-directory>
 ```
+
+Then open Claude Code or Codex in this root and ask:
+
+```text
+Set up Super Turtle on this machine.
+```
+
+The root `CLAUDE.md`/`AGENTS.md` instructions guide the setup wizard and run install/config commands for you.
 
 ### 2) Create the Telegram bot
 
@@ -42,7 +50,7 @@ restart - Restart the bot
 
 Use this value in `TELEGRAM_ALLOWED_USERS`.
 
-### 4) Bootstrap (no manual env editing)
+### 4) Bootstrap command used by the setup wizard
 
 ```bash
 ./super_turtle/setup --driver auto \
@@ -69,7 +77,7 @@ bun run start
 ### Start the Meta Agent directly (CLI)
 
 ```bash
-cd /absolute/path/to/agentic
+cd /absolute/path/to/<repo-directory>
 ./super_turtle/meta/claude-meta
 ```
 
