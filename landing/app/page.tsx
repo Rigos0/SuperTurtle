@@ -23,7 +23,7 @@ const heroHighlights = [
   {
     title: 'Parallel sub-agents, managed for you',
     description:
-      'Breaks work into tasks, runs sub-agents, can open/test webpages, and iterates until done.',
+      'Breaks work into tasks, runs sub-agents, can open/test webpages, and iterates until done. Designed for long-running, large jobs.',
     accent: 'sage',
   },
 ];
