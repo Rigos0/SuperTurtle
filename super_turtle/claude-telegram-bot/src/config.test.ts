@@ -88,9 +88,9 @@ describe("config defaults", () => {
 
     expect(result.exitCode).toBe(0);
     expect(extractMarker(result.stdout, MARKERS.codexEnabled)).toBe("false");
-    expect(extractMarker(result.stdout, MARKERS.sandboxMode)).toBe("danger-full-access");
+    expect(extractMarker(result.stdout, MARKERS.sandboxMode)).toBe("workspace-write");
     expect(extractMarker(result.stdout, MARKERS.approvalPolicy)).toBe("never");
-    expect(extractMarker(result.stdout, MARKERS.networkAccess)).toBe("true");
+    expect(extractMarker(result.stdout, MARKERS.networkAccess)).toBe("false");
   });
 });
 
@@ -118,8 +118,8 @@ describe("config overrides", () => {
     });
 
     expect(result.exitCode).toBe(0);
-    expect(extractMarker(result.stdout, MARKERS.sandboxMode)).toBe("danger-full-access");
+    expect(extractMarker(result.stdout, MARKERS.sandboxMode)).toBe("workspace-write");
     expect(extractMarker(result.stdout, MARKERS.approvalPolicy)).toBe("never");
-    expect(extractMarker(result.stdout, MARKERS.networkAccess)).toBe("true");
+    expect(extractMarker(result.stdout, MARKERS.networkAccess)).toBe("false");
   });
 });

@@ -51,14 +51,14 @@ export type CodexSandboxMode = "read-only" | "workspace-write" | "danger-full-ac
 export type CodexApprovalPolicy = "never" | "on-request" | "on-failure" | "untrusted";
 
 function parseCodexSandboxMode(raw: string | undefined): CodexSandboxMode {
-  const value = (raw || "danger-full-access").toLowerCase();
+  const value = (raw || "workspace-write").toLowerCase();
   if (value === "read-only" || value === "workspace-write" || value === "danger-full-access") {
     return value;
   }
   console.warn(
-    `Invalid META_CODEX_SANDBOX_MODE="${raw}". Falling back to "danger-full-access".`
+    `Invalid META_CODEX_SANDBOX_MODE="${raw}". Falling back to "workspace-write".`
   );
-  return "danger-full-access";
+  return "workspace-write";
 }
 
 function parseCodexApprovalPolicy(raw: string | undefined): CodexApprovalPolicy {
@@ -74,15 +74,15 @@ function parseCodexApprovalPolicy(raw: string | undefined): CodexApprovalPolicy 
 
 function parseMetaCodexNetworkAccess(raw: string | undefined): boolean {
   if (raw === undefined || raw.trim() === "") {
-    return true;
+    return false;
   }
   const value = raw.toLowerCase();
   if (value === "true") return true;
   if (value === "false") return false;
   console.warn(
-    `Invalid META_CODEX_NETWORK_ACCESS="${raw}". Falling back to "true".`
+    `Invalid META_CODEX_NETWORK_ACCESS="${raw}". Falling back to "false".`
   );
-  return true;
+  return false;
 }
 
 export const META_CODEX_SANDBOX_MODE = parseCodexSandboxMode(

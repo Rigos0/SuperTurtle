@@ -686,7 +686,7 @@ export class CodexSession {
       this.thread = await this.codex.startThread({
         workingDirectory: WORKING_DIR,
         skipGitRepoCheck: true,
-        // Runtime policy defaults to SubTurtle parity, but stays overrideable via env.
+        // Runtime policy defaults to least privilege, but stays overrideable via env.
         sandboxMode: META_CODEX_SANDBOX_MODE,
         approvalPolicy: META_CODEX_APPROVAL_POLICY,
         networkAccessEnabled: META_CODEX_NETWORK_ACCESS,
