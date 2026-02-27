@@ -31,7 +31,7 @@ export function getCommandLines(): string[] {
     `/context - Context usage`,
     `/status - Detailed status`,
     `/resume - Resume a session`,
-    `/sub - SubTurtles`,
+    `/sub - SubTurtles (/subs, /subtitles)`,
     `/cron - Scheduled jobs`,
     `/restart - Restart bot`,
   ];
@@ -81,6 +81,96 @@ export type ListedSubTurtle = {
   task: string;
   tunnelUrl: string;
 };
+
+export type ClaudeStateSummary = {
+  currentTask: string;
+  backlogDone: number;
+  backlogTotal: number;
+  backlogCurrent: string;
+};
+
+function extractMarkdownSection(content: string, headingPattern: string): string {
+  const headingRegex = new RegExp(`^#{1,6}\\s*${headingPattern}\\s*$`, "im");
+  const headingMatch = headingRegex.exec(content);
+  if (!headingMatch) return "";
+
+  const afterHeading = content.slice(headingMatch.index + headingMatch[0].length);
+  const nextHeadingMatch = /\n#{1,6}\s+/.exec(afterHeading);
+  const section = nextHeadingMatch ? afterHeading.slice(0, nextHeadingMatch.index) : afterHeading;
+  return section.trim();
+}
+
+function sanitizeTaskLine(raw: string): string {
+  return raw
+    .replace(/\r/g, "")
+    .replace(/^\s*[-*]\s*/, "")
+    .replace(/^\s*\d+\.\s*/, "")
+    .replace(/\s*<-\s*current\s*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function truncateText(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  if (maxLength <= 3) return value.slice(0, maxLength);
+  return `${value.slice(0, maxLength - 3)}...`;
+}
+
+export function parseClaudeStateSummary(content: string): ClaudeStateSummary {
+  const currentTaskSection = extractMarkdownSection(content, "Current\\s+Task");
+  const currentTask = currentTaskSection
+    .split("\n")
+    .map((line) => sanitizeTaskLine(line))
+    .find((line) => line.length > 0) || "";
+
+  const backlogSection = extractMarkdownSection(content, "Backlog");
+  const backlogItems = backlogSection
+    .split("\n")
+    .map((line) => line.match(/^\s*-\s*\[([ xX])\]\s*(.+)$/))
+    .filter((match): match is RegExpMatchArray => Boolean(match))
+    .map((match) => {
+      const rawText = match[2] || "";
+      const text = sanitizeTaskLine(rawText);
+      return {
+        done: match[1]?.toLowerCase() === "x",
+        current: /<-\s*current/i.test(rawText),
+        text,
+      };
+    })
+    .filter((item) => item.text.length > 0);
+
+  const currentBacklogItem =
+    backlogItems.find((item) => item.current && !item.done)?.text ||
+    backlogItems.find((item) => item.current)?.text ||
+    backlogItems.find((item) => !item.done)?.text ||
+    "";
+
+  return {
+    currentTask,
+    backlogDone: backlogItems.filter((item) => item.done).length,
+    backlogTotal: backlogItems.length,
+    backlogCurrent: currentBacklogItem,
+  };
+}
+
+export async function readClaudeStateSummary(path: string): Promise<ClaudeStateSummary | null> {
+  try {
+    const content = await Bun.file(path).text();
+    return parseClaudeStateSummary(content);
+  } catch {
+    return null;
+  }
+}
+
+export function formatBacklogSummary(summary: ClaudeStateSummary): string {
+  if (summary.backlogTotal === 0) {
+    return "No backlog checklist";
+  }
+
+  const progress = `${summary.backlogDone}/${summary.backlogTotal} done`;
+  if (!summary.backlogCurrent) return progress;
+  return `${progress} • Current: ${summary.backlogCurrent}`;
+}
 
 export function parseCtlListOutput(output: string): ListedSubTurtle[] {
   const turtles: ListedSubTurtle[] = [];
@@ -1240,12 +1330,34 @@ export async function handleSubturtle(ctx: Context): Promise<void> {
     return;
   }
 
+  const rootStatePath = `${WORKING_DIR}/CLAUDE.md`;
+  const [rootSummary, turtleStateEntries] = await Promise.all([
+    readClaudeStateSummary(rootStatePath),
+    Promise.all(
+      turtles.map(async (turtle) => {
+        const statePath = `${WORKING_DIR}/.subturtles/${turtle.name}/CLAUDE.md`;
+        const summary = await readClaudeStateSummary(statePath);
+        return [turtle.name, summary] as const;
+      })
+    ),
+  ]);
+  const turtleStateMap = new Map(turtleStateEntries);
+
   // Build message and inline keyboard
   const messageLines: string[] = ["🐢 <b>SubTurtles</b>\n"];
+
+  if (rootSummary) {
+    const rootTask = rootSummary.currentTask || "No current task in root CLAUDE.md";
+    messageLines.push(`🧭 <b>Root</b> • ${escapeHtml(truncateText(rootTask, 110))}`);
+    messageLines.push(`   📌 ${escapeHtml(truncateText(formatBacklogSummary(rootSummary), 140))}`);
+    messageLines.push("");
+  }
 
   const keyboard: Array<Array<{ text: string; callback_data: string }>> = [];
 
   for (const turtle of turtles) {
+    const stateSummary = turtleStateMap.get(turtle.name) || null;
+
     // Format the turtle info line
     let statusEmoji = turtle.status === "running" ? "🟢" : "⚫";
     let typeStr = turtle.type ? ` <code>${escapeHtml(turtle.type)}</code>` : "";
@@ -1256,17 +1368,24 @@ export async function handleSubturtle(ctx: Context): Promise<void> {
         : " left";
       timeStr = ` • ${escapeHtml(turtle.timeRemaining)}${suffix}`;
     }
-    let taskStr = turtle.task ? ` • ${escapeHtml(turtle.task)}` : "";
+    const taskSource = stateSummary?.currentTask || turtle.task || "No current task";
+    const taskStr = truncateText(taskSource, 120);
 
     messageLines.push(
-      `${statusEmoji} <b>${escapeHtml(turtle.name)}</b>${typeStr}${timeStr}${taskStr}`
+      `${statusEmoji} <b>${escapeHtml(turtle.name)}</b>${typeStr}${timeStr}`
     );
+    messageLines.push(`   🧩 ${escapeHtml(taskStr)}`);
+
+    if (stateSummary) {
+      const backlogSummary = formatBacklogSummary(stateSummary);
+      messageLines.push(`   📌 ${escapeHtml(truncateText(backlogSummary, 140))}`);
+    }
 
     // Add buttons for running turtles
     if (turtle.status === "running") {
       keyboard.push([
         {
-          text: "📋 Logs",
+          text: "📋 State",
           callback_data: `subturtle_logs:${turtle.name}`,
         },
         {

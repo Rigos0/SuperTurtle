@@ -521,6 +521,8 @@ bot.command("model", handleModel);
 bot.command("switch", handleSwitch);
 bot.command("resume", handleResume);
 bot.command("sub", handleSubturtle);
+bot.command("subs", handleSubturtle);
+bot.command("subtitles", handleSubturtle);
 bot.command("subturtle", handleSubturtle);
 bot.command("restart", handleRestart);
 bot.command("cron", handleCron);

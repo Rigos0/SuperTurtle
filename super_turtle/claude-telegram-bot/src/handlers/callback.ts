@@ -5,18 +5,28 @@
  */
 
 import type { Context } from "grammy";
-import { unlinkSync, readFileSync, existsSync } from "fs";
+import { unlinkSync } from "fs";
 import { session, getAvailableModels, EFFORT_DISPLAY, type EffortLevel } from "../session";
 import { codexSession } from "../codex-session";
-import { ALLOWED_USERS, WORKING_DIR, TELEGRAM_SAFE_LIMIT } from "../config";
+import { ALLOWED_USERS, WORKING_DIR } from "../config";
 import { isAuthorized } from "../security";
 import { auditLog, startTypingIndicator } from "../utils";
 import { StreamingState, createStatusCallback, isAskUserPromptMessage } from "./streaming";
 import { isAnyDriverRunning, runMessageWithActiveDriver, stopActiveDriverQuery } from "./driver-routing";
 import { escapeHtml } from "../formatting";
 import { removeJob } from "../cron";
-import { buildSessionOverviewLines } from "./commands";
-import { resetAllDriverSessions } from "./commands";
+import {
+  buildSessionOverviewLines,
+  resetAllDriverSessions,
+  readClaudeStateSummary,
+  formatBacklogSummary,
+} from "./commands";
+
+const SAFE_CALLBACK_ID = /^[A-Za-z0-9_-]+$/;
+
+function isSafeCallbackId(value: string): boolean {
+  return SAFE_CALLBACK_ID.test(value);
+}
 
 /**
  * Handle callback queries from inline keyboards.
@@ -212,6 +222,10 @@ export async function handleCallback(ctx: Context): Promise<void> {
 
   const requestId = parts[1]!;
   const optionIndex = parseInt(parts[2]!, 10);
+  if (!isSafeCallbackId(requestId)) {
+    await ctx.answerCallbackQuery({ text: "Invalid request ID" });
+    return;
+  }
 
   // 9. Load request file
   const requestFile = `/tmp/ask-user-${requestId}.json`;
@@ -316,7 +330,7 @@ export async function handleCallback(ctx: Context): Promise<void> {
 }
 
 /**
- * Handle subturtle logs callback (subturtle_logs:{name}).
+ * Handle subturtle state callback (subturtle_logs:{name}).
  */
 async function handleSubturtleLogsCallback(
   ctx: Context,
@@ -324,57 +338,41 @@ async function handleSubturtleLogsCallback(
 ): Promise<void> {
   const name = callbackData.replace("subturtle_logs:", "");
 
-  if (!name) {
+  if (!name || !isSafeCallbackId(name)) {
     await ctx.answerCallbackQuery({ text: "Invalid SubTurtle name" });
     return;
   }
 
-  const logFile = `${WORKING_DIR}/.subturtles/${name}/subturtle.log`;
-
-  // Check if log file exists
-  if (!existsSync(logFile)) {
-    await ctx.answerCallbackQuery({ text: "Log file not found" });
-    return;
-  }
-
   try {
-    const content = readFileSync(logFile, "utf-8");
-    const lines = content.split("\n");
-    const lastLines = lines.slice(-50).filter((line) => line.trim()).join("\n");
+    const turtleStatePath = `${WORKING_DIR}/.subturtles/${name}/CLAUDE.md`;
+    const rootStatePath = `${WORKING_DIR}/CLAUDE.md`;
+    const [turtleSummary, rootSummary] = await Promise.all([
+      readClaudeStateSummary(turtleStatePath),
+      readClaudeStateSummary(rootStatePath),
+    ]);
 
-    if (!lastLines) {
-      await ctx.reply(`📋 <b>Logs for ${escapeHtml(name)}</b>\n\n<code>No log content</code>`, {
-        parse_mode: "HTML",
-      });
-      await ctx.answerCallbackQuery({ text: "Log is empty" });
+    if (!turtleSummary) {
+      await ctx.answerCallbackQuery({ text: "State file not found" });
       return;
     }
 
-    // Chunk if needed (4000 char limit)
-    const chunks: string[] = [];
-    const maxChunkSize = TELEGRAM_SAFE_LIMIT - 100; // Leave room for formatting
-    if (lastLines.length > maxChunkSize) {
-      for (let i = 0; i < lastLines.length; i += maxChunkSize) {
-        chunks.push(lastLines.slice(i, i + maxChunkSize));
-      }
-    } else {
-      chunks.push(lastLines);
+    const lines: string[] = [`📋 <b>State for ${escapeHtml(name)}</b>\n`];
+    const turtleTask = turtleSummary.currentTask || "No current task in CLAUDE.md";
+    lines.push(`🧩 <b>Task:</b> ${escapeHtml(turtleTask)}`);
+    lines.push(`📌 <b>Backlog:</b> ${escapeHtml(formatBacklogSummary(turtleSummary))}`);
+
+    if (rootSummary) {
+      const rootTask = rootSummary.currentTask || "No current task in root CLAUDE.md";
+      lines.push("");
+      lines.push(`🧭 <b>Root task:</b> ${escapeHtml(rootTask)}`);
+      lines.push(`📌 <b>Root backlog:</b> ${escapeHtml(formatBacklogSummary(rootSummary))}`);
     }
 
-    // Send first chunk with header
-    for (let i = 0; i < chunks.length; i++) {
-      const header =
-        i === 0 ? `📋 <b>Logs for ${escapeHtml(name)}</b> (last ~50 lines)\n\n` : "";
-      const footer = chunks.length > 1 && i < chunks.length - 1 ? "\n\n<i>... continued ...</i>" : "";
-      await ctx.reply(`${header}<code>${escapeHtml(chunks[i]!)}</code>${footer}`, {
-        parse_mode: "HTML",
-      });
-    }
-
-    await ctx.answerCallbackQuery({ text: `Logs for ${name}` });
+    await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
+    await ctx.answerCallbackQuery({ text: `State for ${name}` });
   } catch (error) {
-    console.error(`Failed to read log file for ${name}:`, error);
-    await ctx.answerCallbackQuery({ text: "Failed to read logs" });
+    console.error(`Failed to read state for ${name}:`, error);
+    await ctx.answerCallbackQuery({ text: "Failed to read state" });
   }
 }
 
@@ -387,7 +385,7 @@ async function handleSubturtleStopCallback(
 ): Promise<void> {
   const name = callbackData.replace("subturtle_stop:", "");
 
-  if (!name) {
+  if (!name || !isSafeCallbackId(name)) {
     await ctx.answerCallbackQuery({ text: "Invalid SubTurtle name" });
     return;
   }
