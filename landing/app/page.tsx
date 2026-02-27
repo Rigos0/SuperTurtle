@@ -199,16 +199,16 @@ export default function Home() {
                 <h3>Under the hood</h3>
                 <ul className="space-y-3 text-sm">
                   <li className="check-row">
-                    <span className="check-dot" /> Each worker gets its own workspace, state file, and git branch
+                    <span className="check-dot" /> Every task runs in its own workspace with a dedicated state file
                   </li>
                   <li className="check-row">
-                    <span className="check-dot" /> Automatically routes to Claude or Codex based on task complexity and quota
-                  </li>
-                  <li className="check-row">
-                    <span className="check-dot" /> Cron supervision detects stuck workers and restarts them
+                    <span className="check-dot" /> Frontend tasks can capture Playwright screenshots for visual QA
                   </li>
                   <li className="check-row">
                     <span className="check-dot" /> Frontend work gets a live Cloudflare tunnel preview link
+                  </li>
+                  <li className="check-row">
+                    <span className="check-dot" /> Completed changes land as normal git commits with clear messages
                   </li>
                   <li className="check-row">
                     <span className="check-dot" /> Workers self-stop when done — no orphan processes
