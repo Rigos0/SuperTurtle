@@ -1,5 +1,5 @@
 ## Current Task
-Write docs/subturtles/ctl-commands.mdx.
+Write docs/subturtles/state-files.mdx.
 
 ## End Goal with Specs
 Create 9 documentation pages covering SubTurtles and the Meta Agent. Pages go in `docs/subturtles/` and `docs/meta/` as `.mdx` files. Use Mintlify MDX syntax (supports `<Steps>`, `<Card>`, `<CardGroup>`, `<Tip>`, `<Warning>`, `<Note>`, `<Info>`, `<Accordion>`, `<Tabs>`, `<Tab>`).
@@ -42,8 +42,8 @@ Create 9 documentation pages covering SubTurtles and the Meta Agent. Pages go in
 - [x] Read super_turtle/subturtle/README.md
 - [x] Write docs/subturtles/overview.mdx
 - [x] Write docs/subturtles/loop-types.mdx
-- [ ] Write docs/subturtles/ctl-commands.mdx <- current
-- [ ] Write docs/subturtles/state-files.mdx
+- [x] Write docs/subturtles/ctl-commands.mdx
+- [ ] Write docs/subturtles/state-files.mdx <- current
 - [ ] Write docs/subturtles/skills.mdx
 - [ ] Write docs/meta/overview.mdx
 - [ ] Write docs/meta/supervision.mdx

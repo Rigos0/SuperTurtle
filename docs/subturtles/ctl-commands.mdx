@@ -1,0 +1,261 @@
+---
+title: CTL Commands
+description: Full CLI reference for `super_turtle/subturtle/ctl` with flags, defaults, and examples
+---
+
+# CTL Commands
+
+`./super_turtle/subturtle/ctl` manages SubTurtle lifecycle: spawn, run, inspect, stop, and archive.
+
+## Command Summary
+
+| Command | Purpose |
+|---------|---------|
+| `spawn` | Create workspace, seed state, start SubTurtle, register recurring cron supervision |
+| `start` | Start a SubTurtle in an existing workspace (no state seeding) |
+| `stop` | Stop worker, stop watchdog, remove cron, archive workspace |
+| `status` | Show running state, type, elapsed/remaining time, and tunnel URL if present |
+| `logs` | Tail live SubTurtle logs |
+| `list` | List active SubTurtles (or archived with `--archived`) |
+| `archive` | Move a stopped SubTurtle to `.subturtles/.archive/<name>/` |
+| `gc` | Archive stopped SubTurtles older than a max age |
+| `reschedule-cron` | Change recurring supervision interval for a running SubTurtle |
+
+<Info>
+Default loop type is `yolo-codex`. Default timeout is `1h`. `spawn` default cron interval is `10m`.
+</Info>
+
+## Duration Format
+
+Duration flags use `m`, `h`, or `d` suffixes (or raw seconds):
+
+```bash
+30m
+1h
+2h
+1d
+600
+```
+
+Used by:
+- `--timeout`
+- `--cron-interval`
+- `gc --max-age`
+- `reschedule-cron <interval>`
+
+## `spawn`
+
+High-level command used by the Meta Agent.
+
+It:
+1. Creates `.subturtles/<name>/`
+2. Seeds `CLAUDE.md` from `--state-file` or piped stdin
+3. Creates `AGENTS.md -> CLAUDE.md` symlink
+4. Starts the SubTurtle
+5. Registers recurring silent cron supervision
+
+```bash
+./super_turtle/subturtle/ctl spawn [name] \
+  [--type slow|yolo|yolo-codex|yolo-codex-spark] \
+  [--timeout DURATION] \
+  [--state-file PATH|-] \
+  [--cron-interval DURATION] \
+  [--skill NAME ...]
+```
+
+Examples:
+
+```bash
+# Start from a prepared state file
+./super_turtle/subturtle/ctl spawn docs-agent \
+  --type yolo-codex \
+  --timeout 1h \
+  --state-file /tmp/docs-agent.md \
+  --cron-interval 10m
+
+# Pipe state over stdin
+cat /tmp/task.md | ./super_turtle/subturtle/ctl spawn api-agent --state-file -
+
+# Repeat --skill to load multiple skills
+./super_turtle/subturtle/ctl spawn ui-agent \
+  --state-file /tmp/ui.md \
+  --skill frontend \
+  --skill testing
+```
+
+<Warning>
+`spawn` requires state input. If you do not pass `--state-file`, you must pipe stdin.
+</Warning>
+
+## `start`
+
+Low-level start command. Unlike `spawn`, it does not seed `CLAUDE.md` or register cron.
+
+```bash
+./super_turtle/subturtle/ctl start [name] \
+  [--type slow|yolo|yolo-codex|yolo-codex-spark] \
+  [--timeout DURATION] \
+  [--skill NAME ...]
+```
+
+Examples:
+
+```bash
+# Start default workspace (.subturtles/default/)
+./super_turtle/subturtle/ctl start
+
+# Start named workspace with explicit type/timeout
+./super_turtle/subturtle/ctl start docs-agent --type slow --timeout 2h
+```
+
+<Warning>
+`start` fails if `.subturtles/<name>/CLAUDE.md` does not already exist.
+</Warning>
+
+## `stop`
+
+Gracefully stops a SubTurtle:
+- Removes recurring cron job (if any)
+- Stops watchdog
+- Sends `SIGTERM`, then `SIGKILL` if needed
+- Cleans pid/meta files
+- Archives workspace
+
+```bash
+./super_turtle/subturtle/ctl stop [name]
+```
+
+Example:
+
+```bash
+./super_turtle/subturtle/ctl stop docs-agent
+```
+
+## `status`
+
+Reports whether a SubTurtle is running and prints runtime details:
+- Loop type
+- PID
+- Elapsed and remaining timeout
+- Skills list (if set)
+- Process table row
+- Tunnel URL (if `.tunnel-url` exists)
+
+```bash
+./super_turtle/subturtle/ctl status [name]
+```
+
+Example:
+
+```bash
+./super_turtle/subturtle/ctl status docs-agent
+```
+
+## `logs`
+
+Follows the SubTurtle log file:
+
+```bash
+./super_turtle/subturtle/ctl logs [name]
+```
+
+Examples:
+
+```bash
+# Tail and follow default 50 lines
+./super_turtle/subturtle/ctl logs docs-agent
+
+# Increase initial tail size
+LINES=200 ./super_turtle/subturtle/ctl logs docs-agent
+```
+
+## `list`
+
+Lists SubTurtles and current task pulled from each workspace `CLAUDE.md`.
+
+```bash
+./super_turtle/subturtle/ctl list [--archived]
+```
+
+Examples:
+
+```bash
+# Active workspaces
+./super_turtle/subturtle/ctl list
+
+# Archived workspaces
+./super_turtle/subturtle/ctl list --archived
+```
+
+Output includes status, loop type, PID/time summary (if running), current task line, and skills (if any).
+
+## Additional Maintenance Commands
+
+### `archive`
+
+Archive one stopped SubTurtle workspace:
+
+```bash
+./super_turtle/subturtle/ctl archive <name>
+```
+
+### `gc`
+
+Archive stopped SubTurtles older than a threshold (default `1d`):
+
+```bash
+./super_turtle/subturtle/ctl gc [--max-age DURATION]
+```
+
+Example:
+
+```bash
+./super_turtle/subturtle/ctl gc --max-age 12h
+```
+
+### `reschedule-cron`
+
+Update recurring supervision interval for a SubTurtle:
+
+```bash
+./super_turtle/subturtle/ctl reschedule-cron <name> <interval>
+```
+
+Example:
+
+```bash
+./super_turtle/subturtle/ctl reschedule-cron docs-agent 5m
+```
+
+## Typical Lifecycle
+
+<Steps>
+  <Step title="Seed and spawn">
+    ```bash
+    ./super_turtle/subturtle/ctl spawn docs-agent --state-file /tmp/docs-agent.md
+    ```
+  </Step>
+  <Step title="Check progress">
+    ```bash
+    ./super_turtle/subturtle/ctl status docs-agent
+    ./super_turtle/subturtle/ctl logs docs-agent
+    ```
+  </Step>
+  <Step title="Adjust supervision cadence if needed">
+    ```bash
+    ./super_turtle/subturtle/ctl reschedule-cron docs-agent 3m
+    ```
+  </Step>
+  <Step title="Stop and archive">
+    ```bash
+    ./super_turtle/subturtle/ctl stop docs-agent
+    ```
+  </Step>
+</Steps>
+
+## Related Pages
+
+- [SubTurtles Overview](/subturtles/overview)
+- [Loop Types](/subturtles/loop-types)
+- [State Files](/subturtles/state-files)
+- [Meta Supervision](/meta/supervision)
