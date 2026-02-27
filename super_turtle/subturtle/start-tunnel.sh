@@ -26,7 +26,34 @@ WORKSPACE_DIR="${3:-.}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-# Resolve to absolute paths
+require_cmd() {
+  local cmd="$1"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "[start-tunnel] ERROR: required command not found: ${cmd}" >&2
+    exit 1
+  fi
+}
+
+is_within_root() {
+  local path="$1"
+  case "$path" in
+    "$ROOT_DIR" | "$ROOT_DIR"/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+for cmd in npm curl cloudflared grep head mktemp; do
+  require_cmd "$cmd"
+done
+
+if [[ ! "$PORT" =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then
+  echo "[start-tunnel] ERROR: invalid port '${PORT}'. Expected integer in range 1-65535." >&2
+  exit 1
+fi
+
+# Resolve to absolute paths.
+# Keep both project/workspace paths inside repository root to avoid accidental
+# serving or writing outside the agent workspace tree.
 if [[ ! -d "$PROJECT_DIR" ]]; then
   ARCHIVE_PROJECT_DIR="${ROOT_DIR}/.subturtles/.archive/${PROJECT_DIR}"
   if [[ -d "$ARCHIVE_PROJECT_DIR" ]]; then
@@ -37,10 +64,24 @@ if [[ ! -d "$PROJECT_DIR" ]]; then
     exit 1
   fi
 fi
-PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
-WORKSPACE_DIR="$(cd "$WORKSPACE_DIR" && pwd)"
+PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd -P)"
+WORKSPACE_DIR="$(cd "$WORKSPACE_DIR" && pwd -P)"
+
+if ! is_within_root "$PROJECT_DIR"; then
+  echo "[start-tunnel] ERROR: project-dir must be within repository root (${ROOT_DIR})." >&2
+  exit 1
+fi
+if ! is_within_root "$WORKSPACE_DIR"; then
+  echo "[start-tunnel] ERROR: workspace-dir must be within repository root (${ROOT_DIR})." >&2
+  exit 1
+fi
+if [[ ! -w "$WORKSPACE_DIR" ]]; then
+  echo "[start-tunnel] ERROR: workspace-dir is not writable: ${WORKSPACE_DIR}" >&2
+  exit 1
+fi
 
 TUNNEL_URL_FILE="${WORKSPACE_DIR}/.tunnel-url"
+rm -f "$TUNNEL_URL_FILE"
 
 # PIDs to track for cleanup
 DEV_PID=""
@@ -53,6 +94,7 @@ cleanup() {
   if [[ -n "$TUNNEL_OUTPUT" ]] && [[ -f "$TUNNEL_OUTPUT" ]]; then
     rm -f "$TUNNEL_OUTPUT"
   fi
+  rm -f "$TUNNEL_URL_FILE"
   if [[ -n "$DEV_PID" ]]; then
     kill -TERM "$DEV_PID" 2>/dev/null || true
     sleep 0.2
@@ -79,6 +121,10 @@ echo "[start-tunnel] Waiting for dev server to be ready at http://localhost:${PO
 WAIT_TIMEOUT=30
 WAIT_START=$(date +%s)
 while ! curl -s "http://localhost:${PORT}" > /dev/null 2>&1; do
+  if ! kill -0 "$DEV_PID" 2>/dev/null; then
+    echo "[start-tunnel] ERROR: dev server exited before becoming ready" >&2
+    exit 1
+  fi
   WAIT_ELAPSED=$(($(date +%s) - WAIT_START))
   if (( WAIT_ELAPSED >= WAIT_TIMEOUT )); then
     echo "[start-tunnel] ERROR: dev server did not respond after ${WAIT_TIMEOUT}s" >&2
@@ -120,7 +166,8 @@ if [[ -z "$TUNNEL_URL" ]]; then
 fi
 
 # Write URL to workspace file and stdout
-echo "$TUNNEL_URL" > "$TUNNEL_URL_FILE"
+umask 077
+printf '%s\n' "$TUNNEL_URL" > "$TUNNEL_URL_FILE"
 echo "[start-tunnel] Tunnel started! URL written to ${TUNNEL_URL_FILE}"
 echo "$TUNNEL_URL"
 
