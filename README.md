@@ -33,9 +33,9 @@ The system is designed to be:
   <img src="assets/readme-stickers/setup-save-turtle.png" width="108" alt="Setup turtle sticker" />
 </p>
 
-## Setup (AI-guided, clone-and-open)
+## Setup
 
-Super Turtle setup is designed to run through **Claude Code or Codex**. You should not need manual config editing.
+Use **Claude Code** or **Codex**. Keep it simple.
 
 ### 1) Install Claude Code or Codex and run the login wizard
 
