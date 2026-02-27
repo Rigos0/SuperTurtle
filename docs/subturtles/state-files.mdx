@@ -1,0 +1,134 @@
+---
+title: State Files
+description: CLAUDE.md format, ownership model, and lifecycle from spawn to self-stop
+---
+
+# State Files
+
+`CLAUDE.md` is the source of truth for each SubTurtle.
+
+The Meta Agent seeds it before spawn. The SubTurtle reads and updates it every iteration. Supervision logic checks it to understand progress.
+
+## Location and Ownership
+
+Each SubTurtle has its own workspace:
+
+```text
+.subturtles/<name>/
+├── CLAUDE.md   # task state, edited by meta + worker
+└── AGENTS.md   # symlink to CLAUDE.md
+```
+
+- Meta Agent owns initial seeding and task framing.
+- SubTurtle owns iterative progress updates.
+- Both operate on the same file path: `.subturtles/<name>/CLAUDE.md`.
+
+<Info>
+`ctl spawn` always creates `AGENTS.md -> CLAUDE.md` so agents that read either filename see the same content.
+</Info>
+
+## Required Format
+
+SubTurtle state files are plain markdown with stable sections. The minimum practical shape is:
+
+```markdown
+## Current Task
+Write docs/subturtles/state-files.mdx.
+
+## End Goal with Specs
+Create 9 docs pages with Mintlify MDX syntax and accurate architecture coverage.
+
+## Backlog
+- [x] Read source files
+- [ ] Write docs/subturtles/state-files.mdx <- current
+- [ ] Write docs/subturtles/skills.mdx
+- [ ] Commit
+```
+
+When all backlog items are complete, append:
+
+```markdown
+## Loop Control
+STOP
+```
+
+### Backlog Rules
+
+- Use checkbox items: `- [ ]` or `- [x]`.
+- Keep one active item marked with `<- current`.
+- Move `<- current` to the next unchecked item after completing the current one.
+- Keep `Current Task` aligned with the item marked `<- current`.
+
+## How Meta Agent Seeds State
+
+`ctl spawn` accepts state from a file or stdin and writes it to `.subturtles/<name>/CLAUDE.md`.
+
+```bash
+# Seed from file
+./super_turtle/subturtle/ctl spawn docs-agent \
+  --type yolo-codex \
+  --state-file /tmp/docs-agent-state.md
+
+# Seed from stdin
+cat /tmp/docs-agent-state.md | ./super_turtle/subturtle/ctl spawn docs-agent --state-file -
+```
+
+If no state is provided, spawn fails.
+
+<Warning>
+`ctl start` does not seed state. It requires an existing `.subturtles/<name>/CLAUDE.md`.
+</Warning>
+
+## How SubTurtle Uses State
+
+In `yolo`/`yolo-codex` loops, the worker prompt explicitly instructs the SubTurtle to:
+
+<Steps>
+  <Step title="Read state first">
+    Parse current task, end goal, and backlog item marked `&lt;- current`.
+  </Step>
+  <Step title="Do one commit-sized change">
+    Implement one focused slice, run verification, and keep scope tight.
+  </Step>
+  <Step title="Update CLAUDE.md">
+    Check off finished backlog items, move `&lt;- current`, and sync `Current Task`.
+  </Step>
+  <Step title="Commit">
+    Commit code plus state-file progress in the same commit.
+  </Step>
+  <Step title="Self-stop when done">
+    If all backlog items are `[x]`, append `## Loop Control` + `STOP`.
+  </Step>
+</Steps>
+
+## Loop Control STOP Directive
+
+SubTurtle runtime checks for this exact directive:
+
+```text
+## Loop Control
+STOP
+```
+
+When present, the loop exits cleanly and triggers completion handoff behavior.
+
+```python
+# super_turtle/subturtle/__main__.py
+STOP_DIRECTIVE = "## Loop Control\\nSTOP"
+```
+
+## AGENTS.md Symlink Behavior
+
+`AGENTS.md` in each workspace is a symlink to `CLAUDE.md`:
+
+```bash
+ln -sf CLAUDE.md .subturtles/<name>/AGENTS.md
+```
+
+This keeps compatibility with tooling that expects `AGENTS.md` while preserving a single state source of truth.
+
+## Related Pages
+
+- [SubTurtles Overview](/subturtles/overview)
+- [CTL Commands](/subturtles/ctl-commands)
+- [Skills](/subturtles/skills)
