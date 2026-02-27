@@ -1725,6 +1725,179 @@ This gives us **80% of OpenClaw's benefits with 20% of the complexity**, fitting
 
 ---
 
+## Deep Dive: VibeTunnel Architecture vs. Our Cloudflared Tunnel Approach
+
+**Date**: 2026-02-27
+**Focus**: Tunnel architecture, browser-terminal integration, remote access patterns
+
+### What VibeTunnel Does
+
+VibeTunnel transforms a web browser into a full terminal for your Mac (or Linux), allowing you to run commands and agents from anywhere with a web connection. It's a **terminal-in-browser system**, not just a port tunnel.
+
+**Core Use Case**: Run Claude Code, ChatGPT, or other agents from a phone browser while accessing your local Mac terminal, with full ANSI color support, scrollback, and session persistence.
+
+### VibeTunnel Architecture
+
+VibeTunnel is a sophisticated multi-layered system with three primary components:
+
+#### Component 1: Native Desktop App (Swift)
+- **macOS menu bar application** built with Swift 6
+- Manages server lifecycle (start/stop)
+- System integration (auto-launch, tray menu)
+- Sparkle framework for automatic updates
+- Bundles all runtime components into a single installer
+
+#### Component 2: Backend Server (Multi-language)
+- **Primary**: Node.js + TypeScript for web/macOS
+- **Secondary**: Swift backend available
+- **Alternative**: Rust backend for performance-critical scenarios
+- **Linux/Headless**: npm package distribution for non-macOS environments
+
+**Key Capabilities**:
+- Session management with persistent terminal sessions
+- Process spawning via **Rust binary** (handles core I/O)
+- Real-time streaming to browser clients
+- Recording in asciinema format for playback/debugging
+
+#### Component 3: Web Frontend
+- **Lit framework** (Google's lightweight web components library)
+- **Ghostty-web** for terminal rendering (same as VS Code terminal)
+- Full ANSI color support with character-level accuracy
+- Xterm.js-compatible terminal emulation
+- Scrollback buffer management
+- Resize event synchronization
+
+### Technical Communication Strategy
+
+VibeTunnel chose **Server-Sent Events (SSE)** over WebSockets for terminal streaming:
+
+**Why SSE?**
+- Simpler protocol (HTTP + event stream)
+- Better proxy compatibility (many firewalls/corporate proxies block WebSockets)
+- Unidirectional (server → client) naturally matches terminal output flow
+- Reduced client-side complexity
+
+**Tradeoff Discovered**:
+- Browsers limit concurrent SSE connections to **6 per domain**
+- Future multiplexing improvements needed for 7+ simultaneous terminals
+- Acceptable for current use case (most users run 2-3 terminals)
+
+### Process Communication: Named Pipes
+
+The **Rust binary** at the heart of VibeTunnel uses Unix named pipes for bidirectional I/O:
+
+```
+Browser ←→ Node Server ←→ Rust Binary ←→ Terminal Process
+                          ↑              ↑
+                    Named Pipes    (stdin/stdout)
+                    (fifo files)
+```
+
+**Implementation**:
+- **stdout pipe**: Regular file that's continuously polled/streamed
+- **stdin pipe**: Named pipe for command input from browser
+- **Process management**: Rust handles spawning, lifecycle, cleanup
+- **State sync**: Terminal resize events propagate through all layers
+
+### Tunneling Options
+
+VibeTunnel supports **multiple tunnel backends**:
+
+1. **ngrok** — Public tunnel with unique HTTPS URL
+2. **Tailscale** — Private VPN network (most secure, recommended)
+3. **Cloudflare** — Cloudflare tunnel for public access
+4. **localhost:only** — Development mode, local access only
+
+**Architecture Note**: All tunnel options are abstracted behind a single interface, allowing users to choose based on security/access requirements.
+
+### Comparison: VibeTunnel vs. Our Cloudflared Approach
+
+| Aspect | VibeTunnel | Our Approach |
+|--------|-----------|-------------|
+| **Purpose** | Terminal-in-browser system | Dev server port exposition |
+| **Backend** | Node.js server + Rust binary | Cloudflared binary only |
+| **Frontend** | Web app (Lit + Ghostty-web) | Direct to npm dev server |
+| **Communication** | SSE (server → client) | HTTP (stateless) |
+| **Session Persistence** | Full session history, recording | N/A (stateless) |
+| **Bidirectional I/O** | Yes (stdin/stdout pipes) | One-way (HTTP) |
+| **Recording/Playback** | Asciinema format | N/A |
+| **Lines of Code** | ~5,000+ | ~150 (start-tunnel.sh) |
+| **Complexity** | Production-grade infrastructure | Pragmatic scripting |
+| **Tunnel Options** | ngrok, Tailscale, Cloudflare | Cloudflare only |
+| **Platforms** | macOS, iOS, Web, Linux | Shell-based (any Unix) |
+| **Startup Time** | ~2-3 seconds (app + server) | ~1 second |
+| **Resource Usage** | ~80-120MB (Swift app + Node) | ~5-10MB (shell process) |
+
+### Architectural Decisions & Why They Matter
+
+#### 1. **Process Management via Rust**
+VibeTunnel delegates I/O management to a lightweight Rust binary rather than handling it in Node.js. This provides:
+- **Better performance** for high-frequency I/O
+- **Simpler error handling** (process isolation)
+- **System-level control** (Unix named pipes, signals)
+
+**Our Approach**: Cloudflared handles this—we don't manage process I/O at all.
+
+#### 2. **Frontend-First Terminal Rendering**
+Xterm.js + Ghostty-web in the browser gives full terminal power without server-side terminal emulation.
+
+**Our Approach**: N/A—we serve static HTML/React.
+
+#### 3. **Session Recording by Default**
+Every terminal session is recorded in asciinema format for debugging, training, or audit purposes.
+
+**Our Approach**: No recording (not applicable for web apps).
+
+#### 4. **Multi-Tunnel Abstraction**
+Supports ngrok, Tailscale, Cloudflare behind a single abstraction, letting users choose based on trust model.
+
+**Our Approach**: Cloudflare only (sufficient for preview links).
+
+### Applicability to Our System
+
+#### ✅ What We Can Learn
+
+1. **Tunnel Abstraction Pattern** — If we expand beyond preview links, abstracting tunnel providers would be wise. VibeTunnel shows how to do this cleanly.
+
+2. **Process Lifecycle Management** — VibeTunnel's Rust binary + trap handlers is similar to our `start-tunnel.sh` cleanup patterns. If we needed bidirectional I/O, their approach is proven.
+
+3. **Multi-Platform Consideration** — VibeTunnel ships as Swift + Node for macOS and npm for headless systems. We could adopt similar pattern if SubTurtles need multiple platforms.
+
+4. **Recording for Debugging** — Asciinema-style recording could be useful for SubTurtle session replay. Consider adopting for agent audit trails.
+
+#### ❌ What We Don't Need
+
+1. **Terminal Emulation** — Our SubTurtles are headless agents, not interactive terminals.
+2. **Session Persistence** — We prefer ephemeral SubTurtle sessions per task.
+3. **Full Browser Terminal** — Our Telegram bot interface is sufficient; we don't need browser-based terminal control.
+4. **Native Desktop App** — We don't require Swift macOS integration.
+
+### Adoption Recommendation
+
+**Verdict**: ⭐⭐⭐ **Reference Architecture** (not for direct use, but study the patterns)
+
+**When to Reconsider**:
+- If we build **human-in-the-loop agent debugging** requiring interactive terminal access
+- If we expand to **iOS/mobile control** of SubTurtles
+- If we need **session replay** for agent audit trails
+- If we support **multiple tunnel providers** (ngrok, Tailscale, etc.)
+
+**What to Adopt Now**:
+- Study VibeTunnel's **process lifecycle patterns** (Rust binary + trap handlers) — applies to `start-tunnel.sh` hardening
+- Consider **tunnel abstraction layer** if preview links become critical infrastructure
+- Evaluate **asciinema recording** for SubTurtle session audit trails (low effort, high value)
+
+### Key Insight
+
+VibeTunnel and our cloudflared approach solve **fundamentally different problems**:
+
+- **VibeTunnel**: "How do I run an interactive terminal from a web browser?"
+- **Our System**: "How do I expose a dev server to a browser from a local machine?"
+
+The architecture, components, and design decisions are tailored to each use case. VibeTunnel is a **masterclass in building multi-platform agent infrastructure**—worth studying for its patterns, not its specific implementation.
+
+---
+
 ## Summary: Key Takeaways
 
 **steipete is to "agent tooling" what Django is to web frameworks** — a pragmatic, opinionated collection of utilities that solve real problems agents face. His work is characterized by:

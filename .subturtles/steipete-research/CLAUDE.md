@@ -1,6 +1,6 @@
 # Current Task
 
-Check VibeTunnel architecture vs our cloudflared approach: evaluate if their tunnel abstraction is superior.
+Look at OpenClaw's Telegram integration specifically to identify patterns we can adopt.
 
 # End Goal with Specs
 
@@ -83,7 +83,7 @@ Produce a comprehensive research document at `docs/steipete-research.md` that:
 - [x] Review agent-scripts repo: identify scripts we should adopt/port
 - [x] Evaluate Poltergeist for our dev server / file watching needs
 - [x] Review OpenClaw's skills/ClawHub system vs our skills loader
-- [ ] Check VibeTunnel architecture vs our cloudflared approach <- current
-- [ ] Look at OpenClaw's Telegram integration specifically
+- [x] Check VibeTunnel architecture vs our cloudflared approach
+- [ ] Look at OpenClaw's Telegram integration specifically <- current
 - [ ] Write final research document to docs/steipete-research.md with recommendations
 - [ ] Commit the research document
