@@ -11,18 +11,19 @@ const chatMessages = [
 
 const heroHighlights = [
   {
-    title: 'Code',
-    description: 'Uses your Claude Code or Codex subscription.',
+    title: 'Uses your Claude Code or Codex subscription',
+    description: 'No extra API-token workflow for core use.',
     accent: 'olive',
   },
   {
-    title: 'Mobile + Voice',
-    description: 'Control everything from Telegram by text or voice.',
+    title: 'Mobile and voice control first',
+    description: 'Run everything from Telegram by text or voice.',
     accent: 'terracotta',
   },
   {
-    title: 'Parallel',
-    description: 'Sub-agents split tasks and iterate until done.',
+    title: 'Parallel sub-agents, managed for you',
+    description:
+      'Breaks work into tasks, runs sub-agents, can open/test webpages, and iterates until done.',
     accent: 'sage',
   },
 ];
