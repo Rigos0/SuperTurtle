@@ -30,6 +30,79 @@ The system is designed to be:
 - **Self-improving**: Super Turtle builds and maintains itself — dogfooding is a core design principle.
 
 <p align="center">
+  <img src="assets/readme-stickers/setup-save-turtle.png" width="108" alt="Setup turtle sticker" />
+</p>
+
+## Setup (AI-guided, clone-and-open)
+
+Super Turtle setup is designed to run through **Claude Code or Codex**. You should not need manual config editing.
+
+### 1) Install Claude Code or Codex and run the login wizard
+
+```bash
+# Option A: Claude Code
+npm install -g @anthropic-ai/claude-code
+claude
+
+# Option B: Codex
+npm install -g @openai/codex
+codex
+```
+
+Run either `claude` or `codex` at least once so the CLI can open its authentication/setup flow.
+
+### 2) Clone and open the repo root
+
+```bash
+git clone <your-fork-or-repo-url>
+cd <repo-directory>
+```
+
+Then open Claude Code or Codex in that root folder and ask:
+
+```text
+Set up Super Turtle on this machine.
+```
+
+The root `CLAUDE.md`/`AGENTS.md` instructions are loaded automatically and the agent should walk you through setup, run install commands, and configure project files.
+
+### 3) Manual info you must provide
+
+You only need to bring:
+
+- Telegram bot token from [@BotFather](https://t.me/BotFather) (`TELEGRAM_BOT_TOKEN`)
+- Your Telegram user/chat ID (`TELEGRAM_ALLOWED_USERS`) from [@userinfobot](https://t.me/userinfobot) or your bot's `/start`
+- Optional `OPENAI_API_KEY` for voice transcription
+
+### 4) What the setup agent runs
+
+The agent uses:
+
+```bash
+./super_turtle/setup --driver auto \
+  --telegram-token "<botfather_token>" \
+  --telegram-user "<your_telegram_user_id>" \
+  [--openai-api-key "<optional_key>"]
+```
+
+This bootstrap:
+
+- auto-selects Codex (if available) or Claude Code
+- installs required dependencies
+- generates/updates `super_turtle/claude-telegram-bot/.env`
+- pins the default bot driver for consistent behavior
+
+Optional flags:
+
+- `--driver codex` or `--driver claude` to force a driver
+- `--non-interactive` for CI scripts
+
+### 5) Subscription requirements
+
+- Use either local `codex` auth or local `claude` auth.
+- Optional: `OPENAI_API_KEY` for voice transcription.
+
+<p align="center">
   <img src="assets/readme-stickers/architecture-gear-turtle.png" width="108" alt="Architecture turtle sticker" />
 </p>
 
@@ -84,65 +157,6 @@ The system is designed to be:
 - **Skills**: loaded on demand per SubTurtle (`--skill frontend --skill testing`) so expertise stays scoped to the task.
 - **Cron supervision**: `ctl spawn` auto-registers recurring check-ins (default `10m`) to monitor milestones, stalls, and failures.
 - **Tunnel previews**: frontend workers can publish Cloudflare tunnel links; the Meta Agent surfaces the URL when ready.
-
-<p align="center">
-  <img src="assets/readme-stickers/setup-save-turtle.png" width="108" alt="Setup turtle sticker" />
-</p>
-
-## Setup (AI-guided, clone-and-open)
-
-Super Turtle setup is designed to run through **Claude Code or Codex**. You should not need manual config editing.
-
-### 1) Clone and open the repo root
-
-```bash
-git clone <your-fork-or-repo-url>
-cd <repo-directory>
-```
-
-Then open Claude Code or Codex in that root folder and ask:
-
-```text
-Set up Super Turtle on this machine.
-```
-
-The root `CLAUDE.md`/`AGENTS.md` instructions are loaded automatically and the agent should walk you through setup, run install commands, and configure project files.
-
-### 2) Manual info you must provide
-
-You only need to bring:
-
-- Telegram bot token from [@BotFather](https://t.me/BotFather) (`TELEGRAM_BOT_TOKEN`)
-- Your Telegram user/chat ID (`TELEGRAM_ALLOWED_USERS`) from [@userinfobot](https://t.me/userinfobot) or your bot's `/start`
-- Optional `OPENAI_API_KEY` for voice transcription
-
-### 3) What the setup agent runs
-
-The agent uses:
-
-```bash
-./super_turtle/setup --driver auto \
-  --telegram-token "<botfather_token>" \
-  --telegram-user "<your_telegram_user_id>" \
-  [--openai-api-key "<optional_key>"]
-```
-
-This bootstrap:
-
-- auto-selects Codex (if available) or Claude Code
-- installs required dependencies
-- generates/updates `super_turtle/claude-telegram-bot/.env`
-- pins the default bot driver for consistent behavior
-
-Optional flags:
-
-- `--driver codex` or `--driver claude` to force a driver
-- `--non-interactive` for CI scripts
-
-### 4) Subscription requirements
-
-- Use either local `codex` auth or local `claude` auth.
-- Optional: `OPENAI_API_KEY` for voice transcription.
 
 <p align="center">
   <img src="assets/readme-stickers/run-fire-turtle.png" width="108" alt="Run turtle sticker" />
