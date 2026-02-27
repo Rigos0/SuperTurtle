@@ -12,6 +12,7 @@ RUN_STATE_DIR_REL="super_turtle/state"
 RUN_STATE_DIR="${PROJECT_DIR}/${RUN_STATE_DIR_REL}"
 RUNS_JSONL_FILE="${RUN_STATE_DIR}/runs.jsonl"
 HANDOFF_MD_FILE="${RUN_STATE_DIR}/handoff.md"
+RUN_STATE_WRITER="${RUN_STATE_DIR}/run_state_writer.py"
 
 # Use subturtle venv if available, otherwise system python3
 PYTHON="${SCRIPT_DIR}/.venv/bin/python3"
@@ -86,6 +87,31 @@ Last updated: not yet
 ## Notes
 - This summary is refreshed by supervision flows.
 EOF
+  fi
+}
+
+append_run_event() {
+  local name="$1"
+  local event="$2"
+  local status="${3:-}"
+  local -a writer_cmd=(
+    "$PYTHON"
+    "$RUN_STATE_WRITER"
+    --state-dir
+    "$RUN_STATE_DIR"
+    append
+    --run-name
+    "$name"
+    --event
+    "$event"
+  )
+
+  if [[ -n "$status" ]]; then
+    writer_cmd+=(--status "$status")
+  fi
+
+  if ! "${writer_cmd[@]}" >/dev/null 2>&1; then
+    echo "[subturtle:${name}] WARNING: failed to append run state event '${event}'" >&2
   fi
 }
 
@@ -418,6 +444,7 @@ METAEOF
   echo "WATCHDOG_PID=${watchdog_pid}" >> "$mf"
 
   echo "[subturtle:${name}] watchdog armed (${timeout_str}, PID ${watchdog_pid})"
+  append_run_event "$name" "spawn" "running"
 }
 
 register_spawn_cron_job() {
@@ -716,6 +743,7 @@ do_stop() {
   if ! is_running "$name"; then
     echo "[subturtle:${name}] not running"
     rm -f "$(pid_file "$name")" "$(meta_file "$name")"
+    append_run_event "$name" "stop" "not_running"
     do_archive "$name"
     exit 0
   fi
@@ -731,6 +759,7 @@ do_stop() {
     if ! kill -0 "$pid" 2>/dev/null; then
       echo "[subturtle:${name}] stopped"
       rm -f "$(pid_file "$name")" "$(meta_file "$name")"
+      append_run_event "$name" "stop" "stopped"
       do_archive "$name"
       return
     fi
@@ -741,6 +770,7 @@ do_stop() {
   kill -9 "$pid" 2>/dev/null || true
   rm -f "$(pid_file "$name")" "$(meta_file "$name")"
   echo "[subturtle:${name}] killed"
+  append_run_event "$name" "stop" "killed"
   do_archive "$name"
 }
 
