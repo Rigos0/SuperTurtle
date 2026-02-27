@@ -89,7 +89,7 @@ export default function Home() {
         <section id="hero" className="section-shell hero-shell relative">
           <div className="section-container grid gap-10 xl:gap-16 items-start xl:items-center xl:grid-cols-[1.05fr_0.95fr]">
             <div className="reveal" style={{ animationDelay: '80ms' }}>
-              <p className="pill">Super Turtle System</p>
+              <p className="pill">Super Turtle</p>
               <h1 className="headline mt-4">
                 Build in silence, ship in waves
               </h1>

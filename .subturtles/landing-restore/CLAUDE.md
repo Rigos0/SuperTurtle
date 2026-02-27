@@ -1,6 +1,6 @@
 # Current Task
 
-Update hero pill badge to "Super Turtle" (not "Super Turtle System").
+Replace any "agentic" references with "Super Turtle" in page.tsx.
 
 # End Goal with Specs
 
@@ -53,7 +53,7 @@ Four loop types: slow (Plan→Groom→Execute→Review), yolo (single Claude cal
 
 - [x] Restore page.tsx from commit a67778f: `git show a67778f:landing/app/page.tsx > landing/app/page.tsx`
 - [x] Restore globals.css from commit a67778f: `git show a67778f:landing/app/globals.css > landing/app/globals.css`
-- [ ] Update hero pill badge to "Super Turtle" (not "Super Turtle System") <- current
-- [ ] Replace any "agentic" references with "Super Turtle" in page.tsx
+- [x] Update hero pill badge to "Super Turtle" (not "Super Turtle System")
+- [ ] Replace any "agentic" references with "Super Turtle" in page.tsx <- current
 - [ ] Verify terminal demo, loop types, and feature descriptions are accurate
 - [ ] Commit the restored and updated landing page
