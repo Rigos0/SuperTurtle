@@ -9,6 +9,16 @@ Scope: `super_turtle/claude-telegram-bot` runtime and bundled MCP servers (`ask_
 - Medium: 4
 - Low: 1
 
+## Remediation Status (2026-02-27)
+
+- ST-SEC-001: Open
+- ST-SEC-002: Open
+- ST-SEC-003: Open
+- ST-SEC-004: Open
+- ST-SEC-005: Open
+- ST-SEC-006: Open
+- ST-SEC-007: Fixed
+
 ## Findings
 
 ### ST-SEC-001 (High) - Codex path runs with dangerous defaults and no command/file safety gate
@@ -113,8 +123,15 @@ Risk:
 Recommended direction:
 - Validate callback identifiers with strict regex (e.g. `^[a-zA-Z0-9_-]+$`) before filesystem use.
 
+Fix status:
+- Implemented on 2026-02-27.
+- `src/handlers/callback.ts` now enforces strict identifier validation for:
+  - `askuser:{request_id}:{option_index}` request IDs before building `/tmp/ask-user-*.json` paths.
+  - `subturtle_logs:{name}` and `subturtle_stop:{name}` names before building `.subturtles/<name>/...` paths or executing control actions.
+- Regression coverage added in `src/handlers/callback.security.test.ts` for unsafe request IDs, non-numeric option indexes, and unsafe SubTurtle names.
+
 ## Quick Wins for Next Task (small/low-risk fixes)
 
-1. Add strict regex validation for callback `requestId` and `subturtle` name (ST-SEC-007).
-2. Replace global `TELEGRAM_CHAT_ID` with per-request context object in MCP handoff (partial mitigation for ST-SEC-004).
-3. Move MCP IPC files from shared `/tmp` to a private runtime dir with mode `0700` (partial mitigation for ST-SEC-003).
+1. Replace global `TELEGRAM_CHAT_ID` with per-request context object in MCP handoff (partial mitigation for ST-SEC-004).
+2. Move MCP IPC files from shared `/tmp` to a private runtime dir with mode `0700` (partial mitigation for ST-SEC-003).
+3. Add integrity/authentication metadata to MCP request files before execution (partial mitigation for ST-SEC-003/ST-SEC-005).
