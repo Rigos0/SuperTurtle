@@ -91,9 +91,9 @@ export default function Home() {
       <main>
         <section id="hero" className="section-shell hero-shell relative">
           <div className="section-container max-w-5xl space-y-10">
-            <div className="reveal text-center flex flex-col items-center" style={{ animationDelay: '80ms' }}>
-              <div className="mb-4 mx-auto">
-                <img src="/turtle-logo.png" alt="Super Turtle" width={72} height={72} />
+            <div className="reveal" style={{ animationDelay: '80ms' }}>
+              <div className="mb-4">
+                <img src="/turtle-logo.png" alt="Super Turtle" width={104} height={104} />
               </div>
               <h1 className="headline">
                 Super Turtle
@@ -102,7 +102,7 @@ export default function Home() {
                 Code from anywhere with your voice.
               </p>
 
-              <div className="mt-7 flex flex-wrap justify-center gap-3">
+              <div className="mt-7 flex flex-wrap gap-3">
                 <a
                   href={githubUrl}
                   className="btn-primary"
