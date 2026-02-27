@@ -1,0 +1,158 @@
+---
+title: SubTurtle Loop Types
+description: Compare slow, yolo, yolo-codex, and yolo-codex-spark with speed, cost, and quality tradeoffs
+---
+
+# SubTurtle Loop Types
+
+SubTurtles support four loop types:
+- `slow`
+- `yolo`
+- `yolo-codex`
+- `yolo-codex-spark`
+
+Choose loop type based on complexity, iteration speed, and quota pressure.
+
+## At a Glance
+
+| Type | Calls per iteration | Runtime | Best for |
+|------|---------------------|----------|----------|
+| `slow` | 4 calls (Plan -> Groom -> Execute -> Review) | Claude + Codex | Complex, high-risk multi-file work |
+| `yolo` | 1 call | Claude | Focused work that still benefits from Claude reasoning |
+| `yolo-codex` | 1 call | Codex | Default mode for most coding tasks |
+| `yolo-codex-spark` | 1 call | Codex Spark (`gpt-5.3-codex-spark`) | Fastest Codex iterations |
+
+<Info>
+`ctl spawn` and `ctl start` default to `--type yolo-codex`.
+</Info>
+
+## How Each Loop Executes
+
+The loop dispatcher maps type to runtime function:
+
+```python
+LOOP_TYPES = {
+    "slow": run_slow_loop,
+    "yolo": run_yolo_loop,
+    "yolo-codex": run_yolo_codex_loop,
+    "yolo-codex-spark": run_yolo_codex_spark_loop,
+}
+```
+
+### `slow` (Most Thorough)
+
+`slow` runs a 4-phase loop each iteration:
+1. Planner (Claude) creates one-commit plan.
+2. Groomer (Claude) updates `CLAUDE.md` backlog/current marker.
+3. Executor (Codex) implements the plan.
+4. Reviewer (Claude) validates and adds follow-ups if needed.
+
+Use `slow` when:
+- The task is ambiguous or architecture-heavy.
+- Multiple files/systems must stay consistent.
+- You want explicit planning and review every cycle.
+
+Tradeoff:
+- Highest quality guardrails.
+- Slowest and most expensive per iteration.
+
+```bash
+./super_turtle/subturtle/ctl spawn api-hardening --type slow --timeout 2h --state-file /tmp/api-hardening.md
+```
+
+### `yolo` (Fast Claude Loop)
+
+`yolo` runs a single Claude call per iteration using the state-file protocol.
+
+Use `yolo` when:
+- Scope is clear.
+- You still want Claude-centric reasoning.
+- Codex quota is constrained.
+
+Tradeoff:
+- Faster than `slow`.
+- Less structured guardrail than Plan/Groom/Review.
+
+```bash
+./super_turtle/subturtle/ctl spawn auth-fix --type yolo --timeout 1h --state-file /tmp/auth-fix.md
+```
+
+### `yolo-codex` (Default)
+
+`yolo-codex` is the same single-call loop model as `yolo`, but uses Codex.
+
+Use `yolo-codex` when:
+- Work is implementation-heavy and well-scoped.
+- You want best cost-efficiency for autonomous backlog progress.
+- You are spawning many SubTurtles in parallel.
+
+Tradeoff:
+- Best default cost/speed balance.
+- May require tighter state-file specificity than `slow`.
+
+```bash
+./super_turtle/subturtle/ctl spawn docs-agent --type yolo-codex --timeout 1h --state-file /tmp/docs-agent.md
+```
+
+### `yolo-codex-spark` (Fastest Iterations)
+
+`yolo-codex-spark` uses the Codex runtime with model `gpt-5.3-codex-spark`.
+
+Use `yolo-codex-spark` when:
+- Latency matters more than deep reasoning.
+- You want very rapid short iterations.
+- Tasks are concrete and low-ambiguity.
+
+Tradeoff:
+- Fastest loop turnaround.
+- Least conservative option for complex design decisions.
+
+```bash
+./super_turtle/subturtle/ctl spawn ui-polish --type yolo-codex-spark --timeout 45m --state-file /tmp/ui-polish.md
+```
+
+## Selection Guide
+
+<Steps>
+  <Step title="Default to yolo-codex">
+    Start with `yolo-codex` for most tasks. It is the project default and best baseline for throughput.
+  </Step>
+  <Step title="Escalate to slow for complex work">
+    If a task needs explicit planning/review or crosses many boundaries, switch to `slow`.
+  </Step>
+  <Step title="Use yolo when Claude reasoning is preferred">
+    Pick `yolo` when you need Claude in a single-call loop (or Codex quota is high).
+  </Step>
+  <Step title="Use yolo-codex-spark for shortest feedback loops">
+    Pick Spark for highly concrete work where rapid iterations matter most.
+  </Step>
+</Steps>
+
+## Cost and Speed Tradeoffs
+
+| Priority | Recommended type | Why |
+|----------|------------------|-----|
+| Maximum quality checks | `slow` | Includes planning and review each iteration |
+| Balanced default | `yolo-codex` | Single-call loop + low-cost runtime |
+| Claude-first single-call | `yolo` | Faster than `slow`, Claude reasoning |
+| Maximum iteration speed | `yolo-codex-spark` | Spark model tuned for fast cycles |
+
+## Operational Notes
+
+- All loop types read `.subturtles/<name>/CLAUDE.md` as the source of truth.
+- All loop types check for self-stop directive:
+
+```md
+## Loop Control
+STOP
+```
+
+- Timeout/watchdog behavior is independent of loop type.
+- Cron supervision behavior is independent of loop type.
+
+## Related Pages
+
+- [SubTurtles Overview](/subturtles/overview)
+- [CTL Commands](/subturtles/ctl-commands)
+- [State Files](/subturtles/state-files)
+- [Meta Resource Management](/meta/resource-management)
