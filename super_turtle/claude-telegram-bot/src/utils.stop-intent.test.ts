@@ -18,6 +18,9 @@ describe("isStopIntent", () => {
     expect(isStopIntent("stop it please")).toBe(true);
     expect(isStopIntent("can you stop now")).toBe(true);
     expect(isStopIntent("would you please abort current run")).toBe(true);
+    expect(isStopIntent("okay can you please halt all subturtles right away")).toBe(true);
+    expect(isStopIntent("okay stop now please")).toBe(true);
+    expect(isStopIntent("cancél everything now")).toBe(true);
   });
 
   it("does not match regular sentences or non-stop !commands", () => {
@@ -27,5 +30,7 @@ describe("isStopIntent", () => {
     expect(isStopIntent("!deploy")).toBe(false);
     expect(isStopIntent("! run tests")).toBe(false);
     expect(isStopIntent("can you deploy stop button")).toBe(false);
+    expect(isStopIntent("stop by later")).toBe(false);
+    expect(isStopIntent("cancel culture")).toBe(false);
   });
 });
