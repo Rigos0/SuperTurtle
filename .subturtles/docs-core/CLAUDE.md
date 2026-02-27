@@ -1,5 +1,5 @@
 ## Current Task
-Write `docs/architecture.mdx` to match the Mintlify spec and existing repo behavior.
+Verify all three files are valid MDX.
 
 ## End Goal with Specs
 Create three polished documentation pages for the Super Turtle Mintlify docs site. The docs.json config already exists at `docs/docs.json`. Pages go in `docs/` as `.mdx` files. Use Mintlify MDX syntax (supports standard markdown plus components like `<Steps>`, `<Card>`, `<CardGroup>`, `<Tip>`, `<Warning>`, `<Note>`, `<Info>`, `<Accordion>`, `<AccordionGroup>`, `<Tabs>`, `<Tab>`).
@@ -42,8 +42,8 @@ Create three polished documentation pages for the Super Turtle Mintlify docs sit
 - [x] Read existing README.md and docs/index.md for content to pull from
 - [x] Write docs/introduction.mdx
 - [x] Write docs/quickstart.mdx
-- [ ] Write docs/architecture.mdx <- current
-- [ ] Verify all three files are valid MDX
+- [x] Write docs/architecture.mdx
+- [ ] Verify all three files are valid MDX <- current
 - [ ] Commit
 
 ## Notes
