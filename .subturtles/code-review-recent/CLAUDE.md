@@ -1,5 +1,5 @@
 ## Current Task
-Update state and stop.
+All backlog items are complete; loop should stop.
 
 ## End Goal with Specs
 Provide a review doc with top risks and implement small fixes. Call out larger issues without changing behavior unexpectedly.
@@ -8,7 +8,10 @@ Provide a review doc with top risks and implement small fixes. Call out larger i
 - [x] Identify recent commits and areas touched
 - [x] Review for bugs, security issues, regressions
 - [x] Fix small issues; document larger ones
-- [ ] Update state and stop <- current
+- [x] Update state and stop
 
 ## Notes
 Fixed `ctl stop` phantom run-state logging for unknown names; left voice stop/deferred-queue behavior documented as a larger follow-up risk.
+
+## Loop Control
+STOP
