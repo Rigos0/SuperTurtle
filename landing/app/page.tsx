@@ -4,65 +4,69 @@ import { StickyNav } from '@/components/StickyNav';
 import { SectionDivider } from '@/components/SectionDivider';
 
 const chatMessages = [
-  { from: 'user', text: 'build me an API client with tests' },
-  { from: 'bot', text: '🚀 On it. Starting worker "api-client" (yolo-codex, 2h timeout).' },
-  { from: 'bot', text: '🎉 Done. 4 files changed, 12 tests passing.' },
+  { from: 'user', text: 'build me a landing page and wire screenshots' },
+  { from: 'bot', text: '🚀 On it. I split this into 3 SubTurtles.' },
+  { from: 'bot', text: '📍 Milestone: Hero shipped. Screenshot captured. Continuing.' },
 ];
 
-const pillars = [
+const valueProps = [
   {
-    title: 'Player-coach model',
-    description:
-      'The Meta Agent is your conversational interface and project coach. It can code directly for quick tasks, and delegates bigger work to SubTurtles.',
+    title: 'Uses your Claude Code or Codex subscription',
+    description: 'No extra API-token workflow for core use.',
     accent: 'olive',
   },
   {
-    title: 'Milestone-driven',
-    description:
-      'Updates only when there is meaningful news. Milestone reached, blocker found, or work complete.',
+    title: 'Mobile and voice control first',
+    description: 'Run everything from Telegram by text or voice.',
     accent: 'terracotta',
   },
   {
-    title: 'Self-improving',
+    title: 'Autonomous execution',
     description:
-      'Super Turtle builds and maintains itself. The system develops its own features, supervises its own improvements, and commits its own code.',
+      'Breaks work into tasks, runs sub-agents, can open/test webpages, and iterates until done.',
+    accent: 'sage',
+  },
+  {
+    title: 'Runs on your machine',
+    description: 'Local-first today (cloud deployment coming up).',
+    accent: 'olive',
+  },
+  {
+    title: 'Usage-aware load balancing',
+    description: 'Tracks remaining usage and balances work between Claude Code and Codex.',
+    accent: 'terracotta',
+  },
+  {
+    title: 'Autonomous supervision',
+    description:
+      'Scheduled cron check-ins monitor progress in the background and send important updates.',
     accent: 'sage',
   },
 ];
 
-const loopModes = [
+const executionFlow = [
   {
-    title: 'slow',
-    cadence: 'Plan → Groom → Execute → Review',
-    copy: 'Full four-step pass each cycle. For ambiguous requirements, refactors, or architecture changes.',
-    budget: '4 calls/iteration',
-    tone: 'olive',
+    title: 'You send one request',
+    description: 'Example: "build X" in Telegram.',
   },
   {
-    title: 'yolo',
-    cadence: 'Single Claude call per iteration',
-    copy: 'One Claude pass per loop. For tasks that need stronger reasoning without the full slow cycle.',
-    budget: '1 call/iteration',
-    tone: 'terracotta',
+    title: 'It decomposes and spawns SubTurtles',
+    description: 'Parallel workers per task stream.',
   },
   {
-    title: 'yolo-codex',
-    cadence: 'Single Codex call per iteration',
-    copy: 'Default. Keeps costs low on routine implementation, tests, and cleanup.',
-    budget: '1 call/iteration (default)',
-    tone: 'sage',
+    title: 'Workers implement and iterate',
+    description: 'Code, test, browser checks, and retries.',
   },
   {
-    title: 'yolo-codex-spark',
-    cadence: 'Single Codex Spark call per iteration',
-    copy: 'Shortest loop for tiny edits and rapid retries. Quick frontend tweaks, docs, follow-up fixes.',
-    budget: 'Fastest iteration',
-    tone: 'sage',
+    title: 'Meta supervision keeps it moving',
+    description: 'Cron check-ins detect drift and report milestones.',
   },
 ];
 
 export default function Home() {
   const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL ?? "/docs";
+  const githubUrl = "https://github.com/Rigos0/superturtle";
+  const topThree = valueProps.slice(0, 3);
   return (
     <div className="landing-root">
       <StickyNav />
@@ -77,19 +81,21 @@ export default function Home() {
                 Super Turtle
               </h1>
               <p className="lead max-w-2xl">
-                An autonomous coding system you talk to on Telegram. You describe what you want built, by typing or voice, and it decomposes the work, runs autonomous workers, supervises progress, and ships results.
+                Autonomous coding on your existing subscription.
               </p>
 
               <ul className="mt-6 space-y-2 text-sm">
-                <li className="feature-chip"><span className="feature-dot" /> Voice-first: talk to it naturally, it handles transcription quirks and infers intent</li>
-                <li className="feature-chip"><span className="feature-dot" /> Usage-aware: monitors your Claude Code and Codex quota in real time, defaults to cheapest execution</li>
-                <li className="feature-chip"><span className="feature-dot" /> Runs on your machine, your hardware, your existing subscriptions</li>
+                <li className="feature-chip"><span className="feature-dot" /> Uses your Claude Code or Codex subscription</li>
+                <li className="feature-chip"><span className="feature-dot" /> Mobile + voice control first via Telegram</li>
+                <li className="feature-chip"><span className="feature-dot" /> Breaks work into tasks and runs sub-agents</li>
               </ul>
 
               <div className="mt-7 flex flex-wrap gap-3">
                 <a
-                  href="#"
+                  href={githubUrl}
                   className="btn-primary"
+                  target="_blank"
+                  rel="noreferrer"
                 >
                   GitHub
                 </a>
@@ -100,12 +106,80 @@ export default function Home() {
             </div>
 
             <div className="reveal" style={{ animationDelay: '220ms' }}>
+              <div className="grid gap-4">
+                {topThree.map((item, index) => (
+                  <article
+                    className={`deck-card ${index === 0 ? 'olive' : index === 1 ? 'terracotta' : 'sage'}`}
+                    key={item.title}
+                  >
+                    <div className="deck-mark" />
+                    <p className="eyebrow">Value {index + 1}</p>
+                    <h3>{item.title}</h3>
+                    <p>{item.description}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="hero-glow" />
+        </section>
+
+        <SectionDivider />
+
+        <section id="value-proposition" className="section-shell alt-shell">
+          <div className="section-container">
+            <div className="section-head reveal">
+              <p className="eyebrow">Why Super Turtle</p>
+              <h2>Ordered value proposition</h2>
+              <p>This is the sequence users should read first.</p>
+            </div>
+
+            <div className="mt-10 grid gap-4 sm:gap-6 lg:gap-8 sm:grid-cols-2">
+              {valueProps.map((item, index) => (
+                <article
+                  className={`reveal deck-card ${index % 3 === 0 ? 'olive' : index % 3 === 1 ? 'terracotta' : 'sage'}`}
+                  key={item.title}
+                  style={{ animationDelay: `${220 + index * 90}ms` }}
+                >
+                  <div className="deck-mark" />
+                  <p className="eyebrow">#{index + 1}</p>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <SectionDivider />
+
+        <section id="execution" className="section-shell">
+          <div className="section-container grid gap-10 xl:gap-16 xl:grid-cols-[1.05fr_0.95fr]">
+            <div>
+              <div className="section-head reveal">
+                <p className="eyebrow">Execution</p>
+                <h2>How work runs</h2>
+              </div>
+              <div className="mt-8 grid gap-4">
+                {executionFlow.map((step, index) => (
+                  <article className="flow-step reveal" key={step.title} style={{ animationDelay: `${220 + index * 90}ms` }}>
+                    <div className="flow-step-index">{index + 1}</div>
+                    <div>
+                      <h3>{step.title}</h3>
+                      <p>{step.description}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+
+            <div className="reveal" style={{ animationDelay: '260ms' }}>
               <div className="tg-chat">
                 <div className="tg-chat-head">
                   <div className="tg-avatar">🐢</div>
                   <div>
                     <div className="tg-name">Super Turtle</div>
-                    <div className="tg-status">online</div>
+                    <div className="tg-status">scheduled check-ins active</div>
                   </div>
                 </div>
                 <div className="tg-chat-body">
@@ -120,82 +194,23 @@ export default function Home() {
               </div>
             </div>
           </div>
-          <div className="hero-glow" />
         </section>
 
         <SectionDivider />
 
-        <section id="what-it-does" className="section-shell alt-shell">
-          <div className="section-container">
-            <div className="section-head reveal">
-              <p className="eyebrow">Philosophy</p>
-              <h2>Say what, get results</h2>
-              <p>
-                You should not think about infrastructure, loop orchestration, or process management. It runs on your Claude Code or Codex subscription, no API tokens needed.
-              </p>
-            </div>
-
-            <div className="mt-10 grid gap-4 sm:gap-6 lg:gap-8 sm:grid-cols-2 xl:grid-cols-3">
-              {pillars.map((pillar, index) => (
-                <article
-                  className={`reveal deck-card ${index === 0 ? 'olive' : index === 1 ? 'terracotta' : 'sage'}`}
-                  key={pillar.title}
-                  style={{ animationDelay: `${320 + index * 120}ms` }}
-                >
-                  <div className="deck-mark" />
-                  <h3>{pillar.title}</h3>
-                  <p>{pillar.description}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <SectionDivider />
-
-        <section id="loop-types" className="section-shell alt-shell">
-          <div className="section-container">
-            <div className="section-head reveal">
-              <p className="eyebrow">Execution modes</p>
-              <h2>Four loop types</h2>
-              <p>Trade off depth, speed, and cost per task.</p>
-            </div>
-
-            <div className="mt-10 grid gap-4 lg:gap-6 sm:grid-cols-2 xl:grid-cols-4">
-              {loopModes.map((mode, index) => (
-                <article
-                  className={`reveal mode-card ${mode.tone}`}
-                  key={mode.title}
-                  style={{ animationDelay: `${260 + index * 130}ms` }}
-                >
-                  <div className="mode-head">
-                    <h3 className="text-xl">--type {mode.title}</h3>
-                    <p>{mode.cadence}</p>
-                  </div>
-                  <p>{mode.copy}</p>
-                  <p className="muted-label">{mode.budget}</p>
-                  <div className="mode-strip" />
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <SectionDivider />
-
-        <section id="getting-started" className="section-shell">
+        <section id="getting-started" className="section-shell alt-shell">
           <div className="section-container">
             <div className="section-head reveal">
               <p className="eyebrow">Quick start</p>
-              <h2>Get running</h2>
+              <h2>Get running in two minutes</h2>
             </div>
 
             <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {[
                 'git clone <repo>',
-                'cd super-turtle',
-                './super_turtle/subturtle/\nctl spawn my-task \\\n  --type yolo-codex \\\n  --timeout 1h',
-                'tail -f .subturtles/\n  my-task/subturtle.log',
+                'cd super-turtle\nclaude\n# or codex',
+                'say:\nSet up Super Turtle on this machine.',
+                'chat from Telegram\n(text or voice)',
               ].map((command, index) => (
                 <div className="reveal step-card" key={index} style={{ animationDelay: `${280 + index * 100}ms` }}>
                   <div className="step-label">Step {index + 1}</div>
@@ -210,7 +225,7 @@ export default function Home() {
       <footer className="relative section-shell footer-shell">
         <div className="section-container text-center">
           <p className="text-sm text-[var(--text-muted)]">
-            Super Turtle is built using Super Turtle.
+            Super Turtle is built using Super Turtle. Runs locally today; cloud deployment is coming up.
           </p>
         </div>
       </footer>

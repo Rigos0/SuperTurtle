@@ -8,6 +8,7 @@ Super Turtle is an autonomous coding system you talk to on Telegram.
 You say what to build; it coordinates workers and ships results.
 
 Full docs: [docs/index.md](docs/index.md)
+Canonical value proposition order: [docs/value-proposition.md](docs/value-proposition.md)
 
 <p align="center">
   <img src="assets/readme-stickers/skills-idea-turtle.png" width="108" alt="Philosophy turtle sticker" />
@@ -15,11 +16,11 @@ Full docs: [docs/index.md](docs/index.md)
 
 ## Why Super Turtle
 
-1. Uses your Claude Code or Codex subscription.
+1. SuperTurtle uses your Claude Code or Codex subscription.
 2. Mobile and voice control first: run everything from Telegram by text or voice.
 3. Autonomous execution: breaks work into tasks, runs sub-agents, can open/test webpages, and iterates until done.
 4. Runs on your machine (cloud deployment coming up).
-5. Tracks remaining usage and load-balances between Claude Code and Codex.
+5. It tracks remaining usage and load-balances between Claude Code and Codex.
 6. Autonomous supervision: scheduled cron check-ins monitor progress in the background and send important updates.
 
 <p align="center">
@@ -34,6 +35,8 @@ Full docs: [docs/index.md](docs/index.md)
 git clone <your-fork-or-repo-url>
 cd <repo-directory>
 ```
+
+You can ask Claude/Codex to clone it for you, then ensure you are in the repo root.
 
 ### 2) Open Claude Code or Codex in the repo root
 

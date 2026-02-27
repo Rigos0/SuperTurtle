@@ -38,7 +38,7 @@ export function StickyNav() {
 
         {/* Right: GitHub CTA */}
         <a
-          href="https://github.com/anthropics/super-turtle"
+          href="https://github.com/Rigos0/superturtle"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 bg-[#4a5f3b] text-white hover:bg-[#3d4d31] hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(74,95,59,0.2)]"
