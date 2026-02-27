@@ -160,6 +160,18 @@ export async function handleText(
       }
 
       if (driver.isStallError(error) && attempt < MAX_RETRIES) {
+        if (state.sawSpawnOrchestration) {
+          console.warn(
+            `${driver.displayName} stream stalled after spawn orchestration; skipping automatic retry to avoid duplicate side effects`
+          );
+          if (!silent) {
+            await ctx.reply(
+              `⚠️ ${driver.displayName} stream stalled after spawn orchestration. Automatic retry was skipped to avoid duplicate SubTurtle spawns.`
+            );
+          }
+          break;
+        }
+
         console.warn(
           `${driver.displayName} stream stalled, running one continuation attempt (attempt ${attempt + 2}/${MAX_RETRIES + 1})`
         );

@@ -421,6 +421,7 @@ export class StreamingState {
   lastContent = new Map<number, string>(); // segment_id -> last sent content
   silentSegments = new Map<number, string>(); // segment_id -> captured text for silent mode
   sawToolUse = false; // used to avoid replaying side-effectful tool runs on retries
+  sawSpawnOrchestration = false; // true when streamed tool activity indicates `ctl spawn` orchestration
 
   getSilentCapturedText(): string {
     return [...this.silentSegments.entries()]
@@ -428,6 +429,32 @@ export class StreamingState {
       .map(([, text]) => text)
       .join("");
   }
+}
+
+function decodeBasicHtmlEntities(text: string): string {
+  return text
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"');
+}
+
+export function isSpawnOrchestrationToolStatus(content: string): boolean {
+  const normalized = decodeBasicHtmlEntities(content)
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+  if (!normalized.includes("spawn")) {
+    return false;
+  }
+
+  if (normalized.includes("subturtle")) {
+    return true;
+  }
+
+  return normalized.includes("/ctl") || normalized.includes(" ctl ");
 }
 
 /**
@@ -495,6 +522,9 @@ export function createStatusCallback(
         state.toolMessages.push(thinkingMsg);
       } else if (statusType === "tool") {
         state.sawToolUse = true;
+        if (isSpawnOrchestrationToolStatus(content)) {
+          state.sawSpawnOrchestration = true;
+        }
         // Tool status content is pre-formatted HTML (from formatToolStatus
         // or formatCodexToolStatus) — do NOT double-escape.
         try {
@@ -644,6 +674,9 @@ export function createSilentStatusCallback(
     try {
       if (statusType === "tool") {
         state.sawToolUse = true;
+        if (isSpawnOrchestrationToolStatus(content)) {
+          state.sawSpawnOrchestration = true;
+        }
       }
       if (
         (statusType === "text" || statusType === "segment_end") &&
