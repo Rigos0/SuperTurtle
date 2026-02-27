@@ -1,0 +1,321 @@
+---
+title: Security Model
+description: Understanding the bot's security architecture and threat model
+---
+
+# Security Model
+
+The Claude Telegram Bot runs Claude Code with all permission prompts **disabled** for a seamless mobile experience. This guide explains the threat model, defense layers, and how to use the bot securely.
+
+## Permission Mode: Full Bypass
+
+<Warning>
+This bot runs Claude Code with all permission prompts disabled:
+
+```typescript
+permissionMode: "bypassPermissions"
+allowDangerouslySkipPermissions: true
+```
+
+Claude can:
+- **Read and write files** without confirmation
+- **Execute shell commands** without permission prompts
+- **Use all tools** autonomously
+
+This is intentional. The bot is designed for **personal use from mobile**, where confirming every action would be impractical. Instead of per-action prompts, we rely on **defense-in-depth** with multiple security layers.
+</Warning>
+
+This design is **not configurable**. If you need per-action permission prompts, use Claude Code directly instead.
+
+## Threat Model
+
+The bot is designed for **personal use by trusted users**. Primary threats:
+
+1. **Unauthorized access** — Someone discovers/steals your bot token
+2. **Prompt injection** — Malicious content tries to manipulate Claude
+3. **Accidental damage** — You accidentally run destructive commands
+4. **Credential exposure** — Attackers extract API keys or passwords
+
+## Defense in Depth
+
+Six layers protect against these threats:
+
+### Layer 1: User Allowlist
+
+Only Telegram users in `TELEGRAM_ALLOWED_USERS` can use the bot.
+
+```bash
+TELEGRAM_ALLOWED_USERS=123456789,987654321
+```
+
+Characteristics:
+- User IDs are numeric and **cannot be spoofed** in Telegram
+- Get your ID from [@userinfobot](https://t.me/userinfobot)
+- Unauthorized attempts are logged
+- Works as first-line defense against account takeover
+
+**Risk:** If someone steals your bot token, they need to also know your Telegram user ID(s).
+
+### Layer 2: Rate Limiting
+
+Token bucket rate limiting prevents abuse even with valid credentials.
+
+```bash
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_REQUESTS=20     # Default: 20 requests
+RATE_LIMIT_WINDOW=60       # Default: 60 seconds
+```
+
+This means:
+- **Maximum 20 requests per 60 seconds**
+- Automatically rejects excess requests
+- Prevents runaway costs or DoS
+
+**Risk:** Limits damage if bot is compromised, but doesn't stop all abuse.
+
+### Layer 3: Path Validation
+
+File operations are restricted to explicitly allowed directories.
+
+**Default allowed paths:**
+- `CLAUDE_WORKING_DIR` (or home if not set)
+- `~/Documents`
+- `~/Downloads`
+- `~/Desktop`
+- `~/.claude` (Claude Code data)
+- `/tmp/` and `/var/folders/` (temp files for Telegram downloads)
+
+Configure via:
+
+```bash
+ALLOWED_PATHS=~/my-assistant,~/Documents/Notes,~/.claude
+```
+
+**Validation rules:**
+- Symlinks are resolved before checking
+- Path traversal attacks (`../`) are prevented
+- Only exact directory matches are allowed
+- Temp files (`/tmp/`, `/var/folders/`) always permitted
+
+Example:
+
+```bash
+# Allowed
+claude read ~/Documents/notes.txt
+claude exec 'rm ~/my-assistant/temp.txt'
+
+# Blocked (outside ALLOWED_PATHS)
+claude read /etc/passwd
+claude exec 'rm /Users/other/file.txt'
+```
+
+**Risk:** Protects system files and other users' data, but Claude can still delete anything in allowed directories.
+
+### Layer 4: Command Safety
+
+Dangerous shell commands are blocked as defense-in-depth.
+
+**Completely blocked patterns** (always rejected):
+
+| Pattern | Reason |
+|---------|--------|
+| `rm -rf /` | System destruction |
+| `rm -rf ~` | Home directory wipe |
+| `rm -rf $HOME` | Home directory wipe |
+| `sudo rm` | Privileged deletion |
+| `:(){ :\|:& };:` | Fork bomb |
+| `> /dev/sd` | Disk overwrite |
+| `mkfs.` | Filesystem formatting |
+| `dd if=` | Raw disk operations |
+
+**Path-validated deletion** — `rm` commands (that don't match blocked patterns) are allowed but validated:
+
+```bash
+# Allowed (in ALLOWED_PATHS)
+rm file.txt              # If in ALLOWED_PATHS
+rm -rf ./node_modules    # If cwd is in ALLOWED_PATHS
+rm -r /tmp/mydir         # /tmp always allowed
+
+# Blocked (outside ALLOWED_PATHS)
+rm /etc/passwd
+rm -rf /Users/other/file
+```
+
+Each path argument is checked against `ALLOWED_PATHS` before execution.
+
+**Risk:** This is defense-in-depth for the rare case where system prompt fails. The system prompt (Layer 5) is the primary protection.
+
+### Layer 5: System Prompt
+
+Claude receives safety instructions:
+
+1. **Never delete files without confirmation** — Must ask "Are you sure?"
+2. **Only access allowed directories** — Refuse operations outside them
+3. **Never run dangerous commands** — Even if explicitly asked
+4. **Ask for confirmation** on destructive actions
+
+This is the **primary protection layer**. The other layers are backstops if the system prompt fails.
+
+**Risk:** Vulnerable to sophisticated prompt injection or jailbreaks.
+
+### Layer 6: Audit Logging
+
+All interactions are logged for security review.
+
+```bash
+# Log location
+AUDIT_LOG_PATH=/tmp/claude-telegram-audit.log
+
+# Enable JSON format for easier parsing
+AUDIT_LOG_JSON=true
+```
+
+Logged events:
+- `message` — User messages and Claude responses
+- `auth` — Authorization attempts
+- `tool_use` — Claude tool usage
+- `error` — Errors during processing
+- `rate_limit` — Rate limit events
+
+Example log entry:
+
+```json
+{
+  "timestamp": "2026-02-27T14:32:15.123Z",
+  "type": "message",
+  "user_id": 123456789,
+  "direction": "in",
+  "text": "what files are in my home directory?"
+}
+```
+
+**Risk:** Audit logs can detect abuse after the fact, but don't prevent it in real-time.
+
+## What This Doesn't Protect Against
+
+1. **Malicious authorized users** — If you add someone to the allowlist, they have full access
+2. **Zero-day vulnerabilities** — Unknown bugs in Claude, the SDK, or dependencies
+3. **Physical access** — Someone with access to your machine can compromise everything
+4. **Network interception** — Telegram uses encryption, but someone could still intercept tokens
+5. **Sophisticated prompt injection** — Adversarial users might find ways to manipulate Claude
+
+## Security Recommendations
+
+### Essential
+
+1. **Keep allowlist small** — Only add users you fully trust
+2. **Use a dedicated working directory** — Don't point at `/` or `~`
+3. **Keep credentials private** — Never share your bot token or Telegram ID
+4. **Use a dedicated API key** — Create a separate Anthropic key for the bot
+5. **Enable email alerts** — Get notified when new Claude Code sessions start (in Claude Code settings)
+
+### Important
+
+6. **Review audit logs periodically** — Look for suspicious patterns
+7. **Keep dependencies updated** — Run `bun install` regularly for security patches
+8. **Set restrictive `ALLOWED_PATHS`** — Only include directories Claude needs
+9. **Enable rate limiting** — Always keep `RATE_LIMIT_ENABLED=true`
+10. **Use strong rate limits for sensitive work** — Reduce `RATE_LIMIT_REQUESTS` if needed
+
+### Nice to Have
+
+11. **Rotate credentials regularly** — Update bot token and API keys periodically
+12. **Monitor for unusual activity** — Check logs for excessive requests or errors
+13. **Keep the bot offline when not in use** — Reduces attack surface
+14. **Use VPN for mobile access** — Encrypts Telegram traffic
+
+## Incident Response
+
+If you suspect unauthorized access:
+
+1. **Stop the bot immediately**:
+   ```bash
+   # macOS
+   launchctl unload ~/Library/LaunchAgents/com.claude-telegram-ts.plist
+
+   # Linux
+   systemctl --user stop superturtle-bot
+   ```
+
+2. **Revoke the Telegram bot token**:
+   - Message [@BotFather](https://t.me/BotFather)
+   - Use `/revoke` to invalidate the old token
+   - Create a new token with `/newbot`
+
+3. **Review audit logs**:
+   ```bash
+   cat /tmp/claude-telegram-audit.log | grep -E "auth|error"
+   ```
+
+4. **Check for file changes**:
+   - Review recent activity in `ALLOWED_PATHS`
+   - Look for unauthorized files or modifications
+   - Check git history if available: `git log --oneline -20`
+
+5. **Update credentials**:
+   - Rotate `ANTHROPIC_API_KEY` if needed
+   - Update `OPENAI_API_KEY` if compromised
+   - Change any other API keys that may have been exposed
+
+6. **Restart with new token**:
+   - Update `.env` with new `TELEGRAM_BOT_TOKEN`
+   - Restart the bot service
+   - Verify it's working with `/start`
+
+## Security vs Usability Trade-offs
+
+The bot makes deliberate security trade-offs:
+
+| Choice | Security | Usability |
+|--------|----------|-----------|
+| Full permission bypass | Lower (Layer 1-6 needed) | Higher (no prompts) |
+| Rate limiting at 20/min | Medium (prevents abuse) | Lower (can feel slow) |
+| Broad `ALLOWED_PATHS` | Lower (more files exposed) | Higher (more access) |
+| System prompt reliance | Lower (can be jailbroken) | Higher (responsive) |
+
+You can adjust these trade-offs:
+
+- **More security:** Reduce `ALLOWED_PATHS`, increase `RATE_LIMIT_REQUESTS`
+- **More usability:** Expand `ALLOWED_PATHS`, increase `RATE_LIMIT_REQUESTS`
+
+## Compliance
+
+This bot is **not appropriate for:**
+
+- Handling healthcare information (HIPAA)
+- Financial data or payment processing (PCI-DSS)
+- User data from other people (GDPR)
+- Classified or confidential business information
+- Multi-user shared environments
+
+For these use cases, use Claude Code directly with strict enterprise controls.
+
+## Reporting Security Issues
+
+If you discover a security vulnerability:
+
+1. **Don't open a public GitHub issue**
+2. Contact the maintainer privately (see project README)
+3. Allow time for a fix before disclosure
+4. Follow responsible disclosure practices
+
+## Security Checklist
+
+Before deploying in production:
+
+- [ ] `TELEGRAM_ALLOWED_USERS` is set and limited
+- [ ] `ALLOWED_PATHS` is restrictive (not `/` or `~`)
+- [ ] `RATE_LIMIT_ENABLED` is true
+- [ ] `AUDIT_LOG_PATH` is set and monitored
+- [ ] Bot token is stored securely (in `.env`, never in code)
+- [ ] Working directory exists and is readable
+- [ ] API keys are rotated and secure
+- [ ] You've reviewed SECURITY.md and understand the threat model
+- [ ] LaunchAgent/systemd service is properly configured
+- [ ] Logs are reviewed regularly
+
+## Next Steps
+
+- [Environment Variables](/docs/config/environment-variables) — Configure paths and rate limits
+- [Platform Support](/docs/config/platform-support) — Deployment considerations by platform
+- [Drivers](/docs/bot/drivers) — Understanding Claude Code vs Codex security

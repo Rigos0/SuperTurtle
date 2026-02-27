@@ -1,0 +1,365 @@
+---
+title: MCP Tools
+description: Model Context Protocol (MCP) tools for extending Claude's capabilities
+---
+
+# MCP Tools
+
+The bot supports **Model Context Protocol (MCP)** servers that extend Claude's capabilities beyond basic file access and shell commands. Built-in MCP servers provide session control and user interaction, and you can add custom servers for Things, Notion, Typefully, and more.
+
+## Built-In MCP Servers
+
+### ask_user — Interactive Buttons
+
+Claude presents options as tappable inline Telegram buttons. Perfect for confirmation, multiple-choice, or menu-based interactions.
+
+**What Claude can do:**
+
+```
+Claude: Which file format do you prefer?
+[Inline buttons: PDF | PNG | HTML]
+```
+
+When you tap a button, Claude sees your choice and continues.
+
+**Example:**
+
+```
+You: Prepare a report
+Claude: What format? (shows buttons)
+You: [Tap PDF]
+Claude: Generating PDF...
+```
+
+**When to use:**
+- Confirmation dialogs ("Are you sure?")
+- Menu selection ("Which template?")
+- Multiple-choice decisions
+- Workflows that need user input
+
+### bot_control — Session Management
+
+Claude can control the bot's session directly:
+- Start a new session
+- Switch models
+- Toggle drivers (Claude ↔ Codex)
+- Stop active work
+- Trigger restarts
+
+**Example:**
+
+```
+You: I want to switch to Opus for this
+Claude: [Internally calls bot_control to switch model]
+Claude: ✅ Switched to Opus. Ready for complex analysis.
+```
+
+Claude uses this automatically when it knows a task needs a different model or when stopping work.
+
+### send_turtle — Spawn SubTurtles
+
+For complex tasks, Claude can spawn SubTurtles (parallel agents) to work on different aspects in parallel:
+
+```
+Claude: This needs 3 parallel workers. Spawning...
+[SubTurtle: frontend] Building UI
+[SubTurtle: backend] Setting up API
+[SubTurtle: docs] Writing documentation
+Claude: (supervises and merges results)
+```
+
+Claude uses this automatically when Meta Agent decides work should be parallelized. You control this via environment variables in the `.subturtles` directory.
+
+## Custom MCP Servers
+
+### Adding Your Own Tools
+
+The bot loads MCP server definitions from `mcp-config.ts`. This file connects Claude to external tools like:
+
+- **Things 3** — Your to-do manager
+- **Notion** — Your notes and databases
+- **Typefully** — Social media scheduling
+- **Slack** — Team communication
+- **GitHub** — Repository management
+- **Stripe** — Payment processing
+- Custom tools you create
+
+### Setup: Create mcp-config.ts
+
+Copy the example:
+
+```bash
+cd super_turtle/claude-telegram-bot
+cp mcp-config.example.ts mcp-config.ts
+```
+
+Example configuration:
+
+```typescript
+// mcp-config.ts
+import type { McpServerConfig } from "./src/types";
+
+export const MCP_SERVERS: Record<string, McpServerConfig> = {
+  // Built-ins are auto-included
+
+  // Example: Things 3
+  things: {
+    command: "npx",
+    args: ["-y", "@soulmen/things-mcp"],
+    env: {
+      THINGS_DATABASE_PATH: "/Users/you/Library/CloudStorage/iCloud~com~culturedcode~things/Things Database.thingsdatabase",
+    },
+  },
+
+  // Example: Notion
+  notion: {
+    command: "npx",
+    args: ["-y", "@github/notion-mcp"],
+    env: {
+      NOTION_API_KEY: "secret_...", // Get from Notion settings
+    },
+  },
+
+  // Example: Typefully
+  typefully: {
+    command: "npx",
+    args: ["-y", "@typefully/mcp"],
+    env: {
+      TYPEFULLY_API_TOKEN: "...",
+    },
+  },
+};
+```
+
+<Note>
+`mcp-config.ts` is **gitignored** — keep it local. Store secrets in environment variables, not in the file.
+</Note>
+
+### Server Configuration
+
+Each MCP server config has:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `command` | string | Command to run (e.g., `npx`, `python`, `/path/to/binary`) |
+| `args` | string[] | Arguments passed to the command |
+| `env` | object | Environment variables (credentials, configs) |
+| `timeout` | number? | Timeout in ms (default: 5000) |
+
+Example with all options:
+
+```typescript
+myservice: {
+  command: "python",
+  args: ["/path/to/mcp-server.py"],
+  env: {
+    API_KEY: "sk-...",
+    DEBUG: "true",
+  },
+  timeout: 10000, // 10 seconds
+},
+```
+
+## Popular MCP Servers
+
+### Things 3 (macOS)
+
+Todo management via natural language:
+
+```
+You: Add "Review PRs" to my inbox
+Claude: (uses Things MCP)
+Claude: ✅ Added to Things
+```
+
+**Setup:**
+```typescript
+things: {
+  command: "npx",
+  args: ["-y", "@soulmen/things-mcp"],
+  env: {
+    THINGS_DATABASE_PATH: `${require("os").homedir()}/Library/CloudStorage/iCloud~com~culturedcode~things/Things Database.thingsdatabase`,
+  },
+},
+```
+
+### Notion
+
+Query and update Notion databases:
+
+```
+You: What's on my agenda this week?
+Claude: (reads from Notion)
+Claude: You have: [lists items from your Notion calendar]
+```
+
+**Setup:**
+```typescript
+notion: {
+  command: "npx",
+  args: ["-y", "@github/notion-mcp"],
+  env: {
+    NOTION_API_KEY: process.env.NOTION_API_KEY || "",
+  },
+},
+```
+
+Get your API key from [Notion Settings → Integrations](https://www.notion.so/my-integrations).
+
+### GitHub
+
+Access repositories and pull requests:
+
+```
+You: Show me open PRs on my projects
+Claude: (queries GitHub)
+Claude: [lists PRs with review status]
+```
+
+**Setup:**
+```typescript
+github: {
+  command: "npx",
+  args: ["-y", "@anthropics/github-mcp"],
+  env: {
+    GITHUB_TOKEN: process.env.GITHUB_TOKEN || "",
+  },
+},
+```
+
+### Slack
+
+Send messages and query channels:
+
+```
+You: Send a message to #engineering
+Claude: (uses ask_user to confirm)
+You: [Taps Send]
+Claude: ✅ Message sent
+```
+
+## Secrets Management
+
+**Never commit secrets to git.** Use environment variables:
+
+```bash
+# .env (gitignored)
+NOTION_API_KEY=ntn_...
+THINGS_DATABASE_PATH=/path/to/database
+GITHUB_TOKEN=ghp_...
+```
+
+Then reference them in `mcp-config.ts`:
+
+```typescript
+export const MCP_SERVERS: Record<string, McpServerConfig> = {
+  notion: {
+    command: "npx",
+    args: ["-y", "@github/notion-mcp"],
+    env: {
+      NOTION_API_KEY: process.env.NOTION_API_KEY || "",
+    },
+  },
+};
+```
+
+<Warning>
+Environment variables are passed to the MCP process but not logged or exposed. Keep sensitive values in `.env` only.
+</Warning>
+
+## Troubleshooting
+
+**MCP server not connecting?**
+
+1. Check the bot logs:
+   ```bash
+   tail -f /tmp/claude-telegram-bot-ts.log
+   ```
+
+2. Verify the command runs:
+   ```bash
+   npx @soulmen/things-mcp
+   ```
+
+3. Check environment variables are set:
+   ```bash
+   echo $NOTION_API_KEY
+   ```
+
+**Claude won't use the tool?**
+
+- Ensure `mcp-config.ts` exists (not just the example)
+- Restart the bot after editing `mcp-config.ts`
+- Ask Claude explicitly: "Use my Notion integration to..."
+- Check `/status` to see which MCP servers loaded
+
+**Tool is slow or timing out?**
+
+- Increase the `timeout` in the config (default: 5000ms)
+- Check if the external service is responding
+- Look at service logs for errors
+
+## Examples
+
+### Personal Assistant Setup
+
+Connect your entire workflow:
+
+```typescript
+export const MCP_SERVERS: Record<string, McpServerConfig> = {
+  things: {
+    command: "npx",
+    args: ["-y", "@soulmen/things-mcp"],
+    env: {
+      THINGS_DATABASE_PATH: `${require("os").homedir()}/Library/CloudStorage/iCloud~com~culturedcode~things/Things Database.thingsdatabase`,
+    },
+  },
+
+  notion: {
+    command: "npx",
+    args: ["-y", "@github/notion-mcp"],
+    env: {
+      NOTION_API_KEY: process.env.NOTION_API_KEY || "",
+    },
+  },
+
+  github: {
+    command: "npx",
+    args: ["-y", "@anthropics/github-mcp"],
+    env: {
+      GITHUB_TOKEN: process.env.GITHUB_TOKEN || "",
+    },
+  },
+
+  slack: {
+    command: "npx",
+    args: ["-y", "@slackhq/slack-mcp"],
+    env: {
+      SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN || "",
+    },
+  },
+};
+```
+
+**Now Claude can:**
+- Check your to-dos (Things)
+- Query your notes (Notion)
+- Review PRs (GitHub)
+- Send team messages (Slack)
+- All from your phone
+
+### Workflow Example
+
+```
+You: Add "Review design specs" to my inbox and create a Notion reminder
+Claude: (sees your request)
+Claude: Adding to Things... Done
+Claude: Creating Notion entry... Done
+Claude: ✅ Added to Things and created Notion reminder
+```
+
+## Next Steps
+
+- [Personal Assistant Guide](/docs/bot/personal-assistant) — Full setup for using Claude as your assistant
+- [Security](/docs/config/security) — How secrets are handled safely
+- [Environment Variables](/docs/config/environment-variables) — Full config reference

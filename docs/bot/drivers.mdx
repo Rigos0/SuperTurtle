@@ -1,0 +1,212 @@
+---
+title: Drivers and Models
+description: Understanding Claude Code vs Codex and how to choose which to use
+---
+
+# Drivers and Models
+
+The bot supports two AI drivers: **Claude Code** (via SDK) and **Codex** (OpenAI's ChatGPT Pro). The system automatically routes work to the most cost-effective driver, but you can also switch manually.
+
+## Claude Code vs Codex
+
+### Claude Code (Default)
+
+**Best for:** Most tasks, reasoning-heavy work, file access, commands
+
+| Aspect | Claude Code |
+|--------|------------|
+| **Provider** | Anthropic |
+| **Models** | Sonnet, Opus, Haiku |
+| **Reasoning** | Extended thinking (configurable effort) |
+| **Cost** | Per-token usage via Claude Code subscription |
+| **Availability** | Requires Claude Code app on your machine |
+| **File access** | Full access to allowed paths |
+| **Commands** | Full shell access (with path validation) |
+| **Authentication** | CLI auth (recommended) or API key |
+
+Use Claude Code when:
+- You need extended reasoning or deep analysis
+- You're working with files or running shell commands
+- You want to control reasoning effort (high/medium/low)
+- You're doing complex coding or architecture work
+
+### Codex (ChatGPT Pro)
+
+**Best for:** Quick questions, cost-saving, high availability
+
+| Aspect | Codex |
+|--------|-------|
+| **Provider** | OpenAI |
+| **Models** | GPT-4, GPT-4 Turbo, etc. |
+| **Reasoning** | Limited (no extended thinking) |
+| **Cost** | Flat monthly CLOTH subscription |
+| **Availability** | Requires Codex app (OpenAI CLI) |
+| **File access** | Read-only or workspace-write (configurable) |
+| **Commands** | Limited shell access |
+| **Authentication** | Local Codex CLI with CLOTH subscription |
+
+Use Codex when:
+- You want predictable flat-rate costs
+- You're doing quick iterations or rapid prototyping
+- Your CLOTH subscription is active
+- File access is read-only or limited to workspace
+
+<Tip>
+**Cost comparison:** If you use Claude Code heavily, Codex with an active CLOTH subscription can be significantly cheaper. The bot tracks usage and routes work accordingly.
+</Tip>
+
+## Switching Drivers
+
+### The /switch Command
+
+```
+You: /switch
+Bot: Switched to Codex (Claude 4.0) | workspace-write sandbox
+```
+
+Or toggle back to Claude Code:
+
+```
+You: /switch
+Bot: Switched to Claude Code (Sonnet 4) | High effort
+```
+
+<Note>
+`/switch` works only if `CODEX_ENABLED=true` in your configuration. Otherwise only Claude Code is available.
+</Note>
+
+### Automatic Routing (SubTurtles)
+
+When the Meta Agent spawns SubTurtles for complex tasks, it automatically chooses the best driver:
+
+- **High-complexity tasks** → Claude Code (better reasoning)
+- **Simple/fast tasks** → Codex (lower cost if available)
+- **Fallback** → Claude Code (if Codex unavailable or quota full)
+
+You control this via environment variables in `super_turtle/meta/META_SHARED.md`:
+
+```bash
+META_CODEX_SANDBOX_MODE=workspace-write    # Read-only, workspace-write, or danger-full-access
+META_CODEX_APPROVAL_POLICY=never           # never, on-request, on-failure, untrusted
+META_CODEX_NETWORK_ACCESS=false            # Enable network for SubTurtles
+```
+
+## Models
+
+### Claude Code Models
+
+Available models in order of capability:
+
+| Model | Speed | Cost | Best For | Extended Thinking |
+|-------|-------|------|----------|-------------------|
+| **Haiku** | Fast | Cheapest | Quick questions, summaries | ❌ No |
+| **Sonnet** | Balanced | Mid | Default; most tasks | ✅ Yes |
+| **Opus** | Slower | Expensive | Complex reasoning, architecture | ✅ Yes |
+
+Select your model with `/model`:
+
+```
+You: /model
+Bot: [Inline buttons: Haiku, Sonnet, Opus]
+You: [Tap Opus]
+Bot: ✅ Switched to Opus
+```
+
+### Codex Models
+
+Models available via Codex depend on your OpenAI CLOTH subscription. Common options:
+
+- **GPT-4o** — Fast, capable, good for most tasks
+- **GPT-4 Turbo** — More context, slower
+- **GPT-4** — Previous generation
+
+Switch with `/model` when on Codex driver.
+
+## Reasoning Effort (Claude Code Only)
+
+Claude Code models (except Haiku) support **extended thinking** with configurable effort levels:
+
+| Effort | Thinking Time | Cost | Best For |
+|--------|---------------|------|----------|
+| **💨 Low** | ~3 seconds | Lowest | Quick reasoning, summaries |
+| **🟡 Medium** | ~5-10 seconds | Balanced | Most reasoning tasks |
+| **⚡ High** | ~20-30 seconds | Highest | Deep analysis, architecture, complex bugs |
+
+Set effort level with `/model`:
+
+```
+You: /model
+Bot: [Select Sonnet]
+Bot: [Inline buttons: ⚡ High, 🟡 Medium, 💨 Low]
+You: [Tap High]
+Bot: ✅ Switched to Sonnet (High effort)
+```
+
+<Warning>
+High effort uses significantly more tokens. Use it for complex problems, not for every message.
+</Warning>
+
+## Choosing the Right Setup
+
+### For General Use (Recommended)
+
+- **Primary driver:** Claude Code (Sonnet)
+- **Reasoning effort:** Medium (balanced)
+- **Fallback to Codex:** Only if Claude Code quota is low
+
+This gives you good cost/performance balance.
+
+### For Deep Reasoning Work
+
+- **Primary driver:** Claude Code
+- **Model:** Opus
+- **Reasoning effort:** High
+- **Cost awareness:** Check `/usage` regularly
+
+Opus + High effort will consume tokens faster but gives best results for complex problems.
+
+### For Cost Control
+
+- **Enable Codex:** Set `CODEX_ENABLED=true`
+- **CLOTH subscription:** Required for Codex
+- **Auto-routing:** Let SubTurtles choose based on cost
+- **Check `/usage`:** Monitor which driver is being used
+
+## Configuration
+
+Enable/configure drivers in `.env`:
+
+```bash
+# Required: Claude Code authentication
+# Option 1 (recommended): CLI auth
+# Just run: claude auth
+
+# Option 2: API key
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Codex support (optional)
+CODEX_ENABLED=true
+
+# Codex permissions (least privilege by default)
+META_CODEX_SANDBOX_MODE=workspace-write
+META_CODEX_APPROVAL_POLICY=never
+META_CODEX_NETWORK_ACCESS=false
+```
+
+## Troubleshooting
+
+**Claude Code not working?**
+- Run `claude auth` to authenticate with Claude Code
+- Check `ANTHROPIC_API_KEY` if using API key authentication
+- Verify you have active Claude Code subscription
+
+**Codex not available?**
+- Check `CODEX_ENABLED=true` in `.env`
+- Verify Codex CLI is installed: `which codex`
+- Confirm CLOTH subscription is active on your OpenAI account
+- Check quota with `/usage`
+
+**Getting expensive tokens?**
+- Switch to Haiku or Codex for simpler tasks
+- Reduce reasoning effort (High → Medium)
+- Monitor with `/usage` regularly

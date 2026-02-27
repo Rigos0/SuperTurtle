@@ -1,0 +1,120 @@
+---
+title: Telegram Bot Overview
+description: Turn Claude Code into your personal assistant, accessible from anywhere via Telegram
+---
+
+# Telegram Bot Overview
+
+The Claude Telegram Bot turns [Claude Code](https://claude.com/product/claude-code) into your personal assistant, accessible from anywhere via Telegram. Send messages, voice, photos, documents, and video — Claude processes everything in real-time and you see responses instantly.
+
+## Why Use This Bot
+
+Claude Code is described as a powerful AI coding agent, but it's actually a very capable **general-purpose agent** when given the right instructions and tools. This bot lets you access that capability from your phone, so you can:
+
+- Ask questions and get answers instantly
+- Give instructions and see Claude work in real-time
+- Send screenshots and documents for analysis
+- Use voice for natural interaction
+- Stay productive from anywhere
+
+## Core Features
+
+<CardGroup cols={2}>
+  <Card
+    title="💬 Text"
+    description="Ask questions, give instructions, have conversations"
+  />
+  <Card
+    title="🎤 Voice"
+    description="Speak naturally — transcribed via OpenAI and processed by Claude"
+  />
+  <Card
+    title="📸 Photos"
+    description="Send screenshots, documents, or anything visual for analysis"
+  />
+  <Card
+    title="📄 Documents"
+    description="PDFs, text files, and archives (ZIP, TAR) are extracted and analyzed"
+  />
+  <Card
+    title="🎵 Audio"
+    description="Audio files (mp3, m4a, ogg, wav, etc.) transcribed via OpenAI"
+  />
+  <Card
+    title="🎬 Video"
+    description="Video messages and notes processed by Claude with vision analysis"
+  />
+  <Card
+    title="🔄 Session Persistence"
+    description="Conversations continue across messages — context is maintained"
+  />
+  <Card
+    title="🔘 Interactive Buttons"
+    description="Claude presents options as tappable inline buttons via ask_user MCP tool"
+  />
+</CardGroup>
+
+## Advanced Features
+
+- **Extended thinking:** Trigger Claude's reasoning with words like "think" or "reason" — see its thought process as it works
+- **Global stop intents:** Use `stop`, `pause`, `abort`, or `!` to interrupt active work instantly
+- **Message queuing:** Send multiple messages while Claude works — they queue automatically. Prefix with `!` to interrupt and send immediately
+- **Streaming responses:** See Claude's response in real-time, updated as it generates output
+- **Session management:** Resume conversations from recent sessions with automatic recaps
+- **Context awareness:** Claude knows about your preferences, files, and workflows via CLAUDE.md
+
+## Getting Started
+
+<Steps>
+  <Step title="Create a Telegram Bot">
+    Open [@BotFather](https://t.me/BotFather) and send `/newbot`. Follow the prompts to create your bot and copy the token.
+  </Step>
+  <Step title="Get Your Telegram ID">
+    Message [@userinfobot](https://t.me/userinfobot) to get your numeric user ID.
+  </Step>
+  <Step title="Configure and Run">
+    See the [Quick Start](/docs/bot/quickstart) guide for setup instructions.
+  </Step>
+</Steps>
+
+## How It Works
+
+```
+You (Telegram)
+    ↓
+Bot receives message (text/voice/photo/document/video)
+    ↓
+Claude Code processes it
+    ↓
+Response sent back to Telegram
+```
+
+When you send a message:
+1. Bot receives and validates your user ID
+2. Message is sent to Claude Code
+3. Claude can use tools, read files, execute commands (within allowed paths)
+4. Response streams back to you in real-time
+5. You see Claude's work as it happens
+
+## Demo
+
+See the bot in action: [Demo GIF coming soon]
+
+## What You Control
+
+Claude runs with all permission prompts disabled (for seamless mobile experience), but you control **what Claude can access**:
+
+- **File access:** Limited to directories you specify
+- **Commands:** Dangerous patterns like `rm -rf /` are blocked
+- **Rate limiting:** Prevents runaway usage
+- **Audit logging:** All interactions are logged
+
+See [Security](/docs/config/security) for the full threat model and defense layers.
+
+## Next Steps
+
+- [Commands](/docs/bot/commands) — Full reference of `/new`, `/status`, `/model`, and more
+- [Drivers](/docs/bot/drivers) — Claude Code vs Codex, when to use which
+- [MCP Tools](/docs/bot/mcp-tools) — Add custom tools (Things, Notion, Typefully, etc.)
+- [Running as a Service](/docs/bot/running-as-service) — Keep the bot running on macOS or Linux
+- [Personal Assistant Guide](/docs/bot/personal-assistant) — Set up Claude as your personal assistant

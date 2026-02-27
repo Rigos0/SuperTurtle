@@ -1,0 +1,438 @@
+---
+title: Environment Variables Reference
+description: Complete reference of all configuration environment variables
+---
+
+# Environment Variables Reference
+
+All bot configuration is done through environment variables. Keep sensitive values in `.env` (gitignored) and never commit credentials.
+
+## Required Variables
+
+### TELEGRAM_BOT_TOKEN
+
+Your Telegram bot token from @BotFather.
+
+```bash
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+```
+
+Get this from [@BotFather](https://t.me/BotFather) with `/newbot`.
+
+### TELEGRAM_ALLOWED_USERS
+
+Comma-separated Telegram user IDs allowed to use the bot.
+
+```bash
+# Single user
+TELEGRAM_ALLOWED_USERS=123456789
+
+# Multiple users
+TELEGRAM_ALLOWED_USERS=123456789,987654321,555666777
+```
+
+Get your ID from [@userinfobot](https://t.me/userinfobot).
+
+## Recommended Variables
+
+### CLAUDE_WORKING_DIR
+
+Default working directory for Claude. Claude can access files and run commands from here.
+
+```bash
+CLAUDE_WORKING_DIR=~/my-assistant
+```
+
+If not set, defaults to home directory (`~`).
+
+### OPENAI_API_KEY
+
+API key for voice transcription (optional but required for voice messages).
+
+```bash
+OPENAI_API_KEY=sk-proj-1234567890abcdef
+```
+
+Get from [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
+
+Voice transcription won't work without this, but other features are unaffected.
+
+## Claude Code / Codex
+
+### ANTHROPIC_API_KEY
+
+API key for Claude Code (optional if using CLI auth).
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-v0-1234567890abcdef
+```
+
+Get from [console.anthropic.com](https://console.anthropic.com/). Usually not needed if Claude Code is installed.
+
+### CODEX_ENABLED
+
+Enable Codex driver and usage reporting.
+
+```bash
+CODEX_ENABLED=true
+```
+
+Default: `false`. Requires active Codex CLI and CLOTH subscription.
+
+### META_CODEX_SANDBOX_MODE
+
+Sandbox restrictions for Codex SubTurtles.
+
+```bash
+META_CODEX_SANDBOX_MODE=workspace-write
+```
+
+Options:
+- `read-only` — Can only read files
+- `workspace-write` — Can read/write workspace (default, recommended)
+- `danger-full-access` — Full file system access (use cautiously)
+
+### META_CODEX_APPROVAL_POLICY
+
+When to ask for approval before running Codex.
+
+```bash
+META_CODEX_APPROVAL_POLICY=never
+```
+
+Options:
+- `never` — Run without asking (default)
+- `on-request` — Ask only when explicitly requested
+- `on-failure` — Ask if something fails
+- `untrusted` — Ask for untrusted tasks
+
+### META_CODEX_NETWORK_ACCESS
+
+Allow Codex to make network requests.
+
+```bash
+META_CODEX_NETWORK_ACCESS=false
+```
+
+Default: `false`. Set to `true` only if Codex needs to fetch URLs, call APIs, etc.
+
+## File Access & Security
+
+### ALLOWED_PATHS
+
+Comma-separated list of directories Claude can access.
+
+```bash
+# Default (if not set):
+ALLOWED_PATHS=$CLAUDE_WORKING_DIR,~/Documents,~/Downloads,~/Desktop,~/.claude
+
+# Custom:
+ALLOWED_PATHS=~/my-assistant,~/Documents/Notes,~/.claude
+```
+
+If you set this, it **overrides all defaults**. Make sure to include `~/.claude` if you use Claude Code plan mode.
+
+### AUDIT_LOG_PATH
+
+Path for security audit logs.
+
+```bash
+AUDIT_LOG_PATH=/tmp/claude-telegram-audit.log
+```
+
+Default: `/tmp/claude-telegram-audit.log`. Set to empty string to disable logging.
+
+### AUDIT_LOG_JSON
+
+Log in JSON format (easier to parse programmatically).
+
+```bash
+AUDIT_LOG_JSON=true
+```
+
+Default: `false`. Logs as text instead.
+
+## Rate Limiting
+
+### RATE_LIMIT_ENABLED
+
+Enable token bucket rate limiting.
+
+```bash
+RATE_LIMIT_ENABLED=true
+```
+
+Default: `true`. Prevents abuse.
+
+### RATE_LIMIT_REQUESTS
+
+Number of requests allowed per window.
+
+```bash
+RATE_LIMIT_REQUESTS=20
+```
+
+Default: `20` requests. Increase if you use the bot heavily.
+
+### RATE_LIMIT_WINDOW
+
+Time window in seconds.
+
+```bash
+RATE_LIMIT_WINDOW=60
+```
+
+Default: `60` seconds. So by default: 20 requests per 60 seconds = 1 request every 3 seconds.
+
+## Voice Transcription
+
+### TRANSCRIPTION_CONTEXT_FILE
+
+Path to a file with context for voice transcription.
+
+```bash
+TRANSCRIPTION_CONTEXT_FILE=~/my-assistant/transcription-context.txt
+```
+
+Optional. If set, Claude will use this context when transcribing voice messages. Useful for including domain-specific words or acronyms.
+
+Example file content:
+
+```
+This person discusses:
+- Technologies: React, Node.js, TypeScript, Bun
+- Companies: Anthropic, OpenAI, Typefully
+- Personal interests: Sim racing, fitness, photography
+```
+
+### THINKING_KEYWORDS
+
+Comma-separated keywords that trigger extended thinking.
+
+```bash
+THINKING_KEYWORDS=think,pensa,ragiona
+```
+
+Default: `think,pensa,ragiona`. When Claude hears these words, it uses extended thinking (slow reasoning mode).
+
+### THINKING_DEEP_KEYWORDS
+
+Keywords that trigger deep extended thinking (high effort).
+
+```bash
+THINKING_DEEP_KEYWORDS=ultrathink,think hard,pensa bene
+```
+
+Default: `ultrathink,think hard,pensa bene`. These trigger maximum reasoning effort.
+
+## Dashboard (Optional)
+
+### DASHBOARD_ENABLED
+
+Enable the bot's web dashboard.
+
+```bash
+DASHBOARD_ENABLED=true
+```
+
+Default: `false`. If enabled, runs a web UI on `DASHBOARD_PORT`.
+
+### DASHBOARD_PORT
+
+Port for the dashboard.
+
+```bash
+DASHBOARD_PORT=4173
+```
+
+Default: `4173`. Change if this port is already in use.
+
+### DASHBOARD_BIND_ADDR
+
+Address to bind the dashboard to.
+
+```bash
+DASHBOARD_BIND_ADDR=127.0.0.1
+```
+
+Default: `127.0.0.1` (localhost only). Use `0.0.0.0` to allow external access (not recommended for security reasons).
+
+### DASHBOARD_HOST
+
+Dashboard URL shown in responses.
+
+```bash
+DASHBOARD_HOST=https://dashboard.example.com
+```
+
+Default: `http://localhost`. Set if dashboard is behind a reverse proxy or accessible via HTTPS.
+
+### DASHBOARD_AUTH_TOKEN
+
+Authentication token for dashboard access.
+
+```bash
+DASHBOARD_AUTH_TOKEN=your-secret-token
+```
+
+Optional. If set, dashboard requires this token in the `Authorization: Bearer` header.
+
+## Advanced Configuration
+
+### CLAUDE_CLI_PATH
+
+Path to the Claude CLI binary.
+
+```bash
+CLAUDE_CLI_PATH=/opt/homebrew/bin/claude
+```
+
+Usually auto-detected. Set only if `claude` command is not in your PATH.
+
+### CODEX_CLI_PATH
+
+Path to the Codex CLI binary.
+
+```bash
+CODEX_CLI_PATH=/opt/homebrew/bin/codex
+```
+
+Usually auto-detected. Set only if `codex` command is not in your PATH.
+
+## Configuration Groups
+
+### Minimal Setup
+
+Bare minimum to run:
+
+```bash
+TELEGRAM_BOT_TOKEN=your-token
+TELEGRAM_ALLOWED_USERS=your-id
+```
+
+### Development Setup
+
+Good for local testing:
+
+```bash
+TELEGRAM_BOT_TOKEN=your-token
+TELEGRAM_ALLOWED_USERS=your-id
+CLAUDE_WORKING_DIR=~/my-dev-folder
+RATE_LIMIT_REQUESTS=100
+OPENAI_API_KEY=your-key
+```
+
+### Personal Assistant Setup
+
+Full-featured personal use:
+
+```bash
+TELEGRAM_BOT_TOKEN=your-token
+TELEGRAM_ALLOWED_USERS=your-id
+CLAUDE_WORKING_DIR=~/my-assistant
+ALLOWED_PATHS=~/my-assistant,~/Documents/Notes,~/.claude
+OPENAI_API_KEY=your-key
+THINKING_KEYWORDS=think,pensa,analyze
+AUDIT_LOG_PATH=/tmp/claude-telegram-audit.log
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_REQUESTS=50
+```
+
+### Production with Codex
+
+Full setup with both drivers:
+
+```bash
+TELEGRAM_BOT_TOKEN=your-token
+TELEGRAM_ALLOWED_USERS=your-id,other-id
+CLAUDE_WORKING_DIR=/var/lib/claude-assistant
+ALLOWED_PATHS=/var/lib/claude-assistant,/home/user/Documents,~/.claude
+OPENAI_API_KEY=your-key
+CODEX_ENABLED=true
+META_CODEX_SANDBOX_MODE=workspace-write
+META_CODEX_APPROVAL_POLICY=never
+AUDIT_LOG_PATH=/var/log/claude-telegram.log
+AUDIT_LOG_JSON=true
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_REQUESTS=50
+RATE_LIMIT_WINDOW=60
+```
+
+## Example .env File
+
+```bash
+# ============ Required ============
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+TELEGRAM_ALLOWED_USERS=123456789
+
+# ============ Recommended ============
+CLAUDE_WORKING_DIR=~/my-assistant
+OPENAI_API_KEY=sk-proj-1234567890abcdef
+
+# ============ File Access ============
+ALLOWED_PATHS=~/my-assistant,~/Documents/Notes,~/.claude
+
+# ============ Security ============
+AUDIT_LOG_PATH=/tmp/claude-telegram-audit.log
+AUDIT_LOG_JSON=false
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_REQUESTS=20
+RATE_LIMIT_WINDOW=60
+
+# ============ Voice ============
+THINKING_KEYWORDS=think,pensa,analyze
+THINKING_DEEP_KEYWORDS=ultrathink,think hard
+
+# ============ Codex (Optional) ============
+# CODEX_ENABLED=true
+# META_CODEX_SANDBOX_MODE=workspace-write
+# META_CODEX_APPROVAL_POLICY=never
+# META_CODEX_NETWORK_ACCESS=false
+
+# ============ Dashboard (Optional) ============
+# DASHBOARD_ENABLED=false
+# DASHBOARD_PORT=4173
+```
+
+## Validation
+
+The bot validates on startup:
+
+| Validation | Error | Fix |
+|-----------|-------|-----|
+| `TELEGRAM_BOT_TOKEN` missing | "ERROR: TELEGRAM_BOT_TOKEN required" | Add to `.env` |
+| `TELEGRAM_ALLOWED_USERS` missing | "ERROR: TELEGRAM_ALLOWED_USERS required" | Add your ID |
+| `RATE_LIMIT_REQUESTS` invalid | Falls back to 20 | Use integer |
+| `CODEX_SANDBOX_MODE` invalid | Warns, falls back to "workspace-write" | Use valid option |
+| Working directory doesn't exist | Bot starts but Claude can't access it | Create directory |
+
+## Hot Reload
+
+Most environment variables are read at startup. **The bot must be restarted for changes to take effect.**
+
+Changes that require restart:
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_ALLOWED_USERS`
+- `ALLOWED_PATHS`
+- `RATE_LIMIT_*`
+- Codex settings
+
+Changes that take effect immediately:
+- `THINKING_KEYWORDS`
+- `AUDIT_LOG_JSON`
+- `DASHBOARD_*` (if already running)
+
+## Security Best Practices
+
+1. **Never commit `.env`** — It contains secrets
+2. **Use strong tokens** — Telegram and OpenAI provide secure tokens
+3. **Limit `ALLOWED_PATHS`** — Only include directories Claude needs
+4. **Restrict `TELEGRAM_ALLOWED_USERS`** — Only trusted users
+5. **Use read-only sandbox** — For Codex if possible (`read-only` or `workspace-write`)
+6. **Enable audit logging** — Always log interactions for review
+
+## Next Steps
+
+- [Security](/docs/config/security) — Full security model and threat assessment
+- [Platform Support](/docs/config/platform-support) — macOS/Linux/Windows differences
+- [Drivers](/docs/bot/drivers) — Understanding Claude Code vs Codex

@@ -1,0 +1,391 @@
+---
+title: Using Claude as a Personal Assistant
+description: Set up Claude as your 24/7 personal assistant via Telegram
+---
+
+# Using Claude as a Personal Assistant
+
+Claude Code is a powerful AI coding agent, but it's actually a very capable **general-purpose assistant** when given the right instructions, context, and tools. This guide shows how to use the Telegram bot to access Claude as your personal assistant from anywhere.
+
+## The Core Idea
+
+Instead of building a separate "assistant app," you:
+
+1. Create a **personal working folder** with a `CLAUDE.md` that teaches Claude about you
+2. Connect it to the bot via `CLAUDE_WORKING_DIR`
+3. Add scripts, MCP tools, and Skills to extend Claude's capabilities
+4. Access everything from Telegram, on your phone
+
+Claude then becomes your 24/7 assistant that knows your preferences, goals, and workflows.
+
+## Getting Started
+
+### Step 1: Create Your Personal Folder
+
+```bash
+# Create a folder for your assistant setup
+mkdir ~/my-assistant
+cd ~/my-assistant
+
+# Initialize git (optional but recommended)
+git init
+```
+
+### Step 2: Write CLAUDE.md
+
+Create `CLAUDE.md` in this folder. This is Claude's "brain" — it teaches Claude about you:
+
+```markdown
+# CLAUDE.md
+
+This file provides guidance to Claude as my personal assistant.
+
+## Quick Reference
+
+**This folder:**
+- `cli/` - Utility scripts
+- `.claude/skills/` - Task workflows
+- `.claude/agents/` - Specialized subagents
+
+**Key paths:**
+- Notes: `~/Documents/Notes/` (personal, health, research, etc.)
+- Working dir: `~/my-assistant`
+
+## About Me
+
+[Your name] is a [profession] interested in [hobbies/interests].
+
+**Personal context**: See `personal-context.md` for details about family, preferences, goals.
+
+## How to Assist
+
+- **Autonomy**: Handle routine tasks independently
+- **Communication style**: [Your preferred style]
+- **Format preference**: Bullet lists over tables
+- **When to ask**: Before significant actions, big purchases, or writing to permanent files
+
+## Important Tasks
+
+**Keep context fresh**: When you learn something new about me, update:
+- Personal goals → `personal-context.md`
+- Life priorities → `pulse.md`
+- Assistant behavior → this `CLAUDE.md`
+
+## Quick Lookup
+
+- Life goals → `personal-context.md`
+- Notes system → `~/Documents/Notes/`
+- Tasks → Things 3 (via MCP)
+```
+
+### Step 3: Configure the Bot
+
+Set your working directory in `.env`:
+
+```bash
+CLAUDE_WORKING_DIR=~/my-assistant
+```
+
+Now when the bot runs, Claude will read your `CLAUDE.md` and use it as context for every conversation.
+
+## Building Assistant Features
+
+### Scripts and Utilities
+
+Create `cli/` scripts for tasks Claude should automate:
+
+```bash
+#!/bin/bash
+# cli/health.sh
+# Get health metrics from Health Auto Export
+
+jq '.current' ~/Library/Health/Export/*.json | \
+  jq -s 'add | {sleep, activity, vitals}'
+```
+
+Call from Telegram:
+
+```
+You: Check my health metrics
+Claude: (runs cli/health.sh, sees sleep/activity/vitals)
+Claude: Your sleep has been solid at 7.5h average.
+        Resting HR at 52 (good), HRV at 71 (improving).
+```
+
+### Skills (Auto-Triggered Workflows)
+
+Skills are workflows that Claude can use automatically when relevant. Create them in `.claude/skills/`:
+
+```markdown
+---
+name: workout-planning
+description: Create personalized workouts based on training plan and recent activity
+allowed-tools: Read, Write, Bash(cli/health.sh:*), Glob
+---
+
+# Workout Planning
+
+When asked for a workout or exercise routine:
+
+1. **Read training plan**: `~/Documents/Notes/Health/training.md`
+2. **Check recent workouts**: `~/Documents/Notes/Health/Workouts/`
+3. **Get health metrics**: Run `cli/health.sh`
+4. **Propose workout** based on training schedule and recovery
+5. **Create** `Health/Workouts/YYYY-MM-DD-workout.md`
+
+Format workouts as clear, numbered lists with exercise names, sets/reps, and rest periods.
+```
+
+Now when you ask "give me a workout", Claude automatically:
+- Reads your training plan
+- Checks your recent activity and recovery
+- Creates a personalized workout file
+- You see it instantly in your notes app (if synced via iCloud)
+
+### MCP Servers for Tools
+
+Connect Claude to your favorite apps via MCP. Common setups:
+
+**Things 3** (macOS to-do manager):
+```typescript
+// mcp-config.ts
+things: {
+  command: "npx",
+  args: ["-y", "@soulmen/things-mcp"],
+  env: {
+    THINGS_DATABASE_PATH: `${require("os").homedir()}/Library/CloudStorage/iCloud~com~culturedcode~things/Things Database.thingsdatabase`,
+  },
+},
+```
+
+Now ask: "Add 'Review design specs' to my inbox"
+
+**Notion** (notes and databases):
+```typescript
+notion: {
+  command: "npx",
+  args: ["-y", "@github/notion-mcp"],
+  env: {
+    NOTION_API_KEY: process.env.NOTION_API_KEY || "",
+  },
+},
+```
+
+Now ask: "What's on my reading list?" and Claude queries your Notion database.
+
+**Slack** (team communication):
+```typescript
+slack: {
+  command: "npx",
+  args: ["-y", "@slackhq/slack-mcp"],
+  env: {
+    SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN || "",
+  },
+},
+```
+
+Now ask: "Catch me up on what the team has been doing" and Claude reads recent Slack messages.
+
+## Example Workflows
+
+### Morning Briefing
+
+Create a `/life-pulse` command that gathers data from multiple sources:
+
+```markdown
+---
+name: life-pulse
+description: Generate executive life digest
+allowed-tools: Bash, Read, Write, Task
+---
+
+# Generate Life Pulse
+
+Gather data in parallel:
+- Things: Today's tasks and upcoming
+- Email: Unread and important
+- Health: Sleep and recovery metrics
+- Calendar: Upcoming events
+- Work: Issues and blockers (if connected)
+
+Synthesize into a brief digest covering:
+- **TL;DR** - What's on your plate (3-5 bullets)
+- **Now** - What needs attention right now
+- **Health** - Sleep quality, activity, recovery
+- **Next** - Upcoming priorities
+
+Write to `~/Documents/Notes/life-pulse.md`
+```
+
+When you run this from Telegram, Claude:
+1. Gathers all data in parallel
+2. Synthesizes into a readable briefing
+3. Saves to a file synced to your phone via iCloud
+4. You read it with coffee every morning
+
+### Research and Decisions
+
+Create a `research` skill for thorough decision-making:
+
+```markdown
+---
+name: research
+description: Research topics using web search, Reddit, and Hacker News
+allowed-tools: WebSearch, WebFetch, Bash, Read, Write
+---
+
+# Research Workflow
+
+When asked to research:
+
+1. Search the web for reviews and expert opinions
+2. Search Reddit for community experiences
+3. Search Hacker News for tech/startup discussions
+4. Synthesize findings with pros/cons
+5. Save to `~/Documents/Notes/Research/YYYY-MM-DD-topic.md`
+
+Provide clear recommendation based on actual data, not guesses.
+```
+
+Message: "Research the best noise-canceling headphones under $300"
+
+Claude searches multiple sources, compares options, and saves a detailed recommendation to your Notes.
+
+## File Sync Strategy
+
+**Best practice:** Sync your Notes folder to your phone via iCloud:
+
+```bash
+# On macOS
+mkdir -p ~/Documents/Notes
+# Enable iCloud sync: System Settings → iCloud Drive → Documents
+```
+
+Now files Claude creates appear on your phone instantly. Use [Ulysses](https://ulysses.app/) or [iA Writer](https://ia.net/writer) to edit them on the go.
+
+**For Things 3 tasks**: They sync automatically once Claude adds them.
+
+**For Notion**: Updates sync through the Notion app.
+
+## Security & Permissions
+
+<Note>
+The bot runs Claude Code with **all permission prompts disabled**. This is intentional for a seamless mobile experience, but you should understand it means Claude can:
+- Read and write files in allowed directories
+- Execute shell commands without confirmation
+- Access external tools and APIs
+
+See [Security](/docs/config/security) for defense layers in place.
+</Note>
+
+**Set restrictive file access:**
+
+In `.env`:
+```bash
+# Only allow your assistant folder and notes
+ALLOWED_PATHS=~/my-assistant,~/Documents/Notes,~/.claude
+```
+
+Claude can't access other directories, protecting sensitive files.
+
+## Progressive Enhancement
+
+Start simple and expand as you build confidence:
+
+**Week 1:** Basic CLAUDE.md + answer questions
+```
+You: What's my next meeting?
+Claude: Checking calendar... 2pm standup
+```
+
+**Week 2:** Add one script (e.g., health.sh)
+```
+You: How did I sleep last night?
+Claude: (runs health.sh, sees sleep data)
+```
+
+**Week 3:** Connect first MCP (Things 3)
+```
+You: Add project review to my inbox
+Claude: ✅ Added to Things
+```
+
+**Week 4:** Create first Skill (workout planning)
+```
+You: Give me a workout for today
+Claude: (reads training plan, creates workout file)
+```
+
+## Advanced Patterns
+
+### Subagents for Complex Tasks
+
+For complex tasks like "generate my life pulse", use **subagents** that run in parallel with separate context windows:
+
+```
+Main Agent Task: "Give me a life pulse"
+  ↓
+  Subagent 1: Gather email digest
+  Subagent 2: Gather task digest
+  Subagent 3: Gather health digest
+  Subagent 4: Gather work digest
+  ↓
+  Main agent synthesizes into final briefing
+```
+
+This keeps context windows lean and lets you handle complex workflows.
+
+### Calendar Sync via GitHub Gist
+
+Manage calendars that sync to your phone:
+
+```bash
+# calendars/track-days.yaml (auto-generated by Claude)
+events:
+  - date: "2026-01-25"
+    title: "Track day at Portimão"
+    time: "09:00"
+    # syncs to GitHub Gist
+    # you subscribe in Google Calendar / Apple Calendar
+```
+
+Message: "Add the Belgium race to my calendar for next Saturday"
+
+Claude updates the YAML file, syncs to GitHub, and your calendar refreshes automatically.
+
+## File Organization Example
+
+```
+~/my-assistant/
+├── CLAUDE.md                 # Your assistant's instructions
+├── personal-context.md       # Your info: preferences, goals, family
+├── .claude/
+│   ├── skills/
+│   │   ├── workout-planning/SKILL.md
+│   │   ├── research/SKILL.md
+│   │   └── meal-planning/SKILL.md
+│   └── agents/
+│       ├── health-digest/AGENT.md
+│       └── email-digest/AGENT.md
+├── cli/
+│   ├── health.sh            # Get health metrics
+│   ├── calendar.sh          # Get calendar events
+│   └── slack.sh             # Get Slack messages
+└── README.md                # Documentation for future you
+```
+
+## Getting Help
+
+- Need to research something → Ask Claude with the research skill
+- Need a workout → Ask Claude with the workout skill
+- Need to update goals → Ask Claude to edit `personal-context.md`
+- Want a new workflow → Ask Claude to create a new skill
+
+The beautiful part: **when you need new capabilities, just ask Claude to build them.** From Telegram, on your phone.
+
+## Next Steps
+
+- [Drivers & Models](/docs/bot/drivers) — Choose between Claude Code and Codex
+- [MCP Tools](/docs/bot/mcp-tools) — Add more integrations
+- [Commands](/docs/bot/commands) — Full command reference
+- [Security](/docs/config/security) — Understanding the threat model
