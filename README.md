@@ -8,7 +8,6 @@ Super Turtle is an autonomous coding system you talk to on Telegram.
 You say what to build; it coordinates workers and ships results.
 
 Full docs: [docs/index.md](docs/index.md)
-Canonical value proposition order: [docs/value-proposition.md](docs/value-proposition.md)
 
 <p align="center">
   <img src="assets/readme-stickers/skills-idea-turtle.png" width="108" alt="Philosophy turtle sticker" />
