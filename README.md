@@ -79,24 +79,16 @@ The system is designed to be:
 
 ## Setup (Clone-and-run)
 
-This repository is designed for **clone-and-run usage** on your own machine. Setup assumes you are running this repo directly, not embedding Super Turtle into an existing codebase.
+This repository is designed for **clone-and-run usage** on your own machine.
 
-### 1) Clone and install
+### 1) Clone repo
 
 ```bash
 git clone <your-fork-or-repo-url>
 cd agentic
-cd super_turtle/claude-telegram-bot
-bun install
 ```
 
-### 2) Subscription requirements
-
-- Required: active Claude Code subscription and local `claude` auth.
-- Optional for Codex flows: Codex access for the OpenAI account used by local `codex`.
-- Optional: `OPENAI_API_KEY` for voice transcription.
-
-### 3) Create a Telegram bot (BotFather)
+### 2) Create a Telegram bot (BotFather)
 
 1. Open [@BotFather](https://t.me/BotFather).
 2. Run `/newbot` and follow prompts.
@@ -113,26 +105,36 @@ status - Check what Claude is doing
 restart - Restart the bot
 ```
 
-### 4) Get your Telegram chat/user ID
+### 3) Get your Telegram chat/user ID
 
 - Message [@userinfobot](https://t.me/userinfobot), or
 - Start your bot and run `/start` to display your ID.
 
 Use this value in `TELEGRAM_ALLOWED_USERS`.
 
-### 5) Configure environment
-
-Create `super_turtle/claude-telegram-bot/.env`:
+### 4) Run zero-manual bootstrap
 
 ```bash
-TELEGRAM_BOT_TOKEN=1234567890:ABC-DEF...
-TELEGRAM_ALLOWED_USERS=123456789
-
-CLAUDE_WORKING_DIR=/absolute/path/to/agentic
-OPENAI_API_KEY=sk-... # optional, only for voice transcription
-
-CODEX_ENABLED=true # optional, enables Codex usage in /usage and Codex flows
+./super_turtle/setup --driver auto \
+  --telegram-token "<botfather_token>" \
+  --telegram-user "<your_telegram_user_id>"
 ```
+
+`setup` will:
+- auto-select Codex (if available) or Claude Code
+- install bot dependencies
+- generate/update `super_turtle/claude-telegram-bot/.env`
+- pin default bot driver so you do not need manual `/switch`
+
+Optional flags:
+- `--openai-api-key <key>` for voice transcription
+- `--driver codex` or `--driver claude` to force a driver
+- `--non-interactive` for CI scripts
+
+### 5) Subscription requirements
+
+- Use either local `codex` auth or local `claude` auth.
+- Optional: `OPENAI_API_KEY` for voice transcription.
 
 ## Run
 

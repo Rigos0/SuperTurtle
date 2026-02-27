@@ -16,6 +16,8 @@ export interface DriverMessageInput {
 }
 
 const MAX_RETRIES = 1;
+let backgroundRunDepth = 0;
+let backgroundRunPreempted = false;
 
 function buildStallRecoveryPrompt(originalMessage: string): string {
   return `The previous response stream stalled before completion while handling this request.
@@ -36,6 +38,30 @@ export function isLikelyQuotaOrLimitError(error: unknown): boolean {
     text.includes("limit reached") ||
     text.includes("insufficient")
   );
+}
+
+export function isLikelyCancellationError(error: unknown): boolean {
+  const text = String(error).toLowerCase();
+  return text.includes("abort") || text.includes("cancel");
+}
+
+export function beginBackgroundRun(): void {
+  backgroundRunDepth += 1;
+}
+
+export function endBackgroundRun(): void {
+  backgroundRunDepth = Math.max(0, backgroundRunDepth - 1);
+  if (backgroundRunDepth === 0) {
+    backgroundRunPreempted = false;
+  }
+}
+
+export function isBackgroundRunActive(): boolean {
+  return backgroundRunDepth > 0;
+}
+
+export function wasBackgroundRunPreempted(): boolean {
+  return backgroundRunPreempted;
 }
 
 export async function runMessageWithActiveDriver(
@@ -116,6 +142,20 @@ export function getDriverAuditType(baseType: string): string {
 
 export function isAnyDriverRunning(): boolean {
   return session.isRunning || codexSession.isRunning;
+}
+
+export async function preemptBackgroundRunForUserPriority(): Promise<boolean> {
+  if (!isBackgroundRunActive()) {
+    return false;
+  }
+
+  backgroundRunPreempted = true;
+  const stopResult = await stopActiveDriverQuery();
+  if (stopResult) {
+    await Bun.sleep(100);
+    return true;
+  }
+  return false;
 }
 
 export async function stopActiveDriverQuery(): Promise<"stopped" | "pending" | false> {

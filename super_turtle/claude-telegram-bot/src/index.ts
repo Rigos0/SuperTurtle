@@ -32,7 +32,17 @@ import { session } from "./session";
 import { getDueJobs, getJobs, advanceRecurringJob, removeJob } from "./cron";
 import { bot } from "./bot";
 import { startDashboardServer } from "./dashboard";
-import { isAnyDriverRunning, isLikelyQuotaOrLimitError, runMessageWithDriver } from "./handlers/driver-routing";
+import {
+  beginBackgroundRun,
+  endBackgroundRun,
+  isAnyDriverRunning,
+  isBackgroundRunActive,
+  isLikelyCancellationError,
+  isLikelyQuotaOrLimitError,
+  preemptBackgroundRunForUserPriority,
+  runMessageWithDriver,
+  wasBackgroundRunPreempted,
+} from "./handlers/driver-routing";
 import { StreamingState, createSilentStatusCallback, createStatusCallback } from "./handlers/streaming";
 import { getSilentNotificationText } from "./silent-notifications";
 import type { DriverId } from "./drivers/types";
@@ -258,6 +268,14 @@ function summarizeCronError(error: unknown): string {
   return message.length > 300 ? `${message.slice(0, 297)}...` : message;
 }
 
+function isAllowedInteractiveUpdate(ctx: import("grammy").Context): boolean {
+  const userId = ctx.from?.id;
+  if (!userId || !ALLOWED_USERS.includes(userId)) {
+    return false;
+  }
+  return Boolean(ctx.message || ctx.callbackQuery);
+}
+
 function extractCheckedSubturtleName(prompt: string): string | null {
   const match = prompt.match(/^\[SILENT CHECK-IN\]\s+Check SubTurtle\s+([a-zA-Z0-9._-]+):/m);
   return match?.[1] || null;
@@ -428,7 +446,13 @@ async function drainPreparedSnapshotsWhenIdle(): Promise<void> {
     const statusCallback = createSilentStatusCallback(cronCtx, state);
     let response = "";
 
+    beginBackgroundRun();
     try {
+      if (wasBackgroundRunPreempted()) {
+        console.log(`[snapshot:${snapshot.jobId}] skipped before start due to user-priority preemption`);
+        continue;
+      }
+
       try {
         response = await runMessageWithDriver(primaryDriver, {
           message: buildPreparedSnapshotPrompt(snapshot),
@@ -457,11 +481,17 @@ async function drainPreparedSnapshotsWhenIdle(): Promise<void> {
         await bot.api.sendMessage(snapshot.chatId, notificationText);
       }
     } catch (error) {
+      if (wasBackgroundRunPreempted() && isLikelyCancellationError(error)) {
+        console.log(`[snapshot:${snapshot.jobId}] preempted by interactive update`);
+        continue;
+      }
       const errorSummary = summarizeCronError(error);
       await bot.api.sendMessage(
         snapshot.chatId,
         `❌ Background check failed (${snapshot.jobId}).\n${errorSummary}`
       );
+    } finally {
+      endBackgroundRun();
     }
   }
 }
@@ -480,6 +510,17 @@ bot.use(async (ctx, next) => {
       // ignore duplicate callback ack errors
     }
   }
+});
+
+// User updates should preempt low-priority cron/background work.
+bot.use(async (ctx, next) => {
+  if (isAllowedInteractiveUpdate(ctx) && isBackgroundRunActive()) {
+    const interrupted = await preemptBackgroundRunForUserPriority();
+    if (interrupted) {
+      console.log("Preempted background run to prioritize interactive user update");
+    }
+  }
+  await next();
 });
 
 // Sequentialize non-command messages per user (prevents race conditions)
@@ -659,27 +700,13 @@ const startCronTimer = () => {
 
           if (job.silent) {
             const cronCtx = createCronContext(job.prompt);
-            let keepTyping = true;
-            const typingController = {
-              stop: () => {
-                keepTyping = false;
-              },
-            };
-            session.typingController = typingController;
-            const stopProcessing = session.startProcessing();
-
-            const typingLoop = (async () => {
-              while (keepTyping) {
-                try {
-                  await bot.api.sendChatAction(resolvedChatId, "typing");
-                } catch (error) {
-                  console.debug("Silent cron typing indicator failed:", error);
-                }
-                await Bun.sleep(4000);
-              }
-            })();
-
+            beginBackgroundRun();
             try {
+              if (wasBackgroundRunPreempted()) {
+                console.log(`[cron:${job.id}] skipped before start due to user-priority preemption`);
+                continue;
+              }
+
               const primaryDriver: DriverId = session.activeDriver;
               const fallbackDriver: DriverId = primaryDriver === "codex" ? "claude" : "codex";
               const state = new StreamingState();
@@ -735,43 +762,67 @@ const startCronTimer = () => {
                   );
                 }
               }
+            } catch (error) {
+              if (
+                wasBackgroundRunPreempted() &&
+                isLikelyCancellationError(error)
+              ) {
+                console.log(`[cron:${job.id}] preempted by interactive update`);
+                continue;
+              }
+              throw error;
             } finally {
-              typingController.stop();
-              await typingLoop;
-              stopProcessing();
-              session.typingController = null;
+              endBackgroundRun();
             }
           } else {
             // Append instruction so the agent opens its reply with a scheduled notice.
             // Guard against double-injecting when the prompt already contains it.
             const injectedPrompt = buildCronScheduledPrompt(job.prompt);
             const cronCtx = createCronContext(injectedPrompt);
-            const primaryDriver: DriverId = session.activeDriver;
-            const fallbackDriver: DriverId = primaryDriver === "codex" ? "claude" : "codex";
-            const state = new StreamingState();
-            const statusCallback = createStatusCallback(cronCtx, state);
-
+            beginBackgroundRun();
             try {
-              await runMessageWithDriver(primaryDriver, {
-                message: injectedPrompt,
-                username: "cron",
-                userId: resolvedUserId,
-                chatId: resolvedChatId,
-                ctx: cronCtx,
-                statusCallback,
-              });
-            } catch (error) {
-              if (!isLikelyQuotaOrLimitError(error)) {
-                throw error;
+              if (wasBackgroundRunPreempted()) {
+                console.log(`[cron:${job.id}] skipped before start due to user-priority preemption`);
+                continue;
               }
-              await runMessageWithDriver(fallbackDriver, {
-                message: injectedPrompt,
-                username: "cron",
-                userId: resolvedUserId,
-                chatId: resolvedChatId,
-                ctx: cronCtx,
-                statusCallback,
-              });
+              const primaryDriver: DriverId = session.activeDriver;
+              const fallbackDriver: DriverId = primaryDriver === "codex" ? "claude" : "codex";
+              const state = new StreamingState();
+              const statusCallback = createStatusCallback(cronCtx, state);
+
+              try {
+                await runMessageWithDriver(primaryDriver, {
+                  message: injectedPrompt,
+                  username: "cron",
+                  userId: resolvedUserId,
+                  chatId: resolvedChatId,
+                  ctx: cronCtx,
+                  statusCallback,
+                });
+              } catch (error) {
+                if (!isLikelyQuotaOrLimitError(error)) {
+                  throw error;
+                }
+                await runMessageWithDriver(fallbackDriver, {
+                  message: injectedPrompt,
+                  username: "cron",
+                  userId: resolvedUserId,
+                  chatId: resolvedChatId,
+                  ctx: cronCtx,
+                  statusCallback,
+                });
+              }
+            } catch (error) {
+              if (
+                wasBackgroundRunPreempted() &&
+                isLikelyCancellationError(error)
+              ) {
+                console.log(`[cron:${job.id}] preempted by interactive update`);
+                continue;
+              }
+              throw error;
+            } finally {
+              endBackgroundRun();
             }
           }
         } catch (error) {

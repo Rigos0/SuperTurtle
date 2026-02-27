@@ -1,0 +1,261 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: ./super_turtle/setup [options]
+
+Bootstrap Super Turtle without manual config-file editing.
+
+Options:
+  --driver <auto|codex|claude>   Driver to use (default: auto)
+  --telegram-token <token>       Telegram bot token from BotFather
+  --telegram-user <id[,id...]>   Allowed Telegram user ID(s)
+  --openai-api-key <key>         Optional key for voice transcription
+  --skip-install                 Skip dependency install
+  --skip-docs-install            Skip docs npm install
+  --overwrite-env                Overwrite existing bot .env without prompt
+  --no-default-driver            Do not write /tmp/claude-telegram-prefs.json
+  --non-interactive              Fail instead of prompting for missing values
+  -h, --help                     Show this help
+EOF
+}
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BOT_DIR="${ROOT_DIR}/super_turtle/claude-telegram-bot"
+DOCS_DIR="${ROOT_DIR}/docs"
+ENV_FILE="${BOT_DIR}/.env"
+ENV_EXAMPLE="${BOT_DIR}/.env.example"
+PREFS_FILE="/tmp/claude-telegram-prefs.json"
+
+DRIVER="auto"
+TELEGRAM_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
+TELEGRAM_USERS="${TELEGRAM_ALLOWED_USERS:-}"
+OPENAI_KEY="${OPENAI_API_KEY:-}"
+INSTALL_DEPS=1
+INSTALL_DOCS=1
+OVERWRITE_ENV=0
+WRITE_DEFAULT_DRIVER=1
+NON_INTERACTIVE=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --driver)
+      DRIVER="${2:-}"
+      shift 2
+      ;;
+    --telegram-token)
+      TELEGRAM_TOKEN="${2:-}"
+      shift 2
+      ;;
+    --telegram-user)
+      TELEGRAM_USERS="${2:-}"
+      shift 2
+      ;;
+    --openai-api-key)
+      OPENAI_KEY="${2:-}"
+      shift 2
+      ;;
+    --skip-install)
+      INSTALL_DEPS=0
+      shift
+      ;;
+    --skip-docs-install)
+      INSTALL_DOCS=0
+      shift
+      ;;
+    --overwrite-env)
+      OVERWRITE_ENV=1
+      shift
+      ;;
+    --no-default-driver)
+      WRITE_DEFAULT_DRIVER=0
+      shift
+      ;;
+    --non-interactive)
+      NON_INTERACTIVE=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "[setup] Unknown argument: $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+if [[ ! -f "${ROOT_DIR}/AGENTS.md" ]]; then
+  echo "[setup] Run this from the agentic repo root." >&2
+  exit 1
+fi
+
+have_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+prompt_if_missing() {
+  local var_name="$1"
+  local label="$2"
+  local secret="${3:-0}"
+  local value="${!var_name}"
+  if [[ -n "${value}" ]]; then
+    return 0
+  fi
+  if [[ "${NON_INTERACTIVE}" -eq 1 ]]; then
+    echo "[setup] Missing required value: ${label}" >&2
+    exit 1
+  fi
+
+  if [[ "${secret}" -eq 1 ]]; then
+    read -r -s -p "${label}: " value
+    echo
+  else
+    read -r -p "${label}: " value
+  fi
+
+  if [[ -z "${value}" ]]; then
+    echo "[setup] ${label} cannot be empty." >&2
+    exit 1
+  fi
+  printf -v "${var_name}" '%s' "${value}"
+}
+
+yes_no_prompt() {
+  local prompt="$1"
+  local default_yes="${2:-1}"
+  local answer
+
+  if [[ "${NON_INTERACTIVE}" -eq 1 ]]; then
+    [[ "${default_yes}" -eq 1 ]] && return 0 || return 1
+  fi
+
+  if [[ "${default_yes}" -eq 1 ]]; then
+    read -r -p "${prompt} [Y/n]: " answer
+    [[ -z "${answer}" || "${answer,,}" == "y" || "${answer,,}" == "yes" ]]
+    return
+  fi
+
+  read -r -p "${prompt} [y/N]: " answer
+  [[ "${answer,,}" == "y" || "${answer,,}" == "yes" ]]
+}
+
+case "${DRIVER}" in
+  auto|codex|claude) ;;
+  *)
+    echo "[setup] Invalid --driver value: ${DRIVER}" >&2
+    exit 1
+    ;;
+esac
+
+SELECTED_DRIVER="${DRIVER}"
+if [[ "${DRIVER}" == "auto" ]]; then
+  if have_cmd codex; then
+    SELECTED_DRIVER="codex"
+  elif have_cmd claude; then
+    SELECTED_DRIVER="claude"
+  else
+    echo "[setup] Neither 'codex' nor 'claude' is available on PATH." >&2
+    exit 1
+  fi
+fi
+
+if [[ "${SELECTED_DRIVER}" == "codex" ]] && ! have_cmd codex; then
+  echo "[setup] Driver is codex, but 'codex' is not installed or not on PATH." >&2
+  exit 1
+fi
+if [[ "${SELECTED_DRIVER}" == "claude" ]] && ! have_cmd claude; then
+  echo "[setup] Driver is claude, but 'claude' is not installed or not on PATH." >&2
+  exit 1
+fi
+
+echo "[setup] Selected driver: ${SELECTED_DRIVER}"
+
+if [[ "${INSTALL_DEPS}" -eq 1 ]]; then
+  if ! have_cmd bun; then
+    echo "[setup] Bun is required for the bot setup. Install Bun first: https://bun.sh" >&2
+    exit 1
+  fi
+
+  echo "[setup] Installing bot dependencies (bun install)..."
+  (cd "${BOT_DIR}" && bun install)
+
+  if [[ "${INSTALL_DOCS}" -eq 1 ]]; then
+    if have_cmd npm; then
+      echo "[setup] Installing docs dependencies (npm install)..."
+      (cd "${DOCS_DIR}" && npm install)
+    else
+      echo "[setup] npm not found, skipping docs dependency install."
+    fi
+  fi
+fi
+
+prompt_if_missing TELEGRAM_TOKEN "Telegram bot token"
+prompt_if_missing TELEGRAM_USERS "Telegram allowed user ID(s), comma-separated"
+
+if [[ ! "${TELEGRAM_USERS}" =~ ^[0-9]+(,[0-9]+)*$ ]]; then
+  echo "[setup] TELEGRAM_ALLOWED_USERS must be digits separated by commas." >&2
+  exit 1
+fi
+
+if [[ -f "${ENV_FILE}" ]] && [[ "${OVERWRITE_ENV}" -eq 0 ]]; then
+  if yes_no_prompt "[setup] ${ENV_FILE} exists. Overwrite it?" 0; then
+    OVERWRITE_ENV=1
+  else
+    echo "[setup] Keeping existing ${ENV_FILE}."
+  fi
+fi
+
+if [[ "${OVERWRITE_ENV}" -eq 1 || ! -f "${ENV_FILE}" ]]; then
+  cp "${ENV_EXAMPLE}" "${ENV_FILE}"
+fi
+
+upsert_env_key() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+  local tmp="${file}.tmp"
+  awk -v k="${key}" -v v="${value}" '
+    BEGIN { done = 0 }
+    $0 ~ ("^" k "=") {
+      print k "=" v
+      done = 1
+      next
+    }
+    { print }
+    END {
+      if (!done) print k "=" v
+    }
+  ' "${file}" > "${tmp}"
+  mv "${tmp}" "${file}"
+}
+
+upsert_env_key "${ENV_FILE}" "TELEGRAM_BOT_TOKEN" "${TELEGRAM_TOKEN}"
+upsert_env_key "${ENV_FILE}" "TELEGRAM_ALLOWED_USERS" "${TELEGRAM_USERS}"
+upsert_env_key "${ENV_FILE}" "CLAUDE_WORKING_DIR" "${ROOT_DIR}"
+upsert_env_key "${ENV_FILE}" "CODEX_ENABLED" "$([[ "${SELECTED_DRIVER}" == "codex" ]] && echo "true" || echo "false")"
+
+if [[ -n "${OPENAI_KEY}" ]]; then
+  upsert_env_key "${ENV_FILE}" "OPENAI_API_KEY" "${OPENAI_KEY}"
+fi
+
+if [[ "${WRITE_DEFAULT_DRIVER}" -eq 1 ]]; then
+  cat > "${PREFS_FILE}" <<EOF
+{
+  "model": "claude-opus-4-6",
+  "effort": "high",
+  "activeDriver": "${SELECTED_DRIVER}"
+}
+EOF
+  echo "[setup] Wrote default driver preference to ${PREFS_FILE}."
+fi
+
+echo
+echo "[setup] Bootstrap complete."
+echo "[setup] Env file: ${ENV_FILE}"
+echo "[setup] Start bot:"
+echo "  cd super_turtle/claude-telegram-bot && bun run start"
+echo "[setup] Driver: ${SELECTED_DRIVER}"

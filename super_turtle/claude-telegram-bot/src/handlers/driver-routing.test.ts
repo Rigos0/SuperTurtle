@@ -2,7 +2,14 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { codexSession } from "../codex-session";
 import { getDriver } from "../drivers/registry";
 import { session } from "../session";
-import { isAnyDriverRunning, stopActiveDriverQuery } from "./driver-routing";
+import {
+  beginBackgroundRun,
+  endBackgroundRun,
+  isAnyDriverRunning,
+  preemptBackgroundRunForUserPriority,
+  stopActiveDriverQuery,
+  wasBackgroundRunPreempted,
+} from "./driver-routing";
 
 const originalSessionDriver = session.activeDriver;
 
@@ -10,6 +17,7 @@ afterEach(() => {
   session.activeDriver = originalSessionDriver;
   (codexSession as unknown as { isQueryRunning: boolean }).isQueryRunning = false;
   (session as unknown as { _isProcessing: boolean })._isProcessing = false;
+  endBackgroundRun();
 });
 
 describe("driver routing", () => {
@@ -45,6 +53,30 @@ describe("driver routing", () => {
     } finally {
       claudeDriver.stop = originalClaudeStop;
       codexDriver.stop = originalCodexStop;
+    }
+  });
+
+  it("marks and preempts active background runs", async () => {
+    const claudeDriver = getDriver("claude");
+    const originalClaudeStop = claudeDriver.stop;
+    let stopCalls = 0;
+
+    (session as unknown as { isQueryRunning: boolean }).isQueryRunning = true;
+    beginBackgroundRun();
+    claudeDriver.stop = async () => {
+      stopCalls += 1;
+      return "stopped";
+    };
+
+    try {
+      const interrupted = await preemptBackgroundRunForUserPriority();
+      expect(interrupted).toBe(true);
+      expect(stopCalls).toBe(1);
+      expect(wasBackgroundRunPreempted()).toBe(true);
+    } finally {
+      endBackgroundRun();
+      claudeDriver.stop = originalClaudeStop;
+      (session as unknown as { isQueryRunning: boolean }).isQueryRunning = false;
     }
   });
 });

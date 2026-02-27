@@ -195,6 +195,13 @@ function formatCodexInitError(error: unknown): string {
   return `Failed to initialize Codex SDK: ${message.slice(0, 160)}`;
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
 /**
  * Check if MCP servers are already configured in ~/.codex/config.toml.
  * Returns true if any of our 3 servers are found.
@@ -1078,9 +1085,18 @@ ${messageToSend}`;
       const combinedResponse = getCombinedResponse().trim();
       return combinedResponse || "No response from Codex.";
     } catch (error) {
-      console.error("Error sending message to Codex:", error);
-      this.lastError = String(error).slice(0, 100);
-      this.lastErrorTime = new Date();
+      const errorMessage = getErrorMessage(error);
+      const errorLower = errorMessage.toLowerCase();
+      const isCancellation =
+        errorLower.includes("abort") || errorLower.includes("cancel");
+
+      if (isCancellation && this.stopRequested) {
+        console.warn(`Suppressed Codex cancellation after stop request: ${errorMessage}`);
+      } else {
+        console.error("Error sending message to Codex:", error);
+        this.lastError = errorMessage.slice(0, 100);
+        this.lastErrorTime = new Date();
+      }
       throw error;
     } finally {
       this.isQueryRunning = false;

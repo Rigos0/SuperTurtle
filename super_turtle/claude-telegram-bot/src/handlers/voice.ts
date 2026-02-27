@@ -17,7 +17,9 @@ import {
 import {
   getDriverAuditType,
   isActiveDriverSessionActive,
+  isBackgroundRunActive,
   isAnyDriverRunning,
+  preemptBackgroundRunForUserPriority,
   runMessageWithActiveDriver,
 } from "./driver-routing";
 import { StreamingState, createStatusCallback } from "./streaming";
@@ -116,6 +118,9 @@ export async function handleVoice(ctx: Context): Promise<void> {
     }
 
     // 10. If agent is already answering, queue transcript to run after completion.
+    if (isBackgroundRunActive()) {
+      await preemptBackgroundRunForUserPriority();
+    }
     if (isAnyDriverRunning()) {
       const queueSize = enqueueDeferredMessage({
         text: transcript,

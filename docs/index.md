@@ -11,22 +11,14 @@ Super Turtle is an autonomous coding system you control from Telegram. This setu
 
 ## Setup
 
-### 1) Clone and install
+### 1) Clone repo
 
 ```bash
 git clone <your-fork-or-repo-url>
 cd agentic
-cd super_turtle/claude-telegram-bot
-bun install
 ```
 
-### 2) Subscription requirements
-
-- Required: an active **Claude Code** subscription and local `claude` auth.
-- Alternative/optional for Codex flows: active Codex access (CLOTH) for the OpenAI account used by local `codex`.
-- Optional: `OPENAI_API_KEY` for voice transcription support.
-
-### 3) Create the Telegram bot
+### 2) Create the Telegram bot
 
 1. Open [@BotFather](https://t.me/BotFather).
 2. Run `/newbot` and follow prompts.
@@ -43,28 +35,27 @@ status - Check what Claude is doing
 restart - Restart the bot
 ```
 
-### 4) Get your Telegram chat/user ID
+### 3) Get your Telegram chat/user ID
 
 - Message [@userinfobot](https://t.me/userinfobot), or
 - Start your bot and use `/start` to display your ID.
 
 Use this value in `TELEGRAM_ALLOWED_USERS`.
 
-### 5) Configure environment
-
-Create `super_turtle/claude-telegram-bot/.env`:
+### 4) Bootstrap (no manual env editing)
 
 ```bash
-TELEGRAM_BOT_TOKEN=<telegram_bot_token_from_botfather>
-TELEGRAM_ALLOWED_USERS=<telegram_user_id>
-
-CLAUDE_WORKING_DIR=/absolute/path/to/agentic
-OPENAI_API_KEY=<optional_openai_api_key> # optional, only for voice transcription
-
-CODEX_ENABLED=true # optional, for Codex usage in /usage and Codex flows
+./super_turtle/setup --driver auto \
+  --telegram-token "<botfather_token>" \
+  --telegram-user "<your_telegram_user_id>"
 ```
 
-Keep `.env` local only. Real credentials should never be committed.
+The setup command auto-detects Codex/Claude, installs dependencies, writes `super_turtle/claude-telegram-bot/.env`, and sets the bot's default driver.
+
+Optional:
+- `--openai-api-key <key>` for voice transcription
+- `--driver codex` or `--driver claude` to force a driver
+- `--non-interactive` for scripted setup
 
 ## Run
 
