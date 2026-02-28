@@ -21,7 +21,7 @@ type CodexFlowResult = {
   payload: CodexFlowPayload | null;
 };
 
-const commandsPath = resolve(import.meta.dir, "commands.ts");
+const commandsPath = resolve(import.meta.dir, "commands/index.ts");
 const textPath = resolve(import.meta.dir, "text.ts");
 const callbackPath = resolve(import.meta.dir, "callback.ts");
 const sessionPath = resolve(import.meta.dir, "../session.ts");
