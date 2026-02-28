@@ -203,10 +203,10 @@ export default function Home() {
     };
   }, [bubbleHideTimeout]);
 
-  return (
-    <div className="landing-root">
-      <StickyNav />
-      <main>
+	  return (
+	    <div className="landing-root">
+	      <StickyNav />
+	      <main className="flex flex-col">
 	        <section id="hero" className="section-shell hero-shell relative">
 	          <div className="section-container max-w-5xl space-y-10">
             <div className="reveal text-center flex flex-col items-center" style={{ animationDelay: '80ms' }}>
@@ -265,7 +265,9 @@ export default function Home() {
 	          <div className="hero-glow" />
 		        </section>
         
-            <SectionDivider />
+            <div className="mt-auto sm:mt-0">
+              <SectionDivider />
+            </div>
 	      </main>
 
 		      <footer className="relative section-shell footer-shell">
