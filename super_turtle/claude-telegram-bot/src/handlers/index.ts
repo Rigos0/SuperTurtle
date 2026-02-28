@@ -11,7 +11,6 @@ export {
   handleModel,
   handleSwitch,
   handleResume,
-  handleRestart,
   handleSubturtle,
   handleCron,
 } from "./commands";

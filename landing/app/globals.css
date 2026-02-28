@@ -137,14 +137,15 @@ body {
 
 .turtle-tip-bubble {
   position: absolute;
-  left: -110px;
+  left: -80px;
   top: 50%;
-  transform: translateY(-56%) translateX(8px) scale(0.96);
+  transform: translateY(-56%) translateX(calc(-50% + 8px)) scale(0.96);
   padding: 0;
   color: var(--text-heading);
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   font-weight: 700;
   white-space: nowrap;
+  text-align: center;
   text-shadow: 0 1px 8px rgba(255, 255, 255, 0.75);
   opacity: 0;
   visibility: hidden;
@@ -156,12 +157,12 @@ body {
 .turtle-tip-bubble.active {
   opacity: 1;
   visibility: visible;
-  transform: translateY(-56%) translateX(0) scale(1);
+  transform: translateY(-56%) translateX(-50%) scale(1);
 }
 
 @media (max-width: 640px) {
   .turtle-tip-bubble {
-    left: -88px;
+    left: -85px !important;
     top: 48%;
     font-size: 0.65rem;
   }
@@ -183,7 +184,7 @@ body {
   }
 
   .turtle-tip-bubble {
-    transform: translateY(-56%) translateX(0) scale(1);
+    transform: translateY(-56%) translateX(-50%) scale(1);
   }
 }
 

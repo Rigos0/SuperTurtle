@@ -16,7 +16,6 @@ import {
   handleModel,
   handleSwitch,
   handleResume,
-  handleRestart,
   handleSubturtle,
   handleCron,
   handleText,
@@ -566,9 +565,10 @@ bot.command("switch", handleSwitch);
 bot.command("resume", handleResume);
 bot.command("sub", handleSubturtle);
 bot.command("subs", handleSubturtle);
-bot.command("subtitles", handleSubturtle);
 bot.command("subturtle", handleSubturtle);
-bot.command("restart", handleRestart);
+bot.command("subturtles", handleSubturtle);
+bot.command("turtle", handleSubturtle);
+bot.command("turtles", handleSubturtle);
 bot.command("cron", handleCron);
 
 // ============== Message Handlers ==============

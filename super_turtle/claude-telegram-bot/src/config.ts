@@ -4,32 +4,39 @@
  * All environment variables, paths, constants, and safety settings.
  */
 
-import { homedir } from "os";
+import { homedir, platform } from "os";
 import { resolve, dirname } from "path";
 import type { McpServerConfig } from "./types";
 
 // ============== Environment Setup ==============
 
 const HOME = homedir();
+export const IS_MACOS = platform() === "darwin";
+export const IS_LINUX = platform() === "linux";
+export const IS_WINDOWS = platform() === "win32";
 
-// Ensure necessary paths are available for Claude's bash commands
-// LaunchAgents don't inherit the full shell environment
+// Ensure necessary paths are available for Claude's bash commands.
+// LaunchAgents (macOS) don't inherit the full shell environment;
+// systemd services (Linux) may have similarly restricted PATHs.
 const EXTRA_PATHS = [
   `${HOME}/.local/bin`,
   `${HOME}/.bun/bin`,
-  "/opt/homebrew/bin",
-  "/opt/homebrew/sbin",
+  // macOS Homebrew paths (Apple Silicon + Intel)
+  ...(IS_MACOS ? ["/opt/homebrew/bin", "/opt/homebrew/sbin"] : []),
+  // Linux Linuxbrew / snap paths
+  ...(IS_LINUX ? ["/home/linuxbrew/.linuxbrew/bin", "/snap/bin"] : []),
   "/usr/local/bin",
 ];
 
+const PATH_SEPARATOR = IS_WINDOWS ? ";" : ":";
 const currentPath = process.env.PATH || "";
-const pathParts = currentPath.split(":");
+const pathParts = currentPath.split(PATH_SEPARATOR);
 for (const extraPath of EXTRA_PATHS) {
   if (!pathParts.includes(extraPath)) {
     pathParts.unshift(extraPath);
   }
 }
-process.env.PATH = pathParts.join(":");
+process.env.PATH = pathParts.join(PATH_SEPARATOR);
 
 // ============== Core Configuration ==============
 
@@ -276,8 +283,12 @@ export const SESSION_FILE = "/tmp/claude-telegram-session.json";
 export const RESTART_FILE = "/tmp/claude-telegram-restart.json";
 export const TEMP_DIR = "/tmp/telegram-bot";
 
-// Temp paths that are always allowed for bot operations
-export const TEMP_PATHS = ["/tmp/", "/private/tmp/", "/var/folders/"];
+// Temp paths that are always allowed for bot operations.
+// /private/tmp/ and /var/folders/ are macOS-specific symlink targets.
+export const TEMP_PATHS = [
+  "/tmp/",
+  ...(IS_MACOS ? ["/private/tmp/", "/var/folders/"] : []),
+];
 
 // Ensure temp directory exists
 await Bun.write(`${TEMP_DIR}/.keep`, "");

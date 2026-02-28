@@ -200,34 +200,36 @@ describe("handleText crash retry gating", () => {
     expect(result.payload?.messages[1]?.includes("Do not blindly repeat side-effecting operations")).toBe(true);
   });
 
-  it("does not retry stalled runs after spawn orchestration tool activity", async () => {
+  it("retries stalled runs after spawn orchestration tool activity with safe continuation", async () => {
     const result = await probeRetry("spawn-tool-before-stall");
     if (result.exitCode !== 0) {
       throw new Error(`Spawn-tool-before-stall probe failed:\n${result.stderr || result.stdout}`);
     }
 
     expect(result.payload).not.toBeNull();
-    expect(result.payload?.attempts).toBe(1);
+    expect(result.payload?.attempts).toBe(2);
     expect(
       result.payload?.replies.some((entry) =>
         entry.includes("stalled after spawn orchestration")
       )
     ).toBe(true);
+    expect(result.payload?.messages[1]?.includes("./super_turtle/subturtle/ctl list")).toBe(true);
   });
 
-  it("does not retry stalled runs when spawn orchestration tool status is HTML-encoded", async () => {
+  it("retries stalled runs when spawn orchestration tool status is HTML-encoded", async () => {
     const result = await probeRetry("encoded-spawn-tool-before-stall");
     if (result.exitCode !== 0) {
       throw new Error(`Encoded-spawn-tool-before-stall probe failed:\n${result.stderr || result.stdout}`);
     }
 
     expect(result.payload).not.toBeNull();
-    expect(result.payload?.attempts).toBe(1);
+    expect(result.payload?.attempts).toBe(2);
     expect(
       result.payload?.replies.some((entry) =>
         entry.includes("stalled after spawn orchestration")
       )
     ).toBe(true);
+    expect(result.payload?.messages[1]?.includes("./super_turtle/subturtle/ctl list")).toBe(true);
   });
 
   it("retries stalled runs without tool execution", async () => {

@@ -59,6 +59,16 @@ export function getDeferredQueueSize(chatId: number): number {
   return queues.get(chatId)?.length || 0;
 }
 
+/**
+ * Peek at all deferred messages across all chats (for debug/diagnostics).
+ * Returns a snapshot — does NOT dequeue.
+ */
+export function getAllDeferredQueues(): Map<number, ReadonlyArray<DeferredMessage>> {
+  return new Map(
+    Array.from(queues.entries()).map(([chatId, msgs]) => [chatId, [...msgs]])
+  );
+}
+
 export async function drainDeferredQueue(ctx: Context, chatId: number): Promise<void> {
   if (drainingChats.has(chatId) || isAnyDriverRunning()) {
     return;

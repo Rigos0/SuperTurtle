@@ -107,7 +107,7 @@ resume - Pick from recent sessions to resume
 context - Show context usage
 stop - Interrupt current query
 status - Check what Claude is doing
-restart - Restart the bot
+sub - SubTurtles
 ```
 
 ### 2. Configure Environment

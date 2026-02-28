@@ -40,7 +40,7 @@ resume - Pick from recent sessions to resume
 context - Show context usage
 stop - Interrupt current query
 status - Check what Claude is doing
-restart - Restart the bot
+sub - SubTurtles
 ```
 
 ### 3) Get your Telegram chat/user ID

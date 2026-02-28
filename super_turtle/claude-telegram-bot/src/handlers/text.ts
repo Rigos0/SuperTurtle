@@ -51,6 +51,19 @@ Original request:
 ${originalMessage}`;
 }
 
+function buildSpawnOrchestrationRecoveryPrompt(originalMessage: string): string {
+  return `The previous response stream stalled after SubTurtle spawn orchestration.
+Continue from current repository/runtime state and finish the task safely.
+Before taking any side-effecting action:
+1) Run ./super_turtle/subturtle/ctl list and treat already-running SubTurtles as successfully spawned.
+2) If any intended SubTurtles are missing, spawn only the missing ones.
+3) Never re-run spawn commands for names that already exist or are running.
+4) Report exact running names and any missing/failed names.
+
+Original request:
+${originalMessage}`;
+}
+
 /**
  * Handle incoming text messages.
  */
@@ -161,15 +174,18 @@ export async function handleText(
 
         if (driver.isStallError(error) && attempt < MAX_RETRIES) {
           if (state.sawSpawnOrchestration) {
-            console.warn(
-              `${driver.displayName} stream stalled after spawn orchestration; skipping automatic retry to avoid duplicate side effects`
-            );
+            console.warn(`${driver.displayName} stream stalled after spawn orchestration; running safe continuation retry`);
             if (!silent) {
               await ctx.reply(
-                `⚠️ ${driver.displayName} stream stalled after spawn orchestration. Automatic retry was skipped to avoid duplicate SubTurtle spawns.`
+                `⚠️ ${driver.displayName} stream stalled after spawn orchestration. Resuming with state verification to avoid duplicate SubTurtle spawns.`
               );
             }
-            break;
+            message = buildSpawnOrchestrationRecoveryPrompt(message);
+            state = new StreamingState();
+            statusCallback = silent
+              ? createSilentStatusCallback(ctx, state)
+              : createStatusCallback(ctx, state);
+            continue;
           }
 
           console.warn(

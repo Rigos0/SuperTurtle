@@ -63,7 +63,7 @@ describe("driver routing retry parity", () => {
     }
   });
 
-  it("does not retry stalled runs after spawn orchestration signals", async () => {
+  it("retries stalled runs after spawn orchestration with a safe continuation prompt", async () => {
     const driver = getDriver("claude") as unknown as DriverLike;
     const original = {
       runMessage: driver.runMessage,
@@ -72,6 +72,7 @@ describe("driver routing retry parity", () => {
       kill: driver.kill,
     };
 
+    const seenMessages: string[] = [];
     let attempts = 0;
 
     try {
@@ -80,17 +81,21 @@ describe("driver routing retry parity", () => {
       driver.kill = async () => {};
       driver.runMessage = async (input) => {
         attempts += 1;
-        await input.statusCallback(
-          "tool",
-          "<code>./super_turtle/subturtle/ctl spawn web-ui --prompt 'x'</code>"
-        );
-        throw new Error("Event stream stalled for 120000ms before completion");
+        seenMessages.push(input.message);
+        if (attempts === 1) {
+          await input.statusCallback(
+            "tool",
+            "<code>./super_turtle/subturtle/ctl spawn web-ui --prompt 'x'</code>"
+          );
+          throw new Error("Event stream stalled for 120000ms before completion");
+        }
+        return "ok";
       };
 
-      await expect(
-        runMessageWithDriver("claude", baseInput("spawn subturtle"))
-      ).rejects.toThrow("Event stream stalled");
-      expect(attempts).toBe(1);
+      const result = await runMessageWithDriver("claude", baseInput("spawn subturtle"));
+      expect(result).toBe("ok");
+      expect(attempts).toBe(2);
+      expect(seenMessages[1]?.includes("./super_turtle/subturtle/ctl list")).toBe(true);
     } finally {
       driver.runMessage = original.runMessage;
       driver.isStallError = original.isStallError;

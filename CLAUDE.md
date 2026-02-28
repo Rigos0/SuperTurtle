@@ -129,7 +129,7 @@ Super Turtle repository — autonomous agent coordination system (SubTurtles). C
 
 - [ ] Telegram security review (leak/attack surface) + fixes
 - [ ] Cloudflare tunnel security review + fixes
-- [ ] `/sub` command: aliases `/subs` + `/subtitles`, backlog-focused output, Codex/Claude parity
+- [ ] `/sub` command: backlog-focused output, Codex/Claude parity (aliases done: /sub /subs /subturtle /subturtles /turtle /turtles)
 - [ ] Codex meta-agent stop-until-prompt issue: root cause + fix
 - [ ] Peekaboo screenshot tooling wired into frontend guidance
 - [ ] Long-run tracking: runs.jsonl + handoff.md (done; verify smoke test)

@@ -1,0 +1,55 @@
+# Super Turtle Bot — systemd service template for Linux
+#
+# Setup:
+#   1. Copy this file to ~/.config/systemd/user/superturtle-bot.service
+#   2. Replace USERNAME and paths with your actual values
+#   3. Run: systemctl --user daemon-reload
+#   4. Run: systemctl --user enable --now superturtle-bot
+#   5. Check: systemctl --user status superturtle-bot
+#   6. Logs: journalctl --user -u superturtle-bot -f
+#
+# To use system-wide instead of user service:
+#   - Copy to /etc/systemd/system/superturtle-bot.service
+#   - Add User=USERNAME under [Service]
+#   - Use systemctl (without --user)
+
+[Unit]
+Description=Super Turtle Telegram Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/USERNAME/projects/agentic/super_turtle/claude-telegram-bot
+ExecStart=/home/USERNAME/.bun/bin/bun run /home/USERNAME/projects/agentic/super_turtle/claude-telegram-bot/src/index.ts
+Restart=always
+RestartSec=5
+
+# Environment variables (update these)
+Environment=TELEGRAM_BOT_TOKEN=your-bot-token-here
+Environment=TELEGRAM_ALLOWED_USERS=123456789
+Environment=CLAUDE_WORKING_DIR=/home/USERNAME/projects/agentic
+Environment=PATH=/home/USERNAME/.local/bin:/home/USERNAME/.bun/bin:/usr/local/bin:/usr/bin:/bin
+
+# Optional environment variables
+# Environment=OPENAI_API_KEY=sk-...
+# Environment=ALLOWED_PATHS=/home/USERNAME/projects,/home/USERNAME/Documents
+# Environment=CODEX_ENABLED=true
+# Environment=RATE_LIMIT_ENABLED=true
+# Environment=RATE_LIMIT_REQUESTS=40
+# Environment=RATE_LIMIT_WINDOW=60
+
+# Prevent system sleep while bot is running (equivalent to caffeinate on macOS)
+ExecStartPre=/bin/bash -c 'command -v systemd-inhibit >/dev/null 2>&1 || true'
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=2G
+
+# Security hardening (optional, may need adjustment based on your setup)
+# ProtectHome=read-only
+# ProtectSystem=strict
+# ReadWritePaths=/tmp /home/USERNAME/projects/agentic
+
+[Install]
+WantedBy=default.target

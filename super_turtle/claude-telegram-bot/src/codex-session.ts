@@ -322,7 +322,30 @@ let cachedModelCatalog:
   | null = null;
 
 function getCodexBinaryPath(): string {
-  return Bun.which("codex") || "/opt/homebrew/bin/codex";
+  const fromPath = Bun.which("codex");
+  if (fromPath) return fromPath;
+
+  // Platform-specific fallback locations
+  const { platform } = require("os");
+  if (platform() === "darwin") {
+    // macOS: Homebrew on Apple Silicon, then Intel
+    if (require("fs").existsSync("/opt/homebrew/bin/codex")) return "/opt/homebrew/bin/codex";
+    if (require("fs").existsSync("/usr/local/bin/codex")) return "/usr/local/bin/codex";
+  }
+
+  // Linux / fallback: standard locations
+  const home = process.env.HOME || "";
+  const fallbacks = [
+    `${home}/.local/bin/codex`,
+    "/usr/local/bin/codex",
+    "/usr/bin/codex",
+  ];
+  for (const p of fallbacks) {
+    if (require("fs").existsSync(p)) return p;
+  }
+
+  // Last resort — hope it appears in PATH later
+  return "codex";
 }
 
 function getCodexSdkPathOverride(): string {

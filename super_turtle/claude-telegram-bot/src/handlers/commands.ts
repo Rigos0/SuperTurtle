@@ -11,13 +11,16 @@ import {
   RESTART_FILE,
   TELEGRAM_SAFE_LIMIT,
   CODEX_ENABLED,
+  IS_MACOS,
+  IS_LINUX,
 } from "../config";
 import { getContextReport } from "../context-command";
 import { isAuthorized } from "../security";
 import { escapeHtml } from "../formatting";
 import { getJobs } from "../cron";
-import { isAnyDriverRunning, stopActiveDriverQuery } from "./driver-routing";
-import { clearPreparedSnapshots } from "../cron-supervision-queue";
+import { isAnyDriverRunning, isBackgroundRunActive, wasBackgroundRunPreempted, stopActiveDriverQuery } from "./driver-routing";
+import { clearPreparedSnapshots, getPreparedSnapshotCount } from "../cron-supervision-queue";
+import { getAllDeferredQueues } from "../deferred-queue";
 
 // Canonical main-loop log written by live.sh (tmux + caffeinate + run-loop).
 export const MAIN_LOOP_LOG_PATH = "/tmp/claude-telegram-bot-ts.log";
@@ -36,9 +39,8 @@ export function getCommandLines(): string[] {
     `/status - Detailed status`,
     `/looplogs - Main loop logs`,
     `/resume - Resume a session`,
-    `/sub - SubTurtles (/subs, /subtitles)`,
+    `/sub - SubTurtles`,
     `/cron - Scheduled jobs`,
-    `/restart - Restart bot`,
   ];
 }
 
@@ -627,21 +629,76 @@ export async function handleSwitch(ctx: Context): Promise<void> {
 }
 
 /**
+ * Retrieve Claude Code OAuth credentials from the platform keychain.
+ * macOS: uses `security find-generic-password` (Keychain)
+ * Linux: uses `secret-tool lookup` (GNOME Keyring / libsecret)
+ * Returns the parsed credentials object, or null on failure.
+ */
+function getClaudeCredentials(): Record<string, unknown> | null {
+  try {
+    if (IS_MACOS) {
+      const proc = Bun.spawnSync([
+        "security",
+        "find-generic-password",
+        "-s",
+        "Claude Code-credentials",
+        "-a",
+        process.env.USER || "unknown",
+        "-w",
+      ]);
+      if (proc.exitCode !== 0) return null;
+      return JSON.parse(proc.stdout.toString());
+    }
+
+    if (IS_LINUX) {
+      // Try secret-tool (libsecret / GNOME Keyring)
+      if (Bun.which("secret-tool")) {
+        const proc = Bun.spawnSync([
+          "secret-tool",
+          "lookup",
+          "service",
+          "Claude Code-credentials",
+          "username",
+          process.env.USER || "unknown",
+        ]);
+        if (proc.exitCode === 0) {
+          const output = proc.stdout.toString().trim();
+          if (output) return JSON.parse(output);
+        }
+      }
+
+      // Fallback: try reading from Claude Code config directory
+      const credPaths = [
+        `${process.env.HOME}/.config/claude-code/credentials.json`,
+        `${process.env.HOME}/.claude/credentials.json`,
+      ];
+      for (const credPath of credPaths) {
+        try {
+          const file = Bun.file(credPath);
+          if (file.size > 0) {
+            const text = require("fs").readFileSync(credPath, "utf-8");
+            return JSON.parse(text);
+          }
+        } catch {
+          // Try next path
+        }
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Fetch and format usage info as HTML lines. Returns empty array on failure.
  */
 export async function getUsageLines(): Promise<string[]> {
   try {
-    const proc = Bun.spawnSync([
-      "security",
-      "find-generic-password",
-      "-s",
-      "Claude Code-credentials",
-      "-a",
-      process.env.USER || "unknown",
-      "-w",
-    ]);
-    const creds = JSON.parse(proc.stdout.toString());
-    const token = creds.claudeAiOauth?.accessToken;
+    const creds = getClaudeCredentials();
+    if (!creds) return [];
+    const token = (creds as Record<string, Record<string, string>>).claudeAiOauth?.accessToken;
     if (!token) return [];
 
     const res = await fetch("https://api.anthropic.com/api/oauth/usage", {
@@ -883,8 +940,9 @@ export async function handleUsage(ctx: Context): Promise<void> {
  */
 export async function getCodexQuotaLines(): Promise<string[]> {
   try {
-    // Spawn codex app-server process
-    const proc = Bun.spawn(["/opt/homebrew/bin/codex", "app-server"], {
+    // Spawn codex app-server process — use PATH-resolved binary, not hardcoded path
+    const codexBin = Bun.which("codex") || "codex";
+    const proc = Bun.spawn([codexBin, "app-server"], {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
@@ -1431,7 +1489,6 @@ export async function handleSubturtle(ctx: Context): Promise<void> {
 
     // Format the turtle info line
     let statusEmoji = turtle.status === "running" ? "🟢" : "⚫";
-    let typeStr = turtle.type ? ` <code>${escapeHtml(turtle.type)}</code>` : "";
     let timeStr = "";
     if (turtle.timeRemaining) {
       const suffix = turtle.timeRemaining === "OVERDUE" || turtle.timeRemaining === "no timeout"
@@ -1443,7 +1500,7 @@ export async function handleSubturtle(ctx: Context): Promise<void> {
     const taskStr = truncateText(taskSource, 120);
 
     messageLines.push(
-      `${statusEmoji} <b>${escapeHtml(turtle.name)}</b>${typeStr}${timeStr}`
+      `${statusEmoji} <b>${escapeHtml(turtle.name)}</b>${timeStr}`
     );
     messageLines.push(`   🧩 ${escapeHtml(taskStr)}`);
 
@@ -1474,6 +1531,112 @@ export async function handleSubturtle(ctx: Context): Promise<void> {
     parse_mode: "HTML",
     reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined,
   });
+}
+
+/**
+ * /debug - Instant diagnostic snapshot of the bot's internal state.
+ *
+ * Shows: driver state, session info, message queues, background run status,
+ * cron supervision queue, and processing flags.
+ *
+ * This command bypasses sequentialization (all commands do) so it always
+ * responds immediately even when the agent is mid-turn.
+ */
+export async function handleDebug(ctx: Context): Promise<void> {
+  const userId = ctx.from?.id;
+
+  if (!isAuthorized(userId, ALLOWED_USERS)) {
+    await ctx.reply("Unauthorized.");
+    return;
+  }
+
+  const now = Date.now();
+  const lines: string[] = ["🔍 <b>Debug — Internal State</b>\n"];
+
+  // ── Driver / Session ──
+  const driverLabel = session.activeDriver === "codex" ? "Codex 🟢" : "Claude 🔵";
+  const { modelName, effortStr } = formatModelInfo(session.model, session.effort);
+  const claudeRunning = session.isRunning;
+  const codexRunning = codexSession.isRunning;
+  const anyDriverRunning = isAnyDriverRunning();
+
+  lines.push(`<b>Driver</b>`);
+  lines.push(`  Active: ${driverLabel}`);
+  lines.push(`  Model: ${escapeHtml(modelName)}${escapeHtml(effortStr)}`);
+  lines.push(`  Claude session: ${session.isActive ? `active (${session.sessionId?.slice(0, 8)}…)` : "none"}`);
+  lines.push(`  Claude running: ${claudeRunning ? "✅ yes" : "no"}`);
+  if (session.queryStarted) {
+    const elapsed = Math.round((now - session.queryStarted.getTime()) / 1000);
+    lines.push(`  Claude query elapsed: ${elapsed}s`);
+  }
+  if (session.currentTool) {
+    lines.push(`  Claude current tool: <code>${escapeHtml(session.currentTool)}</code>`);
+  }
+  lines.push(`  Codex session: ${codexSession.isActive ? "active" : "none"}`);
+  lines.push(`  Codex running: ${codexRunning ? "✅ yes" : "no"}`);
+  if (codexRunning && codexSession.runningSince) {
+    const elapsed = Math.round((now - codexSession.runningSince.getTime()) / 1000);
+    lines.push(`  Codex query elapsed: ${elapsed}s`);
+  }
+  lines.push(`  Any driver running: ${anyDriverRunning ? "✅ yes" : "no"}`);
+  lines.push("");
+
+  // ── Background runs (cron / snapshots) ──
+  const bgActive = isBackgroundRunActive();
+  const bgPreempted = wasBackgroundRunPreempted();
+  const snapshotQueueSize = getPreparedSnapshotCount();
+
+  lines.push(`<b>Background</b>`);
+  lines.push(`  Background run active: ${bgActive ? "✅ yes" : "no"}`);
+  lines.push(`  Background preempted: ${bgPreempted ? "⚠️ yes" : "no"}`);
+  lines.push(`  Supervision snapshot queue: ${snapshotQueueSize}`);
+  lines.push("");
+
+  // ── Deferred message queue ──
+  const deferredQueues = getAllDeferredQueues();
+  let totalDeferred = 0;
+  for (const [, msgs] of deferredQueues) {
+    totalDeferred += msgs.length;
+  }
+
+  lines.push(`<b>Deferred Queue</b>`);
+  if (totalDeferred === 0) {
+    lines.push(`  Empty`);
+  } else {
+    for (const [chatId, msgs] of deferredQueues) {
+      lines.push(`  Chat ${chatId}: ${msgs.length} message${msgs.length === 1 ? "" : "s"}`);
+      for (const msg of msgs) {
+        const age = Math.round((now - msg.enqueuedAt) / 1000);
+        const preview = msg.text.length > 60 ? msg.text.slice(0, 57) + "…" : msg.text;
+        lines.push(`    • ${escapeHtml(preview)} (${age}s ago, ${msg.source})`);
+      }
+    }
+  }
+  lines.push("");
+
+  // ── Last error from loop log ──
+  const logResult = readMainLoopLogTail();
+  if (logResult.ok && logResult.text) {
+    const logLines = logResult.text.split("\n");
+    // Find last error/warning line in the log
+    const errorLines: string[] = [];
+    for (let i = logLines.length - 1; i >= 0 && errorLines.length < 5; i--) {
+      const line = logLines[i]!.trim();
+      if (!line) continue;
+      if (/error|fail|crash|panic|BLOCKED|SIGTERM|SIGKILL|exit/i.test(line)) {
+        errorLines.unshift(line);
+      }
+    }
+    if (errorLines.length > 0) {
+      lines.push(`<b>Recent Errors (loop log)</b>`);
+      for (const errLine of errorLines) {
+        const truncated = errLine.length > 120 ? errLine.slice(0, 117) + "…" : errLine;
+        lines.push(`  <code>${escapeHtml(truncated)}</code>`);
+      }
+    }
+  }
+
+  await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
 }
 
 /**

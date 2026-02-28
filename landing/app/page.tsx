@@ -83,18 +83,165 @@ const executionFlow = [
   },
 ];
 
+// Easter egg phases after the normal pool
+const rapGodPhrases = [
+  'Look', 'I was gonna', 'go easy on you', 'not to hurt', 'your feelings',
+  "But I'm only", 'going to get', 'this one chance', "Something's wrong",
+  'I can feel it', 'Just a feeling', "I've got", 'Like something', 'is about to happen',
+  "But I don't", 'know what', 'If that means', 'what I think', 'it means',
+  "We're in trouble", 'Big trouble', 'And if he is', 'as bananas', 'as you say',
+  "I'm not taking", 'any chances', 'You are just', 'what the doc ordered',
+  "I'm beginning", 'to feel like', 'a Rap God', 'Rap God',
+  'All my people', 'from the front', 'to the back nod', 'Back nod',
+  'Now who thinks', 'their arms are', 'long enough', 'to slap box', 'Slap box',
+  'They said I rap', 'like a robot', 'so call me', 'Rap-bot',
+  '...', 'wait', 'wrong script', 'sorry',
+];
+
+// SF AI buzzword mode
+const sfBuzzwords = [
+  'synergy', 'disruption', 'pivot', 'Series A', 'product-market fit',
+  'at scale', 'moat', 'TAM', 'flywheel', 'zero to one',
+  'LLM wrapper', 'fine-tuned', 'RLHF', 'emergent behavior', 'inference',
+  'foundational model', 'prompt engineering', 'AGI soon', 'compute',
+  'transformer', 'attention is all', 'you need', 'latent space',
+  'we raised 40M', 'pre-seed', 'YC batch', 'demo day',
+  'growth hacking', 'runway', 'burn rate', 'cap table',
+  'deck looks great', '10x engineer', 'move fast', 'ship it',
+  'stealth mode', 'thought leader', 'paradigm shift', 'first principles',
+  'AI-native', 'vertical SaaS', 'B2B2C', 'open source but', 'enterprise ready',
+  'agentic workflow', 'multi-modal', 'RAG pipeline', 'vector DB',
+  'we are hiring', 'ping me', 'let me intro you',
+];
+
+// Install walkthrough — the turtle walks you through setup then dies
+const installWalkthrough = [
+  'ok bro', 'at this point', 'just install me',
+  'let me walk you through it',
+  '...', 'ready?',
+  'step 1:', 'git clone the repo',
+  'step 2:', 'cd super-turtle',
+  'step 3:', 'open claude', 'or codex',
+  'step 4:', 'say:', 'set up Super Turtle',
+  'step 5:', 'get your Telegram token', 'from BotFather',
+  'step 6:', 'paste it in',
+  'step 7:', 'start the bot',
+  'step 8:', 'open Telegram',
+  'step 9:', 'say hi to me',
+  'step 10:', 'tell me to build something',
+  "that's it", "I'll handle the rest",
+  '...', 'what are you waiting for',
+  'go', 'GO', 'seriously go',
+  '...', "I'm done talking",
+];
+
+// Weighted message pool — higher weight = more likely to appear
+const turtleMessagePool: { text: string; weight: number }[] = [
+  // Personality
+  { text: "I'm amazing", weight: 3 },
+  { text: 'so cool', weight: 3 },
+  { text: 'slow and steady', weight: 2 },
+  { text: 'never sleeps', weight: 2 },
+  { text: 'AGI', weight: 1 },
+  { text: 'pet me again', weight: 2 },
+  { text: 'beep boop', weight: 1 },
+  { text: 'thank you', weight: 2 },
+  { text: 'still here', weight: 2 },
+  { text: 'you again?', weight: 2 },
+  { text: 'shell yeah', weight: 2 },
+  { text: 'turtles all the way down', weight: 1 },
+  { text: 'I made this', weight: 2 },
+  { text: 'autonomy', weight: 1 },
+  // Features
+  { text: 'cron jobs', weight: 2 },
+  { text: 'sub-turtles', weight: 2 },
+  { text: 'browser checks', weight: 2 },
+  { text: 'memory', weight: 2 },
+  { text: 'image understanding', weight: 2 },
+  { text: 'mobile first', weight: 2 },
+  { text: 'write and test', weight: 2 },
+  { text: 'parallel execution', weight: 1 },
+  { text: 'voice controlled', weight: 2 },
+  { text: 'screenshots', weight: 1 },
+  { text: 'auto-commits', weight: 1 },
+  { text: 'self-supervision', weight: 1 },
+  { text: 'tunnel previews', weight: 1 },
+  { text: 'git archaeology', weight: 1 },
+  { text: 'code review', weight: 2 },
+  { text: 'task decomposition', weight: 1 },
+  { text: 'quota balancing', weight: 1 },
+  { text: 'watchdog timers', weight: 1 },
+  { text: 'state management', weight: 1 },
+  { text: 'Telegram bot', weight: 2 },
+  { text: 'headless mode', weight: 1 },
+  { text: 'background loops', weight: 1 },
+];
+
+function pickWeightedRandom(pool: { text: string; weight: number }[], exclude?: string): string {
+  const filtered = exclude ? pool.filter((m) => m.text !== exclude) : pool;
+  const totalWeight = filtered.reduce((sum, m) => sum + m.weight, 0);
+  let roll = Math.random() * totalWeight;
+  for (const msg of filtered) {
+    roll -= msg.weight;
+    if (roll <= 0) return msg.text;
+  }
+  return filtered[filtered.length - 1].text;
+}
+
+// Phase boundaries
+const PHASE_RAP_START = 100;
+const PHASE_RAP_END = PHASE_RAP_START + rapGodPhrases.length;
+const PHASE_POOL2_END = PHASE_RAP_END + 100;
+const PHASE_SF_END = PHASE_POOL2_END + sfBuzzwords.length;
+const PHASE_INSTALL_END = PHASE_SF_END + installWalkthrough.length;
+
 export default function Home() {
   const [hasClickedTurtleTip, setHasClickedTurtleTip] = useState(false);
   const [turtleBubbleText, setTurtleBubbleText] = useState('I built this site');
-  const [nextBubbleText, setNextBubbleText] = useState<'I built this site' | 'step by step'>('I built this site');
+  const [clickCount, setClickCount] = useState(0);
+  const [turtleDead, setTurtleDead] = useState(false);
+  const [lastPoolMessage, setLastPoolMessage] = useState<string | null>(null);
   const [bubbleHideTimeout, setBubbleHideTimeout] = useState<number | null>(null);
   const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL ?? "/docs";
-  const githubUrl = "https://github.com/Rigos0/superturtle";
+  const githubUrl = "https://github.com/rigos0/superturtle";
 
   const handleTurtleClick = () => {
+    // Turtle is done talking
+    if (turtleDead) return;
+
+    const nextCount = clickCount + 1;
+    setClickCount(nextCount);
+
+    let message: string;
+    if (nextCount === 1) {
+      message = 'I built this site';
+    } else if (nextCount === 2) {
+      message = 'step by step';
+    } else if (nextCount >= PHASE_RAP_START && nextCount < PHASE_RAP_END) {
+      // Phase 2: Rap God
+      message = rapGodPhrases[nextCount - PHASE_RAP_START];
+    } else if (nextCount >= PHASE_RAP_END && nextCount < PHASE_POOL2_END) {
+      // Phase 3: back to normal pool for 100 clicks
+      message = pickWeightedRandom(turtleMessagePool, lastPoolMessage ?? undefined);
+      setLastPoolMessage(message);
+    } else if (nextCount >= PHASE_POOL2_END && nextCount < PHASE_SF_END) {
+      // Phase 4: SF AI buzzword mode
+      message = sfBuzzwords[nextCount - PHASE_POOL2_END];
+    } else if (nextCount >= PHASE_SF_END && nextCount < PHASE_INSTALL_END) {
+      // Phase 5: install walkthrough
+      message = installWalkthrough[nextCount - PHASE_SF_END];
+      // Kill the turtle after the last install message
+      if (nextCount === PHASE_INSTALL_END - 1) {
+        setTurtleDead(true);
+      }
+    } else {
+      // Phase 1 (3-99): normal pool
+      message = pickWeightedRandom(turtleMessagePool, lastPoolMessage ?? undefined);
+      setLastPoolMessage(message);
+    }
+
     setHasClickedTurtleTip(true);
-    setTurtleBubbleText(nextBubbleText);
-    setNextBubbleText((prev) => (prev === 'I built this site' ? 'step by step' : 'I built this site'));
+    setTurtleBubbleText(message);
 
     if (bubbleHideTimeout !== null) {
       window.clearTimeout(bubbleHideTimeout);

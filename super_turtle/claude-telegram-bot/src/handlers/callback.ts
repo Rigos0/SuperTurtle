@@ -23,11 +23,18 @@ import {
   formatBacklogSummary,
 } from "./commands";
 
-const SAFE_CALLBACK_ID = /^[A-Za-z0-9_-]+$/;
+const SAFE_CALLBACK_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const SAFE_CALLBACK_OPTION_INDEX = /^\d+$/;
 
 function isSafeCallbackId(value: string): boolean {
-  return SAFE_CALLBACK_ID.test(value);
+  if (!SAFE_CALLBACK_ID.test(value)) {
+    return false;
+  }
+  // Prevent path traversal-like values while allowing dotted SubTurtle names.
+  if (value.includes("..") || value.startsWith(".")) {
+    return false;
+  }
+  return true;
 }
 
 /**

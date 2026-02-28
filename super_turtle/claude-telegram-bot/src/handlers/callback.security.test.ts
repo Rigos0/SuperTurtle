@@ -45,4 +45,10 @@ describe("callback input validation", () => {
     await handleCallback(ctx);
     expect(callbackAnswers).toEqual(["Invalid SubTurtle name"]);
   });
+
+  it("accepts dotted subturtle names", async () => {
+    const { ctx, callbackAnswers } = makeCallbackCtx("subturtle_logs:e2b.remote-fix");
+    await handleCallback(ctx);
+    expect(callbackAnswers[0]).toBe("State file not found");
+  });
 });

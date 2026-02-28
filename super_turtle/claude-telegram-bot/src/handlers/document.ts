@@ -2,7 +2,7 @@
  * Document handler for Claude Telegram Bot.
  *
  * Supports PDFs and text files with media group buffering.
- * PDF extraction uses pdftotext CLI (install via: brew install poppler)
+ * PDF extraction uses pdftotext CLI (macOS: brew install poppler, Linux: apt install poppler-utils)
  */
 
 import type { Context } from "grammy";
@@ -96,7 +96,7 @@ async function extractText(
       return result.text();
     } catch (error) {
       console.error("PDF parsing failed:", error);
-      return "[PDF parsing failed - ensure pdftotext is installed: brew install poppler]";
+      return "[PDF parsing failed - ensure pdftotext is installed: macOS: brew install poppler | Ubuntu/Debian: sudo apt install poppler-utils | Fedora: sudo dnf install poppler-utils]";
     }
   }
 
