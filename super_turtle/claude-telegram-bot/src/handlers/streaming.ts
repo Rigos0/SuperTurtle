@@ -399,6 +399,9 @@ async function executeBotControlAction(
     }
 
     case "restart": {
+      // Stop any active work before restarting
+      await resetAllDriverSessions({ stopRunning: true });
+
       if (chatId) {
         try {
           const msg = await bot.api.sendMessage(chatId, "🔄 Restarting bot...");
@@ -616,47 +619,66 @@ export function createStatusCallback(
           state.lastEditTimes.set(segmentId, now);
         }
       } else if (statusType === "segment_end" && segmentId !== undefined) {
-        if (state.textMessages.has(segmentId) && content) {
-          const msg = state.textMessages.get(segmentId)!;
+        if (content) {
           const formatted = convertMarkdownToHtml(content);
 
-          // Skip if content unchanged
-          if (formatted === state.lastContent.get(segmentId)) {
-            return;
-          }
+          if (state.textMessages.has(segmentId)) {
+            const msg = state.textMessages.get(segmentId)!;
 
-          if (formatted.length <= TELEGRAM_MESSAGE_LIMIT) {
-            try {
-              await ctx.api.editMessageText(
-                msg.chat.id,
-                msg.message_id,
-                formatted,
-                {
-                  parse_mode: "HTML",
+            // Skip if content unchanged
+            if (formatted === state.lastContent.get(segmentId)) {
+              return;
+            }
+
+            if (formatted.length <= TELEGRAM_MESSAGE_LIMIT) {
+              try {
+                await ctx.api.editMessageText(
+                  msg.chat.id,
+                  msg.message_id,
+                  formatted,
+                  {
+                    parse_mode: "HTML",
+                  }
+                );
+              } catch (error) {
+                const errorStr = String(error);
+                if (errorStr.includes("MESSAGE_TOO_LONG")) {
+                  // HTML overhead pushed it over - delete and chunk
+                  try {
+                    await ctx.api.deleteMessage(msg.chat.id, msg.message_id);
+                  } catch (delError) {
+                    console.debug("Failed to delete for chunking:", delError);
+                  }
+                  await sendChunkedMessages(ctx, formatted);
+                } else {
+                  console.debug("Failed to edit final message:", error);
                 }
-              );
-            } catch (error) {
-              const errorStr = String(error);
-              if (errorStr.includes("MESSAGE_TOO_LONG")) {
-                // HTML overhead pushed it over - delete and chunk
-                try {
-                  await ctx.api.deleteMessage(msg.chat.id, msg.message_id);
-                } catch (delError) {
-                  console.debug("Failed to delete for chunking:", delError);
-                }
-                await sendChunkedMessages(ctx, formatted);
-              } else {
-                console.debug("Failed to edit final message:", error);
               }
+            } else {
+              // Too long - delete and split
+              try {
+                await ctx.api.deleteMessage(msg.chat.id, msg.message_id);
+              } catch (error) {
+                console.debug("Failed to delete message for splitting:", error);
+              }
+              await sendChunkedMessages(ctx, formatted);
             }
           } else {
-            // Too long - delete and split
-            try {
-              await ctx.api.deleteMessage(msg.chat.id, msg.message_id);
-            } catch (error) {
-              console.debug("Failed to delete message for splitting:", error);
+            // No streaming message was created (response was too short to trigger
+            // the throttled text callback). Send the final content as a new message.
+            if (formatted.length <= TELEGRAM_MESSAGE_LIMIT) {
+              try {
+                await ctx.reply(formatted, { parse_mode: "HTML" });
+              } catch {
+                try {
+                  await ctx.reply(formatted);
+                } catch (plainError) {
+                  console.debug("Failed to send short segment:", plainError);
+                }
+              }
+            } else {
+              await sendChunkedMessages(ctx, formatted);
             }
-            await sendChunkedMessages(ctx, formatted);
           }
         }
       } else if (statusType === "done") {
