@@ -170,16 +170,9 @@ body {
 
 @media (max-width: 640px) {
   .turtle-tip-bubble {
-    left: 50% !important;
-    top: -0.35rem;
-    transform: translateX(-35%) translateY(-100%) scale(0.96);
+    left: -70px !important;
+    top: 48%;
     font-size: 0.65rem;
-    white-space: normal;
-    max-width: min(78vw, 18rem);
-  }
-
-  .turtle-tip-bubble.active {
-    transform: translateX(-35%) translateY(-100%) scale(1);
   }
 }
 
