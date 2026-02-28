@@ -30,6 +30,7 @@ import {
   getCodexQuotaLines,
   resetAllDriverSessions,
 } from "./commands";
+import { streamLog } from "../logger";
 
 // Union type for bot control to work with both Claude and Codex sessions
 type BotControlSession = ClaudeSession | CodexSession;
@@ -113,7 +114,7 @@ export async function checkPendingAskUserRequests(
         await Bun.write(filepath, JSON.stringify(data));
       }
     } catch (error) {
-      console.warn(`Failed to process ask-user file ${filepath}:`, error);
+      streamLog.warn({ err: error, filepath, chatId }, "Failed to process ask-user file");
     }
   }
 
@@ -154,7 +155,10 @@ export async function checkPendingSendTurtleRequests(
           await ctx.replyWithSticker(inputFile);
         } catch (photoError) {
           // Photo send failed — try sending as a link instead
-          console.warn(`Failed to send turtle photo, falling back to link:`, photoError);
+          streamLog.warn(
+            { err: photoError, filepath, url, chatId },
+            "Failed to send turtle photo, falling back to link"
+          );
           await ctx.reply(`🐢 ${url}${caption ? `\n${caption}` : ""}`);
         }
         photoSent = true;
@@ -164,7 +168,7 @@ export async function checkPendingSendTurtleRequests(
         await Bun.write(filepath, JSON.stringify(data));
       }
     } catch (error) {
-      console.warn(`Failed to process send-turtle file ${filepath}:`, error);
+      streamLog.warn({ err: error, filepath, chatId }, "Failed to process send-turtle file");
     }
   }
 
@@ -216,7 +220,7 @@ export async function checkPendingBotControlRequests(
       await Bun.write(filepath, JSON.stringify(data, null, 2));
       handled = true;
     } catch (error) {
-      console.warn(`Failed to process bot-control file ${filepath}:`, error);
+      streamLog.warn({ err: error, filepath, chatId }, "Failed to process bot-control file");
     }
   }
 
@@ -339,7 +343,10 @@ async function executeBotControlAction(
             const lines = await buildSessionOverviewLines("Switched to Codex 🟢");
             await bot.api.sendMessage(chatId, lines.join("\n"), { parse_mode: "HTML" });
           } catch (err) {
-            console.warn("Failed to send switch overview (Codex):", err);
+            streamLog.warn(
+              { err, action: "switch_driver", driver: "codex", chatId },
+              "Failed to send switch overview"
+            );
           }
         }
         return "Switched to Codex";
@@ -351,7 +358,10 @@ async function executeBotControlAction(
           const lines = await buildSessionOverviewLines("Switched to Claude Code 🔵");
           await bot.api.sendMessage(chatId, lines.join("\n"), { parse_mode: "HTML" });
         } catch (err) {
-          console.warn("Failed to send switch overview (Claude):", err);
+          streamLog.warn(
+            { err, action: "switch_driver", driver: "claude", chatId },
+            "Failed to send switch overview"
+          );
         }
       }
       return "Switched to Claude Code";
@@ -366,7 +376,7 @@ async function executeBotControlAction(
           const lines = await buildSessionOverviewLines("New session");
           await bot.api.sendMessage(chatId, lines.join("\n"), { parse_mode: "HTML" });
         } catch (err) {
-          console.warn("Failed to send new session overview:", err);
+          streamLog.warn({ err, action: "new_session", chatId }, "Failed to send new session overview");
         }
       }
 
@@ -431,7 +441,7 @@ async function executeBotControlAction(
             }),
           );
         } catch (e) {
-          console.warn("Failed to save restart info:", e);
+          streamLog.warn({ err: e, action: "restart", chatId }, "Failed to save restart info");
         }
       }
 
@@ -712,7 +722,7 @@ export function createStatusCallback(
         }
       }
     } catch (error) {
-      console.error("Status callback error:", error);
+      streamLog.error({ err: error, statusType, segmentId }, "Status callback error");
     }
   };
 }
@@ -740,7 +750,7 @@ export function createSilentStatusCallback(
         state.silentSegments.set(segmentId, content);
       }
     } catch (error) {
-      console.error("Silent status callback error:", error);
+      streamLog.error({ err: error, statusType, segmentId }, "Silent status callback error");
     }
   };
 }

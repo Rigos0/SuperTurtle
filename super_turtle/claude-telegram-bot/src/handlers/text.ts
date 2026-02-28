@@ -22,6 +22,7 @@ import {
   createStatusCallback,
   isAskUserPromptMessage,
 } from "./streaming";
+import { streamLog } from "../logger";
 
 export interface HandleTextOptions {
   silent?: boolean;
@@ -175,8 +176,16 @@ export async function handleText(
         // Empty response from stale session — session was already cleared,
         // so retry will start a fresh session transparently.
         if (getErrorMessage(error).includes("Empty response from stale session") && attempt < MAX_RETRIES) {
-          console.log(
-            `Empty response from stale session, retrying with fresh session (attempt ${attempt + 2}/${MAX_RETRIES + 1})`
+          streamLog.info(
+            {
+              userId,
+              username,
+              chatId,
+              driver: driver.id,
+              attempt: attempt + 2,
+              maxAttempts: MAX_RETRIES + 1,
+            },
+            "Empty response from stale session, retrying with fresh session"
           );
           state = new StreamingState();
           statusCallback = silent
@@ -187,7 +196,17 @@ export async function handleText(
 
         if (driver.isStallError(error) && attempt < MAX_RETRIES) {
           if (state.sawSpawnOrchestration) {
-            console.warn(`${driver.displayName} stream stalled after spawn orchestration; running safe continuation retry`);
+            streamLog.warn(
+              {
+                userId,
+                username,
+                chatId,
+                driver: driver.id,
+                attempt: attempt + 2,
+                maxAttempts: MAX_RETRIES + 1,
+              },
+              `${driver.displayName} stream stalled after spawn orchestration; running safe continuation retry`
+            );
             if (!silent) {
               await ctx.reply(
                 `⚠️ ${driver.displayName} stream stalled after spawn orchestration. Resuming with state verification to avoid duplicate SubTurtle spawns.`
@@ -201,8 +220,16 @@ export async function handleText(
             continue;
           }
 
-          console.warn(
-            `${driver.displayName} stream stalled, running one continuation attempt (attempt ${attempt + 2}/${MAX_RETRIES + 1})`
+          streamLog.warn(
+            {
+              userId,
+              username,
+              chatId,
+              driver: driver.id,
+              attempt: attempt + 2,
+              maxAttempts: MAX_RETRIES + 1,
+            },
+            `${driver.displayName} stream stalled, running one continuation attempt`
           );
 
           if (!silent) {
@@ -227,8 +254,16 @@ export async function handleText(
         }
 
         if (driver.isCrashError(error) && attempt < MAX_RETRIES && !state.sawToolUse) {
-          console.log(
-            `${driver.displayName} crashed, retrying (attempt ${attempt + 2}/${MAX_RETRIES + 1})...`
+          streamLog.info(
+            {
+              userId,
+              username,
+              chatId,
+              driver: driver.id,
+              attempt: attempt + 2,
+              maxAttempts: MAX_RETRIES + 1,
+            },
+            `${driver.displayName} crashed, retrying`
           );
           await driver.kill();
           if (!silent) {
@@ -243,13 +278,29 @@ export async function handleText(
         }
 
         if (driver.isCrashError(error) && state.sawToolUse) {
-          console.warn(
+          streamLog.warn(
+            {
+              userId,
+              username,
+              chatId,
+              driver: driver.id,
+            },
             `${driver.displayName} crashed after tool execution; skipping automatic retry to avoid replaying side effects`
           );
         }
 
         // Final attempt failed or non-retryable error
-        console.error(`Error processing message: ${errorSummary}`);
+        streamLog.error(
+          {
+            err: error,
+            errorSummary,
+            userId,
+            username,
+            chatId,
+            driver: driver.id,
+          },
+          "Error processing message"
+        );
 
         if (driver.isCancellationError(error)) {
           const wasInterrupt = session.consumeInterruptFlag();

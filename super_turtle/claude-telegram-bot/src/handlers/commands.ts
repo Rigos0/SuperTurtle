@@ -25,6 +25,7 @@ import { getJobs } from "../cron";
 import { isAnyDriverRunning, isBackgroundRunActive, wasBackgroundRunPreempted, stopActiveDriverQuery } from "./driver-routing";
 import { clearPreparedSnapshots, getPreparedSnapshotCount } from "../cron-supervision-queue";
 import { getAllDeferredQueues } from "../deferred-queue";
+import { cmdLog } from "../logger";
 
 // Canonical main-loop log written by live.sh (tmux + caffeinate + run-loop).
 export const MAIN_LOOP_LOG_PATH = "/tmp/claude-telegram-bot-ts.log";
@@ -1453,7 +1454,7 @@ export async function handleRestart(ctx: Context): Promise<void> {
         })
       );
     } catch (e) {
-      console.warn("Failed to save restart info:", e);
+      cmdLog.warn({ err: e, chatId }, "Failed to save restart info");
     }
   }
 
