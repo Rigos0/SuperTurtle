@@ -7,7 +7,6 @@
 import { homedir, platform } from "os";
 import { resolve, dirname } from "path";
 import { existsSync, readFileSync } from "fs";
-import { fileURLToPath } from "url";
 import type { McpServerConfig } from "./types";
 
 // ============== Environment Setup ==============
@@ -185,7 +184,7 @@ let MCP_SERVERS: Record<string, McpServerConfig> = {};
 
 try {
   // Dynamic import of MCP config
-  const mcpConfigPath = resolve(dirname(fileURLToPath(import.meta.url)), "mcp-config.ts");
+  const mcpConfigPath = resolve(dirname(import.meta.dir), "mcp-config.ts");
   const mcpModule = await import(mcpConfigPath).catch(() => null);
   if (mcpModule?.MCP_SERVERS) {
     MCP_SERVERS = mcpModule.MCP_SERVERS;

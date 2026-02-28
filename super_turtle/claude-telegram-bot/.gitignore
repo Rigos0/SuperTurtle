@@ -20,9 +20,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .env.*
 !.env.example
 
-# user-specific MCP config (use mcp-config.example.ts as template)
-mcp-config.ts
-
 # caches
 .eslintcache
 .cache
