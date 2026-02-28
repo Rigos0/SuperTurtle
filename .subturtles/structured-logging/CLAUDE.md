@@ -1,5 +1,5 @@
 # Current Task
-Run `bun test` to verify nothing broke (currently blocked by missing `.subturtles/test-commands/CLAUDE.md` in workspace)
+All backlog items are complete.
 
 ## End Goal with Specs
 Every log call in the bot produces structured JSON via pino. A single log file that can be tailed with `pino-pretty` for a clean, colored, real-time view of everything happening — both Claude and Codex activity, cron jobs, MCP tools, SubTurtle operations.
@@ -96,5 +96,8 @@ MCP servers:
 - [x] Replace console calls in MCP servers: bot_control, ask_user, send_turtle
 - [x] Replace console calls in remaining files: dashboard.ts, turtle-greetings.ts
 - [x] Verify zero console.log/error/warn remaining (grep check)
-- [ ] Run `bun test` to verify nothing broke (fails currently: missing `.subturtles/test-commands/CLAUDE.md`) <- current
-- [ ] Commit
+- [x] Run `bun test` to verify nothing broke
+- [x] Commit
+
+## Loop Control
+STOP
