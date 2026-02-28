@@ -25,6 +25,9 @@ import {
 import { StreamingState, createStatusCallback } from "./streaming";
 import { drainDeferredQueue, enqueueDeferredMessage } from "../deferred-queue";
 import { stopAllRunningWork } from "./stop";
+import { streamLog } from "../logger";
+
+const voiceLog = streamLog.child({ handler: "voice" });
 
 /**
  * Handle incoming voice messages.
@@ -164,7 +167,7 @@ export async function handleVoice(ctx: Context): Promise<void> {
     // 14. Audit log
     await auditLog(userId, username, getDriverAuditType("VOICE"), transcript, response);
   } catch (error) {
-    console.error("Error processing voice:", error);
+    voiceLog.error({ err: error, userId, username, chatId }, "Voice processing failed");
 
     if (String(error).includes("abort") || String(error).includes("cancel")) {
       // Only show "Query stopped" if it was an explicit stop, not an interrupt from a new message
@@ -185,7 +188,7 @@ export async function handleVoice(ctx: Context): Promise<void> {
       try {
         unlinkSync(voicePath);
       } catch (error) {
-        console.debug("Failed to delete voice file:", error);
+        voiceLog.debug({ err: error, voicePath }, "Failed to delete voice file");
       }
     }
   }
