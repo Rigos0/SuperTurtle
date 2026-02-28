@@ -1,5 +1,5 @@
 # Current Task
-Write handler tests for handleModel, handleSwitch.
+Run `bun test` to verify all tests pass.
 
 ## End Goal with Specs
 Every slash command in `commands.ts` has test coverage. Focus on pure/testable functions first (parsers, formatters), then handler logic that can be tested by mocking the grammY Context.
@@ -88,6 +88,6 @@ Create a helper `mockContext()` that returns a fake grammY Context with:
 - [x] Write tests for parseCtlListOutput with real ctl output samples
 - [x] Write tests for readMainLoopLogTail
 - [x] Write mock Context helper and handler tests for handleNew, handleStatus, handleCron (includes reset + cron keyboard assertions)
-- [ ] Write handler tests for handleModel, handleSwitch <- current
-- [ ] Run `bun test` to verify all tests pass
+- [x] Write handler tests for handleModel, handleSwitch
+- [ ] Run `bun test` to verify all tests pass <- current
 - [ ] Commit

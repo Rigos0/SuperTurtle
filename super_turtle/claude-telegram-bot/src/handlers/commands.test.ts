@@ -21,6 +21,7 @@ const {
   handleNew,
   handleStatus,
   handleCron,
+  handleModel,
 } = await import("./commands");
 
 type ReplyRecord = {
@@ -75,11 +76,17 @@ const cronJobsPath = resolve(import.meta.dir, "../../cron-jobs.json");
 const originalCronJobsText = existsSync(cronJobsPath) ? readFileSync(cronJobsPath, "utf-8") : null;
 const originalSessionStopTyping = session.stopTyping;
 const originalSessionKill = session.kill;
+const originalSessionModel = session.model;
+const originalSessionEffort = session.effort;
+const originalSessionActiveDriver = session.activeDriver;
 const originalCodexKill = codexSession.kill;
 
 afterEach(() => {
   session.stopTyping = originalSessionStopTyping;
   session.kill = originalSessionKill;
+  session.model = originalSessionModel;
+  session.effort = originalSessionEffort;
+  session.activeDriver = originalSessionActiveDriver;
   codexSession.kill = originalCodexKill;
 
   if (originalCronJobsText !== null) {
@@ -114,6 +121,83 @@ describe("getCommandLines", () => {
     }
   });
 });
+
+function getInlineKeyboard(reply: ReplyRecord): Array<Array<{ text?: string; callback_data?: string }>> {
+  return (
+    (reply.extra?.reply_markup as {
+      inline_keyboard?: Array<Array<{ text?: string; callback_data?: string }>>;
+    })?.inline_keyboard || []
+  );
+}
+
+function runSwitchNoArgInIsolatedProcess(codexEnabled: boolean): ReplyRecord[] {
+  const projectRoot = resolve(import.meta.dir, "../..");
+  const script = `
+    process.env.TELEGRAM_BOT_TOKEN = "test-token";
+    process.env.TELEGRAM_ALLOWED_USERS = "123";
+    process.env.CLAUDE_WORKING_DIR = process.cwd();
+    process.env.CODEX_ENABLED = ${JSON.stringify(codexEnabled ? "true" : "false")};
+    process.env.CODEX_CLI_AVAILABLE_OVERRIDE = ${JSON.stringify(codexEnabled ? "true" : "false")};
+    console.log = () => {};
+    console.warn = () => {};
+    console.error = () => {};
+    const { handleSwitch } = await import("./src/handlers/commands.ts");
+    const { session } = await import("./src/session.ts");
+    session.activeDriver = "claude";
+    const replies = [];
+    const ctx = {
+      from: { id: 123 },
+      message: { text: "/switch" },
+      reply: async (text, extra) => {
+        replies.push({ text, extra });
+      },
+    };
+    await handleSwitch(ctx);
+    process.stdout.write(JSON.stringify(replies));
+  `;
+  const proc = Bun.spawnSync(["bun", "-e", script], { cwd: projectRoot });
+  expect(proc.exitCode).toBe(0);
+  const combinedOutput = `${proc.stdout.toString()}\n${proc.stderr.toString()}`;
+  const jsonStart = combinedOutput.search(/\[\s*\{/);
+  expect(jsonStart).toBeGreaterThanOrEqual(0);
+
+  let depth = 0;
+  let inString = false;
+  let isEscaped = false;
+  let jsonEnd = -1;
+  for (let i = jsonStart; i < combinedOutput.length; i += 1) {
+    const ch = combinedOutput[i]!;
+    if (inString) {
+      if (isEscaped) {
+        isEscaped = false;
+      } else if (ch === "\\") {
+        isEscaped = true;
+      } else if (ch === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === "\"") {
+      inString = true;
+      continue;
+    }
+    if (ch === "[") {
+      depth += 1;
+      continue;
+    }
+    if (ch === "]") {
+      depth -= 1;
+      if (depth === 0) {
+        jsonEnd = i;
+        break;
+      }
+    }
+  }
+
+  expect(jsonEnd).toBeGreaterThanOrEqual(jsonStart);
+  const jsonText = combinedOutput.slice(jsonStart, jsonEnd + 1);
+  return JSON.parse(jsonText) as ReplyRecord[];
+}
 
 describe("formatModelInfo", () => {
   it("maps known model IDs to display names", () => {
@@ -503,5 +587,57 @@ describe("handlers with mock Context", () => {
     expect(Array.isArray(keyboard)).toBe(true);
     expect(keyboard?.flat().some((button) => button.callback_data === "cron_cancel:job-1")).toBe(true);
     expect(keyboard?.flat().some((button) => button.callback_data === "cron_cancel:job-2")).toBe(true);
+  });
+
+  it("handleModel replies with inline keyboard model options for Claude", async () => {
+    session.activeDriver = "claude";
+    session.model = getAvailableModels()[0]!.value;
+    session.effort = "high";
+
+    const { ctx, replies } = mockContext("/model");
+    await handleModel(ctx as any);
+
+    expect(replies).toHaveLength(1);
+    const reply = replies[0]!;
+    expect(reply.extra?.parse_mode).toBe("HTML");
+    expect(reply.text).toContain("<b>Model:</b>");
+    expect(reply.text).toContain("Select model or effort level:");
+
+    const keyboard = getInlineKeyboard(reply);
+    expect(keyboard.length).toBeGreaterThan(1);
+
+    const callbackData = keyboard.flat().map((button) => button.callback_data || "");
+    for (const model of getAvailableModels()) {
+      expect(callbackData).toContain(`model:${model.value}`);
+    }
+    expect(callbackData).toContain("effort:low");
+    expect(callbackData).toContain("effort:medium");
+    expect(callbackData).toContain("effort:high");
+  });
+
+  it("handleSwitch shows switch buttons when Codex is unavailable", () => {
+    const replies = runSwitchNoArgInIsolatedProcess(false);
+    expect(replies).toHaveLength(1);
+    const reply = replies[0]!;
+    expect(reply.extra?.parse_mode).toBe("HTML");
+    expect(reply.text).toContain("<b>Current driver:</b>");
+
+    const callbackData = getInlineKeyboard(reply).flat().map((button) => button.callback_data || "");
+    expect(callbackData).toContain("switch:claude");
+    expect(callbackData).toContain("switch:codex_unavailable");
+  });
+
+  it("handleSwitch shows Codex button when Codex is available", () => {
+    const replies = runSwitchNoArgInIsolatedProcess(true);
+
+    expect(replies).toHaveLength(1);
+    const reply = replies[0]!;
+    expect(reply.extra?.parse_mode).toBe("HTML");
+    expect(reply.text).toContain("<b>Current driver:</b>");
+
+    const callbackData = getInlineKeyboard(reply).flat().map((button) => button.callback_data || "");
+    expect(callbackData).toContain("switch:claude");
+    expect(callbackData).toContain("switch:codex");
+    expect(callbackData).not.toContain("switch:codex_unavailable");
   });
 });
