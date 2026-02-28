@@ -10,9 +10,13 @@ import {
   ALLOWED_USERS,
   RESTART_FILE,
   TELEGRAM_SAFE_LIMIT,
+  CODEX_AVAILABLE,
+  CODEX_CLI_AVAILABLE,
   CODEX_ENABLED,
+  CODEX_USER_ENABLED,
   IS_MACOS,
   IS_LINUX,
+  getCodexUnavailableReason,
 } from "../config";
 import { getContextReport } from "../context-command";
 import { isAuthorized } from "../security";
@@ -30,10 +34,13 @@ const LOOPLOGS_LINE_COUNT = 50;
  * Shared command list for display in /new and /status, and new_session bot-control.
  */
 export function getCommandLines(): string[] {
+  const switchLine = CODEX_AVAILABLE
+    ? `/switch - Claude ↔ Codex`
+    : `/switch - Driver controls (Codex unavailable)`;
   return [
     `/new - Fresh session`,
     `/model - Switch model/effort`,
-    `/switch - Claude ↔ Codex`,
+    switchLine,
     `/usage - Subscription usage`,
     `/context - Context usage`,
     `/status - Detailed status`,
@@ -42,6 +49,21 @@ export function getCommandLines(): string[] {
     `/sub - SubTurtles`,
     `/cron - Scheduled jobs`,
   ];
+}
+
+function getCodexUnavailableMessage(): string {
+  const reason = getCodexUnavailableReason();
+  if (!reason) return "❌ Codex is unavailable.";
+  if (!CODEX_USER_ENABLED) {
+    return (
+      `❌ ${reason}\n` +
+      `Run onboarding/setup and enable Codex integration to allow driver switching.`
+    );
+  }
+  if (!CODEX_CLI_AVAILABLE) {
+    return `❌ ${reason}`;
+  }
+  return `❌ ${reason}`;
 }
 
 /**
@@ -393,6 +415,11 @@ export async function handleResume(ctx: Context): Promise<void> {
     return;
   }
 
+  if (session.activeDriver === "codex" && !CODEX_AVAILABLE) {
+    session.activeDriver = "claude";
+    await ctx.reply(`${getCodexUnavailableMessage()}\nFalling back to Claude sessions.`);
+  }
+
   // Get sessions based on active driver
   let sessions: Array<{
     session_id: string;
@@ -470,6 +497,11 @@ export async function handleModel(ctx: Context): Promise<void> {
     return;
   }
 
+  if (session.activeDriver === "codex" && !CODEX_AVAILABLE) {
+    session.activeDriver = "claude";
+    await ctx.reply(`${getCodexUnavailableMessage()}\nUsing Claude model controls.`);
+  }
+
   // Route based on active driver
   if (session.activeDriver === "codex") {
     return handleCodexModel(ctx);
@@ -517,6 +549,11 @@ export async function handleModel(ctx: Context): Promise<void> {
  * Codex model selection (for /model when on Codex driver).
  */
 async function handleCodexModel(ctx: Context): Promise<void> {
+  if (!CODEX_AVAILABLE) {
+    await ctx.reply(getCodexUnavailableMessage());
+    return;
+  }
+
   const { getAvailableCodexModelsLive } = await import("../codex-session");
 
   const models = await getAvailableCodexModelsLive();
@@ -570,11 +607,6 @@ export async function handleSwitch(ctx: Context): Promise<void> {
     return;
   }
 
-  if (!CODEX_ENABLED) {
-    await ctx.reply("❌ Codex is not enabled. Set CODEX_ENABLED=true in environment.");
-    return;
-  }
-
   // Parse command: /switch codex or /switch claude
   const args = ctx.message?.text?.split(/\s+/).slice(1) || [];
   const target = args[0]?.toLowerCase();
@@ -583,6 +615,15 @@ export async function handleSwitch(ctx: Context): Promise<void> {
     // No argument — show options
     const currentDriver = session.activeDriver;
     const driverEmoji = currentDriver === "codex" ? "🟢" : "🔵";
+    const codexRow = CODEX_AVAILABLE
+      ? [[{
+          text: `${currentDriver === "codex" ? "✔ " : ""}Codex 🟢`,
+          callback_data: "switch:codex",
+        }]]
+      : [[{
+          text: "Codex unavailable",
+          callback_data: "switch:codex_unavailable",
+        }]];
     await ctx.reply(`<b>Current driver:</b> ${currentDriver} ${driverEmoji}\n\nSwitch to:`, {
       parse_mode: "HTML",
       reply_markup: {
@@ -593,12 +634,7 @@ export async function handleSwitch(ctx: Context): Promise<void> {
               callback_data: "switch:claude",
             },
           ],
-          [
-            {
-              text: `${currentDriver === "codex" ? "✔ " : ""}Codex 🟢`,
-              callback_data: "switch:codex",
-            },
-          ],
+          ...codexRow,
         ],
       },
     });
@@ -612,6 +648,10 @@ export async function handleSwitch(ctx: Context): Promise<void> {
     const lines = await buildSessionOverviewLines("Switched to Claude Code 🔵");
     await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
   } else if (target === "codex") {
+    if (!CODEX_AVAILABLE) {
+      await ctx.reply(getCodexUnavailableMessage());
+      return;
+    }
     await resetAllDriverSessions({ stopRunning: true });
     try {
       // Fail fast: ensure Codex is available after reset.

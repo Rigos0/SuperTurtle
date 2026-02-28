@@ -6,6 +6,7 @@
 
 import { homedir, platform } from "os";
 import { resolve, dirname } from "path";
+import { existsSync, readFileSync } from "fs";
 import type { McpServerConfig } from "./types";
 
 // ============== Environment Setup ==============
@@ -51,11 +52,20 @@ export const ALLOWED_USERS: number[] = (
 
 export const WORKING_DIR = process.env.CLAUDE_WORKING_DIR || HOME;
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
-export const CODEX_ENABLED =
+export const CODEX_USER_ENABLED =
   (process.env.CODEX_ENABLED || "false").toLowerCase() === "true";
+export const CODEX_ENABLED = CODEX_USER_ENABLED;
 
 export type CodexSandboxMode = "read-only" | "workspace-write" | "danger-full-access";
 export type CodexApprovalPolicy = "never" | "on-request" | "on-failure" | "untrusted";
+
+function parseOptionalBool(raw: string | undefined): boolean | null {
+  if (raw === undefined || raw.trim() === "") return null;
+  const value = raw.toLowerCase();
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
+}
 
 function parseCodexSandboxMode(raw: string | undefined): CodexSandboxMode {
   const value = (raw || "workspace-write").toLowerCase();
@@ -104,20 +114,68 @@ export const META_CODEX_NETWORK_ACCESS = parseMetaCodexNetworkAccess(
 
 // ============== Claude CLI Path ==============
 
-// Auto-detect from PATH, or use environment override
-function findClaudeCli(): string {
+function resolveClaudeCliPath(): string | null {
   const envPath = process.env.CLAUDE_CLI_PATH;
-  if (envPath) return envPath;
+  if (envPath && existsSync(envPath)) return envPath;
 
-  // Try to find claude in PATH using Bun.which
   const whichResult = Bun.which("claude");
   if (whichResult) return whichResult;
+
+  if (existsSync("/usr/local/bin/claude")) return "/usr/local/bin/claude";
+  return null;
+}
+
+// Auto-detect from PATH, or use environment override
+function findClaudeCli(): string {
+  const resolvedPath = resolveClaudeCliPath();
+  if (resolvedPath) return resolvedPath;
 
   // Final fallback
   return "/usr/local/bin/claude";
 }
 
+export const CLAUDE_CLI_AVAILABLE = resolveClaudeCliPath() !== null;
 export const CLAUDE_CLI_PATH = findClaudeCli();
+
+function resolveCodexCliPath(): string | null {
+  const fromPath = Bun.which("codex");
+  if (fromPath) return fromPath;
+
+  if (IS_MACOS) {
+    if (existsSync("/opt/homebrew/bin/codex")) return "/opt/homebrew/bin/codex";
+    if (existsSync("/usr/local/bin/codex")) return "/usr/local/bin/codex";
+  }
+
+  const linuxFallbacks = [
+    `${HOME}/.local/bin/codex`,
+    "/usr/local/bin/codex",
+    "/usr/bin/codex",
+  ];
+  for (const fallback of linuxFallbacks) {
+    if (existsSync(fallback)) return fallback;
+  }
+  return null;
+}
+
+export const CODEX_CLI_PATH = resolveCodexCliPath();
+const codexCliAvailableOverride = parseOptionalBool(
+  process.env.CODEX_CLI_AVAILABLE_OVERRIDE
+);
+export const CODEX_CLI_AVAILABLE =
+  codexCliAvailableOverride !== null
+    ? codexCliAvailableOverride
+    : CODEX_CLI_PATH !== null;
+export const CODEX_AVAILABLE = CODEX_USER_ENABLED && CODEX_CLI_AVAILABLE;
+
+export function getCodexUnavailableReason(): string | null {
+  if (!CODEX_USER_ENABLED) {
+    return "Codex is disabled in config (CODEX_ENABLED=false).";
+  }
+  if (!CODEX_CLI_AVAILABLE) {
+    return "Codex CLI is not installed or not available on PATH.";
+  }
+  return null;
+}
 
 // ============== MCP Configuration ==============
 
@@ -160,8 +218,6 @@ export const ALLOWED_PATHS: string[] = allowedPathsStr
   : defaultAllowedPaths;
 
 // Load META_SHARED.md as system prompt so the bot acts as the meta agent
-import { readFileSync } from "fs";
-
 let META_PROMPT = "";
 try {
   const metaPath = resolve(WORKING_DIR, "super_turtle/meta/META_SHARED.md");

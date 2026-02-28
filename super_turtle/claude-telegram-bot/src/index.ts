@@ -5,7 +5,15 @@
  */
 
 import { run, sequentialize } from "@grammyjs/runner";
-import { WORKING_DIR, ALLOWED_USERS, RESTART_FILE } from "./config";
+import {
+  WORKING_DIR,
+  ALLOWED_USERS,
+  RESTART_FILE,
+  CLAUDE_CLI_AVAILABLE,
+  CODEX_AVAILABLE,
+  CODEX_CLI_AVAILABLE,
+  CODEX_USER_ENABLED,
+} from "./config";
 import { unlinkSync, readFileSync, existsSync, writeFileSync, openSync, closeSync } from "fs";
 import {
   handleNew,
@@ -869,7 +877,17 @@ console.log("Claude Telegram Bot - TypeScript Edition");
 console.log("=".repeat(50));
 console.log(`Working directory: ${WORKING_DIR}`);
 console.log(`Allowed users: ${ALLOWED_USERS.length}`);
+console.log(
+  `Driver capabilities: claude_cli=${CLAUDE_CLI_AVAILABLE} codex_pref=${CODEX_USER_ENABLED} codex_cli=${CODEX_CLI_AVAILABLE} codex_available=${CODEX_AVAILABLE}`
+);
 console.log("Starting bot...");
+
+if (!CLAUDE_CLI_AVAILABLE) {
+  console.error(
+    "Claude CLI is required for the meta-agent runtime. Install Claude Code or set CLAUDE_CLI_PATH."
+  );
+  process.exit(1);
+}
 
 const releaseInstanceLock = acquireInstanceLockOrExit();
 

@@ -14,7 +14,10 @@ import {
   TELEGRAM_SAFE_LIMIT,
   STREAMING_THROTTLE_MS,
   BUTTON_LABEL_MAX_LENGTH,
+  CODEX_AVAILABLE,
+  CODEX_CLI_AVAILABLE,
   CODEX_ENABLED,
+  CODEX_USER_ENABLED,
   RESTART_FILE,
 } from "../config";
 import { session, type ClaudeSession } from "../session";
@@ -30,6 +33,16 @@ import {
 
 // Union type for bot control to work with both Claude and Codex sessions
 type BotControlSession = ClaudeSession | CodexSession;
+
+function codexUnavailableBotControlMessage(): string {
+  if (!CODEX_USER_ENABLED) {
+    return "Codex is disabled in config (CODEX_ENABLED=false).";
+  }
+  if (!CODEX_CLI_AVAILABLE) {
+    return "Codex CLI is not installed or not available on PATH.";
+  }
+  return "Codex is unavailable.";
+}
 
 /**
  * Ask-user prompt messages use inline keyboards and must stay visible
@@ -310,6 +323,10 @@ async function executeBotControlAction(
       const driver = params.driver?.toLowerCase();
       if (driver !== "claude" && driver !== "codex") {
         return `Invalid driver "${params.driver ?? ""}". Use: claude or codex`;
+      }
+
+      if (driver === "codex" && !CODEX_AVAILABLE) {
+        return `Cannot switch to Codex: ${codexUnavailableBotControlMessage()}`;
       }
 
       await resetAllDriverSessions({ stopRunning: true });

@@ -50,12 +50,13 @@ The onboarding flow should be fully guided and step-by-step:
 1. Guide BotFather flow (`@BotFather` -> `/newbot`) and collect token.
 2. Guide Telegram user ID flow (`@userinfobot`) and collect numeric ID.
 3. Ask whether to enable voice transcription, optionally collect `OPENAI_API_KEY`.
-4. Run setup command:
-   - `./super_turtle/setup --driver auto --telegram-token "<token>" --telegram-user "<id>"`
+4. Ask whether to enable Codex integration.
+5. Run setup command:
+   - `./super_turtle/setup --driver claude --enable-codex "<true|false>" --telegram-token "<token>" --telegram-user "<id>"`
    - Add `--openai-api-key "<key>"` if provided.
-5. Start bot:
+6. Start bot:
    - `cd super_turtle/claude-telegram-bot && bun run start`
-6. Ask user to send `/start` (or any message) in Telegram and confirm response.
+7. Ask user to send `/start` (or any message) in Telegram and confirm response.
 
 If the environment supports it, onboarding should use interactive choice prompts (for example via `ask_user`) for yes/no decisions.
 

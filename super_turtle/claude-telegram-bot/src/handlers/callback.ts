@@ -8,7 +8,13 @@ import type { Context } from "grammy";
 import { unlinkSync } from "fs";
 import { session, getAvailableModels, EFFORT_DISPLAY, type EffortLevel } from "../session";
 import { codexSession } from "../codex-session";
-import { ALLOWED_USERS, WORKING_DIR } from "../config";
+import {
+  ALLOWED_USERS,
+  CODEX_AVAILABLE,
+  CODEX_CLI_AVAILABLE,
+  CODEX_USER_ENABLED,
+  WORKING_DIR,
+} from "../config";
 import { isAuthorized } from "../security";
 import { auditLog, startTypingIndicator } from "../utils";
 import { StreamingState, createStatusCallback, isAskUserPromptMessage } from "./streaming";
@@ -35,6 +41,16 @@ function isSafeCallbackId(value: string): boolean {
     return false;
   }
   return true;
+}
+
+function codexUnavailableCallbackText(): string {
+  if (!CODEX_USER_ENABLED) {
+    return "Codex disabled in config";
+  }
+  if (!CODEX_CLI_AVAILABLE) {
+    return "Codex CLI unavailable";
+  }
+  return "Codex unavailable";
 }
 
 /**
@@ -93,8 +109,17 @@ export async function handleCallback(ctx: Context): Promise<void> {
     return;
   }
 
+  if (callbackData === "switch:codex_unavailable") {
+    await ctx.answerCallbackQuery({ text: codexUnavailableCallbackText(), show_alert: true });
+    return;
+  }
+
   // 3b. Handle Codex model selection: codex_model:{model_id}
   if (callbackData.startsWith("codex_model:")) {
+    if (!CODEX_AVAILABLE) {
+      await ctx.answerCallbackQuery({ text: codexUnavailableCallbackText(), show_alert: true });
+      return;
+    }
     const { getAvailableCodexModelsLive } = await import("../codex-session");
     const modelId = callbackData.replace("codex_model:", "");
     const models = await getAvailableCodexModelsLive();
@@ -128,6 +153,10 @@ export async function handleCallback(ctx: Context): Promise<void> {
 
   // 3c. Handle Codex effort selection: codex_effort:{level}
   if (callbackData.startsWith("codex_effort:")) {
+    if (!CODEX_AVAILABLE) {
+      await ctx.answerCallbackQuery({ text: codexUnavailableCallbackText(), show_alert: true });
+      return;
+    }
     const effort = callbackData.replace("codex_effort:", "") as any;
     const validEfforts = ["minimal", "low", "medium", "high", "xhigh"];
 
@@ -171,6 +200,10 @@ export async function handleCallback(ctx: Context): Promise<void> {
       await ctx.editMessageText(lines.join("\n"), { parse_mode: "HTML" });
       await ctx.answerCallbackQuery({ text: "Switched to Claude Code" });
     } else if (driver === "codex") {
+      if (!CODEX_AVAILABLE) {
+        await ctx.answerCallbackQuery({ text: codexUnavailableCallbackText(), show_alert: true });
+        return;
+      }
       try {
         await resetAllDriverSessions({ stopRunning: true });
         await codexSession.startNewThread();
@@ -502,6 +535,11 @@ async function handleCodexResumeCallback(
   ctx: Context,
   callbackData: string
 ): Promise<void> {
+  if (!CODEX_AVAILABLE) {
+    await ctx.answerCallbackQuery({ text: codexUnavailableCallbackText(), show_alert: true });
+    return;
+  }
+
   const userId = ctx.from?.id;
   const username = ctx.from?.username || "unknown";
   const chatId = ctx.chat?.id;

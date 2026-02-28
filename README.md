@@ -61,11 +61,12 @@ The onboarding agent is expected to fully handhold setup:
 1. Guides you through BotFather token creation (`@BotFather`, `/newbot`).
 2. Guides you to get your Telegram user ID (`@userinfobot`).
 3. Optionally collects `OPENAI_API_KEY` for voice transcription.
-4. Runs setup for you:
-   - `./super_turtle/setup --driver auto --telegram-token "<token>" --telegram-user "<id>"`
+4. Asks whether to enable Codex integration.
+5. Runs setup for you:
+   - `./super_turtle/setup --driver claude --enable-codex "<true|false>" --telegram-token "<token>" --telegram-user "<id>"`
    - Adds `--openai-api-key "<key>"` if provided.
-5. Explains what was configured.
-6. Starts the bot and verifies Telegram response.
+6. Explains what was configured.
+7. Starts the bot and verifies Telegram response.
 
 You should not need manual `.env` editing during normal onboarding.
 

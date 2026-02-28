@@ -44,7 +44,7 @@ cd <repo-directory>
 # "Set up Super Turtle on this machine."
 ```
 
-The setup wizard runs `./super_turtle/setup`, installs dependencies, and configures `super_turtle/claude-telegram-bot/.env` for you.
+The setup wizard runs `./super_turtle/setup`, asks whether to enable Codex integration, installs dependencies, and configures `super_turtle/claude-telegram-bot/.env` for you.
 
 ## Quick Start (standalone bot folder, manual)
 

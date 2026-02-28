@@ -8,7 +8,9 @@ Usage: ./super_turtle/setup [options]
 Bootstrap Super Turtle without manual config-file editing.
 
 Options:
-  --driver <auto|codex|claude>   Driver to use (default: auto)
+  --driver <auto|codex|claude>   Driver to use (default: claude)
+  --enable-codex <auto|true|false>
+                                 Codex integration preference (default: auto)
   --telegram-token <token>       Telegram bot token from BotFather
   --telegram-user <id[,id...]>   Allowed Telegram user ID(s)
   --openai-api-key <key>         Optional key for voice transcription
@@ -28,7 +30,8 @@ ENV_FILE="${BOT_DIR}/.env"
 ENV_EXAMPLE="${BOT_DIR}/.env.example"
 PREFS_FILE="/tmp/claude-telegram-prefs.json"
 
-DRIVER="auto"
+DRIVER="claude"
+ENABLE_CODEX="auto"
 TELEGRAM_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 TELEGRAM_USERS="${TELEGRAM_ALLOWED_USERS:-}"
 OPENAI_KEY="${OPENAI_API_KEY:-}"
@@ -42,6 +45,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --driver)
       DRIVER="${2:-}"
+      shift 2
+      ;;
+    --enable-codex)
+      ENABLE_CODEX="${2:-}"
       shift 2
       ;;
     --telegram-token)
@@ -151,12 +158,21 @@ case "${DRIVER}" in
     ;;
 esac
 
+case "${ENABLE_CODEX}" in
+  auto|true|false) ;;
+  *)
+    echo "[setup] Invalid --enable-codex value: ${ENABLE_CODEX}" >&2
+    exit 1
+    ;;
+esac
+
 SELECTED_DRIVER="${DRIVER}"
 if [[ "${DRIVER}" == "auto" ]]; then
-  if have_cmd codex; then
-    SELECTED_DRIVER="codex"
-  elif have_cmd claude; then
+  # Prefer Claude for onboarding by default; Codex remains opt-in.
+  if have_cmd claude; then
     SELECTED_DRIVER="claude"
+  elif have_cmd codex; then
+    SELECTED_DRIVER="codex"
   else
     echo "[setup] Neither 'codex' nor 'claude' is available on PATH." >&2
     exit 1
@@ -201,6 +217,25 @@ if [[ ! "${TELEGRAM_USERS}" =~ ^[0-9]+(,[0-9]+)*$ ]]; then
   exit 1
 fi
 
+CODEX_ENABLED_VALUE="${ENABLE_CODEX}"
+if [[ "${ENABLE_CODEX}" == "auto" ]]; then
+  if yes_no_prompt "[setup] Enable Codex integration (optional)?" 0; then
+    CODEX_ENABLED_VALUE="true"
+  else
+    CODEX_ENABLED_VALUE="false"
+  fi
+fi
+
+if [[ "${SELECTED_DRIVER}" == "codex" ]] && [[ "${CODEX_ENABLED_VALUE}" != "true" ]]; then
+  echo "[setup] Driver 'codex' requires Codex integration. Enabling CODEX_ENABLED=true."
+  CODEX_ENABLED_VALUE="true"
+fi
+
+if [[ "${CODEX_ENABLED_VALUE}" == "true" ]] && ! have_cmd codex; then
+  echo "[setup] Codex integration enabled, but 'codex' CLI was not found on PATH."
+  echo "[setup] You can still continue with Claude; Codex controls stay disabled until CLI is installed."
+fi
+
 if [[ -f "${ENV_FILE}" ]] && [[ "${OVERWRITE_ENV}" -eq 0 ]]; then
   if yes_no_prompt "[setup] ${ENV_FILE} exists. Overwrite it?" 0; then
     OVERWRITE_ENV=1
@@ -236,7 +271,7 @@ upsert_env_key() {
 upsert_env_key "${ENV_FILE}" "TELEGRAM_BOT_TOKEN" "${TELEGRAM_TOKEN}"
 upsert_env_key "${ENV_FILE}" "TELEGRAM_ALLOWED_USERS" "${TELEGRAM_USERS}"
 upsert_env_key "${ENV_FILE}" "CLAUDE_WORKING_DIR" "${ROOT_DIR}"
-upsert_env_key "${ENV_FILE}" "CODEX_ENABLED" "$([[ "${SELECTED_DRIVER}" == "codex" ]] && echo "true" || echo "false")"
+upsert_env_key "${ENV_FILE}" "CODEX_ENABLED" "${CODEX_ENABLED_VALUE}"
 
 if [[ -n "${OPENAI_KEY}" ]]; then
   upsert_env_key "${ENV_FILE}" "OPENAI_API_KEY" "${OPENAI_KEY}"
@@ -259,3 +294,5 @@ echo "[setup] Env file: ${ENV_FILE}"
 echo "[setup] Start bot:"
 echo "  cd super_turtle/claude-telegram-bot && bun run start"
 echo "[setup] Driver: ${SELECTED_DRIVER}"
+echo "[setup] Codex integration preference (CODEX_ENABLED): ${CODEX_ENABLED_VALUE}"
+echo "[setup] Codex CLI available now: $(have_cmd codex && echo yes || echo no)"

@@ -35,6 +35,7 @@ async function probeCodexFlow(): Promise<CodexFlowResult> {
     TELEGRAM_ALLOWED_USERS: "123",
     CLAUDE_WORKING_DIR: process.cwd(),
     CODEX_ENABLED: "true",
+    CODEX_CLI_AVAILABLE_OVERRIDE: "true",
     HOME: process.env.HOME || "/tmp",
   };
 

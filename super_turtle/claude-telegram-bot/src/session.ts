@@ -14,6 +14,8 @@ import { readFileSync } from "fs";
 import type { Context } from "grammy";
 import {
   ALLOWED_PATHS,
+  CLAUDE_CLI_AVAILABLE,
+  CODEX_AVAILABLE,
   MCP_SERVERS,
   META_PROMPT,
   SESSION_FILE,
@@ -193,7 +195,34 @@ export class ClaudeSession {
     const prefs = loadPrefs();
     this._model = prefs.model || "claude-opus-4-6";
     this._effort = prefs.effort || "high";
-    this._activeDriver = prefs.activeDriver || "claude";
+
+    const preferredDriver = prefs.activeDriver || "claude";
+    let resolvedDriver: "claude" | "codex" = preferredDriver;
+
+    if (resolvedDriver === "codex" && !CODEX_AVAILABLE) {
+      resolvedDriver = "claude";
+      console.warn(
+        "Saved active driver is codex, but Codex is unavailable; falling back to claude."
+      );
+    }
+
+    // Claude Code is the default agent for the meta agent.
+    // Do NOT auto-fallback to Codex — require explicit user action via /switch.
+    if (resolvedDriver === "claude" && !CLAUDE_CLI_AVAILABLE) {
+      console.error(
+        "Claude CLI is unavailable. The meta agent requires Claude Code. Install it or set CLAUDE_CLI_PATH."
+      );
+    }
+
+    this._activeDriver = resolvedDriver;
+    if (resolvedDriver !== preferredDriver) {
+      savePrefs({
+        model: this._model,
+        effort: this._effort,
+        activeDriver: this._activeDriver,
+      });
+    }
+
     if (prefs.model || prefs.effort || prefs.activeDriver) {
       console.log(`Loaded preferences: model=${this._model}, effort=${this._effort}, driver=${this._activeDriver}`);
     }

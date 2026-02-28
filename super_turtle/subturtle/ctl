@@ -249,6 +249,83 @@ read_pid() {
   cat "$(pid_file "$1")" 2>/dev/null || echo ""
 }
 
+required_clis_for_loop_type() {
+  local loop_type="$1"
+  case "$loop_type" in
+    slow) echo "claude codex" ;;
+    yolo) echo "claude" ;;
+    yolo-codex|yolo-codex-spark) echo "codex" ;;
+    *) echo "" ;;
+  esac
+}
+
+is_loop_type_supported_here() {
+  local loop_type="$1"
+  local cli
+  for cli in $(required_clis_for_loop_type "$loop_type"); do
+    if ! command -v "$cli" >/dev/null 2>&1; then
+      return 1
+    fi
+  done
+  return 0
+}
+
+list_supported_loop_types() {
+  local -a supported=()
+  local candidate
+  for candidate in slow yolo yolo-codex yolo-codex-spark; do
+    if is_loop_type_supported_here "$candidate"; then
+      supported+=("$candidate")
+    fi
+  done
+
+  if (( ${#supported[@]} == 0 )); then
+    echo "none"
+    return
+  fi
+  printf '%s' "${supported[*]}"
+}
+
+validate_loop_type_prereqs() {
+  local name="$1"
+  local loop_type="$2"
+  local -a missing_clis=()
+  local cli
+
+  for cli in $(required_clis_for_loop_type "$loop_type"); do
+    if ! command -v "$cli" >/dev/null 2>&1; then
+      missing_clis+=("$cli")
+    fi
+  done
+
+  if (( ${#missing_clis[@]} == 0 )); then
+    return 0
+  fi
+
+  local supported_types suggestion
+  supported_types="$(list_supported_loop_types)"
+  suggestion=""
+
+  if [[ "$loop_type" == "slow" ]] && is_loop_type_supported_here "yolo"; then
+    suggestion="Try --type yolo (Claude-only) on this machine."
+  elif [[ "$loop_type" == "slow" ]] && is_loop_type_supported_here "yolo-codex"; then
+    suggestion="Try --type yolo-codex (Codex-only) on this machine."
+  elif [[ "$loop_type" == "yolo-codex" || "$loop_type" == "yolo-codex-spark" ]]; then
+    if is_loop_type_supported_here "yolo"; then
+      suggestion="Try --type yolo (Claude) until Codex CLI is installed."
+    fi
+  elif [[ "$loop_type" == "yolo" ]] && is_loop_type_supported_here "yolo-codex"; then
+    suggestion="Try --type yolo-codex (Codex) until Claude CLI is installed."
+  fi
+
+  echo "[subturtle:${name}] ERROR: loop type '${loop_type}' requires missing CLI(s): ${missing_clis[*]}" >&2
+  echo "[subturtle:${name}] Supported loop types on this host: ${supported_types}" >&2
+  if [[ -n "$suggestion" ]]; then
+    echo "[subturtle:${name}] ${suggestion}" >&2
+  fi
+  exit 1
+}
+
 do_start() {
   local name="${1:-default}"
   local timeout_str="${DEFAULT_TIMEOUT}"
@@ -271,6 +348,8 @@ do_start() {
     slow|yolo|yolo-codex|yolo-codex-spark) ;;
     *) echo "ERROR: unknown SubTurtle type '${loop_type}' (must be: slow, yolo, yolo-codex, yolo-codex-spark)" >&2; exit 1 ;;
   esac
+
+  validate_loop_type_prereqs "$name" "$loop_type"
 
   local timeout_secs
   timeout_secs="$(parse_duration "$timeout_str")" || exit 1
