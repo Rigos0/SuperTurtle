@@ -50,6 +50,27 @@ function mockContext(messageText: string): {
   };
 }
 
+function mockClaudeCredentialLookupFailure(): () => void {
+  const originalSpawnSync = Bun.spawnSync;
+
+  Bun.spawnSync = ((cmd: unknown, opts?: unknown) => {
+    const parts = Array.isArray(cmd) ? cmd.map((part) => String(part)) : [String(cmd)];
+    if (parts[0] === "security" && parts[1] === "find-generic-password") {
+      return {
+        stdout: Buffer.from(""),
+        stderr: Buffer.from("mocked keychain miss"),
+        success: false,
+        exitCode: 1,
+      } as ReturnType<typeof Bun.spawnSync>;
+    }
+    return originalSpawnSync(cmd as Parameters<typeof Bun.spawnSync>[0], opts as Parameters<typeof Bun.spawnSync>[1]);
+  }) as typeof Bun.spawnSync;
+
+  return () => {
+    Bun.spawnSync = originalSpawnSync;
+  };
+}
+
 const cronJobsPath = resolve(import.meta.dir, "../../cron-jobs.json");
 const originalCronJobsText = existsSync(cronJobsPath) ? readFileSync(cronJobsPath, "utf-8") : null;
 const originalSessionStopTyping = session.stopTyping;
@@ -364,12 +385,14 @@ describe("handlers with mock Context", () => {
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async () => new Response("{}", { status: 404 })) as typeof fetch;
+    const restoreSpawnSync = mockClaudeCredentialLookupFailure();
 
     const { ctx, replies } = mockContext("/new");
     try {
       await handleNew(ctx as any);
     } finally {
       globalThis.fetch = originalFetch;
+      restoreSpawnSync();
     }
 
     expect(replies).toHaveLength(1);
@@ -401,12 +424,14 @@ describe("handlers with mock Context", () => {
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async () => new Response("{}", { status: 404 })) as typeof fetch;
+    const restoreSpawnSync = mockClaudeCredentialLookupFailure();
 
     const { ctx, replies } = mockContext("/status");
     try {
       await handleStatus(ctx as any);
     } finally {
       globalThis.fetch = originalFetch;
+      restoreSpawnSync();
     }
 
     expect(replies).toHaveLength(1);

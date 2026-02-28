@@ -87,7 +87,7 @@ Create a helper `mockContext()` that returns a fake grammY Context with:
 - [x] Write tests for pure functions: getCommandLines, formatModelInfo, parseClaudeBacklogItems, parseClaudeStateSummary, formatBacklogSummary, parseCtlListOutput
 - [x] Write tests for parseCtlListOutput with real ctl output samples
 - [x] Write tests for readMainLoopLogTail
-- [x] Write mock Context helper and handler tests for handleNew, handleStatus, handleCron
+- [x] Write mock Context helper and handler tests for handleNew, handleStatus, handleCron (includes reset + cron keyboard assertions)
 - [ ] Write handler tests for handleModel, handleSwitch <- current
 - [ ] Run `bun test` to verify all tests pass
 - [ ] Commit
