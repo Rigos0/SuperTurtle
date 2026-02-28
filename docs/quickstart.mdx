@@ -1,17 +1,18 @@
 ---
 title: Quickstart
-description: Get Super Turtle running in 3 steps
+description: Get Super Turtle running with guided onboarding
 ---
 
 # Quickstart
 
-Super Turtle setup is AI-guided. You clone, open an agent, and tell it to set up. It handles the rest.
+Super Turtle setup is agent-guided. You do not need to manually wire config files.
 
 ## Prerequisites
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Codex CLI](https://github.com/openai/codex) installed and authenticated
-- A Telegram bot token from [@BotFather](https://t.me/BotFather)
-- Your Telegram user ID (used for `TELEGRAM_ALLOWED_USERS`)
+- A machine you can keep awake while the bot runs (macOS is fully supported; Linux is untested alpha)
+
+You do **not** need a Telegram token in advance. The onboarding agent will walk you through creating one.
 
 ## Setup
 
@@ -31,67 +32,40 @@ Super Turtle setup is AI-guided. You clone, open an agent, and tell it to set up
     ```
   </Step>
 
-  <Step title="Prompt">
-    ```
+  <Step title="Prompt the onboarding flow">
+    ```text
     Set up Super Turtle for me.
     ```
-    The agent walks you through everything. It will ask for your Telegram bot token, user ID, and optionally an OpenAI API key for voice transcription. Then it installs dependencies, writes config, and tells you how to start the bot.
   </Step>
 </Steps>
 
-<Info>
-Once setup is complete, start the Telegram bot with `cd super_turtle/claude-telegram-bot && bun run start`, then open Telegram and message your bot.
-</Info>
+## What the onboarding agent should do
 
-## BotFather Setup
+The onboarding flow should be fully guided and step-by-step:
 
-Use [@BotFather](https://t.me/BotFather) to create and configure your bot:
+1. Guide BotFather flow (`@BotFather` -> `/newbot`) and collect token.
+2. Guide Telegram user ID flow (`@userinfobot`) and collect numeric ID.
+3. Ask whether to enable voice transcription, optionally collect `OPENAI_API_KEY`.
+4. Run setup command:
+   - `./super_turtle/setup --driver auto --telegram-token "<token>" --telegram-user "<id>"`
+   - Add `--openai-api-key "<key>"` if provided.
+5. Start bot:
+   - `cd super_turtle/claude-telegram-bot && bun run start`
+6. Ask user to send `/start` (or any message) in Telegram and confirm response.
 
-1. Run `/newbot` and finish the prompts.
-2. Save the generated token as `TELEGRAM_BOT_TOKEN`.
-3. Run `/setcommands` and paste:
-
-```text
-start - Show status and user ID
-new - Start a fresh session
-resume - Pick from recent sessions
-context - Show context usage
-stop - Interrupt current query
-status - Check what Claude is doing
-looplogs - Show bot logs
-restart - Restart the bot
-```
-
-## Getting Your Telegram User ID
-
-- Message [@userinfobot](https://t.me/userinfobot) and copy your numeric ID.
-- Or run `/start` in your bot chat and read the ID in the response.
-
-## What the Setup Wizard Does
-
-When you say "Set up Super Turtle for me", the agent runs `super_turtle/setup` which handles:
-
-1. **Driver detection** — checks whether `claude` or `codex` is available on your PATH and selects the best default.
-2. **Dependency install** — runs `bun install` in the bot directory to install all required packages.
-3. **Environment file** — creates `super_turtle/claude-telegram-bot/.env` from the example template and fills in your Telegram token, user ID, working directory, and optional OpenAI key.
-4. **Driver preferences** — writes `/tmp/claude-telegram-prefs.json` with the default model, effort level, and active driver.
-
-The setup script accepts these flags if you want to run it manually:
-
-```bash
-./super_turtle/setup \
-  --driver auto \
-  --telegram-token "<token>" \
-  --telegram-user "<id>" \
-  --openai-api-key "<key>"      # optional
-```
+If the environment supports it, onboarding should use interactive choice prompts (for example via `ask_user`) for yes/no decisions.
 
 <Warning>
-Do not commit `super_turtle/claude-telegram-bot/.env`. It contains your credentials and is local-only.
+Do not commit `super_turtle/claude-telegram-bot/.env`. It contains local credentials.
 </Warning>
 
-## What's Next
+## Reliability notes for Mac laptops
 
-- Read [Architecture](/architecture) for the system model.
-- Review [Telegram Bot Overview](/bot/overview) for commands and behavior.
-- Learn worker modes in [SubTurtle Loop Types](/subturtles/loop-types).
+- Enable `System Settings -> Battery -> Options -> Prevent automatic sleeping when the display is off` (on power adapter).
+- Keep the lid open while the bot is running.
+
+## What's next
+
+- [Introduction](/introduction)
+- [Architecture](/architecture)
+- [Telegram Bot Overview](/bot/overview)

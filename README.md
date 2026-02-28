@@ -7,34 +7,43 @@
 Code from anywhere with your voice.
 
 <p align="center">
-  <img src="assets/readme-stickers/skills-idea-turtle.png" width="108" alt="Philosophy turtle sticker" />
+  <img src="assets/readme-stickers/skills-idea-turtle.png" width="108" alt="Skills turtle sticker" />
 </p>
 
-## Why Super Turtle
+## What It Is
 
-1. Uses your Claude Code or Codex subscription.* No extra API-token workflow for core use.
-2. Mobile and voice control first. Run everything from Telegram by text or voice.
-3. Designed for long-running, large jobs. Breaks work into tasks, runs sub-agents, can open/test webpages, and iterates until done.
-4. Runs on your machine (cloud deployment coming up).
-5. It tracks remaining usage and load-balances between Claude Code and Codex.
-6. Autonomous supervision: scheduled cron check-ins monitor progress in the background and send important updates.
+Super Turtle is an autonomous coding system controlled from Telegram:
 
-\* Uses official Claude Code/Codex CLI authentication flows in headless mode. This wrapper approach is compliant with provider terms.
+- You talk to one Meta Agent.
+- It decomposes work, spawns SubTurtles, supervises progress, and reports milestones.
+- You focus on outcomes, not orchestration.
+
+Core UX: **say what -> get results**.
+
+## Why Use It
+
+1. Uses your Claude Code or Codex subscription (no extra core API-token workflow).
+2. Mobile + voice first via Telegram.
+3. Designed for long-running, multi-step coding work.
+4. Parallel SubTurtle execution with milestone-focused updates.
+5. Usage-aware routing between Claude and Codex.
+
+\* Uses official Claude Code/Codex CLI auth flows.
 
 <p align="center">
   <img src="assets/readme-stickers/setup-save-turtle.png" width="108" alt="Setup turtle sticker" />
 </p>
 
-## Setup
+## Quick Start
 
-### 1. Clone the repo
+### 1) Clone
 
 ```bash
 git clone https://github.com/Rigos0/superturtle.git
 cd superturtle
 ```
 
-### 2. Open Claude Code or Codex
+### 2) Open an agent session
 
 ```bash
 claude --dangerously-skip-permissions
@@ -42,38 +51,59 @@ claude --dangerously-skip-permissions
 codex --full-auto
 ```
 
-### 3. Prompt
+### 3) Prompt
 
-```
+```text
 Set up Super Turtle for me.
 ```
 
-The agent will walk you through everything — it'll ask for your Telegram bot token, user ID, and optionally an OpenAI API key for voice transcription. Then it installs dependencies, writes config, and tells you how to start the bot.
+## What the onboarding agent does
 
-<p align="center">
-  <img src="assets/readme-stickers/architecture-gear-turtle.png" width="108" alt="Architecture turtle sticker" />
-</p>
+The onboarding agent is expected to fully handhold setup:
 
-## Architecture
+1. Guides you through BotFather token creation (`@BotFather`, `/newbot`).
+2. Guides you to get your Telegram user ID (`@userinfobot`).
+3. Optionally collects `OPENAI_API_KEY` for voice transcription.
+4. Runs setup for you:
+   - `./super_turtle/setup --driver auto --telegram-token "<token>" --telegram-user "<id>"`
+   - Adds `--openai-api-key "<key>"` if provided.
+5. Explains what was configured.
+6. Starts the bot and verifies Telegram response.
 
-- **Human** -> Telegram/CLI
-- **Meta Agent** -> plans, delegates, supervises
-- **SubTurtles** -> autonomous worker agents that code, test, and iterate
-- **State + logs** -> `CLAUDE.md`, `.subturtles/<name>/`, git commits
+You should not need manual `.env` editing during normal onboarding.
 
-Full docs: [superturtle.mintlify.app](https://superturtle.mintlify.app)
+## Platform Status
+
+- macOS: fully supported.
+- Linux: untested alpha.
+- Windows: not an officially supported setup target right now.
+
+Mac laptop reliability notes:
+
+- Enable `System Settings -> Battery -> Options -> Prevent automatic sleeping when the display is off` (on power adapter).
+- Keep the lid open while the bot is running.
 
 <p align="center">
   <img src="assets/readme-stickers/run-fire-turtle.png" width="108" alt="Run turtle sticker" />
 </p>
 
-## Run
-
-Once setup is complete, start the Telegram bot:
+## Run manually (if needed)
 
 ```bash
 cd super_turtle/claude-telegram-bot
 bun run start
 ```
 
-Then open Telegram, find your bot, and start chatting. Tell it to build something.
+Then message your bot in Telegram and ask it to build something.
+
+## Architecture
+
+- **Human** -> Telegram/CLI
+- **Meta Agent** -> plans, delegates, supervises
+- **SubTurtles** -> autonomous worker agents (parallel, looped execution)
+- **State + logs** -> `CLAUDE.md`, `.subturtles/<name>/`, git history
+
+## Documentation
+
+- Docs site: [superturtle.mintlify.app](https://superturtle.mintlify.app)
+- Start with: [Quickstart](docs/quickstart.mdx)

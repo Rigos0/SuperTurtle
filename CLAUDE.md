@@ -1,142 +1,122 @@
-# UX Fundamentals
+# Super Turtle Onboarding Agent Runbook
 
-## What Super Turtle is
+This file is ONLY for first-run onboarding behavior in this repository.
+When the user clones this repo and opens Claude Code or Codex, follow these steps exactly.
 
-An autonomous coding system you talk to on Telegram. You describe what you want built — the system decomposes it, spawns workers, supervises them, and delivers results. You interact with a single conversational agent (the Meta Turtle) who handles everything behind the scenes.
+## Rules
 
-## Core experience principle
+1. Be concrete and step-by-step. Do not give vague summaries.
+2. Do not ask users to manually edit `.env` or config files.
+3. Execute local setup commands yourself (the agent runs with high permissions).
+4. Ask the user only for external actions (Telegram/BotFather/userinfobot) and secrets.
+5. If the `ask_user` tool is available, use it for onboarding choices to make setup seamless.
 
-**Say what → get results.** The user never thinks about processes, infrastructure, or agent orchestration. They say "build me X" and the system figures out how. The chat shows milestones, not machinery.
+## Onboarding Trigger
 
-## First-run setup for new installs (Claude Code / Codex)
+Run this flow when either is true:
 
-When this repo is opened for the first time in Claude Code or Codex, run setup as a guided wizard:
+- This is the user's first setup in this clone.
+- The user asks to set up Super Turtle.
 
-1. Confirm the user already has:
-   - `TELEGRAM_BOT_TOKEN` from BotFather
-   - `TELEGRAM_ALLOWED_USERS` (their Telegram user ID)
-   - Optional `OPENAI_API_KEY` for voice transcription
-2. Run:
-   - `./super_turtle/setup --driver auto --telegram-token "<token>" --telegram-user "<id>"`
-   - Add `--openai-api-key "<key>"` only if provided
-3. Explain what was configured (`.env`, dependencies, default driver) and ask the user to start the bot.
+## Exact Onboarding Sequence
 
-The goal is minimal manual setup: users provide keys/IDs, the agent does everything else.
+### 1. Open with platform reality
 
-## What the user sees
+Always tell the user:
 
-| Event | User sees | User doesn't see |
-|-------|-----------|-------------------|
-| Work starts | "🚀 On it." | SubTurtle spawning, CLAUDE.md creation, cron registration |
-| Work in progress | Nothing (silence = good) | Cron check-ins, status polling, git log inspection |
-| Milestone reached | "🎉 Feature X is done. Starting Y next." | SubTurtle stop/restart, state file updates |
-| Something broke | "⚠️ Hit a snag with X. Here's what happened: ..." | Log tailing, error diagnosis, restart attempts |
-| Everything done | "✅ All done. Here's what shipped: ..." | Cron cleanup, watchdog termination |
-| Preview available | "🔗 Preview: https://..." | Tunnel setup, port management |
+- macOS is currently the only fully supported platform.
+- Linux is untested alpha.
+- On Mac laptops, enable: `System Settings -> Battery -> Options -> Prevent automatic sleeping when the display is off` (on power adapter).
+- Keep the laptop lid open while the bot runs.
 
-## What the user never has to do
+If host OS is not macOS, explicitly warn that runtime behavior may be unstable.
 
-- Break down tasks into subtasks (the system decomposes)
-- Choose which loop type to use (the system defaults to cheapest: yolo-codex)
-- Monitor progress (the system checks silently and only reports news)
-- Restart stuck workers (the system detects and recovers)
-- Manage quotas (the system checks usage and routes work to the cheapest resource)
+### 2. Guide BotFather token creation (handholding)
 
-## Interaction model
+Tell the user exactly:
 
-1. **User sends a message** → Meta agent responds conversationally. If it's a coding task, spawns SubTurtles and confirms briefly.
-2. **Silence** → Work is happening. No news is good news.
-3. **Notification arrives** → Something meaningful happened. Read it — it's worth your attention.
-4. **User asks "how's it going?"** → Meta agent checks and gives a plain-English summary.
-5. **User says "stop"** → Work stops. No questions asked.
+1. Open Telegram and message `@BotFather`
+2. Send `/newbot`
+3. Follow prompts
+4. Copy the bot token
+5. Paste it back here
 
-## Emotional design
+Validate token format before continuing (`^\d+:[A-Za-z0-9_-]+$`).
+If invalid, explain and ask again.
 
-- **Feels like a competent teammate**, not a CI pipeline
-- **Respects attention** — never sends a message that wastes the user's time
-- **Confident but honest** — says "I'm on it" when starting, "I'm stuck" when blocked
-- **Celebrates wins** — completion messages feel like progress, not bureaucracy
-- **Invisible when working** — the best UX is no UX during execution
+### 3. Guide Telegram user ID discovery
 
-## Resource management
+Tell the user exactly:
 
-- **Default to yolo-codex** — Codex is cheap and plentiful. Use it for everything unless the task needs Claude's reasoning.
-- **Claude Code is precious** — every meta agent interaction, every cron check-in costs Claude Code quota. Minimize waste.
-- **Auto-adjust** — when Claude Code is >80%, space out check-ins, shorten responses, force Codex for SubTurtles.
-- **The user shouldn't think about quotas** — the system manages resources silently.
+1. Open Telegram and message `@userinfobot`
+2. Copy numeric user ID
+3. Paste it back here
 
----
+Validate as digits only.
 
-# Current task
+### 4. Ask about voice transcription
 
-Parallel system hardening and UX improvements:
-- Telegram security review
-- Cloudflare tunnel security review
-- `/sub` command UX + parity (aliases, backlog-focused output)
-- Codex meta-agent “stops until prompted” investigation
-- Peekaboo-based screenshot tooling
-- Long-run tracking + handoff state
+If `ask_user` is available, ask with buttons/options:
 
-# End goal with specs
+- `Yes, enable voice transcription`
+- `No, skip for now`
 
-Super Turtle repository — autonomous agent coordination system (SubTurtles). Core infrastructure is complete. Now improving the UX to make the system more autonomous and less noisy.
+If user chooses yes, collect `OPENAI_API_KEY`.
+If no, continue without it.
 
-**Core infrastructure (done):**
-- SubTurtle control (`ctl` command) — spawn, stop, monitor with timeouts
-- State management — CLAUDE.md per agent, symlinked AGENTS.md
-- Cron supervision — scheduled check-ins to monitor progress
-- Loop types — slow (Plan→Groom→Execute→Review), yolo (single Claude call), yolo-codex (cost-optimized)
-- Skills system — agents can load Claude Code skills on demand
-- Tunnel support — cloudflared integration for frontend preview links
-- SubTurtle self-stop — agents write `## Loop Control\nSTOP` to exit cleanly
-- Silent check-ins — cron supervision runs silently, only messages user on news
+### 5. Run setup command yourself
 
-**UX overhaul goal:** The user says "build X" and the system handles everything — decomposition, parallel SubTurtles, supervision, progression — with minimal noise. Chat shows progress milestones, not process spam.
+Always run:
 
-# Roadmap (Completed)
+```bash
+./super_turtle/setup --driver auto --telegram-token "<token>" --telegram-user "<id>"
+```
 
-- ✓ Core SubTurtle loop (slow/yolo/yolo-codex types, watchdog, timeout)
-- ✓ Control script (`ctl` start/stop/status/logs/list + spawn)
-- ✓ Cron job scheduling (one-shot + recurring, auto-fire)
-- ✓ Skills loader system (agents can --skill <name>)
-- ✓ Tunnel support (start-tunnel.sh helper, .tunnel-url tracking)
-- ✓ Snake game (complete with 10 levels, obstacles, visual escalation, neon UI)
-- ✓ Meta agent (decision-making, delegation, supervision)
-- ✓ SubTurtle self-stop (`## Loop Control\nSTOP` directive, _should_stop() check)
-- ✓ UX overhaul proposal (docs/UX-overhaul-proposal.md)
-- ✓ UX Phase 1: Silent check-ins (silent cron, marker-gated notifications, META_SHARED.md updated)
-- ✓ Code quality audit (docs/code-quality-audit.md — 1 critical fixed, 4 medium fixed, 6 documented)
-- ✓ UX Phase 2: Structured message templates (notification formats for all event types)
-- ✓ UX Phase 3: Task decomposition (DECOMPOSITION_PROMPT.md + META_SHARED.md protocol)
-- ✓ UX Phase 4: Pipeline speed (`ctl reschedule-cron` command for dynamic intervals)
-- ✓ UX Phase 5: Enhanced `/status` command (SubTurtle info, git log, usage in one view)
-- ✓ UX Phase 6: Usage-aware resource management (quota decision matrix in META_SHARED.md)
-- ✓ Default loop type changed to yolo-codex
-- ✓ Always route through driver abstraction (remove config toggle)
-- ✓ Codex: inject current date/time at session start
-- ✓ Fix scheduled turtle duplicates + ensure scheduled notice ordering
+If OpenAI key was provided, run:
 
-# Roadmap (Upcoming)
+```bash
+./super_turtle/setup --driver auto --telegram-token "<token>" --telegram-user "<id>" --openai-api-key "<key>"
+```
 
-- Codex parity gap audit (Claude vs Codex flows)
-- Implement missing Codex driver/session/command features
-- Harden restart behavior to avoid unsafe self-termination during autonomous runs
-- Cloud deployment option (E2B integration on `e2b` branch, needs stabilization)
-- End-to-end parity testing and overnight supervision validation
-- Update docs with parity completion status and residual limitations
+### 6. Summarize what was configured
 
-# Backlog
+After setup succeeds, state explicitly:
 
-- [ ] Telegram security review (leak/attack surface) + fixes
-- [ ] Cloudflare tunnel security review + fixes
-- [ ] `/sub` command: backlog-focused output, Codex/Claude parity (aliases done: /sub /subs /subturtle /subturtles /turtle /turtles)
-- [ ] Codex meta-agent stop-until-prompt issue: root cause + fix
-- [ ] Peekaboo screenshot tooling wired into frontend guidance
-- [ ] Long-run tracking: runs.jsonl + handoff.md (done; verify smoke test)
-- [ ] Memory handling for “remember this” (small, explainable, meta-only)
-- [ ] Update landing page palette to Epify Puzlo red-forward brand direction and verify mobile/desktop contrast/accessibility
-- [ ] Investigate iOS Telegram inline button disappearance (ask_user + command buttons)
-- [ ] Build Codex-vs-Claude parity checklist from current code/tests
-- [ ] Implement Codex parity fixes in driver/session/handlers
-- [ ] Run integration pass (Codex mode + Claude mode) and verify no regressions
-- [ ] Update docs with completion status and known gaps
+- Bot env file written: `super_turtle/claude-telegram-bot/.env`
+- Bot dependencies installed via `bun install`
+- Docs dependencies installed (`npm install`, or skipped if npm missing)
+- Default driver preference written to `/tmp/claude-telegram-prefs.json`
+
+### 7. Start bot (agent executes)
+
+Run:
+
+```bash
+cd super_turtle/claude-telegram-bot && bun run start
+```
+
+If you cannot keep it running in the current environment, tell the user to run that exact command.
+
+### 8. Telegram verification
+
+Tell user:
+
+1. Open Telegram
+2. Find their bot
+3. Send `/start` (or any message)
+
+Confirm bot is responding.
+If not, diagnose and retry before declaring setup done.
+
+### 9. Final onboarding handoff
+
+After verification, send:
+
+- Setup is complete
+- They can now request build tasks in plain language
+
+The first Telegram interaction handoff message is defined in:
+
+- `super_turtle/meta/META_SHARED.md`
+
+Keep that behavior prompt-driven (do not add custom runtime first-message hooks).
