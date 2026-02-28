@@ -92,12 +92,12 @@ const EVENT_STREAM_STALL_TIMEOUT_MS = (() => {
   const parsed = Number.parseInt(raw, 10);
   return Number.isFinite(parsed) && parsed >= 1_000 ? parsed : 120_000;
 })();
-// Longer patience while a tool is actively executing (e.g. ctl spawn can take minutes)
+// Longer patience while a tool is actively executing (SDK emits no events during tool runs)
 const TOOL_ACTIVE_STALL_TIMEOUT_MS = (() => {
   const raw = process.env.CLAUDE_TOOL_ACTIVE_STALL_TIMEOUT_MS;
-  if (!raw) return 300_000;
+  if (!raw) return 180_000;
   const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed >= 1_000 ? parsed : 300_000;
+  return Number.isFinite(parsed) && parsed >= 1_000 ? parsed : 180_000;
 })();
 
 // Model configuration
@@ -305,6 +305,12 @@ export class ClaudeSession {
     chatId?: number,
     ctx?: Context
   ): Promise<string> {
+    // Acquire the query lock IMMEDIATELY to prevent TOCTOU races.
+    // Without this, two callers can both check isRunning (false), then both
+    // enter this method and resume the same session concurrently — producing
+    // ghost responses (in=0 out=0) and stalls.
+    this.isQueryRunning = true;
+
     // Set chat context for ask_user MCP tool
     if (chatId) {
       process.env.TELEGRAM_CHAT_ID = String(chatId);
@@ -375,12 +381,12 @@ export class ClaudeSession {
         "Query cancelled before starting (stop was requested during processing)"
       );
       this.stopRequested = false;
+      this.isQueryRunning = false; // Release the lock before bailing
       throw new Error("Query cancelled");
     }
 
     // Create abort controller for cancellation
     this.abortController = new AbortController();
-    this.isQueryRunning = true;
     this.stopRequested = false;
     this.queryStarted = new Date();
     this.currentTool = null;
