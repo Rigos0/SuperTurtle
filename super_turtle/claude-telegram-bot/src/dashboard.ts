@@ -25,12 +25,21 @@ function unauthorizedResponse(): Response {
   });
 }
 
-function isAuthorized(request: Request): boolean {
+export function isAuthorized(request: Request): boolean {
   if (!DASHBOARD_AUTH_TOKEN) return true;
   const url = new URL(request.url);
   const tokenFromQuery = url.searchParams.get("token") || "";
   const tokenFromHeader = request.headers.get("x-dashboard-token") || "";
-  return tokenFromQuery === DASHBOARD_AUTH_TOKEN || tokenFromHeader === DASHBOARD_AUTH_TOKEN;
+  const authorization = request.headers.get("authorization") || "";
+  const tokenFromAuthorization = authorization.toLowerCase().startsWith("bearer ")
+    ? authorization.slice(7).trim()
+    : authorization.trim();
+
+  return (
+    tokenFromQuery === DASHBOARD_AUTH_TOKEN
+    || tokenFromHeader === DASHBOARD_AUTH_TOKEN
+    || tokenFromAuthorization === DASHBOARD_AUTH_TOKEN
+  );
 }
 
 async function readSubturtles(): Promise<ListedSubTurtle[]> {
@@ -44,7 +53,7 @@ async function readSubturtles(): Promise<ListedSubTurtle[]> {
   }
 }
 
-function safeSubstring(input: string, max: number): string {
+export function safeSubstring(input: string, max: number): string {
   return input.length <= max ? input : `${input.slice(0, max)}...`;
 }
 
