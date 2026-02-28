@@ -1,5 +1,5 @@
 ## Current Task
-Write the consolidated audit report to `super_turtle/docs/concurrency-audit.md` by gathering findings from prior commits into one document with clear sections and actionable recommendations.
+All backlog items complete.
 
 ## End Goal with Specs
 Produce a concurrency audit report at `super_turtle/docs/concurrency-audit.md` that documents:
@@ -19,8 +19,8 @@ The report should be concrete — file paths, line numbers, code snippets, and c
 - [x] Audit `handlers/streaming.ts`: `StreamingState` — is it safe if multiple status callbacks fire concurrently? Check `toolMessages` array mutations.
 - [x] Audit `handlers/stop.ts`: `stopAllRunningWork()` — does it cleanly handle the case where a stop races with a new message arriving?
 - [x] Audit `handlers/voice.ts` and `handlers/callback.ts`: Do they properly check `isAnyDriverRunning()` before starting work?
-- [ ] Write the consolidated audit report to `super_turtle/docs/concurrency-audit.md` — gather all findings from previous commits (see git log) into one document with sections: Shared State Map, Findings (each with severity, file, line, description, recommended fix), and Summary <- current
-- [ ] Commit the audit report
+- [x] Write the consolidated audit report to `super_turtle/docs/concurrency-audit.md` — gather all findings from previous commits (see git log) into one document with sections: Shared State Map, Findings (each with severity, file, line, description, recommended fix), and Summary
+- [x] Commit the audit report
 
 ## Notes
 Previous iterations already committed individual audit findings. Check `git log --oneline -10` for commits like "docs: map shared mutable state", "Audit deferred queue concurrency", etc. The final report should consolidate ALL of those findings into one clean document.
@@ -30,3 +30,6 @@ Code-module auditing is complete; remaining work is report consolidation and fin
 This is a READ-ONLY audit — do NOT modify any source files except to create the report. All findings go into the report document.
 
 IMPORTANT: You are on the `dev` branch. Commit to dev.
+
+## Loop Control
+STOP
