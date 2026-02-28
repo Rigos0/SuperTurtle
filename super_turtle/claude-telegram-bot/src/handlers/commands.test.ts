@@ -163,30 +163,27 @@ describe("formatBacklogSummary", () => {
 });
 
 describe("parseCtlListOutput", () => {
-  it("parses a running SubTurtle line with status fields", () => {
-    const output = "worker-1 running yolo-codex (PID 4321) 14m left Implement parser";
+  it("parses real ctl list output with fixed-width columns, skills, and tunnel URL", () => {
+    const output = [
+      "  docs-agent      running  yolo-codex   (PID 12345)   9m left       Implement parser coverage [skills: [\"frontend\",\"tests\"]]",
+      "                 → https://docs-agent.trycloudflare.com",
+      "  bugfix-ops      stopped                                             (no task)",
+    ].join("\n");
+
     const turtles = parseCtlListOutput(output);
 
     expect(turtles).toEqual([
       {
-        name: "worker-1",
+        name: "docs-agent",
         status: "running",
         type: "yolo-codex",
-        pid: "4321",
-        timeRemaining: "14m",
-        task: "Implement parser",
-        tunnelUrl: "",
+        pid: "12345",
+        timeRemaining: "9m",
+        task: "Implement parser coverage",
+        tunnelUrl: "https://docs-agent.trycloudflare.com",
       },
-    ]);
-  });
-
-  it("parses a stopped SubTurtle line", () => {
-    const output = "worker-2 stopped (no task)";
-    const turtles = parseCtlListOutput(output);
-
-    expect(turtles).toEqual([
       {
-        name: "worker-2",
+        name: "bugfix-ops",
         status: "stopped",
         type: "",
         pid: "",
@@ -197,19 +194,42 @@ describe("parseCtlListOutput", () => {
     ]);
   });
 
-  it("captures tunnel URL from the next line", () => {
+  it("parses real running variants for no-timeout and overdue subturtles", () => {
     const output = [
-      "worker-3 running slow (PID 99) OVERDUE Finish release",
-      "→ https://example.trycloudflare.com",
+      "  infra-watch     running  yolo-codex-spark (PID 456) no timeout    Investigate flaky CI",
+      "  migration       running  slow         (PID 7890) OVERDUE      Finish data migration",
     ].join("\n");
+
     const turtles = parseCtlListOutput(output);
 
-    expect(turtles).toHaveLength(1);
-    expect(turtles[0]?.tunnelUrl).toBe("https://example.trycloudflare.com");
+    expect(turtles).toEqual([
+      {
+        name: "infra-watch",
+        status: "running",
+        type: "yolo-codex-spark",
+        pid: "456",
+        timeRemaining: "no timeout",
+        task: "Investigate flaky CI",
+        tunnelUrl: "",
+      },
+      {
+        name: "migration",
+        status: "running",
+        type: "slow",
+        pid: "7890",
+        timeRemaining: "OVERDUE",
+        task: "Finish data migration",
+        tunnelUrl: "",
+      },
+    ]);
   });
 
   it("returns empty array for empty output", () => {
     expect(parseCtlListOutput("")).toEqual([]);
+  });
+
+  it("returns empty array for no-subturtles output", () => {
+    expect(parseCtlListOutput("No SubTurtles found.")).toEqual([]);
   });
 
   it("returns empty array for header-only output", () => {

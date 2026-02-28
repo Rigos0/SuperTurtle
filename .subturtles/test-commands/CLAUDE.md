@@ -1,5 +1,5 @@
 # Current Task
-Write tests for parseCtlListOutput with real ctl output samples.
+Write tests for readMainLoopLogTail.
 
 ## End Goal with Specs
 Every slash command in `commands.ts` has test coverage. Focus on pure/testable functions first (parsers, formatters), then handler logic that can be tested by mocking the grammY Context.
@@ -85,8 +85,8 @@ Create a helper `mockContext()` that returns a fake grammY Context with:
 ## Backlog
 - [x] Read existing command test files to understand mocking patterns
 - [x] Write tests for pure functions: getCommandLines, formatModelInfo, parseClaudeBacklogItems, parseClaudeStateSummary, formatBacklogSummary, parseCtlListOutput
-- [ ] Write tests for parseCtlListOutput with real ctl output samples <- current
-- [ ] Write tests for readMainLoopLogTail
+- [x] Write tests for parseCtlListOutput with real ctl output samples
+- [ ] Write tests for readMainLoopLogTail <- current
 - [ ] Write mock Context helper and handler tests for handleNew, handleStatus, handleCron
 - [ ] Write handler tests for handleModel, handleSwitch
 - [ ] Run `bun test` to verify all tests pass
