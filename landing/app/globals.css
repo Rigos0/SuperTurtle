@@ -56,7 +56,6 @@ body {
 
 .landing-root > main {
   flex: 1 0 auto;
-  padding-bottom: clamp(3.25rem, 10vh, 7rem);
 }
 
 .section-shell {
@@ -97,6 +96,7 @@ body {
 
 .hero-shell {
   padding-top: clamp(3rem, 6vw, 5rem);
+  padding-bottom: clamp(4.5rem, 10vh, 8rem);
 }
 
 .hero-glow {

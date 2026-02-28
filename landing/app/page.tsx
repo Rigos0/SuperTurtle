@@ -142,7 +142,7 @@ export default function Home() {
   const [turtleDead, setTurtleDead] = useState(false);
   const [lastPoolMessage, setLastPoolMessage] = useState<string | null>(null);
   const [bubbleHideTimeout, setBubbleHideTimeout] = useState<number | null>(null);
-  const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL ?? "/docs";
+  const docsUrl = "https://superturtle.mintlify.app/";
   const githubUrl = "https://github.com/rigos0/superturtle";
 
   const handleTurtleClick = () => {
