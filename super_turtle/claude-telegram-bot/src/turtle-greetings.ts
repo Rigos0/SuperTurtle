@@ -1,6 +1,7 @@
 import type { Bot } from "grammy";
 import { InputFile } from "grammy";
 import turtleCombos from "../send_turtle_mcp/turtle-combos.json";
+import { botLog } from "./logger";
 
 const DEFAULT_TIME_ZONE = "Europe/Prague";
 const DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -182,13 +183,13 @@ async function sendGreeting(bot: Bot, chatId: number, definition: GreetingDefini
     const sticker = new InputFile(buffer, "turtle.webp");
     await bot.api.sendSticker(chatId, sticker);
   } catch (error) {
-    console.warn(`[turtle-greetings] ${definition.type} sticker send failed:`, error);
+    botLog.warn({ err: error, greetingType: definition.type, chatId }, "Turtle greeting sticker send failed");
   }
 
   try {
     await bot.api.sendMessage(chatId, message);
   } catch (error) {
-    console.warn(`[turtle-greetings] ${definition.type} message send failed:`, error);
+    botLog.warn({ err: error, greetingType: definition.type, chatId }, "Turtle greeting message send failed");
   }
 }
 

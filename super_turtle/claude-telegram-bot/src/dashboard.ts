@@ -1,6 +1,7 @@
 import { WORKING_DIR, DASHBOARD_ENABLED, DASHBOARD_AUTH_TOKEN, DASHBOARD_BIND_ADDR, DASHBOARD_PORT } from "./config";
 import { getJobs } from "./cron";
 import { parseCtlListOutput, getSubTurtleElapsed, type ListedSubTurtle } from "./handlers/commands";
+import { logger } from "./logger";
 
 type TurtleView = ListedSubTurtle & {
   elapsed: string;
@@ -17,6 +18,8 @@ type DashboardState = {
     chatId: number;
   }>;
 };
+
+const dashboardLog = logger.child({ module: "dashboard" });
 
 function unauthorizedResponse(): Response {
   return new Response("Unauthorized", {
@@ -330,9 +333,15 @@ export function startDashboardServer(): void {
   }
 
   if (!DASHBOARD_AUTH_TOKEN) {
-    console.log(`Starting dashboard on http://${DASHBOARD_BIND_ADDR}:${DASHBOARD_PORT}/dashboard`);
+    dashboardLog.info(
+      { host: DASHBOARD_BIND_ADDR, port: DASHBOARD_PORT, authEnabled: false },
+      `Starting dashboard on http://${DASHBOARD_BIND_ADDR}:${DASHBOARD_PORT}/dashboard`
+    );
   } else {
-    console.log(`Starting dashboard on http://${DASHBOARD_BIND_ADDR}:${DASHBOARD_PORT}/dashboard?token=<redacted>`);
+    dashboardLog.info(
+      { host: DASHBOARD_BIND_ADDR, port: DASHBOARD_PORT, authEnabled: true },
+      `Starting dashboard on http://${DASHBOARD_BIND_ADDR}:${DASHBOARD_PORT}/dashboard?token=<redacted>`
+    );
   }
 
   Bun.serve({
