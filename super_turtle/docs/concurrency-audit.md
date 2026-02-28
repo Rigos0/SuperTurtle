@@ -9,9 +9,10 @@ Completed in this revision:
 - Backlog item 4: audited `handlers/driver-routing.ts` (`isAnyDriverRunning`, preemption, stop fallback).
 - Backlog item 5: audited cron execution path in `src/index.ts` (timer loop vs interactive updates).
 - Backlog item 6: audited `handlers/streaming.ts` (`StreamingState`, callback serialization, `toolMessages` mutation safety).
+- Backlog item 7: audited `handlers/stop.ts` (`stopAllRunningWork` and stop-vs-new-message races).
 
 Pending:
-- Race-condition and TOCTOU analysis for remaining modules (backlog items 7+).
+- Race-condition and TOCTOU analysis for remaining modules (backlog items 8+).
 
 ## Shared Mutable State Inventory
 
@@ -398,3 +399,57 @@ Recommended fix:
 1. Add an internal callback queue (promise chain/mutex) in `createStatusCallback` so callback bodies always run serially regardless of caller behavior.
 2. Add a `finalized` boolean set by `done`; ignore non-`done` events after finalization.
 3. Optionally clear `state.toolMessages` after cleanup to make repeated `done` calls idempotent and cheap.
+
+## Stop Handler Concurrency Audit (`src/handlers/stop.ts`)
+
+### Question: Does `stopAllRunningWork()` cleanly handle a stop racing with a new message arriving?
+
+Conclusion:
+- Not fully. Current behavior is best-effort cancellation and does not establish a quiescence barrier before new work can start.
+
+Evidence:
+- Stop path ordering is: stop typing, request driver stop, then stop subturtles (`src/handlers/stop.ts:71-78`).
+- The stop request path can return on acknowledgement, not guaranteed completion (`src/handlers/driver-routing.ts:174-183`).
+- Interactive updates that can start work (stop intents, callbacks, voice, commands) bypass the per-chat sequentializer (`src/index.ts:531-550`).
+- Claude driver stop clears `stopRequested` after a fixed delay (`src/drivers/claude-driver.ts:25-29`) even when session stop reported `"pending"` (`src/session.ts:285-290`), while pre-start cancellation is checked once (`src/session.ts:378-385`).
+
+## Finding SP-1 (High): `stopAllRunningWork` does not wait for driver quiescence before returning
+
+Where:
+- `stopAllRunningWork` returns immediately after `stopActiveDriverQuery` plus subturtle stop attempt (`src/handlers/stop.ts:71-78`).
+- `stopActiveDriverQuery` has no "wait until not running" handshake (`src/handlers/driver-routing.ts:174-183`).
+
+Race scenario:
+1. Request A is running.
+2. User sends stop request; stop path calls `stopActiveDriverQuery`, which only issues stop/abort.
+3. Before A fully tears down, another interactive update (callback/voice/command path) starts Request B because these paths are not sequentialized.
+4. A and B can overlap transiently on shared singleton state and side-effecting tool execution.
+
+Impact:
+- "Stopped all running work" is not a hard synchronization point.
+- Overlap can produce duplicate/interleaved side effects and inconsistent status messaging.
+
+Recommended fix:
+1. Add a bounded quiescence wait in stop flow (`wait until isAnyDriverRunning() === false`, timeout guarded).
+2. Gate new work on stop epoch/ownership token so post-stop messages are admitted only after the targeted run has exited.
+3. Reuse the same quiescence helper in callback preemption and other stop callers to remove fixed-sleep stop handshakes.
+
+## Finding SP-2 (Medium): Fixed-time `clearStopRequested` can erase `"pending"` cancellation before it is consumed
+
+Where:
+- `"pending"` stop request is set during `_isProcessing` (`src/session.ts:285-290`).
+- Claude driver unconditionally clears `stopRequested` after 100ms (`src/drivers/claude-driver.ts:25-29`).
+- Pre-query cancellation check relies on that flag (`src/session.ts:378-385`).
+
+Race scenario:
+1. Request A has called `startProcessing()` but has not yet reached `sendMessageStreaming` pre-start cancel check.
+2. Stop request arrives and sets `"pending"` cancellation.
+3. `ClaudeDriver.stop()` clears `stopRequested` on a timer before A reaches the pre-start check.
+4. A proceeds normally despite an acknowledged stop request.
+
+Impact:
+- Stop-vs-new-message behavior is timing-dependent and can violate user expectation that stop cancels the in-flight turn.
+
+Recommended fix:
+1. Remove timer-based `clearStopRequested()` from driver stop path.
+2. Clear stop intent only at deterministic ownership boundaries (for example when the superseding request acquires run ownership, or when the canceled request consumes the stop at pre-start check).

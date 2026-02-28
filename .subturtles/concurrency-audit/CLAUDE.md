@@ -1,5 +1,5 @@
 ## Current Task
-Audit `handlers/stop.ts`: `stopAllRunningWork()` — does it cleanly handle the case where a stop races with a new message arriving?
+Audit `handlers/voice.ts` and `handlers/callback.ts`: Do they properly check `isAnyDriverRunning()` before starting work?
 
 ## End Goal with Specs
 Produce a concurrency audit report at `super_turtle/docs/concurrency-audit.md` that documents:
@@ -17,8 +17,8 @@ The report should be concrete — file paths, line numbers, code snippets, and c
 - [x] Audit `handlers/driver-routing.ts`: `isAnyDriverRunning()` checks both drivers — but is there a window where one driver's `isRunning` getter lags? What about `preemptBackgroundRunForUserPriority`?
 - [x] Audit cron job execution in `src/index.ts`: How does the cron loop interact with active message processing? Can cron-triggered messages race with user messages?
 - [x] Audit `handlers/streaming.ts`: `StreamingState` — is it safe if multiple status callbacks fire concurrently? Check `toolMessages` array mutations.
-- [ ] Audit `handlers/stop.ts`: `stopAllRunningWork()` — does it cleanly handle the case where a stop races with a new message arriving? <- current
-- [ ] Audit `handlers/voice.ts` and `handlers/callback.ts`: Do they properly check `isAnyDriverRunning()` before starting work?
+- [x] Audit `handlers/stop.ts`: `stopAllRunningWork()` — does it cleanly handle the case where a stop races with a new message arriving?
+- [ ] Audit `handlers/voice.ts` and `handlers/callback.ts`: Do they properly check `isAnyDriverRunning()` before starting work? <- current
 - [ ] Write the audit report to `super_turtle/docs/concurrency-audit.md` with findings and recommendations
 - [ ] Commit the audit report
 
