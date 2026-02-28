@@ -268,14 +268,14 @@ export default function Home() {
             <SectionDivider />
 	      </main>
 
-	      <footer className="relative section-shell footer-shell">
-	        <div className="section-container text-center">
-		          <p className="text-sm text-[var(--text-muted)]">
-		            <a href={githubUrl} target="_blank" rel="noreferrer" className="underline underline-offset-4 hover:no-underline">
-		              SuperTurtle
-		            </a>{' '}
-		            is built using{' '}
-		            <a href={githubUrl} target="_blank" rel="noreferrer" className="underline underline-offset-4 hover:no-underline">
+		      <footer className="relative section-shell footer-shell">
+		        <div className="section-container text-center">
+			          <p className="text-xs sm:text-sm leading-relaxed text-[var(--text-muted)]">
+			            <a href={githubUrl} target="_blank" rel="noreferrer" className="underline underline-offset-4 hover:no-underline">
+			              SuperTurtle
+			            </a>{' '}
+			            is built using{' '}
+			            <a href={githubUrl} target="_blank" rel="noreferrer" className="underline underline-offset-4 hover:no-underline">
 		              SuperTurtle
 		            </a>
 		            . Runs locally today; cloud deployment is coming up.
