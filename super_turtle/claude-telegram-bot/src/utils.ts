@@ -15,6 +15,9 @@ import {
   TRANSCRIPTION_PROMPT,
   TRANSCRIPTION_AVAILABLE,
 } from "./config";
+import { logger } from "./logger";
+
+const utilsLog = logger.child({ module: "utils" });
 
 // ============== OpenAI Client ==============
 
@@ -50,7 +53,7 @@ async function writeAuditLog(event: AuditEvent): Promise<void> {
     const fs = await import("fs/promises");
     await fs.appendFile(AUDIT_LOG_PATH, content);
   } catch (error) {
-    console.error("Failed to write audit log:", error);
+    utilsLog.error({ err: error }, "Failed to write audit log");
   }
 }
 
@@ -151,7 +154,7 @@ export async function transcribeVoice(
   filePath: string
 ): Promise<string | null> {
   if (!openaiClient) {
-    console.warn("OpenAI client not available for transcription");
+    utilsLog.warn("OpenAI client not available for transcription");
     return null;
   }
 
@@ -164,7 +167,7 @@ export async function transcribeVoice(
     });
     return transcript.text;
   } catch (error) {
-    console.error("Transcription failed:", error);
+    utilsLog.error({ err: error }, "Transcription failed");
     return null;
   }
 }
@@ -225,7 +228,7 @@ export async function checkInterrupt(text: string): Promise<string> {
   const strippedText = text.slice(1).trimStart();
 
   if (sessionModule.session.isRunning) {
-    console.log("! prefix - interrupting current query");
+    utilsLog.info("! prefix - interrupting current query");
     sessionModule.session.stopTyping();
     sessionModule.session.markInterrupt();
     await sessionModule.session.stop();

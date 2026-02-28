@@ -34,6 +34,7 @@ import type {
   StatusCallback,
   TokenUsage,
 } from "./types";
+import { claudeLog } from "./logger";
 
 /**
  * Determine thinking token budget based on message keywords.
@@ -132,7 +133,7 @@ function savePrefs(prefs: UserPrefs): void {
   try {
     Bun.write(PREFS_FILE, JSON.stringify(prefs, null, 2));
   } catch (error) {
-    console.warn("Failed to save preferences:", error);
+    claudeLog.warn({ err: error }, "Failed to save preferences");
   }
 }
 
@@ -188,7 +189,7 @@ export class ClaudeSession {
   set activeDriver(value: "claude" | "codex") {
     this._activeDriver = value;
     savePrefs({ model: this._model, effort: this._effort, activeDriver: this._activeDriver });
-    console.log(`Switched to ${value} driver`);
+    claudeLog.info({ driver: value }, `Switched to ${value} driver`);
   }
 
   constructor() {
@@ -201,7 +202,7 @@ export class ClaudeSession {
 
     if (resolvedDriver === "codex" && !CODEX_AVAILABLE) {
       resolvedDriver = "claude";
-      console.warn(
+      claudeLog.warn(
         "Saved active driver is codex, but Codex is unavailable; falling back to claude."
       );
     }
@@ -209,7 +210,7 @@ export class ClaudeSession {
     // Claude Code is the default agent for the meta agent.
     // Do NOT auto-fallback to Codex — require explicit user action via /switch.
     if (resolvedDriver === "claude" && !CLAUDE_CLI_AVAILABLE) {
-      console.error(
+      claudeLog.error(
         "Claude CLI is unavailable. The meta agent requires Claude Code. Install it or set CLAUDE_CLI_PATH."
       );
     }
@@ -224,7 +225,10 @@ export class ClaudeSession {
     }
 
     if (prefs.model || prefs.effort || prefs.activeDriver) {
-      console.log(`Loaded preferences: model=${this._model}, effort=${this._effort}, driver=${this._activeDriver}`);
+      claudeLog.info(
+        { model: this._model, effort: this._effort, driver: this._activeDriver },
+        `Loaded preferences: model=${this._model}, effort=${this._effort}, driver=${this._activeDriver}`
+      );
     }
   }
 
@@ -307,14 +311,14 @@ export class ClaudeSession {
     if (this.isQueryRunning && this.abortController) {
       this.stopRequested = true;
       this.abortController.abort();
-      console.log("Stop requested - aborting current query");
+      claudeLog.info("Stop requested - aborting current query");
       return "stopped";
     }
 
     // If processing but query not started yet
     if (this._isProcessing) {
       this.stopRequested = true;
-      console.log("Stop requested - will cancel before query starts");
+      claudeLog.info("Stop requested - will cancel before query starts");
       return "pending";
     }
 
@@ -391,14 +395,14 @@ export class ClaudeSession {
     }
 
     if (this.sessionId && !isNewSession) {
-      console.log(
+      claudeLog.info(
         `RESUMING session ${this.sessionId.slice(
           0,
           8
         )}... (model=${this.model}, effort=${this.effort}, thinking=${thinkingLabel})`
       );
     } else {
-      console.log(
+      claudeLog.info(
         `STARTING new Claude session (model=${this.model}, effort=${this.effort}, thinking=${thinkingLabel})`
       );
       this.sessionId = null;
@@ -406,7 +410,7 @@ export class ClaudeSession {
 
     // Check if stop was requested during processing phase
     if (this.stopRequested) {
-      console.log(
+      claudeLog.info(
         "Query cancelled before starting (stop was requested during processing)"
       );
       this.stopRequested = false;
@@ -466,7 +470,7 @@ export class ClaudeSession {
 
         if (nextResult === stallTimeoutSentinel) {
           stalled = true;
-          console.warn(
+          claudeLog.warn(
             `Event stream stalled for ${activeTimeout}ms (tool_active=${toolActive}); aborting stream and flushing partial response`
           );
           this.abortController?.abort();
@@ -480,14 +484,14 @@ export class ClaudeSession {
         const event = nextResult.value;
         // Check for abort
         if (this.stopRequested) {
-          console.log("Query aborted by user");
+          claudeLog.info("Query aborted by user");
           break;
         }
 
         // Capture session_id from first message
         if (!this.sessionId && event.session_id) {
           this.sessionId = event.session_id;
-          console.log(`GOT session_id: ${this.sessionId!.slice(0, 8)}...`);
+          claudeLog.info({ sessionId: this.sessionId }, `GOT session_id: ${this.sessionId!.slice(0, 8)}...`);
           this.saveSession();
         }
 
@@ -502,7 +506,7 @@ export class ClaudeSession {
             if (block.type === "thinking") {
               const thinkingText = block.thinking;
               if (thinkingText) {
-                console.log(`THINKING BLOCK: ${thinkingText.slice(0, 100)}...`);
+                claudeLog.info(`THINKING BLOCK: ${thinkingText.slice(0, 100)}...`);
                 await statusCallback("thinking", thinkingText);
               }
             }
@@ -518,7 +522,7 @@ export class ClaudeSession {
                 const command = String(toolInput.command || "");
                 const [isSafe, reason] = checkCommandSafety(command);
                 if (!isSafe) {
-                  console.warn(`BLOCKED: ${reason}`);
+                  claudeLog.warn({ reason, tool: "Bash" }, `BLOCKED: ${reason}`);
                   await statusCallback("tool", `BLOCKED: ${reason}`);
                   throw new Error(`Unsafe command blocked: ${reason}`);
                 }
@@ -535,7 +539,7 @@ export class ClaudeSession {
                       filePath.includes("/.claude/"));
 
                   if (!isTmpRead && !isPathAllowed(filePath)) {
-                    console.warn(
+                    claudeLog.warn(
                       `BLOCKED: File access outside allowed paths: ${filePath}`
                     );
                     await statusCallback("tool", `Access denied: ${filePath}`);
@@ -559,7 +563,7 @@ export class ClaudeSession {
               const toolDisplay = formatToolStatus(toolName, toolInput);
               this.currentTool = toolDisplay;
               this.lastTool = toolDisplay;
-              console.log(`Tool: ${toolDisplay}`);
+              claudeLog.info({ tool: toolName }, `Tool: ${toolDisplay}`);
 
               // Don't show tool status for MCP tools that handle their own output
               if (
@@ -656,14 +660,14 @@ export class ClaudeSession {
 
         // Result message
         if (event.type === "result") {
-          console.log("Response complete");
+          claudeLog.info("Response complete");
           queryCompleted = true;
 
           // Capture usage if available
           if ("usage" in event && event.usage) {
             this.lastUsage = event.usage as TokenUsage;
             const u = this.lastUsage;
-            console.log(
+            claudeLog.info(
               `Usage: in=${u.input_tokens} out=${u.output_tokens} cache_read=${
                 u.cache_read_input_tokens || 0
               } cache_create=${u.cache_creation_input_tokens || 0}`
@@ -673,7 +677,7 @@ export class ClaudeSession {
       }
 
       if (stalled) {
-        console.log("Stall recovery activated; continuing with partial response flush");
+        claudeLog.info("Stall recovery activated; continuing with partial response flush");
       }
 
       // V1 query completes automatically when the generator ends
@@ -693,11 +697,11 @@ export class ClaudeSession {
         isStallAbort ||
         isPostCompletionError
       ) {
-        console.warn(
+        claudeLog.warn(
           `Suppressed post-completion error: ${normalizedError.message}`
         );
       } else {
-        console.error(`Error in query: ${normalizedError.message}`);
+        claudeLog.error({ err: normalizedError }, `Error in query: ${normalizedError.message}`);
         this.lastError = normalizedError.message.slice(0, 100);
         this.lastErrorTime = new Date();
         throw normalizedError;
@@ -737,7 +741,7 @@ export class ClaudeSession {
     if (!responseText && this.lastUsage) {
       const u = this.lastUsage;
       if (u.input_tokens === 0 && u.output_tokens === 0) {
-        console.warn(
+        claudeLog.warn(
           "Empty response detected (in=0 out=0) — session likely stale, clearing for retry"
         );
         // Clear the stale session so the retry starts fresh
@@ -764,7 +768,7 @@ export class ClaudeSession {
     this.sessionId = null;
     this.lastActivity = null;
     this.conversationTitle = null;
-    console.log("Session cleared");
+    claudeLog.info("Session cleared");
   }
 
   /**
@@ -802,9 +806,9 @@ export class ClaudeSession {
 
       // Save
       Bun.write(SESSION_FILE, JSON.stringify(history, null, 2));
-      console.log(`Session saved to ${SESSION_FILE}`);
+      claudeLog.info({ sessionFile: SESSION_FILE, sessionId: this.sessionId }, `Session saved to ${SESSION_FILE}`);
     } catch (error) {
-      console.warn(`Failed to save session: ${error}`);
+      claudeLog.warn({ err: error }, "Failed to save session");
     }
   }
 
@@ -858,7 +862,7 @@ export class ClaudeSession {
     this.conversationTitle = sessionData.title;
     this.lastActivity = new Date();
 
-    console.log(
+    claudeLog.info(
       `Resumed session ${sessionData.session_id.slice(0, 8)}... - "${sessionData.title}"`
     );
 

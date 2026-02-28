@@ -17,6 +17,7 @@ import {
 } from "./config";
 import { formatCodexToolStatus } from "./formatting";
 import type { StatusCallback, McpCompletionCallback, SavedSession, SessionHistory } from "./types";
+import { codexLog } from "./logger";
 
 // Prefs file for Codex (separate from Claude)
 const CODEX_PREFS_FILE = "/tmp/codex-telegram-prefs.json";
@@ -51,7 +52,7 @@ function saveCodexPrefs(prefs: CodexPrefs): void {
   try {
     Bun.write(CODEX_PREFS_FILE, JSON.stringify(prefs, null, 2));
   } catch (error) {
-    console.warn("Failed to save Codex preferences:", error);
+    codexLog.warn({ err: error }, "Failed to save Codex preferences");
   }
 }
 
@@ -474,7 +475,7 @@ async function requestAppServer<T>(
   }
 
   if (requestError) {
-    console.warn(`Codex app-server ${method} error: ${requestError}`);
+    codexLog.warn({ action: method }, `Codex app-server ${method} error: ${requestError}`);
     return null;
   }
 
@@ -640,13 +641,16 @@ export class CodexSession {
 
     if (prefs.threadId) {
       this.threadId = prefs.threadId;
-      console.log(
+      codexLog.info(
         `Loaded saved Codex thread: ${this.threadId.slice(0, 8)}...`
       );
     }
 
     if (prefs.model || prefs.reasoningEffort) {
-      console.log(`Codex preferences: model=${this._model}, reasoningEffort=${this._reasoningEffort}`);
+      codexLog.info(
+        { model: this._model, reasoningEffort: this._reasoningEffort },
+        `Codex preferences: model=${this._model}, reasoningEffort=${this._reasoningEffort}`
+      );
     }
   }
 
@@ -659,7 +663,7 @@ export class CodexSession {
     if (this.isQueryRunning && this.abortController) {
       this.stopRequested = true;
       this.abortController.abort();
-      console.log("Codex stop requested - aborting current query");
+      codexLog.info("Codex stop requested - aborting current query");
       return "stopped";
     }
 
@@ -684,11 +688,11 @@ export class CodexSession {
       const codexPathOverride = getCodexSdkPathOverride();
       const hasExisting = await hasExistingMcpConfig();
       if (hasExisting) {
-        console.log("MCP servers found in ~/.codex/config.toml, using existing config");
+        codexLog.info("MCP servers found in ~/.codex/config.toml, using existing config");
         this.codex = new CodexImpl({ codexPathOverride });
       } else {
         // Pass MCP config programmatically if not already configured
-        console.log("Passing MCP servers via Codex constructor");
+        codexLog.info("Passing MCP servers via Codex constructor");
         const mcpConfig = buildCodexMcpConfig();
         this.codex = new CodexImpl({ codexPathOverride, config: mcpConfig });
       }
@@ -732,7 +736,7 @@ export class CodexSession {
       this.threadId = this.thread.id;
       this.systemPromptPrepended = false; // Reset flag for new thread
 
-      console.log(`Started new Codex thread: ${this.threadId?.slice(0, 8)}...`);
+      codexLog.info({ sessionId: this.threadId }, `Started new Codex thread: ${this.threadId?.slice(0, 8)}...`);
 
       // Save thread ID for persistence
       saveCodexPrefs({
@@ -742,7 +746,7 @@ export class CodexSession {
         reasoningEffort: threadEffort,
       });
     } catch (error) {
-      console.error("Error starting Codex thread:", error);
+      codexLog.error({ err: error }, "Error starting Codex thread");
       this.lastError = String(error).slice(0, 100);
       this.lastErrorTime = new Date();
       throw error;
@@ -777,9 +781,9 @@ export class CodexSession {
       this.threadId = threadId;
       this.systemPromptPrepended = true; // Already sent in original thread
 
-      console.log(`Resumed Codex thread: ${threadId.slice(0, 8)}...`);
+      codexLog.info({ sessionId: threadId }, `Resumed Codex thread: ${threadId.slice(0, 8)}...`);
     } catch (error) {
-      console.error("Error resuming Codex thread:", error);
+      codexLog.error({ err: error }, "Error resuming Codex thread");
       this.lastError = String(error).slice(0, 100);
       this.lastErrorTime = new Date();
       throw error;
@@ -921,7 +925,7 @@ ${messageToSend}`;
 
         if (nextResult === stallTimeoutSentinel) {
           stalled = true;
-          console.warn(
+          codexLog.warn(
             `Codex event stream stalled for ${EVENT_STREAM_STALL_TIMEOUT_MS}ms; aborting stream`
           );
           this.stopRequested = true;
@@ -938,7 +942,7 @@ ${messageToSend}`;
         const event = nextResult.value;
         // Check for abort
         if (this.stopRequested) {
-          console.log("Codex query aborted by user");
+          codexLog.info("Codex query aborted by user");
           break;
         }
 
@@ -985,7 +989,7 @@ ${messageToSend}`;
           }
 
           if (item.type === "reasoning" && statusCallback && item.text) {
-            console.log(`THINKING: ${item.text.slice(0, 100)}...`);
+            codexLog.info(`THINKING: ${item.text.slice(0, 100)}...`);
             await statusCallback("thinking", item.text);
           }
 
@@ -993,7 +997,7 @@ ${messageToSend}`;
             const toolLabel = `${item.server}/${item.tool}`;
             const statusSuffix =
               item.status === "failed" ? `(failed: ${item.error?.message || "unknown"})` : "";
-            console.log(`MCP TOOL: ${toolLabel}`);
+            codexLog.info({ tool: item.tool }, `MCP TOOL: ${toolLabel}`);
             if (statusCallback) {
               await statusCallback("tool", formatCodexToolStatus("mcp", toolLabel, statusSuffix || undefined));
             }
@@ -1006,7 +1010,7 @@ ${messageToSend}`;
                   askUserTriggered = true;
                 }
               } catch (error) {
-                console.warn("Error in MCP completion callback:", error);
+                codexLog.warn({ err: error }, "Error in MCP completion callback");
               }
             }
           }
@@ -1015,7 +1019,7 @@ ${messageToSend}`;
             const command = item.command.slice(0, 100);
             const exitInfo =
               typeof item.exit_code === "number" ? `(exit ${item.exit_code})` : "";
-            console.log(`COMMAND: ${command}`);
+            codexLog.info(`COMMAND: ${command}`);
             await statusCallback("tool", formatCodexToolStatus("bash", command, exitInfo || undefined));
           }
 
@@ -1024,23 +1028,23 @@ ${messageToSend}`;
             const count = item.changes.length;
             if (firstPath) {
               const suffix = count > 1 ? `(+${count - 1} more)` : "";
-              console.log(`FILE: ${firstPath}`);
+              codexLog.info(`FILE: ${firstPath}`);
               await statusCallback("tool", formatCodexToolStatus("file", firstPath, suffix || undefined));
             }
           }
 
           if (item.type === "web_search" && itemCompleted && statusCallback) {
-            console.log(`SEARCH: ${item.query}`);
+            codexLog.info(`SEARCH: ${item.query}`);
             await statusCallback("tool", formatCodexToolStatus("search", item.query));
           }
 
           if (item.type === "error" && statusCallback) {
-            console.log(`ERROR: ${item.message}`);
+            codexLog.info(`ERROR: ${item.message}`);
             await statusCallback("tool", `Error: ${item.message}`);
           }
 
           if (item.type === "todo_list" && statusCallback && item.items.length > 0) {
-            console.log(`TODO LIST: ${item.items.length} items`);
+            codexLog.info(`TODO LIST: ${item.items.length} items`);
             await statusCallback(
               "tool",
               `Todo: ${item.items.length} item${item.items.length > 1 ? "s" : ""}`
@@ -1050,7 +1054,7 @@ ${messageToSend}`;
 
         // Break out of event loop if ask_user was triggered
         if (askUserTriggered) {
-          console.log("Ask user triggered, breaking event loop");
+          codexLog.info("Ask user triggered, breaking event loop");
           break;
         }
 
@@ -1061,7 +1065,7 @@ ${messageToSend}`;
           event.usage
         ) {
           this.lastUsage = event.usage;
-          console.log(
+          codexLog.info(
             `Codex usage: in=${event.usage.input_tokens} out=${event.usage.output_tokens}`
           );
           queryCompleted = true;
@@ -1109,7 +1113,7 @@ ${messageToSend}`;
       if (!combinedResponse && this.lastUsage) {
         const u = this.lastUsage;
         if (u.input_tokens === 0 && u.output_tokens === 0) {
-          console.warn(
+          codexLog.warn(
             "Empty Codex response detected (in=0 out=0) — thread likely stale, clearing for retry"
           );
           this.threadId = null;
@@ -1141,9 +1145,9 @@ ${messageToSend}`;
         errorLower.includes("abort") || errorLower.includes("cancel");
 
       if (isCancellation && this.stopRequested) {
-        console.warn(`Suppressed Codex cancellation after stop request: ${errorMessage}`);
+        codexLog.warn(`Suppressed Codex cancellation after stop request: ${errorMessage}`);
       } else {
-        console.error("Error sending message to Codex:", error);
+        codexLog.error({ err: error }, "Error sending message to Codex");
         this.lastError = errorMessage.slice(0, 100);
         this.lastErrorTime = new Date();
       }
@@ -1188,9 +1192,9 @@ ${messageToSend}`;
 
       // Save
       Bun.write(CODEX_SESSION_FILE, JSON.stringify(history, null, 2));
-      console.log(`Codex session saved: ${this.threadId!.slice(0, 8)}...`);
+      codexLog.info({ sessionId: this.threadId }, `Codex session saved: ${this.threadId!.slice(0, 8)}...`);
     } catch (error) {
-      console.warn(`Failed to save Codex session: ${error}`);
+      codexLog.warn({ err: error }, "Failed to save Codex session");
     }
   }
 
@@ -1269,7 +1273,7 @@ ${messageToSend}`;
     try {
       await this.resumeThread(sessionId);
       this.saveSession(sessionData.title);
-      console.log(
+      codexLog.info(
         `Resumed Codex session ${sessionData.session_id.slice(0, 8)}... - "${sessionData.title}"`
       );
       return [true, `Resumed Codex session: "${sessionData.title}"`];
@@ -1305,7 +1309,7 @@ ${messageToSend}`;
       createdAt: new Date().toISOString(),
     });
 
-    console.log("Codex session cleared");
+    codexLog.info("Codex session cleared");
   }
 
   /**
