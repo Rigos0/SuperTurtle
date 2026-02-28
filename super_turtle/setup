@@ -200,11 +200,15 @@ if [[ "${INSTALL_DEPS}" -eq 1 ]]; then
   (cd "${BOT_DIR}" && bun install)
 
   if [[ "${INSTALL_DOCS}" -eq 1 ]]; then
-    if have_cmd npm; then
-      echo "[setup] Installing docs dependencies (npm install)..."
-      (cd "${DOCS_DIR}" && npm install)
+    if [[ -f "${DOCS_DIR}/package.json" ]]; then
+      if have_cmd npm; then
+        echo "[setup] Installing docs dependencies (npm install)..."
+        (cd "${DOCS_DIR}" && npm install)
+      else
+        echo "[setup] npm not found, skipping docs dependency install."
+      fi
     else
-      echo "[setup] npm not found, skipping docs dependency install."
+      echo "[setup] Docs is not a Node.js project (no package.json), skipping npm install."
     fi
   fi
 fi
