@@ -2,13 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { StickyNav } from '@/components/StickyNav';
-import { SectionDivider } from '@/components/SectionDivider';
-
-const chatMessages = [
-  { from: 'user', text: 'build me a landing page and wire screenshots' },
-  { from: 'bot', text: '🚀 On it. I split this into 3 SubTurtles.' },
-  { from: 'bot', text: '📍 Milestone: Hero shipped. Screenshot captured. Continuing.' },
-];
 
 const heroHighlights = [
   {
@@ -26,25 +19,6 @@ const heroHighlights = [
     description:
       'Breaks work into tasks, runs sub-agents, can open/test webpages, and iterates until done.',
     accent: 'sage',
-  },
-];
-
-const executionFlow = [
-  {
-    title: 'You send one request',
-    description: 'Example: "build X" in Telegram.',
-  },
-  {
-    title: 'It decomposes and spawns SubTurtles',
-    description: 'Parallel workers per task stream.',
-  },
-  {
-    title: 'Workers implement and iterate',
-    description: 'Code, test, browser checks, and retries.',
-  },
-  {
-    title: 'Meta supervision keeps it moving',
-    description: 'Cron check-ins detect drift and report milestones.',
   },
 ];
 
@@ -289,77 +263,7 @@ export default function Home() {
           </div>
           <div className="hero-glow" />
 	        </section>
-
-	        <SectionDivider />
-
-	        <section id="execution" className="section-shell">
-	          <div className="section-container max-w-4xl space-y-10">
-	            <div>
-	              <div className="section-head reveal">
-                <p className="eyebrow">Execution</p>
-                <h2>How work runs</h2>
-              </div>
-              <div className="mt-8 grid gap-4">
-                {executionFlow.map((step, index) => (
-                  <article className="flow-step reveal" key={step.title} style={{ animationDelay: `${220 + index * 90}ms` }}>
-                    <div className="flow-step-index">{index + 1}</div>
-                    <div>
-                      <h3>{step.title}</h3>
-                      <p>{step.description}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </div>
-
-            <div className="reveal max-w-2xl" style={{ animationDelay: '260ms' }}>
-              <div className="tg-chat">
-                <div className="tg-chat-head">
-                  <div className="tg-avatar">🐢</div>
-                  <div>
-                    <div className="tg-name">Super Turtle</div>
-                    <div className="tg-status">scheduled check-ins active</div>
-                  </div>
-                </div>
-                <div className="tg-chat-body">
-                  {chatMessages.map((msg, i) => (
-                    <div key={i} className={`tg-bubble ${msg.from === 'user' ? 'tg-bubble-user' : 'tg-bubble-bot'}`}>
-                      {msg.text.split('\n').map((line, j) => (
-                        <span key={j}>{line}{j < msg.text.split('\n').length - 1 && <br />}</span>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <SectionDivider />
-
-        <section id="getting-started" className="section-shell alt-shell">
-          <div className="section-container max-w-4xl">
-            <div className="section-head reveal">
-              <p className="eyebrow">Quick start</p>
-              <h2>Get running in two minutes</h2>
-            </div>
-
-            <div className="mt-10 grid gap-5">
-              {[
-                'git clone <repo>',
-                'cd super-turtle\nclaude\n# or codex',
-                'say:\nSet up Super Turtle on this machine.',
-                'chat from Telegram\n(text or voice)',
-              ].map((command, index) => (
-                <div className="reveal step-card" key={index} style={{ animationDelay: `${280 + index * 100}ms` }}>
-                  <div className="step-label">Step {index + 1}</div>
-                  <div className="step-code">{command}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      </main>
+	      </main>
 
       <footer className="relative section-shell footer-shell">
         <div className="section-container text-center">
