@@ -172,6 +172,19 @@ export async function handleText(
           }
         }
 
+        // Empty response from stale session — session was already cleared,
+        // so retry will start a fresh session transparently.
+        if (getErrorMessage(error).includes("Empty response from stale session") && attempt < MAX_RETRIES) {
+          console.log(
+            `Empty response from stale session, retrying with fresh session (attempt ${attempt + 2}/${MAX_RETRIES + 1})`
+          );
+          state = new StreamingState();
+          statusCallback = silent
+            ? createSilentStatusCallback(ctx, state)
+            : createStatusCallback(ctx, state);
+          continue;
+        }
+
         if (driver.isStallError(error) && attempt < MAX_RETRIES) {
           if (state.sawSpawnOrchestration) {
             console.warn(`${driver.displayName} stream stalled after spawn orchestration; running safe continuation retry`);

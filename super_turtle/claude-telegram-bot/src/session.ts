@@ -702,6 +702,22 @@ export class ClaudeSession {
       return "[Waiting for user selection]";
     }
 
+    // Detect empty response (in=0 out=0) — typically means the resumed session
+    // is stale or expired. Throw so the caller can retry with a fresh session.
+    const responseText = responseParts.join("");
+    if (!responseText && this.lastUsage) {
+      const u = this.lastUsage;
+      if (u.input_tokens === 0 && u.output_tokens === 0) {
+        console.warn(
+          "Empty response detected (in=0 out=0) — session likely stale, clearing for retry"
+        );
+        // Clear the stale session so the retry starts fresh
+        this.sessionId = null;
+        await statusCallback("done", "");
+        throw new Error("Empty response from stale session");
+      }
+    }
+
     // Emit final segment
     if (currentSegmentText) {
       await statusCallback("segment_end", currentSegmentText, currentSegmentId);
@@ -709,7 +725,7 @@ export class ClaudeSession {
 
     await statusCallback("done", "");
 
-    return responseParts.join("") || "No response from Claude.";
+    return responseText || "No response from Claude.";
   }
 
   /**
@@ -738,7 +754,7 @@ export class ClaudeSession {
         session_id: this.sessionId,
         saved_at: new Date().toISOString(),
         working_dir: WORKING_DIR,
-        title: this.conversationTitle || "Sessione senza titolo",
+        title: this.conversationTitle || "Untitled session",
       };
 
       // Remove any existing entry with same session_id (update in place)
@@ -799,13 +815,13 @@ export class ClaudeSession {
     const sessionData = history.sessions.find((s) => s.session_id === sessionId);
 
     if (!sessionData) {
-      return [false, "Sessione non trovata"];
+      return [false, "Session not found"];
     }
 
     if (sessionData.working_dir && sessionData.working_dir !== WORKING_DIR) {
       return [
         false,
-        `Sessione per directory diversa: ${sessionData.working_dir}`,
+        `Session belongs to a different directory: ${sessionData.working_dir}`,
       ];
     }
 
@@ -819,7 +835,7 @@ export class ClaudeSession {
 
     return [
       true,
-      `Ripresa sessione: "${sessionData.title}"`,
+      `Resumed session: "${sessionData.title}"`,
     ];
   }
 
@@ -829,7 +845,7 @@ export class ClaudeSession {
   resumeLast(): [success: boolean, message: string] {
     const sessions = this.getSessionList();
     if (sessions.length === 0) {
-      return [false, "Nessuna sessione salvata"];
+      return [false, "No saved sessions"];
     }
 
     return this.resumeSession(sessions[0]!.session_id);
