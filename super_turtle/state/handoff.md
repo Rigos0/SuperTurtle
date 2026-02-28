@@ -1,9 +1,9 @@
 # SubTurtle Long-Run Handoff
 
-Last updated: 2026-02-28T08:26:20Z
+Last updated: 2026-02-28T23:28:18Z
 
 ## Active Runs
-- concurrency-audit (last event: spawn at 2026-02-28T08:06:14Z)
+- structured-logging (last event: spawn at 2026-02-28T22:58:14Z)
 
 ## Recent Milestones
 - None yet.
