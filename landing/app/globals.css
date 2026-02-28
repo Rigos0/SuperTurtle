@@ -49,6 +49,13 @@ body {
 .landing-root {
   position: relative;
   overflow-x: hidden;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.landing-root > main {
+  flex: 1 0 auto;
 }
 
 .section-shell {
@@ -453,6 +460,7 @@ body {
 }
 
 .footer-shell {
+  margin-top: auto;
   border-top: 1px solid rgba(85, 108, 75, 0.2);
   background: linear-gradient(0deg, rgba(255, 255, 255, 0.65), rgba(248, 246, 241, 0.4));
 }
