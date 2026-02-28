@@ -6,8 +6,6 @@
 
 Code from anywhere with your voice.
 
-Full docs: [docs/index.md](docs/index.md)
-
 <p align="center">
   <img src="assets/readme-stickers/skills-idea-turtle.png" width="108" alt="Philosophy turtle sticker" />
 </p>
@@ -21,7 +19,7 @@ Full docs: [docs/index.md](docs/index.md)
 5. It tracks remaining usage and load-balances between Claude Code and Codex.
 6. Autonomous supervision: scheduled cron check-ins monitor progress in the background and send important updates.
 
-* Uses official Claude Code/Codex CLI authentication flows in headless mode. This wrapper approach is compliant with provider terms.
+\* Uses official Claude Code/Codex CLI authentication flows in headless mode. This wrapper approach is compliant with provider terms.
 
 <p align="center">
   <img src="assets/readme-stickers/setup-save-turtle.png" width="108" alt="Setup turtle sticker" />
@@ -29,34 +27,28 @@ Full docs: [docs/index.md](docs/index.md)
 
 ## Setup
 
-### 1) Clone the repo
+### 1. Clone the repo
 
 ```bash
 git clone https://github.com/Rigos0/superturtle.git
 cd superturtle
 ```
 
-You can ask Claude/Codex to clone it for you, then ensure you are in the repo root.
-
-### 2) Open Claude Code or Codex in the repo root
+### 2. Open Claude Code or Codex
 
 ```bash
-# from repo root
-claude
+claude --dangerously-skip-permissions
 # or
-codex
+codex --full-auto
 ```
 
-### 3) Say the setup prompt
+### 3. Prompt
 
-```text
-Set up Super Turtle on this machine.
+```
+Set up Super Turtle for me.
 ```
 
-Required values to provide:
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_ALLOWED_USERS`
-- Optional `OPENAI_API_KEY`
+The agent will walk you through everything — it'll ask for your Telegram bot token, user ID, and optionally an OpenAI API key for voice transcription. Then it installs dependencies, writes config, and tells you how to start the bot.
 
 <p align="center">
   <img src="assets/readme-stickers/architecture-gear-turtle.png" width="108" alt="Architecture turtle sticker" />
@@ -66,8 +58,10 @@ Required values to provide:
 
 - **Human** -> Telegram/CLI
 - **Meta Agent** -> plans, delegates, supervises
-- **SubTurtles** -> `slow`, `yolo`, `yolo-codex`, `yolo-codex-spark`
+- **SubTurtles** -> autonomous worker agents that code, test, and iterate
 - **State + logs** -> `CLAUDE.md`, `.subturtles/<name>/`, git commits
+
+Full docs: [superturtle.mintlify.app](https://superturtle.mintlify.app)
 
 <p align="center">
   <img src="assets/readme-stickers/run-fire-turtle.png" width="108" alt="Run turtle sticker" />
@@ -75,42 +69,11 @@ Required values to provide:
 
 ## Run
 
-### Start Meta Agent
-
-```bash
-./super_turtle/meta/claude-meta
-```
-
-### Key SubTurtle commands
-
-```bash
-./super_turtle/subturtle/ctl spawn <name> --type yolo-codex --timeout 1h --state-file <path|->
-./super_turtle/subturtle/ctl list
-./super_turtle/subturtle/ctl status <name>
-./super_turtle/subturtle/ctl logs <name>
-./super_turtle/subturtle/ctl stop <name>
-```
-
-### Docs (optional)
-
-```bash
-cd docs
-npm install
-npm run docs:dev
-```
-
-<p align="center">
-  <img src="assets/readme-stickers/monitoring-alarm-turtle.png" width="108" alt="Monitoring turtle sticker" />
-</p>
-
-## Bot Monitoring
+Once setup is complete, start the Telegram bot:
 
 ```bash
 cd super_turtle/claude-telegram-bot
 bun run start
-
-# optional
-# tmux attach -t superturtle-bot
-# tmux has-session -t superturtle-bot && echo "running" || echo "stopped"
-# tmux kill-session -t superturtle-bot
 ```
+
+Then open Telegram, find your bot, and start chatting. Tell it to build something.

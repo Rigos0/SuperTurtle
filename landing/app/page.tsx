@@ -407,10 +407,9 @@ export default function Home() {
 
             <div className="mt-10 grid gap-5">
               {[
-                'git clone <repo>',
-                'cd super-turtle\nclaude\n# or codex',
-                'say:\nSet up Super Turtle on this machine.',
-                'chat from Telegram\n(text or voice)',
+                'git clone https://github.com/Rigos0/superturtle.git\ncd superturtle',
+                'claude --dangerously-skip-permissions\n# or\ncodex --full-auto',
+                'Set up Super Turtle for me.',
               ].map((command, index) => (
                 <div className="reveal step-card" key={index} style={{ animationDelay: `${280 + index * 100}ms` }}>
                   <div className="step-label">Step {index + 1}</div>
