@@ -1,5 +1,5 @@
 # Current Task
-Read streaming.ts and write streaming.test.ts.
+Run `bun test` to verify all new tests pass alongside existing tests.
 
 ## End Goal with Specs
 Fill the critical gaps in bot test coverage with pure unit tests. No Telegram API mocking needed — focus on exported pure functions.
@@ -101,6 +101,7 @@ Tests for:
 - [x] Read cron.ts and write cron.test.ts
 - [x] Read context-command.ts and write context-command.test.ts
 - [x] Read dashboard.ts and write dashboard.test.ts
-- [ ] Read streaming.ts and write streaming.test.ts <- current
-- [ ] Run `bun test` to verify all new tests pass alongside existing tests
+- [x] Read streaming.ts and write streaming.test.ts
+- [ ] Run `bun test` to verify all new tests pass alongside existing tests <- current
+  - Note: Ran `bun test`; suite currently has pre-existing failures unrelated to streaming tests.
 - [ ] Commit
