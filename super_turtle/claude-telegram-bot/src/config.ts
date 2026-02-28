@@ -217,14 +217,19 @@ export const ALLOWED_PATHS: string[] = allowedPathsStr
       .filter(Boolean)
   : defaultAllowedPaths;
 
-// Load META_SHARED.md as system prompt so the bot acts as the meta agent
+// Load BOT_SYSTEM_PROMPT.md as system prompt for the Telegram bot
 let META_PROMPT = "";
 try {
-  const metaPath = resolve(WORKING_DIR, "super_turtle/meta/META_SHARED.md");
-  META_PROMPT = readFileSync(metaPath, "utf-8").trim();
-  console.log(`Loaded meta prompt from ${metaPath}`);
+  const botPromptPath = resolve(
+    WORKING_DIR,
+    "super_turtle/claude-telegram-bot/BOT_SYSTEM_PROMPT.md"
+  );
+  META_PROMPT = readFileSync(botPromptPath, "utf-8").trim();
+  console.log(`Loaded bot system prompt from ${botPromptPath}`);
 } catch {
-  console.warn("Failed to load META_SHARED.md - running without meta prompt");
+  console.warn(
+    "Failed to load BOT_SYSTEM_PROMPT.md - bot will respond with default Claude behavior"
+  );
 }
 
 export { META_PROMPT };
