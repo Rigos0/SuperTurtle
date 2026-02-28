@@ -1,14 +1,11 @@
 # Super Turtle
 
+Code from anywhere with your voice.
+
 <p align="center">
   <img src="assets/readme-stickers/hero-double-turtle.png" width="160" alt="Super Turtle" />
 </p>
 
-Code from anywhere with your voice.
-
-<p align="center">
-  <img src="assets/readme-stickers/skills-idea-turtle.png" width="108" alt="Skills turtle sticker" />
-</p>
 
 ## What It Is
 
@@ -107,3 +104,6 @@ Then message your bot in Telegram and ask it to build something.
 
 - Docs site: [superturtle.mintlify.app](https://superturtle.mintlify.app)
 - Start with: [Quickstart](docs/quickstart.mdx)
+
+Full documentation: https://superturtle.mintlify.app
+Platform support details: https://superturtle.mintlify.app/config/platform-support
