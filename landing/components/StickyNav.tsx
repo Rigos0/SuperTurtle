@@ -26,15 +26,15 @@ export function StickyNav() {
       <div className="max-w-6xl mx-auto w-full flex items-center justify-between">
         {/* Left: Logo + Text */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 flex-shrink-0">
-            <img
-              src="/turtle-logo.png"
-              alt="Super Turtle"
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <span className="text-lg font-bold text-[#1a1815]">Super Turtle</span>
-        </div>
+	          <div className="w-8 h-8 flex-shrink-0">
+	            <img
+	              src="/turtle-logo.png"
+	              alt="SuperTurtle"
+	              className="w-full h-full object-contain"
+	            />
+	          </div>
+	          <span className="text-lg font-bold text-[#1a1815]">SuperTurtle</span>
+	        </div>
 
         {/* Right: GitHub CTA */}
         <a

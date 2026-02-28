@@ -62,7 +62,7 @@ const installWalkthrough = [
   'step 1:', 'git clone the repo',
   'step 2:', 'cd super-turtle',
   'step 3:', 'open claude', 'or codex',
-  'step 4:', 'say:', 'set up Super Turtle',
+  'step 4:', 'say:', 'set up SuperTurtle',
   'step 5:', 'get your Telegram token', 'from BotFather',
   'step 6:', 'paste it in',
   'step 7:', 'start the bot',
@@ -218,13 +218,13 @@ export default function Home() {
                   className="turtle-sticker-trigger"
                   onClick={handleTurtleClick}
                   aria-label="Show turtle message"
-                >
-                  <img className="turtle-sticker-image" src="/turtle-logo.png" alt="Super Turtle" width={104} height={104} style={{ width: 'var(--turtle-size)', height: 'var(--turtle-size)' }} />
-                </div>
-              </div>
-              <h1 className="headline mt-6 sm:mt-7 md:mt-8">
-                Super Turtle!
-              </h1>
+	                >
+	                  <img className="turtle-sticker-image" src="/turtle-logo.png" alt="SuperTurtle" width={104} height={104} style={{ width: 'var(--turtle-size)', height: 'var(--turtle-size)' }} />
+	                </div>
+	              </div>
+	              <h1 className="headline mt-6 sm:mt-7 md:mt-8">
+	                SuperTurtle!
+	              </h1>
               <p className="lead max-w-2xl">
                 Code from anywhere with your voice
               </p>
@@ -268,13 +268,16 @@ export default function Home() {
             <SectionDivider />
 	      </main>
 
-      <footer className="relative section-shell footer-shell">
-        <div className="section-container text-center">
-          <p className="text-sm text-[var(--text-muted)]">
-            Super Turtle is built using Super Turtle. Runs locally today; cloud deployment is coming up.
-          </p>
-        </div>
-      </footer>
+	      <footer className="relative section-shell footer-shell">
+	        <div className="section-container text-center">
+	          <p className="text-sm text-[var(--text-muted)]">
+	            <a href={githubUrl} target="_blank" rel="noreferrer" className="underline underline-offset-4 hover:no-underline">
+	              SuperTurtle
+	            </a>{' '}
+	            is built using SuperTurtle. Runs locally today; cloud deployment is coming up.
+	          </p>
+	        </div>
+	      </footer>
     </div>
   );
 }
