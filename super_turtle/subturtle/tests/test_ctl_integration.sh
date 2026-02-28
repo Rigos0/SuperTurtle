@@ -617,6 +617,47 @@ STATE
   return 0
 }
 
+test_watchdog_timeout() {
+  local name state_path ws pid log_path
+  name="$(make_test_name "watchdog-timeout")"
+  state_path="${TMP_DIR}/${name}.md"
+  ws="${SUBTURTLES_DIR}/${name}"
+  log_path="${ws}/subturtle.log"
+
+  cat > "$state_path" <<'STATE'
+# Current Task
+watchdog timeout test
+STATE
+
+  if ! "$CTL" spawn "$name" --type yolo-codex --timeout 5 --state-file "$state_path" >/dev/null; then
+    fail "spawn failed for ${name}"
+    return 1
+  fi
+  track_subturtle "$name"
+
+  pid="$(cat "${ws}/subturtle.pid")"
+  assert_pid_running "$pid" || return 1
+
+  for _ in $(seq 1 40); do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      break
+    fi
+    sleep 0.25
+  done
+
+  assert_pid_dead "$pid" || return 1
+
+  for _ in $(seq 1 20); do
+    if grep -Fq "TIMEOUT" "$log_path" 2>/dev/null; then
+      return 0
+    fi
+    sleep 0.25
+  done
+
+  fail "expected timeout log entry in ${log_path}"
+  return 1
+}
+
 run_test() {
   local test_name="$1"
   TOTAL_TESTS=$((TOTAL_TESTS + 1))
@@ -661,6 +702,7 @@ register_test test_stop_archives_workspace
 register_test test_stop_already_dead
 register_test test_list_shows_subturtles
 register_test test_list_shows_tunnel_url
+register_test test_watchdog_timeout
 
 run_all_tests() {
   local test_name

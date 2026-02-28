@@ -1,5 +1,5 @@
 # Current Task
-Write watchdog timeout test (5s timeout).
+Write gc and reschedule-cron tests.
 
 ## End Goal with Specs
 A single test script that exercises every `ctl` command with fake CLI binaries. Tests run in ~30 seconds, no real Claude/Codex calls, fully deterministic.
@@ -58,8 +58,8 @@ A single test script that exercises every `ctl` command with fake CLI binaries. 
 - [x] Write status tests: running output, stopped output
 - [x] Write stop tests: kills process, cleans cron, archives, handles dead process
 - [x] Write list tests: shows subturtles, shows tunnel URL
-- [ ] Write watchdog timeout test (5s timeout) <- current
-- [ ] Write gc and reschedule-cron tests
+- [x] Write watchdog timeout test (5s timeout)
+- [ ] Write gc and reschedule-cron tests <- current
 - [ ] Write CLI validation test (missing codex binary)
 - [ ] Run all tests, fix any failures
 - [ ] Commit
