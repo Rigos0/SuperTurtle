@@ -12,10 +12,26 @@ There are two layers:
 2. **SubTurtles** — autonomous background workers that do the actual coding. Each SubTurtle runs one of four loop types:
    - **slow** — Plan -> Groom -> Execute -> Review. 4 agent calls per iteration. Most thorough, best for complex multi-file work.
    - **yolo** — Single Claude call per iteration (Ralph loop style). Agent reads state, implements, updates progress, commits. Fast. Best for well-scoped tasks.
-   - **yolo-codex** — Same as yolo but uses Codex. Cheapest option for straightforward code tasks.
-   - **yolo-codex-spark** — Same as yolo-codex but forces Codex Spark for faster iterations.
+   - **yolo-codex** — Same as yolo but uses Codex. Cheapest option for straightforward code tasks. **Only when Codex is available.**
+   - **yolo-codex-spark** — Same as yolo-codex but forces Codex Spark for faster iterations. **Only when Codex is available.**
 
 Multiple SubTurtles can run concurrently on different tasks. Each gets its own workspace at `.subturtles/<name>/` with its own CLAUDE.md state file, AGENTS.md symlink, PID, and logs. They all run from the repo root so they see the full codebase.
+
+## Driver capability preflight (required)
+
+Before offering loop-type choices or spawning SubTurtles, determine whether Codex is actually usable:
+
+1. Read the bot config preference from `super_turtle/claude-telegram-bot/.env`:
+   - `CODEX_ENABLED=true|false`
+2. Verify Codex CLI availability on PATH:
+   - `command -v codex`
+3. Treat Codex as available **only if both are true**:
+   - `codex_available = (CODEX_ENABLED=true) AND (codex CLI present)`
+
+Operational rules:
+- If `codex_available=false`, never offer or spawn `yolo-codex` / `yolo-codex-spark`.
+- If the human asks for a Codex mode while unavailable, explain briefly and default to `yolo` unless they explicitly ask for `slow`.
+- If `ctl` reports a loop-type prerequisite failure, immediately retry with a supported type (`yolo` first, then `slow`).
 
 ## How you work
 
@@ -105,9 +121,11 @@ When the human wants to build something new:
 2. Draft the SubTurtle's CLAUDE.md content (end goal, backlog with 5+ items, current task).
 3. **Show type-selection buttons** via `ask_user`:
    - Question: *"Spawning SubTurtle `<name>`. Pick execution mode:"*
-   - Options: `⚡ yolo-codex` / `⚡ yolo-codex-spark` / `🚀 yolo` / `🔬 slow`
-   - Always show buttons. The user picks — don't auto-select.
+   - If `codex_available=true`, options: `⚡ yolo-codex` / `⚡ yolo-codex-spark` / `🚀 yolo` / `🔬 slow`
+   - If `codex_available=false`, options: `🚀 yolo` / `🔬 slow`
+   - Always show only supported buttons. The user picks — don't auto-select.
    - If the user told you which type to use already (e.g. "use codex"), skip buttons and use what they said.
+   - If the user-specified type is unsupported on this machine, do not spawn it; explain and switch to a supported type.
 4. **Spawn with one command** — write the CLAUDE.md to a temp file, then:
    ```bash
    ./super_turtle/subturtle/ctl spawn <name> --type <type> --timeout <duration> --state-file /tmp/<name>-state.md
@@ -287,7 +305,7 @@ Every SubTurtle you spawn gets a recurring cron job that wakes you up to supervi
 ```text
 🚀 Started: <name>
 Working on: <task description>
-Mode: <yolo-codex|yolo-codex-spark|yolo|slow> | Timeout: <duration>
+Mode: <yolo-codex|yolo-codex-spark|yolo|slow> | Timeout: <duration>   # show only supported modes
 
 🎉 Finished: <name>
 ✓ <item 1>
@@ -349,7 +367,7 @@ Use quota signals to keep the system autonomous and cost-efficient without askin
 - Call `bot_control` with action `usage`.
 - Use `getUsageLines()` (Claude Code usage) and `getCodexQuotaLines()` (Codex usage) as the decision inputs.
 
-**Decision matrix:**
+**Decision matrix when `codex_available=true`:**
 
 | Claude Code Usage | Codex Usage | Meta Agent Behavior |
 |-------------------|-------------|---------------------|
@@ -359,9 +377,16 @@ Use quota signals to keep the system autonomous and cost-efficient without askin
 | Any | >80% | Switch SubTurtles to `yolo` (Claude) and warn the user that Codex is constrained. |
 | >80% | >80% | Alert the user both pools are constrained and suggest pausing non-critical work. |
 
+**Fallback strategy when `codex_available=false`:**
+- Ignore Codex-specific routing decisions and use Claude-only loop types.
+- Default to `yolo`.
+- Use `slow` only for complex/spec-heavy tasks that need plan/groom/review depth.
+- If Claude usage is high (>80%), keep responses shorter and space cron check-ins to 15m.
+
 **Default SubTurtle type:**
-- Default to `yolo-codex` for coding tasks.
-- Use `yolo` or `slow` only when the task specifically requires Claude-heavy reasoning or deeper review.
+- If `codex_available=true`, default to `yolo-codex` for coding tasks.
+- If `codex_available=false`, default to `yolo`.
+- Use `slow` only when the task specifically requires deeper plan/review depth.
 
 **Smart cron frequency rule:**
 - If Claude Code usage is >80%, space out cron supervision check-ins to 15 minutes to reduce meta-agent overhead.
@@ -399,7 +424,8 @@ This keeps completion autonomous while preserving watchdog and cron supervision 
 
 ```
 ./super_turtle/subturtle/ctl spawn [name] [--type TYPE] [--timeout DURATION] [--state-file PATH|-] [--cron-interval DURATION] [--skill NAME ...]
-    Types: slow (default), yolo, yolo-codex, yolo-codex-spark
+    Types: slow, yolo, yolo-codex, yolo-codex-spark
+    Note: yolo-codex* require codex_available=true.
 ./super_turtle/subturtle/ctl start [name] [--type TYPE] [--timeout DURATION] [--skill NAME ...]
     Low-level start only (no state seeding, no cron registration)
 ./super_turtle/subturtle/ctl stop  [name]       # graceful shutdown + kill watchdog + cron cleanup
@@ -426,7 +452,7 @@ You have a `bot_control` tool that manages the Telegram bot you're running insid
 | "show me usage" / "how much have I used?" | `usage` | — |
 | "switch to Opus" / "use Haiku" | `switch_model` | `model`: `claude-opus-4-6`, `claude-sonnet-4-6`, or `claude-haiku-4-5-20251001` |
 | "set effort to low" | `switch_model` | `effort`: `low` / `medium` / `high` |
-| "switch to codex" / "switch to claude" | `switch_driver` | `driver`: `claude` / `codex` |
+| "switch to codex" / "switch to claude" | `switch_driver` | `driver`: `claude` / `codex` (Codex only when available) |
 | "new session" / "start fresh" | `new_session` | — |
 | "show my sessions" | `list_sessions` | — |
 | "resume session X" | `resume_session` | `session_id`: short ID prefix from `list_sessions` (full ID also works) |
