@@ -93,9 +93,9 @@ export default function Home() {
   const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL ?? '/docs';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? '/';
   const githubUrl = 'https://github.com/Rigos0/superturtle';
-  const substackUrl = process.env.NEXT_PUBLIC_SUBSTACK_URL ?? 'https://substack.com';
-  const linkedinUrl = process.env.NEXT_PUBLIC_LINKEDIN_URL ?? 'https://www.linkedin.com';
-  const twitterUrl = process.env.NEXT_PUBLIC_TWITTER_URL ?? 'https://x.com';
+  const substackUrl = 'https://richardmladek.substack.com/';
+  const linkedinUrl = 'https://www.linkedin.com/in/richard-mladek/';
+  const twitterUrl = 'https://x.com/rmladek';
 
   const socialLinks: SocialLink[] = [
     { label: 'Substack', href: substackUrl, kind: 'substack', external: true },
@@ -203,18 +203,18 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="relative mt-16 section-shell footer-shell sm:mt-20 md:mt-24">
+      <footer className="relative mt-16 footer-shell py-8 sm:mt-20 sm:py-10 md:mt-28 lg:mt-40">
         <div className="section-container">
           <div className="mx-auto max-w-6xl">
-            <div className="space-y-9">
+            <div className="space-y-6 sm:space-y-7">
               <div className="mx-auto w-full max-w-[28rem] text-center">
                 <p className="text-sm leading-relaxed text-[var(--text-muted)]">
                   <a href={siteUrl} className="font-semibold text-[var(--text-heading)] hover:text-[var(--accent-olive)] transition-colors">SuperTurtle</a> was built using <a href={siteUrl} className="font-semibold text-[var(--text-heading)] hover:text-[var(--accent-olive)] transition-colors">SuperTurtle</a>. Runs locally today; cloud deployment is coming up.
                 </p>
               </div>
 
-              <div className="mx-auto flex w-full max-w-[30rem] flex-col items-center gap-8 sm:flex-row sm:items-start sm:justify-center sm:gap-14">
-                <nav className="w-full max-w-[12rem] space-y-3 text-left" aria-label="Social links">
+              <div className="mx-auto flex w-full max-w-[30rem] flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-center sm:gap-10">
+                <nav className="w-full max-w-[12rem] space-y-2 text-left" aria-label="Social links">
                   {socialLinks.map((link) => (
                     <a
                       key={link.label}
@@ -231,7 +231,7 @@ export default function Home() {
                   ))}
                 </nav>
 
-                <nav className="w-full max-w-[12rem] space-y-3 text-left" aria-label="Resource links">
+                <nav className="w-full max-w-[12rem] space-y-2 text-left" aria-label="Resource links">
                   {resourceLinks.map((link) => (
                     <a
                       key={link.label}
