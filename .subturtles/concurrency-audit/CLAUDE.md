@@ -1,5 +1,5 @@
 ## Current Task
-Audit `handlers/text.ts`: the retry loop resets `state` and `statusCallback` — verify whether stall recovery can overlap with a new incoming message, and whether `session.lastMessage` can be clobbered unsafely.
+Audit `handlers/driver-routing.ts`: `isAnyDriverRunning()` checks both drivers — verify whether one driver's `isRunning` can lag and whether `preemptBackgroundRunForUserPriority` has race windows.
 
 ## End Goal with Specs
 Produce a concurrency audit report at `super_turtle/docs/concurrency-audit.md` that documents:
@@ -13,8 +13,8 @@ The report should be concrete — file paths, line numbers, code snippets, and c
 ## Backlog
 - [x] Map all shared mutable state: `session.ts` (isQueryRunning, stopRequested, isActive, etc.), `codex-session.ts` (same), `deferred-queue.ts` (queues Map, drainingChats Set), `session.ts` module-level session singleton
 - [x] Audit `deferred-queue.ts`: Can `drainDeferredQueue` race with `handleText`? What if two cron jobs fire simultaneously and both call `drainDeferredQueue`? Is the `drainingChats` guard sufficient?
-- [ ] Audit `handlers/text.ts`: The retry loop resets `state` and `statusCallback` — can a stall recovery overlap with a new incoming message? What about `session.lastMessage` being overwritten? <- current
-- [ ] Audit `handlers/driver-routing.ts`: `isAnyDriverRunning()` checks both drivers — but is there a window where one driver's `isRunning` getter lags? What about `preemptBackgroundRunForUserPriority`?
+- [x] Audit `handlers/text.ts`: The retry loop resets `state` and `statusCallback` — can a stall recovery overlap with a new incoming message? What about `session.lastMessage` being overwritten?
+- [ ] Audit `handlers/driver-routing.ts`: `isAnyDriverRunning()` checks both drivers — but is there a window where one driver's `isRunning` getter lags? What about `preemptBackgroundRunForUserPriority`? <- current
 - [ ] Audit cron job execution in `src/index.ts`: How does the cron loop interact with active message processing? Can cron-triggered messages race with user messages?
 - [ ] Audit `handlers/streaming.ts`: `StreamingState` — is it safe if multiple status callbacks fire concurrently? Check `toolMessages` array mutations.
 - [ ] Audit `handlers/stop.ts`: `stopAllRunningWork()` — does it cleanly handle the case where a stop races with a new message arriving?

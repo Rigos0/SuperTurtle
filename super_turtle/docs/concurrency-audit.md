@@ -157,3 +157,68 @@ Recommended fix:
 1. Add a global idle drain scheduler in `src/deferred-queue.ts` that scans queued chat IDs and drains one-by-one whenever the system transitions to idle.
 2. Trigger that scheduler from a central completion point (for example after `runMessageWithDriver` completes in cron/text/voice flows), not only from the current chat finalizer.
 3. Keep `drainingChats` as the per-chat re-entrancy guard, but combine it with a process-wide "drain loop active" guard to avoid redundant global sweep invocations.
+
+## Text Handler Concurrency Audit (`src/handlers/text.ts`)
+
+### Question 1: Can stall recovery overlap with a new incoming message?
+
+Conclusion: yes, overlap is possible on the `!` interrupt path and can allow the stalled request to continue retrying while the new message starts.
+
+Evidence:
+- `!` messages bypass per-chat sequentialization (`src/index.ts:536-539`), so they can execute concurrently with an in-flight `handleText`.
+- The retry loop in `handleText` resets local `state`/`statusCallback` and immediately `continue`s on stall (`src/handlers/text.ts:175-213`), without checking whether the request was superseded.
+- Interrupt handling sets `stopRequested`, then unconditionally clears it after a fixed sleep (`src/utils.ts:227-235`).
+- A stop request set during `_isProcessing` only cancels if it is still present when `sendMessageStreaming` reaches the pre-start check (`src/session.ts:286-290`, `378-385`).
+
+Race timeline:
+1. Request A stalls and enters retry catch path (`src/handlers/text.ts:163-213`).
+2. User sends `!new message`; `checkInterrupt` runs concurrently, marks interrupt, calls `session.stop()` (often returns `"pending"` in this gap), then clears `stopRequested` (`src/utils.ts:227-235`).
+3. Request A continues retry path and can start a new attempt because no ownership/interruption guard exists before `continue`.
+4. Request B also proceeds, so both runs can overlap in the shared singleton/session surface.
+
+Impact:
+- The "interrupt current run and replace with new message" contract is not guaranteed during stall recovery windows.
+- Overlap increases risk of duplicate side effects and inconsistent status/cleanup behavior.
+
+Recommended fix:
+1. Add per-request ownership token/epoch in `handleText` and `session` (or driver-routing), and refuse retries if ownership changed.
+2. Remove fixed-time `clearStopRequested()` usage for interrupts; clear only when the superseding request has actually acquired execution ownership.
+3. Before each retry `continue`, explicitly re-check interruption/supersession state and abort the older request if set.
+
+## Finding TX-1 (High): Interrupted stalled run can continue retrying concurrently with superseding `!` message
+
+Where:
+- Retry continue path (`src/handlers/text.ts:175-213`)
+- Interrupt flow (`src/utils.ts:227-235`)
+- Stop pre-start gate (`src/session.ts:378-385`)
+- Sequentialization bypass for interrupts (`src/index.ts:536-539`)
+
+Why this is a race:
+- Stop intent is represented by one mutable shared flag (`stopRequested`) and is cleared on timer, not by request ownership.
+- Retry logic has no "still current request?" guard.
+
+### Question 2: Can `session.lastMessage` be clobbered unsafely?
+
+Conclusion: yes. `session.lastMessage` is a shared singleton field and is overwritten on every text request with no concurrency guard.
+
+Evidence:
+- Global write in text handler: `session.lastMessage = message` (`src/handlers/text.ts:122`).
+- Field is process-global mutable state on singleton (`src/session.ts:163`).
+- `handleText` is not globally serialized: only non-command/non-`!` text is per-chat sequentialized (`src/index.ts:531-553`), so cross-chat and bypass paths can overlap.
+
+Impact:
+- Current impact is low because no live reader exists today.
+- Future readers (debug, retry resume, crash recovery) can observe unrelated prompt data from another in-flight request.
+
+Recommended fix:
+1. Either remove `lastMessage` (if unused), or scope it by driver/chat/request (`Map` keyed by run identity) instead of singleton scalar.
+2. If retained, only update once request ownership is established and clear it in request finalizers to avoid stale cross-run bleed.
+
+## Finding TX-2 (Low): `session.lastMessage` is unsafely shared mutable state
+
+Where:
+- Declaration: `src/session.ts:163`
+- Write site: `src/handlers/text.ts:122`
+
+Why this is unsafe:
+- Non-atomic shared overwrite with no ownership semantics in a concurrently-invoked handler path.
