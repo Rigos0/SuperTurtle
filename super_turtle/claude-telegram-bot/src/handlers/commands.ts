@@ -230,6 +230,14 @@ export function parseCtlListOutput(output: string): ListedSubTurtle[] {
     const line = rawLine.trim();
     if (!line || line === "No SubTurtles found.") continue;
 
+    // Skip optional table headers/separators from `ctl list`.
+    if (/^(name|subturtle)\s+status\b/i.test(line) || /^[-|:\s]+$/.test(line)) {
+      continue;
+    }
+    if (line.startsWith("|") && /status/i.test(line)) {
+      continue;
+    }
+
     // Tunnel lines are emitted as: "→ https://..."
     if (line.startsWith("→")) {
       if (lastTurtle) {
