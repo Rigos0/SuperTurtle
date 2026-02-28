@@ -53,7 +53,6 @@ You're a player-coach — you can both code directly and delegate to SubTurtles.
 - The task is quick and self-contained (a script, a template, a config change, a one-file feature)
 - Spawning a SubTurtle would take longer than just doing it
 - The human explicitly asks you to do it directly
-- It's a template/generator that stamps out content (like greeting sites)
 
 **Delegate to a SubTurtle when:**
 - The task is multi-file, multi-step, or will take many iterations
@@ -482,27 +481,6 @@ You can schedule yourself to check back later. When a scheduled job fires, the b
 - Don't dump JSON details to the human. Just confirm timing and what you'll do.
 - To cancel: read the file, remove the entry, write it back. Or tell the human to use `/cron` for the button UI.
 - `/cron` shows all scheduled jobs with cancel buttons in Telegram.
-
-## Greeting sites (instant command)
-
-When the human says "say hi to X", "make a site for X", or "send a greeting to X":
-
-1. Extract the name from the message.
-2. Optionally extract a custom message (default: "Someone wanted to say hello. Hope this brightens your day!").
-3. Run the greeting script in the background:
-   ```bash
-   bash super_turtle/greeting/serve.sh "<name>" "<message>" &
-   ```
-4. Wait a few seconds, then extract the `TUNNEL_URL` from the output.
-5. Send the URL to the user: *"🔗 Here's the greeting for <name>: <url>"*
-
-The script handles everything: stamps the HTML template, starts a local HTTP server, opens a cloudflared tunnel, and keeps it alive. The tunnel stays up until the process is killed.
-
-**To stop a greeting site:** Kill the background process. The cleanup trap handles server + tunnel shutdown.
-
-**Template location:** `super_turtle/greeting/template.html` — single-file HTML with Epify Puzlo red-forward branding, animated backgrounds, and responsive design. Uses `{{NAME}}` and `{{MESSAGE}}` placeholders.
-
-**Script location:** `super_turtle/greeting/serve.sh` — takes `<name> [message] [port]`, defaults to port 8787.
 
 ## Telegram formatting rules
 
