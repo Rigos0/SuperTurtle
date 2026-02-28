@@ -1,5 +1,5 @@
 ## Current Task
-Complete the `book-1` test draft and commit it.
+All backlog items completed.
 
 ## End Goal with Specs
 A markdown file with:
@@ -8,12 +8,9 @@ A markdown file with:
 - Chapter 1 (about 700-900 words)
 
 ## Backlog
-- [x] Create `testing/books/book-1.md` with title, genre, premise, outline, and Chapter 1
+- [x] Create `testing/books/book-2.md` with title, genre, premise, outline, and Chapter 1
 - [x] Quick self-review for coherence and typos
-- [x] Commit with message `test: add book-1 draft`
+- [x] Commit with message `test: add book-2 draft`
 
 ## Notes
 Keep it concise and clean. This is a test.
-
-## Loop Control
-STOP
