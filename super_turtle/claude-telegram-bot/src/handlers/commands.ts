@@ -16,7 +16,7 @@ import {
 } from "../config";
 import { getContextReport } from "../context-command";
 import { isAuthorized } from "../security";
-import { escapeHtml } from "../formatting";
+import { escapeHtml, convertMarkdownToHtml } from "../formatting";
 import { getJobs } from "../cron";
 import { isAnyDriverRunning, isBackgroundRunActive, wasBackgroundRunPreempted, stopActiveDriverQuery } from "./driver-routing";
 import { clearPreparedSnapshots, getPreparedSnapshotCount } from "../cron-supervision-queue";
@@ -1502,11 +1502,11 @@ export async function handleSubturtle(ctx: Context): Promise<void> {
     messageLines.push(
       `${statusEmoji} <b>${escapeHtml(turtle.name)}</b>${timeStr}`
     );
-    messageLines.push(`   🧩 ${escapeHtml(taskStr)}`);
+    messageLines.push(`   🧩 ${convertMarkdownToHtml(taskStr)}`);
 
     if (stateSummary) {
       const backlogSummary = formatBacklogSummary(stateSummary);
-      messageLines.push(`   📌 ${escapeHtml(truncateText(backlogSummary, 140))}`);
+      messageLines.push(`   📌 ${convertMarkdownToHtml(truncateText(backlogSummary, 140))}`);
     }
 
     // Add buttons for running turtles

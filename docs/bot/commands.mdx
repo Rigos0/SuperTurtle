@@ -1,200 +1,53 @@
 ---
 title: Bot Commands
-description: Full reference of all Telegram bot commands and what they do
+description: Source-accurate reference of Telegram bot commands and command-like intents
 ---
 
 # Bot Commands
 
-All commands are available as `/command` in Telegram. Many also have shorter intents (e.g., `stop` instead of `/stop`).
+This page reflects the current implementation in:
+- `super_turtle/claude-telegram-bot/src/index.ts`
+- `super_turtle/claude-telegram-bot/src/handlers/commands.ts`
 
-## Command Reference
+## Registered Slash Commands
 
-| Command | Intent | Description | Returns |
-|---------|--------|-------------|---------|
-| `/new` | `new` | Start a fresh session | Session ID, current model/effort settings, and available commands |
-| `/resume` | `resume` | Pick from last 5 sessions to resume | List of recent sessions with recaps; select one to restore context |
-| `/status` | `status` | Check what Claude is doing | Detailed task status, current SubTurtles if any, next job time, git status |
-| `/model` | `model` | Switch model or reasoning effort | List of available models; select one and optionally set effort level |
-| `/switch` | `switch` | Toggle between Claude Code and Codex | Confirmation of driver switch with new model info |
-| `/usage` | `usage` | Show subscription usage | Claude Code token usage, Codex usage (if enabled), quota status |
-| `/context` | `context` | Show context usage | Tokens used in current session, remaining context window |
-| `/stop` | `stop, pause, abort, !` | Interrupt current query | Confirms work stopped; stops active SubTurtles |
-| `/sub` | `subs, subtitles` | List SubTurtles | Table of running SubTurtles: status, type, task, tunnel URL (if preview available) |
-| `/cron` | `jobs` | Show scheduled jobs | List of scheduled tasks: next run time, cron expression, status |
-| `/looplogs` | `logs` | Show last 50 lines of main loop log | Tail of `/tmp/claude-telegram-bot-ts.log` for debugging |
-| `/restart` | `restart` | Restart the bot | Stops bot cleanly and restarts it; sessions persist |
+These commands are currently wired with `bot.command(...)` in `index.ts`.
 
-## Global Stop Intents
+| Slash command | Aliases | What it does |
+|---------|---------|-------------|
+| `/new` | none | Resets both drivers (stopping active work), starts a fresh session overview |
+| `/status` | none | Shows the same overview as `/new` without resetting sessions |
+| `/looplogs` | none | Sends the last 50 lines from `/tmp/claude-telegram-bot-ts.log` |
+| `/usage` | none | Shows unified Claude + Codex quota/usage (when available) |
+| `/context` | none | Shows Claude context usage for the active Claude session |
+| `/model` | none | Opens model/effort picker for the active driver |
+| `/switch` | none | Switches active driver (`claude` or `codex`) |
+| `/resume` | none | Shows up to 20 saved sessions and lets you resume one |
+| `/sub` | `/subs`, `/subturtle`, `/subturtles`, `/turtle`, `/turtles` | Shows SubTurtle status with task/backlog summary and state/stop buttons |
+| `/cron` | none | Lists scheduled jobs with cancel buttons |
 
-Even without a command prefix, Claude recognizes these as stop requests:
+## Stop Intents (Command-Like)
 
-- `stop`
-- `pause`
-- `abort`
+These are handled as stop intents in text handling (not via `bot.command(...)` registrations):
+
+- `/stop`
+- `/pause`
+- `/abort`
 - `!` (single character)
-- Voice transcripts of the above
+- Natural language variants recognized by `isStopIntent(...)` (for example, `please stop now`)
 
-These work **anywhere in your message** and take priority. If Claude is working, sending any of these will interrupt immediately.
+When matched, the bot stops active driver work and attempts to stop running SubTurtles.
 
-## Interactive Commands
+## Implemented in `commands.ts` But Not Registered as Slash Commands
 
-### /new — Start Fresh
+The following handlers exist in `handlers/commands.ts` but are not currently wired in `index.ts` via `bot.command(...)`:
 
-Clears context and starts a new session. Useful when you want to switch topics or reset Claude's understanding.
+| Command | Status | Behavior |
+|---------|--------|----------|
+| `/debug` | Implemented handler, not slash-registered | Builds an internal diagnostics snapshot (driver/session/background queue/deferred queue/log error summary) |
+| `/restart` | Implemented handler, not slash-registered | Writes restart marker info and exits so the process can be relaunched |
 
-Returns:
-- New session ID
-- Current model and reasoning effort
-- List of available commands
+## Notes
 
-### /model — Switch Model or Effort
-
-Opens a menu to select your preferred model:
-
-- **Claude models:** Sonnet (default), Opus, Haiku
-- **Reasoning effort:** High, Medium, Low (Sonnet/Opus only; Haiku doesn't support reasoning)
-
-Example:
-```
-You: /model
-Bot: [Inline buttons: Sonnet, Opus, Haiku]
-You: [Tap Sonnet]
-Bot: [Inline buttons: ⚡ High, 🟡 Medium, 💨 Low]
-You: [Tap High]
-Bot: ✅ Switched to Sonnet (High effort)
-```
-
-### /switch — Toggle Drivers
-
-Switches between Claude Code and Codex. Requires `CODEX_ENABLED=true` in configuration.
-
-Example:
-```
-You: /switch
-Bot: Switched to Codex (Claude 4.0) | workspace-write sandbox
-```
-
-### /resume — Pick a Recent Session
-
-Shows your last 5 sessions with brief recaps. Tap one to restore its context.
-
-Each session shows:
-- Session ID (first 8 chars)
-- Recap (first ~100 chars of what was discussed)
-- Timestamp
-
-Useful for continuing work without saying `/new`.
-
-### /status — Detailed Status
-
-Shows everything happening right now:
-
-- Current model and driver (Claude Code or Codex)
-- Token usage in current session
-- Any running SubTurtles (name, status, task, time remaining)
-- Next scheduled check-in time
-- Recent git log (if in a git repo)
-
-### /context — Token Usage
-
-Displays:
-- Tokens used so far in this session
-- Remaining context window
-- Percentage of context used (color-coded: 🟢 under 50%, 🟡 50-80%, 🔴 over 80%)
-
-When context gets full, you'll see a warning. Use `/new` to start fresh.
-
-### /usage — Subscription Usage
-
-Shows subscription status:
-
-**Claude Code usage (always shown):**
-- Tokens used this month
-- Subscription quota
-- Usage trend (last 7 days)
-
-**Codex usage (if `CODEX_ENABLED=true`):**
-- Requests used this billing period
-- Estimated tokens (parsed from local Codex history)
-- Active CLOTH subscription status
-
-Both are refreshed every time you run the command.
-
-### /sub — List SubTurtles
-
-Shows all currently running SubTurtles (parallel agents spawned for complex tasks):
-
-| Field | Meaning |
-|-------|---------|
-| **Status** | `running`, `paused`, `waiting` |
-| **Type** | `slow`, `yolo`, or `yolo-codex` (loop type) |
-| **Task** | First line of the SubTurtle's current task |
-| **Tunnel URL** | Live preview link (if frontend available) |
-| **Time Remaining** | Estimated time until completion |
-
-Aliases: `/subs`, `/subtitles`
-
-### /cron — Show Scheduled Jobs
-
-Lists all scheduled work:
-
-| Field | Meaning |
-|-------|---------|
-| **Job** | Task name |
-| **Next Run** | When it executes next |
-| **Interval** | How often it runs (cron expression) |
-| **Status** | `scheduled`, `running`, `completed`, `failed` |
-
-Useful for monitoring background work and checking if something is stuck.
-
-### /looplogs — Main Loop Logs
-
-Tails the last 50 lines of `/tmp/claude-telegram-bot-ts.log` (the bot's main run loop).
-
-Use this to debug issues:
-- Is the bot actually running?
-- Are there connection errors?
-- Did something crash?
-
-Example output:
-```
-[14:32:15] Listening on 127.0.0.1:3000
-[14:32:18] Message from user 123456: "build me a site"
-[14:32:19] Spawning SubTurtle: frontend-builder
-[14:33:45] SubTurtle frontend-builder completed
-[14:33:46] Tunnel live at https://abc123.trycloudflare.com
-```
-
-### /restart — Restart the Bot
-
-Gracefully restarts the bot process. Sessions persist across restarts.
-
-Use when:
-- Bot seems stuck
-- You updated configuration and want to reload
-- You want to refresh connections
-
-## Message Prefixes
-
-Prefix your message with `!` to send it **immediately**, interrupting any running work:
-
-```
-You: (Claude is thinking...)
-You: ! What time is it?
-```
-
-Claude stops the current work and responds to your question.
-
-## Context and State
-
-All commands respect the current session context:
-
-- `/model` changes affect all future messages in this session
-- `/switch` changes affect which driver processes your messages
-- `/new` completely resets context (but keeps session history in `/resume`)
-- `/context` shows usage for this session only
-
-Context resets when:
-1. You run `/new`
-2. You exceed the model's max context window (usually ~100k tokens)
-3. You start a fresh `/resume` from an old session
+- `/cron` does **not** currently have a `/jobs` slash alias in source.
+- `/subtitles` is **not** a registered `/sub` alias.

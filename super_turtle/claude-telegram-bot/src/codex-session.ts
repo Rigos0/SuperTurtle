@@ -803,10 +803,21 @@ export class CodexSession {
     reasoningEffort?: CodexEffortLevel,
     mcpCompletionCallback?: McpCompletionCallback
   ): Promise<string> {
+    // Acquire query lock IMMEDIATELY to prevent TOCTOU races.
+    // Without this, two callers can both check isRunning (false), then both
+    // enter sendMessage concurrently — causing ghost responses or stalls.
+    this.isQueryRunning = true;
+
     if (!this.thread) {
       // Create thread if not already created
-      await this.startNewThread(model, reasoningEffort);
+      try {
+        await this.startNewThread(model, reasoningEffort);
+      } catch (error) {
+        this.isQueryRunning = false; // Release lock on thread creation failure
+        throw error;
+      }
       if (!this.thread) {
+        this.isQueryRunning = false; // Release lock on thread creation failure
         throw new Error("Failed to create Codex thread");
       }
     }
@@ -844,7 +855,6 @@ ${messageToSend}`;
 
       // Create abort controller for cancellation
       this.abortController = new AbortController();
-      this.isQueryRunning = true;
       this.stopRequested = false;
       this.queryStarted = new Date();
 
@@ -1093,6 +1103,24 @@ ${messageToSend}`;
         }
       }
 
+      // Detect empty response (in=0 out=0) — typically means the resumed thread
+      // is stale or expired. Throw so the caller can retry with a fresh session.
+      const combinedResponse = getCombinedResponse().trim();
+      if (!combinedResponse && this.lastUsage) {
+        const u = this.lastUsage;
+        if (u.input_tokens === 0 && u.output_tokens === 0) {
+          console.warn(
+            "Empty Codex response detected (in=0 out=0) — thread likely stale, clearing for retry"
+          );
+          this.threadId = null;
+          this.thread = null;
+          if (statusCallback) {
+            await statusCallback("done", "");
+          }
+          throw new Error("Empty response from stale session");
+        }
+      }
+
       if (statusCallback) {
         await statusCallback("done", "");
       }
@@ -1105,7 +1133,6 @@ ${messageToSend}`;
       const title = userMessage.length > 50 ? userMessage.slice(0, 47) + "..." : userMessage;
       this.saveSession(title);
 
-      const combinedResponse = getCombinedResponse().trim();
       return combinedResponse || "No response from Codex.";
     } catch (error) {
       const errorMessage = getErrorMessage(error);

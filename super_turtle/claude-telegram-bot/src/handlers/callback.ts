@@ -13,7 +13,7 @@ import { isAuthorized } from "../security";
 import { auditLog, startTypingIndicator } from "../utils";
 import { StreamingState, createStatusCallback, isAskUserPromptMessage } from "./streaming";
 import { isAnyDriverRunning, runMessageWithActiveDriver, stopActiveDriverQuery } from "./driver-routing";
-import { escapeHtml } from "../formatting";
+import { escapeHtml, convertMarkdownToHtml } from "../formatting";
 import { removeJob } from "../cron";
 import {
   buildSessionOverviewLines,
@@ -371,15 +371,15 @@ async function handleSubturtleLogsCallback(
 
     const lines: string[] = [`📋 <b>State for ${escapeHtml(name)}</b>\n`];
     const turtleTask = turtleSummary.currentTask || "No current task in CLAUDE.md";
-    lines.push(`🧩 <b>Task:</b> ${escapeHtml(turtleTask)}`);
+    lines.push(`🧩 <b>Task:</b> ${convertMarkdownToHtml(turtleTask)}`);
     if (turtleBacklog.length === 0) {
-      lines.push(`📌 <b>Backlog:</b> ${escapeHtml(formatBacklogSummary(turtleSummary))}`);
+      lines.push(`📌 <b>Backlog:</b> ${convertMarkdownToHtml(formatBacklogSummary(turtleSummary))}`);
     } else {
       lines.push(`📌 <b>Backlog:</b>`);
       for (const item of turtleBacklog) {
         const status = item.done ? "✅" : "⬜";
-        const currentTag = item.current ? " <- current" : "";
-        lines.push(`${status} ${escapeHtml(item.text)}${currentTag}`);
+        const currentTag = item.current ? " ← current" : "";
+        lines.push(`${status} ${convertMarkdownToHtml(item.text)}${currentTag}`);
       }
     }
 
@@ -440,13 +440,13 @@ async function handleResumeCallback(
   const sessionId = callbackData.replace("resume:", "");
 
   if (!sessionId || !userId || !chatId) {
-    await ctx.answerCallbackQuery({ text: "ID sessione non valido" });
+    await ctx.answerCallbackQuery({ text: "Invalid session ID" });
     return;
   }
 
   // Check if session is already active
   if (session.isActive) {
-    await ctx.answerCallbackQuery({ text: "Sessione già attiva" });
+    await ctx.answerCallbackQuery({ text: "Session already active" });
     return;
   }
 
@@ -464,7 +464,7 @@ async function handleResumeCallback(
   } catch (error) {
     console.debug("Failed to edit resume message:", error);
   }
-  await ctx.answerCallbackQuery({ text: "Sessione ripresa!" });
+  await ctx.answerCallbackQuery({ text: "Session resumed!" });
 
   // Send a hidden recap prompt to Claude
   const recapPrompt =

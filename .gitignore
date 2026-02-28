@@ -41,3 +41,4 @@ super_turtle/state/runs.jsonl
 # Claude Code (local-only)
 .claude/settings.local.json
 .claude/.DS_Store
+.claude/agent-memory/

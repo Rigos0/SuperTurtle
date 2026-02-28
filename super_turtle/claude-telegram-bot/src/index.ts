@@ -18,6 +18,8 @@ import {
   handleResume,
   handleSubturtle,
   handleCron,
+  handleDebug,
+  handleRestart,
   handleText,
   handleVoice,
   handlePhoto,
@@ -570,6 +572,8 @@ bot.command("subturtles", handleSubturtle);
 bot.command("turtle", handleSubturtle);
 bot.command("turtles", handleSubturtle);
 bot.command("cron", handleCron);
+bot.command("debug", handleDebug);
+bot.command("restart", handleRestart);
 
 // ============== Message Handlers ==============
 
@@ -890,8 +894,8 @@ if (existsSync(RESTART_FILE)) {
     const data = JSON.parse(readFileSync(RESTART_FILE, "utf-8"));
     const age = Date.now() - data.timestamp;
 
-    // Only update if restart was recent (within 30 seconds)
-    if (age < 30000 && data.chat_id && data.message_id) {
+    // Only update if restart was recent (within 60 seconds)
+    if (age < 60000 && data.chat_id && data.message_id) {
       // Edit the "Restarting..." message to show completion
       try {
         await bot.api.editMessageText(
@@ -906,9 +910,10 @@ if (existsSync(RESTART_FILE)) {
         }
       }
 
-      await resetAllDriverSessions();
+      // Clean slate: reset driver sessions (stop any stale work from before restart)
+      await resetAllDriverSessions({ stopRunning: true });
 
-      // Send startup message with the same standardized overview format.
+      // Send startup message with the same standardized overview format (same as /new)
       const lines = await buildSessionOverviewLines("Bot restarted");
       await bot.api.sendMessage(data.chat_id, lines.join("\n"), { parse_mode: "HTML" });
     }

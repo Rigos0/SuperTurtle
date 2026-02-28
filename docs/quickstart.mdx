@@ -1,72 +1,46 @@
 ---
 title: Quickstart
-description: Get Super Turtle running in 5 minutes
+description: Get Super Turtle running in 3 steps
 ---
 
 # Quickstart
 
-Set up Super Turtle and start coding from Telegram. The setup is AI-guided: you provide credentials and the system handles install and configuration.
+Super Turtle setup is AI-guided. You clone, open an agent, and tell it to set up. It handles the rest.
 
 ## Prerequisites
 
-Before you start:
-
-- `bun` installed ([bun.sh](https://bun.sh/))
-- Claude Code or Codex CLI installed and authenticated
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Codex CLI](https://github.com/openai/codex) installed and authenticated
 - A Telegram bot token from [@BotFather](https://t.me/BotFather)
 - Your Telegram user ID (used for `TELEGRAM_ALLOWED_USERS`)
-- Optional `OPENAI_API_KEY` if you want voice transcription
 
 ## Setup
 
 <Steps>
-  <Step title="Clone the repository">
+  <Step title="Clone the repo">
     ```bash
     git clone https://github.com/Rigos0/superturtle.git
     cd superturtle
     ```
   </Step>
 
-  <Step title="Open Claude Code or Codex at repo root">
+  <Step title="Open Claude Code or Codex">
     ```bash
-    claude
-
+    claude --dangerously-skip-permissions
     # or
-    codex
+    codex --full-auto
     ```
   </Step>
 
-  <Step title="Say the setup prompt">
-    In Claude Code or Codex, send:
+  <Step title="Prompt">
     ```
-    Set up Super Turtle on this machine.
+    Set up Super Turtle for me.
     ```
-  </Step>
-
-  <Step title="Provide required values">
-    Share the values requested by the setup wizard:
-    - `TELEGRAM_BOT_TOKEN`
-    - `TELEGRAM_ALLOWED_USERS`
-    - Optional `OPENAI_API_KEY`
-  </Step>
-
-  <Step title="Start the Telegram bot">
-    ```bash
-    cd super_turtle/claude-telegram-bot
-    bun run start
-    ```
-  </Step>
-
-  <Step title="Message your bot on Telegram">
-    Open Telegram, find your bot, and send:
-    ```
-    /start
-    ```
+    The agent walks you through everything. It will ask for your Telegram bot token, user ID, and optionally an OpenAI API key for voice transcription. Then it installs dependencies, writes config, and tells you how to start the bot.
   </Step>
 </Steps>
 
 <Info>
-The setup flow writes `super_turtle/claude-telegram-bot/.env`, installs dependencies, and sets the default driver automatically.
+Once setup is complete, start the Telegram bot with `cd super_turtle/claude-telegram-bot && bun run start`, then open Telegram and message your bot.
 </Info>
 
 ## BotFather Setup
@@ -90,19 +64,34 @@ restart - Restart the bot
 
 ## Getting Your Telegram User ID
 
-Use one of these:
-
 - Message [@userinfobot](https://t.me/userinfobot) and copy your numeric ID.
 - Or run `/start` in your bot chat and read the ID in the response.
 
-Set that value as `TELEGRAM_ALLOWED_USERS`.
+## What the Setup Wizard Does
+
+When you say "Set up Super Turtle for me", the agent runs `super_turtle/setup` which handles:
+
+1. **Driver detection** — checks whether `claude` or `codex` is available on your PATH and selects the best default.
+2. **Dependency install** — runs `bun install` in the bot directory to install all required packages.
+3. **Environment file** — creates `super_turtle/claude-telegram-bot/.env` from the example template and fills in your Telegram token, user ID, working directory, and optional OpenAI key.
+4. **Driver preferences** — writes `/tmp/claude-telegram-prefs.json` with the default model, effort level, and active driver.
+
+The setup script accepts these flags if you want to run it manually:
+
+```bash
+./super_turtle/setup \
+  --driver auto \
+  --telegram-token "<token>" \
+  --telegram-user "<id>" \
+  --openai-api-key "<key>"      # optional
+```
+
+<Warning>
+Do not commit `super_turtle/claude-telegram-bot/.env`. It contains your credentials and is local-only.
+</Warning>
 
 ## What's Next
 
 - Read [Architecture](/architecture) for the system model.
 - Review [Telegram Bot Overview](/bot/overview) for commands and behavior.
 - Learn worker modes in [SubTurtle Loop Types](/subturtles/loop-types).
-
-<Warning>
-Do not commit `super_turtle/claude-telegram-bot/.env`. It contains your credentials and is local-only.
-</Warning>

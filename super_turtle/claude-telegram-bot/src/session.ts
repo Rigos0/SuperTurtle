@@ -92,6 +92,13 @@ const EVENT_STREAM_STALL_TIMEOUT_MS = (() => {
   const parsed = Number.parseInt(raw, 10);
   return Number.isFinite(parsed) && parsed >= 1_000 ? parsed : 120_000;
 })();
+// Longer patience while a tool is actively executing (SDK emits no events during tool runs)
+const TOOL_ACTIVE_STALL_TIMEOUT_MS = (() => {
+  const raw = process.env.CLAUDE_TOOL_ACTIVE_STALL_TIMEOUT_MS;
+  if (!raw) return 180_000;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed >= 1_000 ? parsed : 180_000;
+})();
 
 // Model configuration
 export type EffortLevel = "low" | "medium" | "high";
@@ -298,6 +305,12 @@ export class ClaudeSession {
     chatId?: number,
     ctx?: Context
   ): Promise<string> {
+    // Acquire the query lock IMMEDIATELY to prevent TOCTOU races.
+    // Without this, two callers can both check isRunning (false), then both
+    // enter this method and resume the same session concurrently — producing
+    // ghost responses (in=0 out=0) and stalls.
+    this.isQueryRunning = true;
+
     // Set chat context for ask_user MCP tool
     if (chatId) {
       process.env.TELEGRAM_CHAT_ID = String(chatId);
@@ -368,12 +381,12 @@ export class ClaudeSession {
         "Query cancelled before starting (stop was requested during processing)"
       );
       this.stopRequested = false;
+      this.isQueryRunning = false; // Release the lock before bailing
       throw new Error("Query cancelled");
     }
 
     // Create abort controller for cancellation
     this.abortController = new AbortController();
-    this.isQueryRunning = true;
     this.stopRequested = false;
     this.queryStarted = new Date();
     this.currentTool = null;
@@ -386,6 +399,7 @@ export class ClaudeSession {
     let queryCompleted = false;
     let askUserTriggered = false;
     let stalled = false;
+    let toolActive = false; // true between tool_use event and next non-tool event
 
     try {
       // Use V1 query() API - supports all options including cwd, mcpServers, etc.
@@ -405,6 +419,7 @@ export class ClaudeSession {
       while (true) {
         const iteratorNext = iterator.next();
         let stallTimer: ReturnType<typeof setTimeout> | null = null;
+        const activeTimeout = toolActive ? TOOL_ACTIVE_STALL_TIMEOUT_MS : EVENT_STREAM_STALL_TIMEOUT_MS;
         const nextResult = await Promise.race<
           IteratorResult<SDKMessage> | typeof stallTimeoutSentinel
         >([
@@ -412,7 +427,7 @@ export class ClaudeSession {
           new Promise<typeof stallTimeoutSentinel>((resolve) => {
             stallTimer = setTimeout(
               () => resolve(stallTimeoutSentinel),
-              EVENT_STREAM_STALL_TIMEOUT_MS
+              activeTimeout
             );
           }),
         ]);
@@ -423,7 +438,7 @@ export class ClaudeSession {
         if (nextResult === stallTimeoutSentinel) {
           stalled = true;
           console.warn(
-            `Event stream stalled for ${EVENT_STREAM_STALL_TIMEOUT_MS}ms; aborting stream and flushing partial response`
+            `Event stream stalled for ${activeTimeout}ms (tool_active=${toolActive}); aborting stream and flushing partial response`
           );
           this.abortController?.abort();
           break;
@@ -449,6 +464,10 @@ export class ClaudeSession {
 
         // Handle different message types
         if (event.type === "assistant") {
+          // Reset tool-active flag when we receive a new assistant message
+          // (tool results come as separate events before the next assistant message)
+          toolActive = false;
+
           for (const block of event.message.content) {
             // Thinking blocks
             if (block.type === "thinking") {
@@ -461,6 +480,7 @@ export class ClaudeSession {
 
             // Tool use blocks
             if (block.type === "tool_use") {
+              toolActive = true; // Tool is executing — use longer stall patience
               const toolName = block.name;
               const toolInput = block.input as Record<string, unknown>;
 
@@ -682,6 +702,22 @@ export class ClaudeSession {
       return "[Waiting for user selection]";
     }
 
+    // Detect empty response (in=0 out=0) — typically means the resumed session
+    // is stale or expired. Throw so the caller can retry with a fresh session.
+    const responseText = responseParts.join("");
+    if (!responseText && this.lastUsage) {
+      const u = this.lastUsage;
+      if (u.input_tokens === 0 && u.output_tokens === 0) {
+        console.warn(
+          "Empty response detected (in=0 out=0) — session likely stale, clearing for retry"
+        );
+        // Clear the stale session so the retry starts fresh
+        this.sessionId = null;
+        await statusCallback("done", "");
+        throw new Error("Empty response from stale session");
+      }
+    }
+
     // Emit final segment
     if (currentSegmentText) {
       await statusCallback("segment_end", currentSegmentText, currentSegmentId);
@@ -689,7 +725,7 @@ export class ClaudeSession {
 
     await statusCallback("done", "");
 
-    return responseParts.join("") || "No response from Claude.";
+    return responseText || "No response from Claude.";
   }
 
   /**
@@ -718,7 +754,7 @@ export class ClaudeSession {
         session_id: this.sessionId,
         saved_at: new Date().toISOString(),
         working_dir: WORKING_DIR,
-        title: this.conversationTitle || "Sessione senza titolo",
+        title: this.conversationTitle || "Untitled session",
       };
 
       // Remove any existing entry with same session_id (update in place)
@@ -779,13 +815,13 @@ export class ClaudeSession {
     const sessionData = history.sessions.find((s) => s.session_id === sessionId);
 
     if (!sessionData) {
-      return [false, "Sessione non trovata"];
+      return [false, "Session not found"];
     }
 
     if (sessionData.working_dir && sessionData.working_dir !== WORKING_DIR) {
       return [
         false,
-        `Sessione per directory diversa: ${sessionData.working_dir}`,
+        `Session belongs to a different directory: ${sessionData.working_dir}`,
       ];
     }
 
@@ -799,7 +835,7 @@ export class ClaudeSession {
 
     return [
       true,
-      `Ripresa sessione: "${sessionData.title}"`,
+      `Resumed session: "${sessionData.title}"`,
     ];
   }
 
@@ -809,7 +845,7 @@ export class ClaudeSession {
   resumeLast(): [success: boolean, message: string] {
     const sessions = this.getSessionList();
     if (sessions.length === 0) {
-      return [false, "Nessuna sessione salvata"];
+      return [false, "No saved sessions"];
     }
 
     return this.resumeSession(sessions[0]!.session_id);
