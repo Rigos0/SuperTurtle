@@ -13,7 +13,7 @@ interface SessionLogEntry {
   };
 }
 
-function contentToString(content: unknown): string | null {
+export function contentToString(content: unknown): string | null {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return null;
 
@@ -34,7 +34,7 @@ function contentToString(content: unknown): string | null {
   return parts.length > 0 ? parts.join("\n") : null;
 }
 
-function extractLocalCommandStdout(text: string): string | null {
+export function extractLocalCommandStdout(text: string): string | null {
   const startTag = "<local-command-stdout>";
   const endTag = "</local-command-stdout>";
   const start = text.indexOf(startTag);
@@ -47,7 +47,7 @@ function extractLocalCommandStdout(text: string): string | null {
   return text.slice(start + startTag.length, end).trim();
 }
 
-function findLatestContextOutput(
+export function findLatestContextOutput(
   sessionLogText: string,
   startedAtMs: number
 ): string | null {

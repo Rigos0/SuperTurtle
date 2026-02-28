@@ -1,5 +1,5 @@
 # Current Task
-Read context-command.ts and write context-command.test.ts.
+Read dashboard.ts and write dashboard.test.ts.
 
 ## End Goal with Specs
 Fill the critical gaps in bot test coverage with pure unit tests. No Telegram API mocking needed — focus on exported pure functions.
@@ -99,8 +99,8 @@ Tests for:
 ## Backlog
 - [x] Read security.ts and write security.test.ts
 - [x] Read cron.ts and write cron.test.ts
-- [ ] Read context-command.ts and write context-command.test.ts <- current
-- [ ] Read dashboard.ts and write dashboard.test.ts
+- [x] Read context-command.ts and write context-command.test.ts
+- [ ] Read dashboard.ts and write dashboard.test.ts <- current
 - [ ] Read streaming.ts and write streaming.test.ts
 - [ ] Run `bun test` to verify all new tests pass alongside existing tests
 - [ ] Commit
