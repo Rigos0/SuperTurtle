@@ -1,0 +1,74 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Super Turtle",
+  "description": "Autonomous coding system you control from Telegram. Uses your Claude Code and Codex subscriptions.",
+  "theme": "mint",
+  "colors": {
+    "primary": "#E53935",
+    "light": "#FF6F61",
+    "dark": "#C62828"
+  },
+  "logo": {
+    "light": "/assets/hero-double-turtle.png",
+    "dark": "/assets/hero-double-turtle.png"
+  },
+  "favicon": "/assets/hero-double-turtle.png",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Docs",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "architecture"
+            ]
+          },
+          {
+            "group": "Telegram Bot",
+            "pages": [
+              "bot/overview",
+              "bot/commands",
+              "bot/drivers",
+              "bot/mcp-tools",
+              "bot/personal-assistant",
+              "bot/running-as-service"
+            ]
+          },
+          {
+            "group": "SubTurtles",
+            "pages": [
+              "subturtles/overview",
+              "subturtles/loop-types",
+              "subturtles/ctl-commands",
+              "subturtles/state-files",
+              "subturtles/skills"
+            ]
+          },
+          {
+            "group": "Meta Agent",
+            "pages": [
+              "meta/overview",
+              "meta/supervision",
+              "meta/task-decomposition",
+              "meta/resource-management"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "config/environment-variables",
+              "config/security",
+              "config/platform-support"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footerSocials": {
+    "github": "https://github.com/Rigos0/superturtle"
+  }
+}
