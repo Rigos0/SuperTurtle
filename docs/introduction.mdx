@@ -5,45 +5,103 @@ description: What Super Turtle is and how it works
 
 # Introduction
 
-Super Turtle is an autonomous coding system you control from Telegram. You describe what you want built, and it handles decomposition, execution, and supervision on your machine.
+Super Turtle is an autonomous coding system you control from Telegram.
+You describe what you want built, and it handles decomposition, execution,
+and supervision on your machine.
 
-You interact with one Meta Agent in chat. Behind the scenes, it can run work itself or spawn SubTurtles in parallel, route work between Claude Code and Codex, and report only meaningful milestones.
+The core experience is simple: **say what, get results**.
+You do not need to plan subtasks, pick loop strategies, or monitor logs.
+You interact with one Meta Agent in chat while the system coordinates the rest.
 
-## Key Features
+## What You Can Ask For
+
+Here are real examples of requests that fit Super Turtle:
+
+- "Build me a landing page for my product and send me a preview link."
+- "Refactor the auth system to clean up middleware and add tests."
+- "Add a `/usage` command that shows Claude and Codex quotas together."
+- "Investigate why Codex meta-agent stops until prompted, then fix it."
+- "Review Telegram and Cloudflare tunnel security and harden defaults."
+
+For each request, the system can split work into focused SubTurtles, run those
+workers in parallel, and report progress at milestone level.
+
+## Core Experience: Say What -> Get Results
+
+1. You send a text or voice message in Telegram.
+2. The Meta Agent interprets intent and decides whether to do the task directly
+or spawn SubTurtles.
+3. SubTurtles execute in autonomous loops, update state, and commit progress.
+4. Cron supervision checks background work silently and notifies you only on
+meaningful changes (milestones, completion, stuck states, or errors).
+5. You stay in one conversation while the system manages orchestration.
+
+Silence means progress. You should only get interrupted when it matters.
+
+## Example Milestone Conversation
+
+```text
+You: build me a landing page and wire screenshot checks
+Meta Agent: 🚀 On it.
+Meta Agent: 🎉 Milestone: hero section shipped. Screenshot captured. Starting form flow.
+Meta Agent: ✅ All done. Here's what shipped: landing page + responsive form + screenshot tooling.
+```
+
+The message stream stays outcome-focused: start, meaningful milestones, completion.
+
+## Key Capabilities
 
 <CardGroup cols={2}>
   <Card
-    title="Voice-First Control"
-    description="Send text or voice from Telegram; the system treats both as first-class input."
+    title="Text + Voice Control"
+    description="Send text or voice from Telegram. Voice notes can be transcribed and handled like normal requests."
   />
   <Card
     title="Parallel SubTurtles"
-    description="Spawn multiple worker agents to execute subtasks concurrently and reduce turnaround time."
+    description="Spawn focused worker agents that execute subtasks concurrently to reduce turnaround time."
   />
   <Card
-    title="Claude + Codex Drivers"
-    description="Use dual driver support through one interface, with automatic routing by task type and cost."
+    title="Claude + Codex Driver Layer"
+    description="Run through one interface while routing work between Claude Code and Codex as task needs change."
+  />
+  <Card
+    title="Usage-Aware Balancing"
+    description="Track usage and quota pressure, then adapt driver choice and supervision cadence to stay cost-efficient."
   />
   <Card
     title="Autonomous Supervision"
-    description="Background cron check-ins monitor progress and notify you only when something meaningful changes."
+    description="Background cron check-ins monitor long-running work and keep chat updates milestone-focused."
   />
   <Card
-    title="Usage Tracking"
-    description="Track usage and driver load so long-running work can stay cost-aware and reliable."
+    title="Long-Run Continuity"
+    description="State files and run tracking support resilient handoffs across extended or multi-stage work."
   />
 </CardGroup>
 
-## How It Works
+## What You See vs What Runs Behind the Scenes
 
-```text
-Human
-  -> Telegram
-  -> Meta Agent
-  -> SubTurtles
-  -> Code
-```
+From your perspective:
 
-<Tip>
-See <a href="/quickstart">Quickstart</a> to set up Super Turtle in a few minutes.
-</Tip>
+- You ask for outcomes.
+- You get concise milestone updates.
+- You receive completion summaries and preview links when available.
+
+Behind the scenes:
+
+- The Meta Agent decomposes large requests.
+- SubTurtles execute in loop types like `yolo-codex`, `yolo`, or `slow`.
+- Each worker maintains a markdown state contract in `CLAUDE.md`.
+- Scheduled supervision watches for drift, failure, and completion.
+
+## Why This Model Works
+
+- **Low cognitive load:** you stay focused on outcomes, not process management.
+- **Better throughput:** parallel workers can ship independent streams at once.
+- **Lower noise:** milestone-only reporting reduces chat spam.
+- **Practical autonomy:** the system can keep moving without constant prompts.
+
+## Next Step
+
+Start with [Quickstart](/quickstart), then read [Architecture](/architecture) to
+understand how Meta Agent supervision, SubTurtle loops, and driver routing fit
+together.
