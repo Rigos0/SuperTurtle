@@ -92,6 +92,13 @@ const EVENT_STREAM_STALL_TIMEOUT_MS = (() => {
   const parsed = Number.parseInt(raw, 10);
   return Number.isFinite(parsed) && parsed >= 1_000 ? parsed : 120_000;
 })();
+// Longer patience while a tool is actively executing (e.g. ctl spawn can take minutes)
+const TOOL_ACTIVE_STALL_TIMEOUT_MS = (() => {
+  const raw = process.env.CLAUDE_TOOL_ACTIVE_STALL_TIMEOUT_MS;
+  if (!raw) return 300_000;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed >= 1_000 ? parsed : 300_000;
+})();
 
 // Model configuration
 export type EffortLevel = "low" | "medium" | "high";
@@ -386,6 +393,7 @@ export class ClaudeSession {
     let queryCompleted = false;
     let askUserTriggered = false;
     let stalled = false;
+    let toolActive = false; // true between tool_use event and next non-tool event
 
     try {
       // Use V1 query() API - supports all options including cwd, mcpServers, etc.
@@ -405,6 +413,7 @@ export class ClaudeSession {
       while (true) {
         const iteratorNext = iterator.next();
         let stallTimer: ReturnType<typeof setTimeout> | null = null;
+        const activeTimeout = toolActive ? TOOL_ACTIVE_STALL_TIMEOUT_MS : EVENT_STREAM_STALL_TIMEOUT_MS;
         const nextResult = await Promise.race<
           IteratorResult<SDKMessage> | typeof stallTimeoutSentinel
         >([
@@ -412,7 +421,7 @@ export class ClaudeSession {
           new Promise<typeof stallTimeoutSentinel>((resolve) => {
             stallTimer = setTimeout(
               () => resolve(stallTimeoutSentinel),
-              EVENT_STREAM_STALL_TIMEOUT_MS
+              activeTimeout
             );
           }),
         ]);
@@ -423,7 +432,7 @@ export class ClaudeSession {
         if (nextResult === stallTimeoutSentinel) {
           stalled = true;
           console.warn(
-            `Event stream stalled for ${EVENT_STREAM_STALL_TIMEOUT_MS}ms; aborting stream and flushing partial response`
+            `Event stream stalled for ${activeTimeout}ms (tool_active=${toolActive}); aborting stream and flushing partial response`
           );
           this.abortController?.abort();
           break;
@@ -449,6 +458,10 @@ export class ClaudeSession {
 
         // Handle different message types
         if (event.type === "assistant") {
+          // Reset tool-active flag when we receive a new assistant message
+          // (tool results come as separate events before the next assistant message)
+          toolActive = false;
+
           for (const block of event.message.content) {
             // Thinking blocks
             if (block.type === "thinking") {
@@ -461,6 +474,7 @@ export class ClaudeSession {
 
             // Tool use blocks
             if (block.type === "tool_use") {
+              toolActive = true; // Tool is executing — use longer stall patience
               const toolName = block.name;
               const toolInput = block.input as Record<string, unknown>;
 

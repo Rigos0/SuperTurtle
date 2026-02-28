@@ -18,6 +18,7 @@ import {
   handleResume,
   handleSubturtle,
   handleCron,
+  handleDebug,
   handleText,
   handleVoice,
   handlePhoto,
@@ -570,6 +571,7 @@ bot.command("subturtles", handleSubturtle);
 bot.command("turtle", handleSubturtle);
 bot.command("turtles", handleSubturtle);
 bot.command("cron", handleCron);
+bot.command("debug", handleDebug);
 
 // ============== Message Handlers ==============
 
