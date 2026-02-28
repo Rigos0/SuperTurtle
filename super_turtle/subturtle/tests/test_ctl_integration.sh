@@ -153,7 +153,7 @@ assert_file_contains() {
   local path="$1"
   local needle="$2"
   assert_file_exists "$path" || return 1
-  grep -Fq "$needle" "$path" || fail "expected '$path' to contain '$needle'"
+  grep -Fq -- "$needle" "$path" || fail "expected '$path' to contain '$needle'"
 }
 
 assert_equals() {
@@ -352,6 +352,58 @@ PY
   return 0
 }
 
+test_status_running() {
+  local name state_path ws pid status_output
+  name="$(make_test_name "status-running")"
+  state_path="${TMP_DIR}/${name}.md"
+  ws="${SUBTURTLES_DIR}/${name}"
+
+  cat > "$state_path" <<'STATE'
+# Current Task
+status running test
+STATE
+
+  if ! "$CTL" spawn "$name" --type yolo-codex --timeout 2m --state-file "$state_path" >/dev/null; then
+    fail "spawn failed for ${name}"
+    return 1
+  fi
+  track_subturtle "$name"
+
+  pid="$(cat "${ws}/subturtle.pid")"
+  assert_pid_running "$pid" || return 1
+
+  status_output="$("$CTL" status "$name")"
+  assert_contains "$status_output" "[subturtle:${name}] running as yolo-codex (PID ${pid})" || return 1
+  assert_contains "$status_output" "elapsed" || return 1
+  assert_contains "$status_output" "left" || return 1
+
+  stop_subturtle_if_running "$name"
+  return 0
+}
+
+test_status_stopped() {
+  local name state_path status_output
+  name="$(make_test_name "status-stopped")"
+  state_path="${TMP_DIR}/${name}.md"
+
+  cat > "$state_path" <<'STATE'
+# Current Task
+status stopped test
+STATE
+
+  if ! "$CTL" spawn "$name" --type yolo-codex --timeout 2m --state-file "$state_path" >/dev/null; then
+    fail "spawn failed for ${name}"
+    return 1
+  fi
+  track_subturtle "$name"
+
+  stop_subturtle_if_running "$name"
+
+  status_output="$("$CTL" status "$name")"
+  assert_contains "$status_output" "[subturtle:${name}] not running" || return 1
+  return 0
+}
+
 run_test() {
   local test_name="$1"
   TOTAL_TESTS=$((TOTAL_TESTS + 1))
@@ -388,6 +440,8 @@ register_test test_spawn_creates_workspace
 register_test test_spawn_stdin_state
 register_test test_spawn_file_state
 register_test test_spawn_with_skills
+register_test test_status_running
+register_test test_status_stopped
 
 run_all_tests() {
   local test_name

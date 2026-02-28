@@ -1,5 +1,5 @@
 # Current Task
-Write status tests: running output, stopped output.
+Write stop tests: kills process, cleans cron, archives, handles dead process.
 
 ## End Goal with Specs
 A single test script that exercises every `ctl` command with fake CLI binaries. Tests run in ~30 seconds, no real Claude/Codex calls, fully deterministic.
@@ -55,8 +55,8 @@ A single test script that exercises every `ctl` command with fake CLI binaries. 
 - [x] Read smoke_spawn_status.sh to match existing test patterns
 - [x] Write test harness: setup (fake bins, backup cron), teardown (cleanup), assert helpers
 - [x] Write spawn tests: workspace creation, stdin state, file state, skills
-- [ ] Write status tests: running output, stopped output <- current
-- [ ] Write stop tests: kills process, cleans cron, archives, handles dead process
+- [x] Write status tests: running output, stopped output
+- [ ] Write stop tests: kills process, cleans cron, archives, handles dead process <- current
 - [ ] Write list tests: shows subturtles, shows tunnel URL
 - [ ] Write watchdog timeout test (5s timeout)
 - [ ] Write gc and reschedule-cron tests
