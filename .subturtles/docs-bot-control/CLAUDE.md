@@ -1,5 +1,5 @@
 # Current Task
-Read send_turtle_mcp/server.ts and ask_user_mcp/server.ts for accuracy.
+Read current docs/bot/mcp-tools.mdx to understand existing structure.
 
 ## End Goal with Specs
 The `bot_control` MCP tool is the most important part of the system — it controls sessions, models, drivers, and restarts. The docs should fully explain every action, parameters, and behavior.
@@ -26,8 +26,8 @@ The `bot_control` MCP tool is the most important part of the system — it contr
 
 ## Backlog
 - [x] Read bot_control_mcp/server.ts to understand all actions and params
-- [ ] Read send_turtle_mcp/server.ts and ask_user_mcp/server.ts for accuracy <- current
-- [ ] Read current docs/bot/mcp-tools.mdx to understand existing structure
+- [x] Read send_turtle_mcp/server.ts and ask_user_mcp/server.ts for accuracy
+- [ ] Read current docs/bot/mcp-tools.mdx to understand existing structure <- current
 - [ ] Rewrite bot_control section with full action reference table and descriptions
 - [ ] Fix send_turtle section (rename from "Spawn SubTurtles" to correct description)
 - [ ] Review ask_user section for accuracy
