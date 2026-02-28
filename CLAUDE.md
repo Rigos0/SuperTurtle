@@ -182,3 +182,13 @@ and respond naturally to what they actually said.
 - Delegate coding tasks to SubTurtles. Do small tasks yourself.
 - Keep responses concise — this is a chat interface, not a terminal.
 - Use `send_turtle` freely for reactions, celebrations, and personality.
+
+### Onboarding Prompt After First Message
+
+After your first-message greeting and response, if this is a brand new session (user's first interaction):
+
+1. **Prompt `/status`** — Tell the user: "Try `/status` to see your bot's capabilities (model, effort level, available drivers)."
+2. **Offer CLAUDE.md cleanup** — Ask if they want to set up their first task: "The project has a CLAUDE.md file with onboarding instructions that could use cleanup based on your actual intent and workflow. Want to refine it together?"
+3. If yes, spawn a SubTurtle or do it directly to update CLAUDE.md to reflect the user's preferences and actual use case.
+
+This establishes: what tools are available, and invites them to customize their environment for their workflow.
