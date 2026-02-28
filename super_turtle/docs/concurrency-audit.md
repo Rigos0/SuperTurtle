@@ -5,9 +5,11 @@ Status: in progress.
 Completed in this revision:
 - Backlog item 1: mapped shared mutable state and access patterns.
 - Backlog item 2: audited `deferred-queue.ts` drain/enqueue concurrency and cron interaction.
+- Backlog item 3: audited `handlers/text.ts` retry/interrupt overlap and shared `lastMessage`.
+- Backlog item 4: audited `handlers/driver-routing.ts` (`isAnyDriverRunning`, preemption, stop fallback).
 
 Pending:
-- Race-condition and TOCTOU analysis for each module (backlog items 3+).
+- Race-condition and TOCTOU analysis for remaining modules (backlog items 5+).
 
 ## Shared Mutable State Inventory
 
@@ -222,3 +224,75 @@ Where:
 
 Why this is unsafe:
 - Non-atomic shared overwrite with no ownership semantics in a concurrently-invoked handler path.
+
+## Driver Routing Concurrency Audit (`src/handlers/driver-routing.ts`)
+
+### Question 1: Can one driver's `isRunning` getter lag and make `isAnyDriverRunning()` miss active work?
+
+Conclusion:
+- No direct getter-lag bug was found in `isAnyDriverRunning()` itself.
+- Both drivers now acquire query locks at method entry (`src/session.ts:300-313`, `src/codex-session.ts:799-810`), and `isAnyDriverRunning()` is a direct OR (`src/handlers/driver-routing.ts:156-158`).
+- Remaining risk is in stop/preemption handoff rather than the getter read.
+
+## Finding DR-1 (High): Codex pre-abort window can make stop/preempt report "nothing to stop" while a run is active
+
+Where:
+- Codex stop requires both `isQueryRunning` and `abortController` (`src/codex-session.ts:657-667`).
+- Codex marks running before creating abort controller (`src/codex-session.ts:809`, `857`), with async thread setup in between (`811-815`).
+- Driver-routing stop path relies on that result (`src/handlers/driver-routing.ts:174-182`).
+
+Race scenario:
+1. Codex run starts and sets `isQueryRunning = true` (`src/codex-session.ts:809`).
+2. Before `abortController` is assigned (`857`), user callback/background preempt calls `stopActiveDriverQuery`.
+3. `codexSession.stop()` returns `false` (`659-666`) even though the run is active.
+4. Caller can proceed as if no active run exists, and start new work.
+
+Impact:
+- Preemption can silently fail in an active run window.
+- Follow-up work (for example callback answer continuation) can overlap with the still-running Codex turn.
+
+Recommended fix:
+1. Mirror Claude semantics in Codex stop: if `isQueryRunning` but abort controller is not ready, set `stopRequested = true` and return `"pending"` (similar to `src/session.ts:285-290`).
+2. Add an early `stopRequested` check in Codex `sendMessage` before entering streamed run (parallel to `src/session.ts:378-385`).
+3. Treat `"pending"` as a successful preemption request in caller paths.
+
+## Finding DR-2 (High): Time-based preemption handshake leaves a race window for overlapping runs
+
+Where:
+- Preemption helper uses one fixed sleep after stop request (`src/handlers/driver-routing.ts:166-169`).
+- Callback handler does the same pattern before starting replacement work (`src/handlers/callback.ts:293-298`, `309-316`).
+- Drivers also use fixed sleep after stop (`src/drivers/claude-driver.ts:25-29`, `src/drivers/codex-driver.ts:136-140`).
+
+Why this is a race:
+- `stop()` acknowledges an abort request, not guaranteed completion of stream teardown.
+- A fixed 100ms delay is not a synchronization guarantee; teardown can exceed that budget.
+- New work can be started immediately after sleep without re-checking quiescence.
+
+Impact:
+- Concurrent overlapping runs are still possible during stop/preempt transitions.
+- Increases risk of duplicate side effects and interleaved status output.
+
+Recommended fix:
+1. Replace fixed sleeps with a bounded wait loop that polls `isAnyDriverRunning()` until false (or timeout).
+2. Gate replacement work on confirmed idle state, not just "stop requested".
+3. If timeout hits, queue/defer the new request instead of starting immediately.
+
+## Finding DR-3 (Medium): `stopActiveDriverQuery()` fallback target can be wrong if `activeDriver` changes mid-call
+
+Where:
+- Current driver is captured first (`src/handlers/driver-routing.ts:175`), then `await current.stop()` (`176`), then fallback is computed from mutable `session.activeDriver` (`181`).
+- `session.activeDriver` can change at runtime from command/callback handlers (`src/handlers/callback.ts:164-177`, `src/handlers/commands.ts:608-620`).
+
+Race scenario:
+1. `stopActiveDriverQuery` captures current driver object.
+2. While awaiting `current.stop()`, another update switches `session.activeDriver`.
+3. Fallback driver ID is derived from the new driver selection, not the originally captured one.
+4. Fallback call can target the same driver twice and skip the other driver's stop path.
+
+Impact:
+- "Stop both possibilities" behavior is not deterministic under concurrent driver switches.
+
+Recommended fix:
+1. Capture `currentDriverId` once at function entry.
+2. Derive fallback from that captured ID only.
+3. Optionally stop both drivers in deterministic order when preempting background runs.
