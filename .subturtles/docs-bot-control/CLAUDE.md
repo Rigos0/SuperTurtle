@@ -33,3 +33,6 @@ The `bot_control` MCP tool is the most important part of the system — it contr
 - [x] Review ask_user section for accuracy
 - [x] Also check docs/bot/commands.mdx references bot_control, update if needed
 - [x] Commit changes
+
+## Loop Control
+STOP
