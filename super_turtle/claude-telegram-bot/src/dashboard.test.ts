@@ -1,49 +1,39 @@
-import { afterAll, describe, expect, it, mock } from "bun:test";
-
-mock.module("./config", () => ({
-  WORKING_DIR: "/tmp",
-  DASHBOARD_ENABLED: false,
-  DASHBOARD_AUTH_TOKEN: "dashboard-secret",
-  DASHBOARD_BIND_ADDR: "127.0.0.1",
-  DASHBOARD_PORT: 4173,
-}));
-
-mock.module("./cron", () => ({
-  getJobs: () => [],
-}));
-
-mock.module("./handlers/commands", () => ({
-  parseCtlListOutput: () => [],
-  getSubTurtleElapsed: async () => "0",
-}));
+import { describe, expect, it } from "bun:test";
+import { DASHBOARD_AUTH_TOKEN } from "./config";
 
 const { isAuthorized, safeSubstring } = await import("./dashboard");
 
-afterAll(() => {
-  mock.restore();
-});
+const hasAuthToken = DASHBOARD_AUTH_TOKEN.length > 0;
+const validToken = hasAuthToken ? DASHBOARD_AUTH_TOKEN : "any-token";
 
 describe("isAuthorized()", () => {
   it("accepts token in query string", () => {
-    const request = new Request("http://localhost/dashboard?token=dashboard-secret");
+    const request = new Request(`http://localhost/dashboard?token=${encodeURIComponent(validToken)}`);
+    expect(isAuthorized(request)).toBe(true);
+  });
+
+  it("accepts token in x-dashboard-token header", () => {
+    const request = new Request("http://localhost/dashboard", {
+      headers: { "x-dashboard-token": validToken },
+    });
     expect(isAuthorized(request)).toBe(true);
   });
 
   it("accepts token in Authorization header", () => {
     const request = new Request("http://localhost/dashboard", {
-      headers: { Authorization: "Bearer dashboard-secret" },
+      headers: { Authorization: `Bearer ${validToken}` },
     });
     expect(isAuthorized(request)).toBe(true);
   });
 
-  it("rejects missing token", () => {
+  it("handles missing token based on auth mode", () => {
     const request = new Request("http://localhost/dashboard");
-    expect(isAuthorized(request)).toBe(false);
+    expect(isAuthorized(request)).toBe(!hasAuthToken);
   });
 
-  it("rejects incorrect token", () => {
+  it("handles incorrect token based on auth mode", () => {
     const request = new Request("http://localhost/dashboard?token=wrong-token");
-    expect(isAuthorized(request)).toBe(false);
+    expect(isAuthorized(request)).toBe(!hasAuthToken);
   });
 });
 

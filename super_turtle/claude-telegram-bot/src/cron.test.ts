@@ -12,7 +12,10 @@ const fixtureJobsFile = join(fixtureRoot, "cron-jobs.json");
 const realDateNow = Date.now;
 
 mkdirSync(fixtureSrcDir, { recursive: true });
-writeFileSync(fixtureCronPath, readFileSync(new URL("./cron.ts", import.meta.url), "utf-8"));
+writeFileSync(
+  fixtureCronPath,
+  readFileSync(new URL("./cron.ts", import.meta.url), "utf-8").replace(`from "./logger";`, `from "./logger.ts";`)
+);
 writeFileSync(
   fixtureLoggerPath,
   `export const cronLog = { warn: () => {}, error: () => {}, info: () => {}, debug: () => {} };\n`

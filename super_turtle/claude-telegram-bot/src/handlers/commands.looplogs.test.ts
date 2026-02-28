@@ -5,8 +5,9 @@ process.env.TELEGRAM_ALLOWED_USERS ||= "123";
 process.env.CLAUDE_WORKING_DIR ||= process.cwd();
 
 const { handleLooplogs, MAIN_LOOP_LOG_PATH } = await import("./commands");
+const { ALLOWED_USERS } = await import("../config");
 
-const authorizedUserId = Number((process.env.TELEGRAM_ALLOWED_USERS || "123").split(",")[0]?.trim() || "123");
+const authorizedUserId = ALLOWED_USERS[0] ?? Number((process.env.TELEGRAM_ALLOWED_USERS || "123").split(",")[0]?.trim() || "123");
 
 describe("/looplogs", () => {
   it("returns the tailed main-loop logs", async () => {

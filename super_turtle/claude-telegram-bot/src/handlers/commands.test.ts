@@ -9,6 +9,8 @@ process.env.TELEGRAM_ALLOWED_USERS ||= "123";
 process.env.CLAUDE_WORKING_DIR ||= process.cwd();
 process.env.CODEX_ENABLED = "false";
 
+const { ALLOWED_USERS } = await import("../config");
+
 const {
   getCommandLines,
   formatModelInfo,
@@ -38,7 +40,7 @@ function mockContext(messageText: string): {
   replies: ReplyRecord[];
 } {
   const replies: ReplyRecord[] = [];
-  const authorizedUserId = Number((process.env.TELEGRAM_ALLOWED_USERS || "123").split(",")[0]?.trim() || "123");
+  const authorizedUserId = ALLOWED_USERS[0] ?? Number((process.env.TELEGRAM_ALLOWED_USERS || "123").split(",")[0]?.trim() || "123");
   return {
     ctx: {
       from: { id: authorizedUserId },

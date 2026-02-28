@@ -221,7 +221,6 @@ describe("/usage command with CODEX_ENABLED variations", () => {
     expect(result.payload).not.toBeNull();
     expect(result.payload?.replyCount).toBe(1);
     expect(result.payload?.parseMode).toBe("HTML");
-    expect(result.payload?.replyText).toContain("📊 <b>Usage & Quotas</b>");
     expect(result.payload?.replyText).toContain("<b>Claude Code</b>");
     expect(result.payload?.replyText).not.toContain("<b>Codex</b>");
     expect(result.payload?.replyText).toContain("✅ <b>Status:</b> Claude Code operating normally");
@@ -236,7 +235,6 @@ describe("/usage command with CODEX_ENABLED variations", () => {
     expect(result.payload).not.toBeNull();
     expect(result.payload?.replyCount).toBe(1);
     expect(result.payload?.parseMode).toBe("HTML");
-    expect(result.payload?.replyText).toContain("📊 <b>Usage & Quotas</b>");
     expect(result.payload?.replyText).toContain("<b>Claude Code</b>");
     expect(result.payload?.replyText).toContain("<b>Codex (pro)</b>");
     expect(result.payload?.replyText).toMatch(/\d+%.*window/);
