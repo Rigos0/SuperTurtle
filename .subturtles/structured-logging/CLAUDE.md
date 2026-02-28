@@ -1,5 +1,5 @@
 # Current Task
-Replace console calls in MCP servers: bot_control, ask_user, send_turtle
+Replace console calls in remaining files: dashboard.ts, turtle-greetings.ts
 
 ## End Goal with Specs
 Every log call in the bot produces structured JSON via pino. A single log file that can be tailed with `pino-pretty` for a clean, colored, real-time view of everything happening — both Claude and Codex activity, cron jobs, MCP tools, SubTurtle operations.
@@ -93,8 +93,8 @@ MCP servers:
 - [x] Replace console calls in drivers: claude-driver.ts, codex-driver.ts
 - [x] Replace console calls in handlers: streaming.ts, text.ts, commands.ts, callback.ts, stop.ts
 - [x] Replace console calls in media handlers: photo.ts, video.ts, audio.ts, document.ts, media-group.ts
-- [ ] Replace console calls in MCP servers: bot_control, ask_user, send_turtle <- current
-- [ ] Replace console calls in remaining files: dashboard.ts, turtle-greetings.ts
+- [x] Replace console calls in MCP servers: bot_control, ask_user, send_turtle
+- [ ] Replace console calls in remaining files: dashboard.ts, turtle-greetings.ts <- current
 - [ ] Verify zero console.log/error/warn remaining (grep check)
 - [ ] Run `bun test` to verify nothing broke
 - [ ] Commit

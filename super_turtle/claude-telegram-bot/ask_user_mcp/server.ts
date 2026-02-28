@@ -15,6 +15,9 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { mcpLog } from "../src/logger";
+
+const askUserLog = mcpLog.child({ tool: "ask_user", server: "ask-user" });
 
 // Create the MCP server
 const server = new Server(
@@ -109,7 +112,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Ask User MCP server running on stdio");
+  askUserLog.info({ action: "startup" }, "Ask User MCP server running on stdio");
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  askUserLog.error({ err: error, action: "startup" }, "Ask User MCP server failed");
+  process.exitCode = 1;
+});

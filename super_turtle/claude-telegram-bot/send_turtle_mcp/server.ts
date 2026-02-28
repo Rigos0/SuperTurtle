@@ -16,17 +16,23 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { dirname, resolve } from "path";
+import { mcpLog } from "../src/logger";
+
+const sendTurtleLog = mcpLog.child({ tool: "send_turtle", server: "send-turtle" });
 
 // Load turtle combo lookup table (emoji codepoint → gstatic URL)
 const COMBOS_PATH = resolve(dirname(import.meta.path), "turtle-combos.json");
 const TURTLE_COMBOS: Record<string, string> = await Bun.file(COMBOS_PATH)
   .json()
-  .catch(() => {
-    console.error(`Failed to load turtle combos from ${COMBOS_PATH}`);
+  .catch((error) => {
+    sendTurtleLog.error({ err: error, action: "load_combos", path: COMBOS_PATH }, "Failed to load turtle combos");
     return {};
   });
 
-console.error(`Loaded ${Object.keys(TURTLE_COMBOS).length} turtle combinations`);
+sendTurtleLog.info(
+  { action: "load_combos", combosLoaded: Object.keys(TURTLE_COMBOS).length },
+  "Loaded turtle combinations"
+);
 
 /**
  * Normalize an emoji input to the codepoint key format used in our combo table.
@@ -193,7 +199,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Send Turtle MCP server running on stdio");
+  sendTurtleLog.info({ action: "startup" }, "Send Turtle MCP server running on stdio");
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  sendTurtleLog.error({ err: error, action: "startup" }, "Send Turtle MCP server failed");
+  process.exitCode = 1;
+});
