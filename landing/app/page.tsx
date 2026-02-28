@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { StickyNav } from '@/components/StickyNav';
+import { SectionDivider } from '@/components/SectionDivider';
 
 const heroHighlights = [
   {
@@ -206,8 +207,8 @@ export default function Home() {
     <div className="landing-root">
       <StickyNav />
       <main>
-        <section id="hero" className="section-shell hero-shell relative">
-          <div className="section-container max-w-5xl space-y-10">
+	        <section id="hero" className="section-shell hero-shell relative">
+	          <div className="section-container max-w-5xl space-y-10">
             <div className="reveal text-center flex flex-col items-center" style={{ animationDelay: '80ms' }}>
               <div className="mx-auto turtle-sticker-wrap">
                 <div className={`turtle-tip-bubble ${hasClickedTurtleTip ? 'active' : ''}`} aria-hidden={!hasClickedTurtleTip}>
@@ -260,9 +261,11 @@ export default function Home() {
                 * Uses official Claude Code/Codex CLI authentication flows in headless mode. This wrapper approach is compliant with provider terms.
               </p>
             </div>
-          </div>
-          <div className="hero-glow" />
-	        </section>
+	          </div>
+	          <div className="hero-glow" />
+		        </section>
+        
+            <SectionDivider />
 	      </main>
 
       <footer className="relative section-shell footer-shell">
