@@ -21,6 +21,7 @@
           {
             "group": "Getting Started",
             "pages": [
+              "index",
               "introduction",
               "quickstart",
               "architecture"
