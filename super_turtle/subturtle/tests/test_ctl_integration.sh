@@ -754,6 +754,33 @@ STATE
   return 0
 }
 
+test_spawn_validates_cli() {
+  local name state_path ws out_file err_file output restricted_path
+  name="$(make_test_name "spawn-validates-cli")"
+  state_path="${TMP_DIR}/${name}.md"
+  ws="${SUBTURTLES_DIR}/${name}"
+  out_file="${TMP_DIR}/${name}.out"
+  err_file="${TMP_DIR}/${name}.err"
+  restricted_path="/usr/bin:/bin:/usr/sbin:/sbin"
+
+  cat > "$state_path" <<'STATE'
+# Current Task
+spawn validates missing codex CLI
+STATE
+
+  if run_and_capture "$out_file" "$err_file" env PATH="$restricted_path" "$CTL" spawn "$name" --type yolo-codex --timeout 2m --state-file "$state_path"; then
+    fail "spawn unexpectedly succeeded without codex for ${name}"
+    return 1
+  fi
+
+  output="$(cat "$out_file" "$err_file")"
+  assert_contains "$output" "requires missing CLI(s): codex" || return 1
+  assert_contains "$output" "Supported loop types on this host" || return 1
+  assert_file_exists "${ws}/CLAUDE.md" || return 1
+  [[ ! -f "${ws}/subturtle.pid" ]] || fail "expected no PID file for failed spawn"
+  return 0
+}
+
 run_test() {
   local test_name="$1"
   TOTAL_TESTS=$((TOTAL_TESTS + 1))
@@ -801,6 +828,7 @@ register_test test_list_shows_tunnel_url
 register_test test_watchdog_timeout
 register_test test_gc_archives_old
 register_test test_reschedule_cron
+register_test test_spawn_validates_cli
 
 run_all_tests() {
   local test_name

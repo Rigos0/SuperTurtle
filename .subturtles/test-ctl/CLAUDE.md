@@ -1,5 +1,5 @@
 # Current Task
-Write CLI validation test (missing codex binary).
+Run all tests, fix any failures.
 
 ## End Goal with Specs
 A single test script that exercises every `ctl` command with fake CLI binaries. Tests run in ~30 seconds, no real Claude/Codex calls, fully deterministic.
@@ -60,6 +60,6 @@ A single test script that exercises every `ctl` command with fake CLI binaries. 
 - [x] Write list tests: shows subturtles, shows tunnel URL
 - [x] Write watchdog timeout test (5s timeout)
 - [x] Write gc and reschedule-cron tests
-- [ ] Write CLI validation test (missing codex binary) <- current
-- [ ] Run all tests, fix any failures
+- [x] Write CLI validation test (missing codex binary)
+- [ ] Run all tests, fix any failures <- current
 - [ ] Commit
