@@ -21,7 +21,7 @@ type UsageProbeResult = {
   payload: UsageProbePayload | null;
 };
 
-const commandsPath = resolve(import.meta.dir, "commands.ts");
+const commandsPath = resolve(import.meta.dir, "commands/index.ts");
 const marker = "__USAGE_PROBE__=";
 
 async function probeUsage(codexEnabled: "true" | "false"): Promise<UsageProbeResult> {

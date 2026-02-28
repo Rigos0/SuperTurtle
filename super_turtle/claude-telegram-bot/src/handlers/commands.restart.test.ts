@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { resolve } from "path";
 
-const commandsPath = resolve(import.meta.dir, "commands.ts");
+const commandsPath = resolve(import.meta.dir, "commands/index.ts");
 const marker = "__RESTART_PROBE__=";
 
 type RestartProbePayload = {
