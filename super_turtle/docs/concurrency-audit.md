@@ -4,9 +4,10 @@ Status: in progress.
 
 Completed in this revision:
 - Backlog item 1: mapped shared mutable state and access patterns.
+- Backlog item 2: audited `deferred-queue.ts` drain/enqueue concurrency and cron interaction.
 
 Pending:
-- Race-condition and TOCTOU analysis for each module (backlog items 2+).
+- Race-condition and TOCTOU analysis for each module (backlog items 3+).
 
 ## Shared Mutable State Inventory
 
@@ -104,9 +105,55 @@ External shared access pattern:
 - Text handler drains after request completion (`src/handlers/text.ts:257`).
 - `/status` command reads a snapshot through `getAllDeferredQueues` (`src/handlers/commands.ts:1596`).
 
-## Notes for Next Backlog Item
+## Deferred Queue Concurrency Audit (`src/deferred-queue.ts`)
 
-The shared-state map above is the baseline for item 2 (`deferred-queue.ts` race audit). Focus areas:
-- `drainDeferredQueue` guard sequence (`src/deferred-queue.ts:73-77`)
-- interplay between `isAnyDriverRunning()` checks and `session.startProcessing()` in queue drain (`79-87`)
-- concurrent cron/user entry points that can call drain in parallel.
+### Question 1: Can `drainDeferredQueue` race with `handleText`?
+
+Conclusion: no same-chat re-entrancy race was found in current code.
+
+Evidence:
+- `handleText` calls `drainDeferredQueue` only in `finally` after clearing processing/typing (`src/handlers/text.ts:252-257`).
+- `drainDeferredQueue` does guard check and `drainingChats.add(chatId)` synchronously, before the first `await` (`src/deferred-queue.ts:73-77`).
+- For each dequeued item, it sets `session.startProcessing()` before awaiting driver work (`src/deferred-queue.ts:85-93`), so `isAnyDriverRunning()` flips true promptly via `session.isRunning` (`src/session.ts:229-231`, `265-269`; `src/handlers/driver-routing.ts:156-158`).
+
+Why this matters:
+- In a single Node/Bun event loop, there is no preemption inside that synchronous block. Another handler cannot observe the chat as "not draining" between line 73 and line 77.
+
+### Question 2: What if two cron jobs fire simultaneously and both call `drainDeferredQueue`?
+
+Conclusion: this path does not exist in current code.
+
+Evidence:
+- Cron execution uses `runMessageWithDriver(...)` directly for both silent and non-silent jobs (`src/index.ts:706-818`).
+- `drainDeferredQueue` is invoked from text/voice handler finalizers (`src/handlers/text.ts:257`, `src/handlers/voice.ts:181`), not from cron loop.
+
+Note:
+- The cron comment claiming non-silent jobs route through `handleText` is stale (`src/index.ts:611-612`), but implementation is direct driver invocation.
+
+### Question 3: Is `drainingChats` a sufficient guard?
+
+Conclusion:
+- Sufficient for preventing duplicate drains of the same chat.
+- Not sufficient for global forward progress across chats.
+
+## Finding DQ-1 (Medium): Cross-chat deferred queue starvation/liveness gap
+
+Where:
+- Enqueue happens in voice handler when any driver is running (`src/handlers/voice.ts:124-132`).
+- Drain attempts are per-chat and opportunistic (`src/handlers/text.ts:257`, `src/handlers/voice.ts:181`).
+- Drain bails immediately if any driver is running (`src/deferred-queue.ts:73-74`).
+
+Scenario:
+1. Chat A is running a long task.
+2. Voice from chat B arrives, gets queued (`enqueueDeferredMessage`), then `drainDeferredQueue(chatB)` returns early because A is running.
+3. A later finishes and drains chat A only.
+4. If no further text/voice events arrive in chat B, chat B's deferred queue can remain indefinitely.
+
+Impact:
+- "Queued" voice transcripts are not guaranteed to run after current work completes unless another event later triggers a drain for that same chat.
+- This is a concurrency/liveness issue (progress depends on unrelated future traffic).
+
+Recommended fix:
+1. Add a global idle drain scheduler in `src/deferred-queue.ts` that scans queued chat IDs and drains one-by-one whenever the system transitions to idle.
+2. Trigger that scheduler from a central completion point (for example after `runMessageWithDriver` completes in cron/text/voice flows), not only from the current chat finalizer.
+3. Keep `drainingChats` as the per-chat re-entrancy guard, but combine it with a process-wide "drain loop active" guard to avoid redundant global sweep invocations.
