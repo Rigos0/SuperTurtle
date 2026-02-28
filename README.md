@@ -92,6 +92,10 @@ cd super_turtle/claude-telegram-bot
 bun run start
 ```
 
+> **Note:** `bun run start` uses `live.sh`, which requires `tmux` and an interactive terminal.
+> Run it in your own terminal session — it cannot be launched by an agent or as a background process.
+> If tmux is not installed: `brew install tmux` (macOS) or `sudo apt install tmux` (Linux).
+
 Then message your bot in Telegram and ask it to build something.
 
 ## Architecture
