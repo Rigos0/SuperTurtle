@@ -7,9 +7,10 @@ Completed in this revision:
 - Backlog item 2: audited `deferred-queue.ts` drain/enqueue concurrency and cron interaction.
 - Backlog item 3: audited `handlers/text.ts` retry/interrupt overlap and shared `lastMessage`.
 - Backlog item 4: audited `handlers/driver-routing.ts` (`isAnyDriverRunning`, preemption, stop fallback).
+- Backlog item 5: audited cron execution path in `src/index.ts` (timer loop vs interactive updates).
 
 Pending:
-- Race-condition and TOCTOU analysis for remaining modules (backlog items 5+).
+- Race-condition and TOCTOU analysis for remaining modules (backlog items 6+).
 
 ## Shared Mutable State Inventory
 
@@ -296,3 +297,67 @@ Recommended fix:
 1. Capture `currentDriverId` once at function entry.
 2. Derive fallback from that captured ID only.
 3. Optionally stop both drivers in deterministic order when preempting background runs.
+
+## Cron Loop Concurrency Audit (`src/index.ts`)
+
+### Question 1: How does the cron loop interact with active user message processing?
+
+Conclusion:
+- Cron jobs are not routed through `handleText`; they execute through direct driver calls in the timer loop.
+- User updates and cron work are therefore not globally serialized on one queue; interaction depends on `isAnyDriverRunning()` checks plus best-effort preemption.
+
+Evidence:
+- Timer loop runs in `setInterval(async () => ...)` and executes jobs with `runMessageWithDriver(...)` (`src/index.ts:621-860`, especially `725-745`, `799-818`).
+- Interactive updates use middleware preemption + sequentialization (`src/index.ts:517-555`), but cron invocations bypass that path.
+- Preemption uses a stop request and fixed-delay handshake (`src/handlers/driver-routing.ts:160-169`), which is not a hard quiescence barrier (see DR-2).
+
+### Question 2: Can cron-triggered work race with user cron mutations (cancel/remove)?
+
+Conclusion: yes.
+
+## Finding CR-1 (Medium): Stale due-job snapshot can execute a job after user cancellation
+
+Where:
+- Tick snapshot is captured once: `const dueJobs = getDueJobs()` (`src/index.ts:623`).
+- Job execution loop awaits each job run (`src/index.ts:725-745`, `799-818`).
+- User cancellation path removes jobs concurrently via callback (`src/handlers/callback.ts:567-593`, removal at `581`).
+- Timer mutation return values are ignored (`src/index.ts:638-642`), so missing jobs do not block execution.
+
+Race scenario:
+1. Cron tick snapshots `dueJobs` containing jobs A and B.
+2. Tick executes A and awaits driver completion.
+3. During that await, user taps "Cancel" for B (`removeJob(jobId)` succeeds).
+4. Tick resumes and still executes B from stale in-memory `dueJobs` entry.
+
+Impact:
+- User sees "Job cancelled" but the cancelled job may still run once.
+- Violates expected cancel semantics and can trigger unintended side effects.
+
+Recommended fix:
+1. Re-check job existence immediately before execution (fresh `getJobs()` lookup by `job.id`).
+2. Honor `advanceRecurringJob`/`removeJob` return values; if mutation fails, skip execution.
+3. Prefer a "claim then execute" model (`in_flight` marker) instead of iterating a long-lived stale snapshot across awaits.
+
+### Question 3: Can cron-triggered messages race with interactive messages?
+
+Conclusion: yes; preemption can cancel cron work after dequeue, which drops that scheduled run.
+
+## Finding CR-2 (Medium): User-priority preemption can permanently drop one-shot cron runs
+
+Where:
+- Jobs are removed/advanced before execution (`src/index.ts:637-642`).
+- Interactive updates can preempt background runs (`src/index.ts:517-525`, `src/handlers/driver-routing.ts:160-171`).
+- Preempted cancellation path `continue`s without requeue (`src/index.ts:770-777`, `821-827`).
+
+Race scenario:
+1. Cron dequeues one-shot job J (or advances recurring J) before starting its driver run.
+2. User sends an interactive update while J is running; preemption aborts background run.
+3. Cron treats this as preempted and continues without restoring J.
+
+Impact:
+- One-shot jobs can be lost entirely.
+- Recurring jobs can silently skip an interval due to user interaction timing.
+
+Recommended fix:
+1. Keep pre-execution crash safety, but add explicit "preempted" retry semantics (requeue one-shots with a short delay; do not count as completed run).
+2. Separate completion states (`success`, `failed`, `preempted`) and only finalize/removal on terminal outcomes.
