@@ -12,6 +12,9 @@ import { auditLog, auditLogRateLimit, startTypingIndicator } from "../utils";
 import { getDriverAuditType, isActiveDriverSessionActive, runMessageWithActiveDriver } from "./driver-routing";
 import { StreamingState, createStatusCallback } from "./streaming";
 import { createMediaGroupBuffer, handleProcessingError } from "./media-group";
+import { streamLog } from "../logger";
+
+const photoLog = streamLog.child({ handler: "photo" });
 
 // Create photo-specific media group buffer
 const photoBuffer = createMediaGroupBuffer({
@@ -129,7 +132,7 @@ export async function handlePhoto(ctx: Context): Promise<void> {
   // 2. For single photos, show status and rate limit early
   let statusMsg: Awaited<ReturnType<typeof ctx.reply>> | null = null;
   if (!mediaGroupId) {
-    console.log(`Received photo from @${username}`);
+    photoLog.info({ userId, username, chatId, msgType: "photo" }, "Received photo message");
     // Rate limit
     const [allowed, retryAfter] = rateLimiter.check(userId);
     if (!allowed) {
@@ -149,7 +152,7 @@ export async function handlePhoto(ctx: Context): Promise<void> {
   try {
     photoPath = await downloadPhoto(ctx);
   } catch (error) {
-    console.error("Failed to download photo:", error);
+    photoLog.error({ err: error, userId, username, chatId }, "Failed to download photo");
     if (statusMsg) {
       try {
         await ctx.api.editMessageText(
@@ -158,7 +161,10 @@ export async function handlePhoto(ctx: Context): Promise<void> {
           "❌ Failed to download photo."
         );
       } catch (editError) {
-        console.debug("Failed to edit status message:", editError);
+        photoLog.debug(
+          { err: editError, userId, username, chatId, messageId: statusMsg.message_id },
+          "Failed to edit photo status message"
+        );
         await ctx.reply("❌ Failed to download photo.");
       }
     } else {
@@ -182,7 +188,10 @@ export async function handlePhoto(ctx: Context): Promise<void> {
     try {
       await ctx.api.deleteMessage(statusMsg.chat.id, statusMsg.message_id);
     } catch (error) {
-      console.debug("Failed to delete status message:", error);
+      photoLog.debug(
+        { err: error, userId, username, chatId, messageId: statusMsg.message_id },
+        "Failed to delete photo status message"
+      );
     }
     return;
   }
