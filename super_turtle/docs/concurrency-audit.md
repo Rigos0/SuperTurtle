@@ -10,9 +10,10 @@ Completed in this revision:
 - Backlog item 5: audited cron execution path in `src/index.ts` (timer loop vs interactive updates).
 - Backlog item 6: audited `handlers/streaming.ts` (`StreamingState`, callback serialization, `toolMessages` mutation safety).
 - Backlog item 7: audited `handlers/stop.ts` (`stopAllRunningWork` and stop-vs-new-message races).
+- Backlog item 8: audited `handlers/voice.ts` and `handlers/callback.ts` (`isAnyDriverRunning` guards before dispatch).
 
 Pending:
-- Race-condition and TOCTOU analysis for remaining modules (backlog items 8+).
+- Consolidate findings into the final report format and commit it (backlog items 9+).
 
 ## Shared Mutable State Inventory
 
@@ -453,3 +454,41 @@ Impact:
 Recommended fix:
 1. Remove timer-based `clearStopRequested()` from driver stop path.
 2. Clear stop intent only at deterministic ownership boundaries (for example when the superseding request acquires run ownership, or when the canceled request consumes the stop at pre-start check).
+
+## Voice and Callback Handler Concurrency Audit (`src/handlers/voice.ts`, `src/handlers/callback.ts`)
+
+### Question: Do these handlers properly check `isAnyDriverRunning()` before starting work?
+
+Conclusion:
+- `handleVoice` does check correctly before dispatching to the active driver.
+- `handleCallback` is mixed: the `askuser:` path checks, but resume recap paths (`resume:` and `codex_resume:`) start driver work without any `isAnyDriverRunning()` guard.
+
+Evidence:
+- Voice handler queues instead of dispatching when busy (`src/handlers/voice.ts:120-137`), and only sets processing state after that guard (`src/handlers/voice.ts:139-142`).
+- Ask-user callback path checks busy state and requests stop before dispatch (`src/handlers/callback.ts:293-299`), but still uses fixed-delay handoff already covered by Finding DR-2.
+- Resume recap paths call `runMessageWithActiveDriver(...)` directly with no prior `isAnyDriverRunning()` check:
+  - Claude resume recap (`src/handlers/callback.ts:473-488`)
+  - Codex resume recap (`src/handlers/callback.ts:541-556`)
+- Callback updates are explicitly not sequentialized (`src/index.ts:548-550`), so these recap runs can be triggered while another run is still active.
+
+## Finding VC-1 (Medium): Resume callback recap paths can start overlapping work without `isAnyDriverRunning()` gating
+
+Where:
+- `handleResumeCallback` recap dispatch (`src/handlers/callback.ts:473-488`)
+- `handleCodexResumeCallback` recap dispatch (`src/handlers/callback.ts:541-556`)
+- Callback non-sequentialization (`src/index.ts:548-550`)
+
+Race scenario:
+1. A run is already active (possibly on the other driver).
+2. User presses a resume button; callback handler is admitted immediately (not sequentialized).
+3. Resume handler starts recap dispatch without checking or preempting active work.
+4. Two runs can overlap across shared singleton state and status output paths.
+
+Impact:
+- Resume UX path can violate single-active-run expectations.
+- Overlap increases risk of interleaved status updates and side-effect duplication under tool use.
+
+Recommended fix:
+1. Before recap dispatch in both resume callbacks, apply the same busy handling policy as other interactive paths:
+2. If `isAnyDriverRunning()` is true, either preempt + wait for quiescence (not fixed sleep) or defer recap.
+3. Reuse a shared helper so callback/voice/text paths use one consistent admission gate.

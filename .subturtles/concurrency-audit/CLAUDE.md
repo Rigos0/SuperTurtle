@@ -1,5 +1,5 @@
 ## Current Task
-Audit `handlers/voice.ts` and `handlers/callback.ts`: Do they properly check `isAnyDriverRunning()` before starting work?
+Write the consolidated audit report to `super_turtle/docs/concurrency-audit.md` by gathering findings from prior commits into one document with clear sections and actionable recommendations.
 
 ## End Goal with Specs
 Produce a concurrency audit report at `super_turtle/docs/concurrency-audit.md` that documents:
@@ -18,24 +18,14 @@ The report should be concrete — file paths, line numbers, code snippets, and c
 - [x] Audit cron job execution in `src/index.ts`: How does the cron loop interact with active message processing? Can cron-triggered messages race with user messages?
 - [x] Audit `handlers/streaming.ts`: `StreamingState` — is it safe if multiple status callbacks fire concurrently? Check `toolMessages` array mutations.
 - [x] Audit `handlers/stop.ts`: `stopAllRunningWork()` — does it cleanly handle the case where a stop races with a new message arriving?
-- [ ] Audit `handlers/voice.ts` and `handlers/callback.ts`: Do they properly check `isAnyDriverRunning()` before starting work? <- current
-- [ ] Write the audit report to `super_turtle/docs/concurrency-audit.md` with findings and recommendations
+- [x] Audit `handlers/voice.ts` and `handlers/callback.ts`: Do they properly check `isAnyDriverRunning()` before starting work?
+- [ ] Write the consolidated audit report to `super_turtle/docs/concurrency-audit.md` — gather all findings from previous commits (see git log) into one document with sections: Shared State Map, Findings (each with severity, file, line, description, recommended fix), and Summary <- current
 - [ ] Commit the audit report
 
 ## Notes
-Key context: We just fixed a TOCTOU race in both `session.ts` and `codex-session.ts` where `isQueryRunning` was set too late, allowing concurrent callers to both pass the `isAnyDriverRunning()` guard. The fix moved `isQueryRunning = true` to the top of the method. This audit is looking for ANY remaining similar patterns.
+Previous iterations already committed individual audit findings. Check `git log --oneline -10` for commits like "docs: map shared mutable state", "Audit deferred queue concurrency", etc. The final report should consolidate ALL of those findings into one clean document.
 
-Key files to audit:
-- `super_turtle/claude-telegram-bot/src/session.ts` — Claude Code session (singleton)
-- `super_turtle/claude-telegram-bot/src/codex-session.ts` — Codex session (singleton)
-- `super_turtle/claude-telegram-bot/src/deferred-queue.ts` — Message queueing when driver is busy
-- `super_turtle/claude-telegram-bot/src/handlers/text.ts` — Main message handler with retry loop
-- `super_turtle/claude-telegram-bot/src/handlers/driver-routing.ts` — Driver selection and preemption
-- `super_turtle/claude-telegram-bot/src/handlers/streaming.ts` — Streaming state management
-- `super_turtle/claude-telegram-bot/src/handlers/stop.ts` — Stop/abort logic
-- `super_turtle/claude-telegram-bot/src/handlers/voice.ts` — Voice message handling
-- `super_turtle/claude-telegram-bot/src/handlers/callback.ts` — Inline button callbacks
-- `super_turtle/claude-telegram-bot/src/index.ts` — Bot setup, cron loop, middleware
+Code-module auditing is complete; remaining work is report consolidation and final audit-report commit.
 
 This is a READ-ONLY audit — do NOT modify any source files except to create the report. All findings go into the report document.
 
