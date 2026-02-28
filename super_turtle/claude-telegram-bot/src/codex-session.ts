@@ -803,10 +803,21 @@ export class CodexSession {
     reasoningEffort?: CodexEffortLevel,
     mcpCompletionCallback?: McpCompletionCallback
   ): Promise<string> {
+    // Acquire query lock IMMEDIATELY to prevent TOCTOU races.
+    // Without this, two callers can both check isRunning (false), then both
+    // enter sendMessage concurrently — causing ghost responses or stalls.
+    this.isQueryRunning = true;
+
     if (!this.thread) {
       // Create thread if not already created
-      await this.startNewThread(model, reasoningEffort);
+      try {
+        await this.startNewThread(model, reasoningEffort);
+      } catch (error) {
+        this.isQueryRunning = false; // Release lock on thread creation failure
+        throw error;
+      }
       if (!this.thread) {
+        this.isQueryRunning = false; // Release lock on thread creation failure
         throw new Error("Failed to create Codex thread");
       }
     }
@@ -844,7 +855,6 @@ ${messageToSend}`;
 
       // Create abort controller for cancellation
       this.abortController = new AbortController();
-      this.isQueryRunning = true;
       this.stopRequested = false;
       this.queryStarted = new Date();
 
