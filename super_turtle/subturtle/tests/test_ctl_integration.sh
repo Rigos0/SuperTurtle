@@ -239,6 +239,37 @@ assert_cron_job_missing() {
   fi
 }
 
+assert_cron_job_interval_ms() {
+  local job_id="$1"
+  local expected_interval_ms="$2"
+
+  assert_not_empty "$job_id" "cron job id" || return 1
+
+  if ! python3 - "$CRON_JOBS_FILE" "$job_id" "$expected_interval_ms" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+cron_jobs_path = Path(sys.argv[1])
+job_id = sys.argv[2]
+expected = int(sys.argv[3])
+raw = cron_jobs_path.read_text(encoding="utf-8").strip() if cron_jobs_path.exists() else ""
+jobs = json.loads(raw) if raw else []
+if not isinstance(jobs, list):
+    raise SystemExit(2)
+
+for job in jobs:
+    if isinstance(job, dict) and str(job.get("id")) == job_id:
+        raise SystemExit(0 if int(job.get("interval_ms", -1)) == expected else 1)
+
+raise SystemExit(1)
+PY
+  then
+    fail "expected cron job ${job_id} interval_ms=${expected_interval_ms}"
+    return 1
+  fi
+}
+
 stop_subturtle_if_running() {
   local name="$1"
   "$CTL" stop "$name" >/dev/null 2>&1 || true
@@ -658,6 +689,71 @@ STATE
   return 1
 }
 
+test_gc_archives_old() {
+  local name ws archive_ws old_stamp
+  name="$(make_test_name "gc-archives-old")"
+  ws="${SUBTURTLES_DIR}/${name}"
+  archive_ws="${ARCHIVE_DIR}/${name}"
+  old_stamp="${TMP_DIR}/old-stamp-${name}"
+
+  mkdir -p "$ws"
+  cat > "${ws}/CLAUDE.md" <<'STATE'
+# Current Task
+gc archives old test
+STATE
+  track_subturtle "$name"
+
+  if ! touch -t 200001010000 "$old_stamp" "$ws"; then
+    fail "failed to set old mtime for ${ws}"
+    return 1
+  fi
+  if ! touch -r "$old_stamp" "$ws"; then
+    fail "failed to apply old mtime for ${ws}"
+    return 1
+  fi
+
+  if ! "$CTL" gc --max-age 1d >/dev/null; then
+    fail "gc failed"
+    return 1
+  fi
+
+  assert_dir_not_exists "$ws" || return 1
+  assert_dir_exists "$archive_ws" || return 1
+  assert_file_exists "${archive_ws}/CLAUDE.md" || return 1
+  return 0
+}
+
+test_reschedule_cron() {
+  local name state_path cron_job_id
+  name="$(make_test_name "reschedule-cron")"
+  state_path="${TMP_DIR}/${name}.md"
+
+  cat > "$state_path" <<'STATE'
+# Current Task
+reschedule cron test
+STATE
+
+  if ! "$CTL" spawn "$name" --type yolo-codex --timeout 2m --state-file "$state_path" >/dev/null; then
+    fail "spawn failed for ${name}"
+    return 1
+  fi
+  track_subturtle "$name"
+
+  cron_job_id="$(meta_value "$name" "CRON_JOB_ID")"
+  assert_not_empty "$cron_job_id" "CRON_JOB_ID" || return 1
+  assert_cron_job_exists "$cron_job_id" || return 1
+
+  if ! "$CTL" reschedule-cron "$name" 15m >/dev/null; then
+    fail "reschedule-cron failed for ${name}"
+    return 1
+  fi
+
+  assert_cron_job_interval_ms "$cron_job_id" 900000 || return 1
+
+  stop_subturtle_if_running "$name"
+  return 0
+}
+
 run_test() {
   local test_name="$1"
   TOTAL_TESTS=$((TOTAL_TESTS + 1))
@@ -703,6 +799,8 @@ register_test test_stop_already_dead
 register_test test_list_shows_subturtles
 register_test test_list_shows_tunnel_url
 register_test test_watchdog_timeout
+register_test test_gc_archives_old
+register_test test_reschedule_cron
 
 run_all_tests() {
   local test_name
