@@ -134,6 +134,11 @@ assert_dir_exists() {
   [[ -d "$path" ]] || fail "expected directory to exist: $path"
 }
 
+assert_dir_not_exists() {
+  local path="$1"
+  [[ ! -d "$path" ]] || fail "expected directory to not exist: $path"
+}
+
 assert_symlink_target() {
   local path="$1"
   local expected_target="$2"
@@ -222,6 +227,16 @@ if not isinstance(jobs, list):
 found = any(isinstance(job, dict) and str(job.get("id")) == job_id for job in jobs)
 raise SystemExit(0 if found else 1)
 PY
+}
+
+assert_cron_job_missing() {
+  local job_id="$1"
+  assert_not_empty "$job_id" "cron job id" || return 1
+
+  if assert_cron_job_exists "$job_id"; then
+    fail "expected cron job ${job_id} to be removed from ${CRON_JOBS_FILE}"
+    return 1
+  fi
 }
 
 stop_subturtle_if_running() {
@@ -404,6 +419,128 @@ STATE
   return 0
 }
 
+test_stop_kills_process() {
+  local name state_path ws pid
+  name="$(make_test_name "stop-kills-process")"
+  state_path="${TMP_DIR}/${name}.md"
+  ws="${SUBTURTLES_DIR}/${name}"
+
+  cat > "$state_path" <<'STATE'
+# Current Task
+stop kills process test
+STATE
+
+  if ! "$CTL" spawn "$name" --type yolo-codex --timeout 2m --state-file "$state_path" >/dev/null; then
+    fail "spawn failed for ${name}"
+    return 1
+  fi
+  track_subturtle "$name"
+
+  pid="$(cat "${ws}/subturtle.pid")"
+  assert_pid_running "$pid" || return 1
+
+  if ! "$CTL" stop "$name" >/dev/null; then
+    fail "stop failed for ${name}"
+    return 1
+  fi
+
+  assert_pid_dead "$pid" || return 1
+  return 0
+}
+
+test_stop_cleans_cron() {
+  local name state_path cron_job_id
+  name="$(make_test_name "stop-cleans-cron")"
+  state_path="${TMP_DIR}/${name}.md"
+
+  cat > "$state_path" <<'STATE'
+# Current Task
+stop cleans cron test
+STATE
+
+  if ! "$CTL" spawn "$name" --type yolo-codex --timeout 2m --state-file "$state_path" >/dev/null; then
+    fail "spawn failed for ${name}"
+    return 1
+  fi
+  track_subturtle "$name"
+
+  cron_job_id="$(meta_value "$name" "CRON_JOB_ID")"
+  assert_not_empty "$cron_job_id" "CRON_JOB_ID" || return 1
+  assert_cron_job_exists "$cron_job_id" || return 1
+
+  if ! "$CTL" stop "$name" >/dev/null; then
+    fail "stop failed for ${name}"
+    return 1
+  fi
+
+  assert_cron_job_missing "$cron_job_id" || return 1
+  return 0
+}
+
+test_stop_archives_workspace() {
+  local name state_path ws archive_ws
+  name="$(make_test_name "stop-archives-workspace")"
+  state_path="${TMP_DIR}/${name}.md"
+  ws="${SUBTURTLES_DIR}/${name}"
+  archive_ws="${ARCHIVE_DIR}/${name}"
+
+  cat > "$state_path" <<'STATE'
+# Current Task
+stop archives workspace test
+STATE
+
+  if ! "$CTL" spawn "$name" --type yolo-codex --timeout 2m --state-file "$state_path" >/dev/null; then
+    fail "spawn failed for ${name}"
+    return 1
+  fi
+  track_subturtle "$name"
+  assert_dir_exists "$ws" || return 1
+
+  if ! "$CTL" stop "$name" >/dev/null; then
+    fail "stop failed for ${name}"
+    return 1
+  fi
+
+  assert_dir_not_exists "$ws" || return 1
+  assert_dir_exists "$archive_ws" || return 1
+  assert_file_exists "${archive_ws}/CLAUDE.md" || return 1
+  return 0
+}
+
+test_stop_already_dead() {
+  local name state_path ws pid stop_output
+  name="$(make_test_name "stop-already-dead")"
+  state_path="${TMP_DIR}/${name}.md"
+  ws="${SUBTURTLES_DIR}/${name}"
+
+  cat > "$state_path" <<'STATE'
+# Current Task
+stop already dead test
+STATE
+
+  if ! "$CTL" spawn "$name" --type yolo-codex --timeout 2m --state-file "$state_path" >/dev/null; then
+    fail "spawn failed for ${name}"
+    return 1
+  fi
+  track_subturtle "$name"
+
+  pid="$(cat "${ws}/subturtle.pid")"
+  assert_pid_running "$pid" || return 1
+  kill -9 "$pid" 2>/dev/null || true
+
+  for _ in $(seq 1 20); do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      break
+    fi
+    sleep 0.2
+  done
+
+  stop_output="$("$CTL" stop "$name" 2>&1)"
+  assert_contains "$stop_output" "[subturtle:${name}] not running" || return 1
+  assert_dir_exists "${ARCHIVE_DIR}/${name}" || return 1
+  return 0
+}
+
 run_test() {
   local test_name="$1"
   TOTAL_TESTS=$((TOTAL_TESTS + 1))
@@ -442,6 +579,10 @@ register_test test_spawn_file_state
 register_test test_spawn_with_skills
 register_test test_status_running
 register_test test_status_stopped
+register_test test_stop_kills_process
+register_test test_stop_cleans_cron
+register_test test_stop_archives_workspace
+register_test test_stop_already_dead
 
 run_all_tests() {
   local test_name

@@ -1,5 +1,5 @@
 # Current Task
-Write stop tests: kills process, cleans cron, archives, handles dead process.
+Write list tests: shows subturtles, shows tunnel URL.
 
 ## End Goal with Specs
 A single test script that exercises every `ctl` command with fake CLI binaries. Tests run in ~30 seconds, no real Claude/Codex calls, fully deterministic.
@@ -56,8 +56,8 @@ A single test script that exercises every `ctl` command with fake CLI binaries. 
 - [x] Write test harness: setup (fake bins, backup cron), teardown (cleanup), assert helpers
 - [x] Write spawn tests: workspace creation, stdin state, file state, skills
 - [x] Write status tests: running output, stopped output
-- [ ] Write stop tests: kills process, cleans cron, archives, handles dead process <- current
-- [ ] Write list tests: shows subturtles, shows tunnel URL
+- [x] Write stop tests: kills process, cleans cron, archives, handles dead process
+- [ ] Write list tests: shows subturtles, shows tunnel URL <- current
 - [ ] Write watchdog timeout test (5s timeout)
 - [ ] Write gc and reschedule-cron tests
 - [ ] Write CLI validation test (missing codex binary)
