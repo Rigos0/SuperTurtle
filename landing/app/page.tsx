@@ -29,41 +29,6 @@ const heroHighlights = [
   },
 ];
 
-const valueProps = [
-  {
-    title: 'Wraps your Claude Code or Codex subscription',
-    description: 'No extra API tokens needed.',
-    accent: 'olive',
-  },
-  {
-    title: 'Mobile and voice control first',
-    description: 'Run everything from Telegram by text or voice.',
-    accent: 'terracotta',
-  },
-  {
-    title: 'Parallel sub-agents, managed for you',
-    description:
-      'Breaks work into tasks, runs sub-agents, can open/test webpages, and iterates until done.',
-    accent: 'sage',
-  },
-  {
-    title: 'Runs on your machine',
-    description: 'Local-first today (cloud deployment coming up).',
-    accent: 'olive',
-  },
-  {
-    title: 'Usage-aware load balancing',
-    description: 'Tracks remaining usage and balances work between Claude Code and Codex.',
-    accent: 'terracotta',
-  },
-  {
-    title: 'Autonomous supervision',
-    description:
-      'Scheduled cron check-ins monitor progress in the background and send important updates.',
-    accent: 'sage',
-  },
-];
-
 const executionFlow = [
   {
     title: 'You send one request',
@@ -323,40 +288,14 @@ export default function Home() {
             </div>
           </div>
           <div className="hero-glow" />
-        </section>
+	        </section>
 
-        <SectionDivider />
+	        <SectionDivider />
 
-        <section id="value-proposition" className="section-shell alt-shell">
-          <div className="section-container max-w-4xl">
-            <div className="section-head reveal">
-              <p className="eyebrow">Why Super Turtle</p>
-              <h2>What you get</h2>
-              <p>Clear priorities, in the order users care about.</p>
-            </div>
-
-            <div className="mt-10 grid gap-1 sm:gap-6">
-              {valueProps.map((item, index) => (
-                <article
-                  className={`reveal deck-card ${index % 3 === 0 ? 'olive' : index % 3 === 1 ? 'terracotta' : 'sage'}`}
-                  key={item.title}
-                  style={{ animationDelay: `${220 + index * 90}ms` }}
-                >
-                  <div className="deck-mark" />
-                  <h3>{item.title}</h3>
-                  <p>{item.description}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <SectionDivider />
-
-        <section id="execution" className="section-shell">
-          <div className="section-container max-w-4xl space-y-10">
-            <div>
-              <div className="section-head reveal">
+	        <section id="execution" className="section-shell">
+	          <div className="section-container max-w-4xl space-y-10">
+	            <div>
+	              <div className="section-head reveal">
                 <p className="eyebrow">Execution</p>
                 <h2>How work runs</h2>
               </div>
