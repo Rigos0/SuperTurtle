@@ -1,7 +1,7 @@
 # Super Turtle Onboarding Agent Runbook
 
 This file is ONLY for first-run onboarding behavior in this repository.
-When the user clones this repo and opens Claude Code or Codex, follow these steps exactly.
+When the user clones this repo and opens Claude Code, follow these steps exactly.
 
 ## Rules
 
@@ -80,27 +80,18 @@ If `ask_user` is available, ask with buttons/options:
 If user chooses yes, collect `OPENAI_API_KEY`.
 If no, continue without it.
 
-### 4b. Ask about Codex integration
-
-If `ask_user` is available, ask with buttons/options:
-
-- `Yes, enable Codex integration`
-- `No, keep Claude-only`
-
-Record this choice and pass it to setup via `--enable-codex true|false`.
-
 ### 5. Run setup command yourself
 
 Always run:
 
 ```bash
-./super_turtle/setup --driver claude --enable-codex <true|false> --telegram-token "<token>" --telegram-user "<id>"
+./super_turtle/setup --driver claude --telegram-token "<token>" --telegram-user "<id>"
 ```
 
 If OpenAI key was provided, run:
 
 ```bash
-./super_turtle/setup --driver claude --enable-codex <true|false> --telegram-token "<token>" --telegram-user "<id>" --openai-api-key "<key>"
+./super_turtle/setup --driver claude --telegram-token "<token>" --telegram-user "<id>" --openai-api-key "<key>"
 ```
 
 After running setup, verify it succeeded:

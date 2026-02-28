@@ -9,7 +9,7 @@ Super Turtle setup is agent-guided. You do not need to manually wire config file
 
 ## Prerequisites
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Codex CLI](https://github.com/openai/codex) installed and authenticated
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
 - A machine you can keep awake while the bot runs (macOS is fully supported; Linux is untested alpha)
 
 You do **not** need a Telegram token in advance. The onboarding agent will walk you through creating one.
@@ -28,11 +28,9 @@ Before running setup, check [Platform Support](/config/platform-support). macOS 
     ```
   </Step>
 
-  <Step title="Open Claude Code or Codex">
+  <Step title="Open Claude Code">
     ```bash
-    claude --dangerously-skip-permissions
-    # or
-    codex --full-auto
+    claude
     ```
   </Step>
 
@@ -50,13 +48,12 @@ The onboarding flow should be fully guided and step-by-step:
 1. Guide BotFather flow (`@BotFather` -> `/newbot`) and collect token.
 2. Guide Telegram user ID flow (`@userinfobot`) and collect numeric ID.
 3. Ask whether to enable voice transcription, optionally collect `OPENAI_API_KEY`.
-4. Ask whether to enable Codex integration.
-5. Run setup command:
-   - `./super_turtle/setup --driver claude --enable-codex "<true|false>" --telegram-token "<token>" --telegram-user "<id>"`
+4. Run setup command:
+   - `./super_turtle/setup --driver claude --telegram-token "<token>" --telegram-user "<id>"`
    - Add `--openai-api-key "<key>"` if provided.
-6. Start bot:
+5. Start bot:
    - `cd super_turtle/claude-telegram-bot && bun run start`
-7. Ask user to send `/start` (or any message) in Telegram and confirm response.
+6. Ask user to send `/start` (or any message) in Telegram and confirm response.
 
 If the environment supports it, onboarding should use interactive choice prompts (for example via `ask_user`) for yes/no decisions.
 

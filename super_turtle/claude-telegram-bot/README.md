@@ -40,11 +40,11 @@ To achieve this, I set up a folder with a CLAUDE.md that teaches Claude about me
 ```bash
 git clone <your-fork-or-repo-url>
 cd <repo-directory>
-# Open Claude Code or Codex here and ask:
+# Open Claude Code here and ask:
 # "Set up Super Turtle on this machine."
 ```
 
-The setup wizard runs `./super_turtle/setup`, asks whether to enable Codex integration, installs dependencies, and configures `super_turtle/claude-telegram-bot/.env` for you.
+The setup wizard runs `./super_turtle/setup`, installs dependencies, and configures `super_turtle/claude-telegram-bot/.env` for you.
 
 ## Quick Start (standalone bot folder, manual)
 

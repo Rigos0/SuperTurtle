@@ -19,13 +19,13 @@ Core UX: **say what -> get results**.
 
 ## Why Use It
 
-1. Uses your Claude Code or Codex subscription (no extra core API-token workflow).
+1. Uses your Claude Code subscription (no extra API-token workflow).
 2. Mobile + voice first via Telegram.
 3. Designed for long-running, multi-step coding work.
 4. Parallel SubTurtle execution with milestone-focused updates.
-5. Usage-aware routing between Claude and Codex.
+5. Natural voice and text interaction from anywhere.
 
-\* Uses official Claude Code/Codex CLI auth flows.
+\* Uses official Claude Code CLI auth flows.
 
 <p align="center">
   <img src="assets/readme-stickers/setup-save-turtle.png" width="108" alt="Setup turtle sticker" />
@@ -40,15 +40,13 @@ git clone https://github.com/Rigos0/superturtle.git
 cd superturtle
 ```
 
-### 2) Open an agent session
+### 2) Open Claude Code and run setup
 
 ```bash
-claude --dangerously-skip-permissions
-# or
-codex --full-auto
+claude
 ```
 
-### 3) Prompt
+When prompted, ask:
 
 ```text
 Set up Super Turtle for me.
@@ -61,12 +59,11 @@ The onboarding agent is expected to fully handhold setup:
 1. Guides you through BotFather token creation (`@BotFather`, `/newbot`).
 2. Guides you to get your Telegram user ID (`@userinfobot`).
 3. Optionally collects `OPENAI_API_KEY` for voice transcription.
-4. Asks whether to enable Codex integration.
-5. Runs setup for you:
-   - `./super_turtle/setup --driver claude --enable-codex "<true|false>" --telegram-token "<token>" --telegram-user "<id>"`
+4. Runs setup for you:
+   - `./super_turtle/setup --driver claude --telegram-token "<token>" --telegram-user "<id>"`
    - Adds `--openai-api-key "<key>"` if provided.
-6. Explains what was configured.
-7. Starts the bot and verifies Telegram response.
+5. Explains what was configured.
+6. Starts the bot and verifies Telegram response.
 
 You should not need manual `.env` editing during normal onboarding.
 
