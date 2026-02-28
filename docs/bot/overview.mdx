@@ -5,7 +5,7 @@ description: Turn Claude Code into your personal assistant, accessible from anyw
 
 # Telegram Bot Overview
 
-The Claude Telegram Bot turns [Claude Code](https://claude.com/product/claude-code) into your personal assistant, accessible from anywhere via Telegram. Send messages, voice, photos, documents, and video — Claude processes everything in real-time and you see responses instantly.
+The Claude Telegram Bot turns [Claude Code](https://claude.com/product/claude-code) into your personal assistant, accessible from anywhere via Telegram. Send text, voice notes, photos, documents, audio, and video; the bot downloads/transcribes/extracts as needed, then streams replies back in chat.
 
 ## Why Use This Bot
 
@@ -26,23 +26,23 @@ Claude Code is described as a powerful AI coding agent, but it's actually a very
   />
   <Card
     title="🎤 Voice"
-    description="Speak naturally — transcribed via OpenAI and processed by Claude"
+    description="Voice notes are transcribed via OpenAI (OPENAI_API_KEY required), then processed by the active driver"
   />
   <Card
     title="📸 Photos"
-    description="Send screenshots, documents, or anything visual for analysis"
+    description="Single photos and photo albums are downloaded and analyzed (captions included)"
   />
   <Card
     title="📄 Documents"
-    description="PDFs, text files, and archives (ZIP, TAR) are extracted and analyzed"
+    description="PDF, text, and archive files (ZIP/TAR variants) are extracted and analyzed; audio documents route to transcription"
   />
   <Card
     title="🎵 Audio"
-    description="Audio files (mp3, m4a, ogg, wav, etc.) transcribed via OpenAI"
+    description="Telegram audio files (mp3, m4a, ogg, wav, etc.) are transcribed via OpenAI, then processed as text"
   />
   <Card
     title="🎬 Video"
-    description="Video messages and notes processed by Claude with vision analysis"
+    description="Video messages and video notes are downloaded and sent to the active driver with path + caption context"
   />
   <Card
     title="🔄 Session Persistence"
@@ -56,7 +56,7 @@ Claude Code is described as a powerful AI coding agent, but it's actually a very
 
 ## Advanced Features
 
-- **Extended thinking:** Trigger Claude's reasoning with words like "think" or "reason" — see its thought process as it works
+- **Extended thinking:** Keywords like `think`, `ultrathink`, or `think hard` increase reasoning effort
 - **Global stop intents:** Use `stop`, `pause`, `abort`, or `!` to interrupt active work instantly
 - **Message queuing:** Send multiple messages while Claude works — they queue automatically. Prefix with `!` to interrupt and send immediately
 - **Streaming responses:** See Claude's response in real-time, updated as it generates output
@@ -95,10 +95,6 @@ When you send a message:
 3. Claude can use tools, read files, execute commands (within allowed paths)
 4. Response streams back to you in real-time
 5. You see Claude's work as it happens
-
-## Demo
-
-See the bot in action: [Demo GIF coming soon]
 
 ## What You Control
 

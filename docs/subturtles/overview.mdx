@@ -11,7 +11,7 @@ The core model is simple:
 - Meta Agent decides what should be done.
 - SubTurtle executes one focused backlog item at a time.
 - State is tracked in `.subturtles/<name>/CLAUDE.md`.
-- Completion is signaled by writing `## Loop Control` and `STOP`.
+- Completion is signaled by appending `## Loop Control` and `STOP`.
 
 ## What a SubTurtle Is
 
@@ -25,7 +25,9 @@ Each SubTurtle:
 - Is supervised by recurring, silent cron check-ins
 
 <Info>
-Default spawn settings are `--type yolo-codex`, `--timeout 1h`, and `--cron-interval 10m`.
+`ctl spawn` defaults are `--type yolo-codex`, `--timeout 1h`, and `--cron-interval 10m`.
+Supervision is registered with `silent: true` by default.
+(`META_SHARED.md` currently describes a 5-minute target cadence, but the executable default in `ctl` is 10 minutes unless overridden.)
 </Info>
 
 ## Workspace Structure
@@ -40,10 +42,12 @@ Example workspace for a SubTurtle named `docs-agent`:
 ├── subturtle.log    # stdout/stderr log stream
 ├── subturtle.meta   # Spawned timestamp, timeout, type, watchdog pid, cron job id
 ├── .tunnel-url      # Optional frontend preview URL
+├── .runtime-home/   # Optional writable HOME fallback in restricted environments
 └── screenshots/     # Optional verification artifacts
 ```
 
 `ctl spawn` seeds `CLAUDE.md`, creates the `AGENTS.md` symlink, starts the SubTurtle, and registers recurring cron supervision.
+When a SubTurtle is stopped (manually or via self-stop cleanup), its workspace is archived to `.subturtles/.archive/<name>/`.
 
 ## State File Ownership
 
@@ -63,7 +67,7 @@ Write docs/subturtles/overview.mdx.
 ```
 
 Lifecycle:
-1. Meta Agent writes initial `.subturtles/<name>/CLAUDE.md` before spawn.
+1. Meta Agent provides initial task state (typically via `ctl spawn --state-file <path>` or piped stdin; low-level `ctl start` expects `CLAUDE.md` to already exist).
 2. SubTurtle reads it each iteration, does one commit-sized slice, and updates backlog progress.
 3. Supervisor check-ins inspect this file to determine `Finished`, `Milestone`, `Stuck`, or `Error` events.
 
@@ -76,14 +80,14 @@ When all backlog items are complete, the SubTurtle appends:
 STOP
 ```
 
-The loop checks for this directive after iterations and exits cleanly when present.
+The loop checks for this directive before and after each iteration and exits cleanly when present.
 
 ```bash
 # In super_turtle/subturtle/__main__.py
 STOP_DIRECTIVE = "## Loop Control\\nSTOP"
 ```
 
-After self-stop, completion handoff logic triggers cleanup via `ctl stop` semantics (including cron removal/archive behavior).
+After self-stop, the loop queues completion handoff notifications, then invokes `ctl stop` semantics to remove recurring cron supervision and archive the workspace.
 
 ## Timeout and Watchdog
 
@@ -99,13 +103,13 @@ This prevents runaway loops and guarantees bounded runtime even if an agent gets
 ./super_turtle/subturtle/ctl spawn docs-agent --timeout 30m
 ```
 
-Accepted duration format is flexible (`30m`, `1h`, `2h`, `4h`, etc.).
+Accepted duration format is flexible (`30m`, `1h`, `2h`, `1d`, or raw seconds like `3600`).
 
 ## End-to-End Flow
 
 <Steps>
-  <Step title="Meta Agent seeds state">
-    It writes `.subturtles/&lt;name&gt;/CLAUDE.md` with current task, end goal, and backlog.
+  <Step title="Meta Agent provides state">
+    It provides initial task state (current task, end goal, backlog) via `--state-file` or stdin to `ctl spawn`.
   </Step>
   <Step title="Meta Agent spawns worker">
     It runs:

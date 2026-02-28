@@ -1,5 +1,0 @@
-There once was a coder named Lee,
-Who wrestled with bugs by the sea.
-With tests as a light,
-They coded all night,
-And shipped clean deploys before tea.
