@@ -541,6 +541,82 @@ STATE
   return 0
 }
 
+test_list_shows_subturtles() {
+  local name_one name_two state_one state_two list_output
+  name_one="$(make_test_name "list-a")"
+  name_two="$(make_test_name "list-b")"
+  state_one="${TMP_DIR}/${name_one}.md"
+  state_two="${TMP_DIR}/${name_two}.md"
+
+  cat > "$state_one" <<'STATE'
+# Current Task
+list shows subturtles A
+STATE
+
+  cat > "$state_two" <<'STATE'
+# Current Task
+list shows subturtles B
+STATE
+
+  if ! "$CTL" spawn "$name_one" --type yolo-codex --timeout 2m --state-file "$state_one" >/dev/null; then
+    fail "spawn failed for ${name_one}"
+    return 1
+  fi
+  track_subturtle "$name_one"
+
+  if ! "$CTL" spawn "$name_two" --type yolo-codex --timeout 2m --state-file "$state_two" >/dev/null; then
+    fail "spawn failed for ${name_two}"
+    return 1
+  fi
+  track_subturtle "$name_two"
+
+  list_output="$("$CTL" list)"
+  assert_contains "$list_output" "$name_one" || return 1
+  assert_contains "$list_output" "$name_two" || return 1
+
+  if ! printf '%s\n' "$list_output" | grep -Eq "^[[:space:]]*${name_one}[[:space:]].*running"; then
+    fail "expected ${name_one} to be shown as running in list output"
+    return 1
+  fi
+
+  if ! printf '%s\n' "$list_output" | grep -Eq "^[[:space:]]*${name_two}[[:space:]].*running"; then
+    fail "expected ${name_two} to be shown as running in list output"
+    return 1
+  fi
+
+  stop_subturtle_if_running "$name_one"
+  stop_subturtle_if_running "$name_two"
+  return 0
+}
+
+test_list_shows_tunnel_url() {
+  local name state_path ws tunnel_url list_output
+  name="$(make_test_name "list-tunnel-url")"
+  state_path="${TMP_DIR}/${name}.md"
+  ws="${SUBTURTLES_DIR}/${name}"
+  tunnel_url="https://${name}.example.com"
+
+  cat > "$state_path" <<'STATE'
+# Current Task
+list shows tunnel URL
+STATE
+
+  if ! "$CTL" spawn "$name" --type yolo-codex --timeout 2m --state-file "$state_path" >/dev/null; then
+    fail "spawn failed for ${name}"
+    return 1
+  fi
+  track_subturtle "$name"
+
+  printf '%s\n' "$tunnel_url" > "${ws}/.tunnel-url"
+
+  list_output="$("$CTL" list)"
+  assert_contains "$list_output" "$name" || return 1
+  assert_contains "$list_output" "$tunnel_url" || return 1
+
+  stop_subturtle_if_running "$name"
+  return 0
+}
+
 run_test() {
   local test_name="$1"
   TOTAL_TESTS=$((TOTAL_TESTS + 1))
@@ -583,6 +659,8 @@ register_test test_stop_kills_process
 register_test test_stop_cleans_cron
 register_test test_stop_archives_workspace
 register_test test_stop_already_dead
+register_test test_list_shows_subturtles
+register_test test_list_shows_tunnel_url
 
 run_all_tests() {
   local test_name
