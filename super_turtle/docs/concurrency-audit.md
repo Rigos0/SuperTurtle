@@ -8,9 +8,10 @@ Completed in this revision:
 - Backlog item 3: audited `handlers/text.ts` retry/interrupt overlap and shared `lastMessage`.
 - Backlog item 4: audited `handlers/driver-routing.ts` (`isAnyDriverRunning`, preemption, stop fallback).
 - Backlog item 5: audited cron execution path in `src/index.ts` (timer loop vs interactive updates).
+- Backlog item 6: audited `handlers/streaming.ts` (`StreamingState`, callback serialization, `toolMessages` mutation safety).
 
 Pending:
-- Race-condition and TOCTOU analysis for remaining modules (backlog items 6+).
+- Race-condition and TOCTOU analysis for remaining modules (backlog items 7+).
 
 ## Shared Mutable State Inventory
 
@@ -361,3 +362,39 @@ Impact:
 Recommended fix:
 1. Keep pre-execution crash safety, but add explicit "preempted" retry semantics (requeue one-shots with a short delay; do not count as completed run).
 2. Separate completion states (`success`, `failed`, `preempted`) and only finalize/removal on terminal outcomes.
+
+## Streaming Callback Concurrency Audit (`src/handlers/streaming.ts`)
+
+### Question: Is `StreamingState` safe if multiple status callbacks fire concurrently?
+
+Conclusion:
+- No currently reachable data race was found for `StreamingState` in present call paths.
+- `toolMessages` mutation is safe under current producer behavior because both Claude and Codex session loops `await` every status callback invocation, preserving in-order, single-flight callback execution per run.
+
+Evidence:
+- `StreamingState` is allocated per request/interaction and passed into one callback closure (`src/handlers/streaming.ts:433-440`, `524-528`), so different runs do not share the same `toolMessages` array.
+- Claude session invokes callback operations sequentially with explicit `await` (`src/session.ts:477`, `493`, `512`, `520`, `541`, `612`, `701`, `707`, `710`).
+- Codex session does the same across streamed event handling and finalization (`src/codex-session.ts:975`, `983`, `989`, `998`, `1019`, `1028`, `1034`, `1039`, `1044`, `1102`, `1107`).
+- `toolMessages` writes happen after awaited Telegram send calls (`src/handlers/streaming.ts:535-538`, `547-548`, `555-556`) and cleanup on `done` runs only after upstream producers finish (`src/handlers/streaming.ts:662-674`).
+
+Assessment:
+- Under current implementation, array corruption/TOCTOU on `toolMessages` was not reproduced by code inspection.
+- The design still assumes producer-side serialization and has no defensive local guard inside `createStatusCallback`.
+
+## Finding ST-1 (Low): `createStatusCallback` lacks an internal serialization/finalization guard
+
+Where:
+- Shared mutable callback state and tool cleanup logic (`src/handlers/streaming.ts:433-440`, `538`, `548`, `556`, `662-674`).
+
+Why this is a missing guard:
+- If a future producer stops awaiting `statusCallback` (or emits callbacks in parallel), `done` can run while a late `tool` callback is still awaiting `ctx.reply`, then that late callback pushes a new `toolMessages` entry after cleanup already finished.
+- This does not corrupt the array structure in JavaScript, but can leak ephemeral tool messages and create out-of-order UI cleanup.
+
+Impact:
+- Low in current code because all known producers serialize callbacks.
+- Medium risk of regression if streaming producers are refactored without preserving `await` semantics.
+
+Recommended fix:
+1. Add an internal callback queue (promise chain/mutex) in `createStatusCallback` so callback bodies always run serially regardless of caller behavior.
+2. Add a `finalized` boolean set by `done`; ignore non-`done` events after finalization.
+3. Optionally clear `state.toolMessages` after cleanup to make repeated `done` calls idempotent and cheap.
