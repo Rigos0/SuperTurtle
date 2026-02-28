@@ -1,5 +1,5 @@
 # Current Task
-Also check docs/bot/commands.mdx references bot_control, update if needed.
+Backlog complete. Append loop stop marker and stop.
 
 ## End Goal with Specs
 The `bot_control` MCP tool is the most important part of the system — it controls sessions, models, drivers, and restarts. The docs should fully explain every action, parameters, and behavior.
@@ -31,5 +31,5 @@ The `bot_control` MCP tool is the most important part of the system — it contr
 - [x] Rewrite bot_control section with full action reference table and descriptions
 - [x] Fix send_turtle section (rename from "Spawn SubTurtles" to correct description)
 - [x] Review ask_user section for accuracy
-- [ ] Also check docs/bot/commands.mdx references bot_control, update if needed <- current
-- [ ] Commit changes
+- [x] Also check docs/bot/commands.mdx references bot_control, update if needed
+- [x] Commit changes
