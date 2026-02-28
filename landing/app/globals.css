@@ -454,7 +454,16 @@ body {
 
 .footer-shell {
   border-top: 1px solid rgba(85, 108, 75, 0.2);
-  background: linear-gradient(0deg, rgba(255, 255, 255, 0.7), rgba(248, 246, 241, 0.45));
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.65), rgba(248, 246, 241, 0.4));
+}
+
+.footer-shell nav a {
+  @apply transition-colors duration-200;
+  color: #5b6356;
+}
+
+.footer-shell nav a:hover {
+  color: var(--accent-olive);
 }
 
 /* Buttons */

@@ -29,11 +29,11 @@ export function StickyNav() {
           <div className="w-8 h-8 flex-shrink-0">
             <img
               src="/turtle-logo.png"
-              alt="SuperTurtle"
+              alt="Super Turtle"
               className="w-full h-full object-contain"
             />
           </div>
-          <span className="text-lg font-bold text-[#1a1815]">SuperTurtle</span>
+          <span className="text-lg font-bold text-[#1a1815]">Super Turtle</span>
         </div>
 
         {/* Right: GitHub CTA */}

@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SuperTurtle",
+  title: "Super Turtle — Autonomous coding on your existing subscription",
   description: "Message it on Telegram. It wraps Claude Code or Codex — your existing subscription, no API tokens. It writes code, runs tests, and commits while you do other things.",
   icons: {
     icon: "/gemoji-turtle-turtle.png",

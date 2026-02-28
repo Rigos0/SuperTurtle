@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { StickyNav } from '@/components/StickyNav';
+import { SectionDivider } from '@/components/SectionDivider';
+
+const chatMessages = [
+  { from: 'user', text: 'build me a landing page and wire screenshots' },
+  { from: 'bot', text: '🚀 On it. I split this into 3 SubTurtles.' },
+  { from: 'bot', text: '📍 Milestone: Hero shipped. Screenshot captured. Continuing.' },
+];
 
 const heroHighlights = [
   {
@@ -22,104 +29,219 @@ const heroHighlights = [
   },
 ];
 
-const turtleMessagePool = [
-  'I built this site',
-  'step by step',
-  'slow and steady',
-  'sub-turtles',
-  'mobile first',
-  'browser checks',
-  'headless mode',
-  'autonomy',
-  'code review',
-  'voice controlled',
-  'screenshots',
-  'thank you',
-  'still here',
-  'no panic, only progress',
-  'ship ship ship',
+const valueProps = [
+  {
+    title: 'Wraps your Claude Code or Codex subscription',
+    description: 'No extra API tokens needed.',
+    accent: 'olive',
+  },
+  {
+    title: 'Mobile and voice control first',
+    description: 'Run everything from Telegram by text or voice.',
+    accent: 'terracotta',
+  },
+  {
+    title: 'Parallel sub-agents, managed for you',
+    description:
+      'Breaks work into tasks, runs sub-agents, can open/test webpages, and iterates until done.',
+    accent: 'sage',
+  },
+  {
+    title: 'Runs on your machine',
+    description: 'Local-first today (cloud deployment coming up).',
+    accent: 'olive',
+  },
+  {
+    title: 'Usage-aware load balancing',
+    description: 'Tracks remaining usage and balances work between Claude Code and Codex.',
+    accent: 'terracotta',
+  },
+  {
+    title: 'Autonomous supervision',
+    description:
+      'Scheduled cron check-ins monitor progress in the background and send important updates.',
+    accent: 'sage',
+  },
 ];
 
-type SocialKind = 'substack' | 'linkedin' | 'twitter' | 'github' | 'docs';
+const executionFlow = [
+  {
+    title: 'You send one request',
+    description: 'Example: "build X" in Telegram.',
+  },
+  {
+    title: 'It decomposes and spawns SubTurtles',
+    description: 'Parallel workers per task stream.',
+  },
+  {
+    title: 'Workers implement and iterate',
+    description: 'Code, test, browser checks, and retries.',
+  },
+  {
+    title: 'Meta supervision keeps it moving',
+    description: 'Cron check-ins detect drift and report milestones.',
+  },
+];
 
-type SocialLink = {
-  label: string;
-  href: string;
-  kind: SocialKind;
-  external: boolean;
-};
+// Easter egg phases after the normal pool
+const rapGodPhrases = [
+  'Look', 'I was gonna', 'go easy on you', 'not to hurt', 'your feelings',
+  "But I'm only", 'going to get', 'this one chance', "Something's wrong",
+  'I can feel it', 'Just a feeling', "I've got", 'Like something', 'is about to happen',
+  "But I don't", 'know what', 'If that means', 'what I think', 'it means',
+  "We're in trouble", 'Big trouble', 'And if he is', 'as bananas', 'as you say',
+  "I'm not taking", 'any chances', 'You are just', 'what the doc ordered',
+  "I'm beginning", 'to feel like', 'a Rap God', 'Rap God',
+  'All my people', 'from the front', 'to the back nod', 'Back nod',
+  'Now who thinks', 'their arms are', 'long enough', 'to slap box', 'Slap box',
+  'They said I rap', 'like a robot', 'so call me', 'Rap-bot',
+  '...', 'wait', 'wrong script', 'sorry',
+];
 
-function SocialIcon({ kind }: { kind: SocialKind }) {
-  switch (kind) {
-    case 'substack':
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <path d="M4 5h16M4 10h16M4 15h16M4 19h16" strokeLinecap="round" />
-        </svg>
-      );
-    case 'linkedin':
-      return (
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M4.98 3.5C4.98 4.88 3.87 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5ZM.22 8.28h4.56V24H.22V8.28Zm7.23 0h4.37v2.15h.06c.61-1.15 2.1-2.37 4.32-2.37 4.62 0 5.47 3.04 5.47 6.99V24h-4.56v-7.98c0-1.9-.03-4.34-2.65-4.34-2.66 0-3.07 2.08-3.07 4.21V24H7.45V8.28Z" />
-        </svg>
-      );
-    case 'twitter':
-      return (
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M18.9 2.25h3.68l-8.04 9.19L24 21.75h-7.41l-5.8-6.57-5.75 6.57H1.35l8.6-9.83L.94 2.25h7.6l5.24 5.96 5.12-5.96Zm-1.29 17.3h2.04L7.43 4.34H5.24l12.37 15.21Z" />
-        </svg>
-      );
-    case 'github':
-      return (
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M12 2C6.5 2 2 6.5 2 12c0 4.4 2.9 8.2 6.8 9.5.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.2-3.4-1.2-.4-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.3 1.5 2.9 1.2.1-.7.3-1.2.6-1.5-2.2-.2-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.2-.4-1.3.1-2.7 0 0 .8-.3 2.8 1 .8-.2 1.6-.3 2.5-.3.9 0 1.7.1 2.5.3 1.9-1.3 2.8-1 2.8-1 .5 1.4.2 2.5.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.8V21c0 .3.2.6.7.5A10 10 0 0 0 22 12c0-5.5-4.5-10-10-10Z" />
-        </svg>
-      );
-    case 'docs':
-      return (
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M6 3h9l4 4v14H6V3Zm8 1.5V8h3.5L14 4.5ZM8 10h8v1.6H8V10Zm0 3.2h8v1.6H8v-1.6Zm0 3.2h5.5V18H8v-1.6Z" />
-        </svg>
-      );
+// SF AI buzzword mode
+const sfBuzzwords = [
+  'synergy', 'disruption', 'pivot', 'Series A', 'product-market fit',
+  'at scale', 'moat', 'TAM', 'flywheel', 'zero to one',
+  'LLM wrapper', 'fine-tuned', 'RLHF', 'emergent behavior', 'inference',
+  'foundational model', 'prompt engineering', 'AGI soon', 'compute',
+  'transformer', 'attention is all', 'you need', 'latent space',
+  'we raised 40M', 'pre-seed', 'YC batch', 'demo day',
+  'growth hacking', 'runway', 'burn rate', 'cap table',
+  'deck looks great', '10x engineer', 'move fast', 'ship it',
+  'stealth mode', 'thought leader', 'paradigm shift', 'first principles',
+  'AI-native', 'vertical SaaS', 'B2B2C', 'open source but', 'enterprise ready',
+  'agentic workflow', 'multi-modal', 'RAG pipeline', 'vector DB',
+  'we are hiring', 'ping me', 'let me intro you',
+];
+
+// Install walkthrough — the turtle walks you through setup then dies
+const installWalkthrough = [
+  'ok bro', 'at this point', 'just install me',
+  'let me walk you through it',
+  '...', 'ready?',
+  'step 1:', 'git clone the repo',
+  'step 2:', 'cd super-turtle',
+  'step 3:', 'open claude', 'or codex',
+  'step 4:', 'say:', 'set up Super Turtle',
+  'step 5:', 'get your Telegram token', 'from BotFather',
+  'step 6:', 'paste it in',
+  'step 7:', 'start the bot',
+  'step 8:', 'open Telegram',
+  'step 9:', 'say hi to me',
+  'step 10:', 'tell me to build something',
+  "that's it", "I'll handle the rest",
+  '...', 'what are you waiting for',
+  'go', 'GO', 'seriously go',
+  '...', "I'm done talking",
+];
+
+// Weighted message pool — higher weight = more likely to appear
+const turtleMessagePool: { text: string; weight: number }[] = [
+  // Personality
+  { text: "I'm amazing", weight: 3 },
+  { text: 'so cool', weight: 3 },
+  { text: 'slow and steady', weight: 2 },
+  { text: 'never sleeps', weight: 2 },
+  { text: 'AGI', weight: 1 },
+  { text: 'pet me again', weight: 2 },
+  { text: 'beep boop', weight: 1 },
+  { text: 'thank you', weight: 2 },
+  { text: 'still here', weight: 2 },
+  { text: 'you again?', weight: 2 },
+  { text: 'shell yeah', weight: 2 },
+  { text: 'turtles all the way down', weight: 1 },
+  { text: 'I made this', weight: 2 },
+  { text: 'autonomy', weight: 1 },
+  // Features
+  { text: 'cron jobs', weight: 2 },
+  { text: 'sub-turtles', weight: 2 },
+  { text: 'browser checks', weight: 2 },
+  { text: 'memory', weight: 2 },
+  { text: 'image understanding', weight: 2 },
+  { text: 'mobile first', weight: 2 },
+  { text: 'write and test', weight: 2 },
+  { text: 'parallel execution', weight: 1 },
+  { text: 'voice controlled', weight: 2 },
+  { text: 'screenshots', weight: 1 },
+  { text: 'auto-commits', weight: 1 },
+  { text: 'self-supervision', weight: 1 },
+  { text: 'tunnel previews', weight: 1 },
+  { text: 'git archaeology', weight: 1 },
+  { text: 'code review', weight: 2 },
+  { text: 'task decomposition', weight: 1 },
+  { text: 'quota balancing', weight: 1 },
+  { text: 'watchdog timers', weight: 1 },
+  { text: 'state management', weight: 1 },
+  { text: 'Telegram bot', weight: 2 },
+  { text: 'headless mode', weight: 1 },
+  { text: 'background loops', weight: 1 },
+];
+
+function pickWeightedRandom(pool: { text: string; weight: number }[], exclude?: string): string {
+  const filtered = exclude ? pool.filter((m) => m.text !== exclude) : pool;
+  const totalWeight = filtered.reduce((sum, m) => sum + m.weight, 0);
+  let roll = Math.random() * totalWeight;
+  for (const msg of filtered) {
+    roll -= msg.weight;
+    if (roll <= 0) return msg.text;
   }
+  return filtered[filtered.length - 1].text;
 }
+
+// Phase boundaries
+const PHASE_RAP_START = 100;
+const PHASE_RAP_END = PHASE_RAP_START + rapGodPhrases.length;
+const PHASE_POOL2_END = PHASE_RAP_END + 100;
+const PHASE_SF_END = PHASE_POOL2_END + sfBuzzwords.length;
+const PHASE_INSTALL_END = PHASE_SF_END + installWalkthrough.length;
 
 export default function Home() {
   const [hasClickedTurtleTip, setHasClickedTurtleTip] = useState(false);
   const [turtleBubbleText, setTurtleBubbleText] = useState('I built this site');
-  const [lastMessage, setLastMessage] = useState<string | null>(null);
+  const [clickCount, setClickCount] = useState(0);
+  const [turtleDead, setTurtleDead] = useState(false);
+  const [lastPoolMessage, setLastPoolMessage] = useState<string | null>(null);
   const [bubbleHideTimeout, setBubbleHideTimeout] = useState<number | null>(null);
-
-  const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL ?? '/docs';
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? '/';
-  const githubUrl = 'https://github.com/Rigos0/superturtle';
-  const substackUrl = 'https://richardmladek.substack.com/';
-  const linkedinUrl = 'https://www.linkedin.com/in/richard-mladek/';
-  const twitterUrl = 'https://x.com/rmladek';
-
-  const socialLinks: SocialLink[] = [
-    { label: 'Substack', href: substackUrl, kind: 'substack', external: true },
-    { label: 'LinkedIn', href: linkedinUrl, kind: 'linkedin', external: true },
-    { label: 'Twitter', href: twitterUrl, kind: 'twitter', external: true },
-  ];
-
-  const resourceLinks: SocialLink[] = [
-    { label: 'GitHub', href: githubUrl, kind: 'github', external: true },
-    {
-      label: 'Docs',
-      href: docsUrl,
-      kind: 'docs',
-      external: docsUrl.startsWith('http://') || docsUrl.startsWith('https://'),
-    },
-  ];
+  const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL ?? "/docs";
+  const githubUrl = "https://github.com/rigos0/superturtle";
 
   const handleTurtleClick = () => {
-    const available = turtleMessagePool.filter((msg) => msg !== lastMessage);
-    const next = available[Math.floor(Math.random() * available.length)] ?? turtleMessagePool[0];
+    // Turtle is done talking
+    if (turtleDead) return;
 
-    setLastMessage(next);
+    const nextCount = clickCount + 1;
+    setClickCount(nextCount);
+
+    let message: string;
+    if (nextCount === 1) {
+      message = 'I built this site';
+    } else if (nextCount === 2) {
+      message = 'step by step';
+    } else if (nextCount >= PHASE_RAP_START && nextCount < PHASE_RAP_END) {
+      // Phase 2: Rap God
+      message = rapGodPhrases[nextCount - PHASE_RAP_START];
+    } else if (nextCount >= PHASE_RAP_END && nextCount < PHASE_POOL2_END) {
+      // Phase 3: back to normal pool for 100 clicks
+      message = pickWeightedRandom(turtleMessagePool, lastPoolMessage ?? undefined);
+      setLastPoolMessage(message);
+    } else if (nextCount >= PHASE_POOL2_END && nextCount < PHASE_SF_END) {
+      // Phase 4: SF AI buzzword mode
+      message = sfBuzzwords[nextCount - PHASE_POOL2_END];
+    } else if (nextCount >= PHASE_SF_END && nextCount < PHASE_INSTALL_END) {
+      // Phase 5: install walkthrough
+      message = installWalkthrough[nextCount - PHASE_SF_END];
+      // Kill the turtle after the last install message
+      if (nextCount === PHASE_INSTALL_END - 1) {
+        setTurtleDead(true);
+      }
+    } else {
+      // Phase 1 (3-99): normal pool
+      message = pickWeightedRandom(turtleMessagePool, lastPoolMessage ?? undefined);
+      setLastPoolMessage(message);
+    }
+
     setHasClickedTurtleTip(true);
-    setTurtleBubbleText(next);
+    setTurtleBubbleText(message);
 
     if (bubbleHideTimeout !== null) {
       window.clearTimeout(bubbleHideTimeout);
@@ -142,10 +264,9 @@ export default function Home() {
   }, [bubbleHideTimeout]);
 
   return (
-    <div className="landing-root min-h-screen flex flex-col">
+    <div className="landing-root">
       <StickyNav />
-
-      <main className="flex-1">
+      <main>
         <section id="hero" className="section-shell hero-shell relative">
           <div className="section-container max-w-5xl space-y-10">
             <div className="reveal text-center flex flex-col items-center" style={{ animationDelay: '80ms' }}>
@@ -158,24 +279,26 @@ export default function Home() {
                   onClick={handleTurtleClick}
                   aria-label="Show turtle message"
                 >
-                  <img
-                    className="turtle-sticker-image"
-                    src="/turtle-logo.png"
-                    alt="SuperTurtle"
-                    width={104}
-                    height={104}
-                    style={{ width: 'var(--turtle-size)', height: 'var(--turtle-size)' }}
-                  />
+                  <img className="turtle-sticker-image" src="/turtle-logo.png" alt="Super Turtle" width={104} height={104} style={{ width: 'var(--turtle-size)', height: 'var(--turtle-size)' }} />
                 </div>
               </div>
-              <h1 className="headline mt-6 sm:mt-7 md:mt-8">SuperTurtle!</h1>
-              <p className="lead max-w-2xl">Code from anywhere with your voice</p>
+              <h1 className="headline mt-6 sm:mt-7 md:mt-8">
+                Super Turtle!
+              </h1>
+              <p className="lead max-w-2xl">
+                Code from anywhere with your voice
+              </p>
 
               <div className="mt-7 flex flex-wrap justify-center gap-2 sm:gap-3">
-                <a href={githubUrl} className="btn-primary" target="_blank" rel="noreferrer">
+                <a
+                  href={githubUrl}
+                  className="btn-primary"
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   GitHub
                 </a>
-                <a href={docsUrl} className="btn-ghost" target={docsUrl.startsWith('http') ? '_blank' : undefined} rel={docsUrl.startsWith('http') ? 'noreferrer' : undefined}>
+                <a href={docsUrl} className="btn-ghost">
                   Docs
                 </a>
               </div>
@@ -201,55 +324,109 @@ export default function Home() {
           </div>
           <div className="hero-glow" />
         </section>
-      </main>
 
-      <footer className="relative mt-16 footer-shell py-8 sm:mt-20 sm:py-10 md:mt-28 lg:mt-40">
-        <div className="section-container">
-          <div className="mx-auto max-w-6xl">
-            <div className="space-y-6 sm:space-y-7">
-              <div className="mx-auto w-full max-w-[28rem] text-center">
-                <p className="text-sm leading-relaxed text-[var(--text-muted)]">
-                  <a href={siteUrl} className="font-semibold text-[var(--text-heading)] hover:text-[var(--accent-olive)] transition-colors">SuperTurtle</a> was built using <a href={siteUrl} className="font-semibold text-[var(--text-heading)] hover:text-[var(--accent-olive)] transition-colors">SuperTurtle</a>. Runs locally today; cloud deployment is coming up.
-                </p>
+        <SectionDivider />
+
+        <section id="value-proposition" className="section-shell alt-shell">
+          <div className="section-container max-w-4xl">
+            <div className="section-head reveal">
+              <p className="eyebrow">Why Super Turtle</p>
+              <h2>What you get</h2>
+              <p>Clear priorities, in the order users care about.</p>
+            </div>
+
+            <div className="mt-10 grid gap-1 sm:gap-6">
+              {valueProps.map((item, index) => (
+                <article
+                  className={`reveal deck-card ${index % 3 === 0 ? 'olive' : index % 3 === 1 ? 'terracotta' : 'sage'}`}
+                  key={item.title}
+                  style={{ animationDelay: `${220 + index * 90}ms` }}
+                >
+                  <div className="deck-mark" />
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <SectionDivider />
+
+        <section id="execution" className="section-shell">
+          <div className="section-container max-w-4xl space-y-10">
+            <div>
+              <div className="section-head reveal">
+                <p className="eyebrow">Execution</p>
+                <h2>How work runs</h2>
               </div>
+              <div className="mt-8 grid gap-4">
+                {executionFlow.map((step, index) => (
+                  <article className="flow-step reveal" key={step.title} style={{ animationDelay: `${220 + index * 90}ms` }}>
+                    <div className="flow-step-index">{index + 1}</div>
+                    <div>
+                      <h3>{step.title}</h3>
+                      <p>{step.description}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
 
-              <div className="mx-auto flex w-full max-w-[30rem] flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-center sm:gap-10">
-                <nav className="w-full max-w-[12rem] space-y-2 text-left" aria-label="Social links">
-                  {socialLinks.map((link) => (
-                    <a
-                      key={link.label}
-                      href={link.href}
-                      className="flex items-center gap-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-heading)] transition-colors"
-                      target={link.external ? '_blank' : undefined}
-                      rel={link.external ? 'noreferrer noopener' : undefined}
-                    >
-                      <span className="inline-flex h-3.5 w-3.5 items-center justify-center text-[var(--accent-olive)]">
-                        <SocialIcon kind={link.kind} />
-                      </span>
-                      <span>{link.label}</span>
-                    </a>
+            <div className="reveal max-w-2xl" style={{ animationDelay: '260ms' }}>
+              <div className="tg-chat">
+                <div className="tg-chat-head">
+                  <div className="tg-avatar">🐢</div>
+                  <div>
+                    <div className="tg-name">Super Turtle</div>
+                    <div className="tg-status">scheduled check-ins active</div>
+                  </div>
+                </div>
+                <div className="tg-chat-body">
+                  {chatMessages.map((msg, i) => (
+                    <div key={i} className={`tg-bubble ${msg.from === 'user' ? 'tg-bubble-user' : 'tg-bubble-bot'}`}>
+                      {msg.text.split('\n').map((line, j) => (
+                        <span key={j}>{line}{j < msg.text.split('\n').length - 1 && <br />}</span>
+                      ))}
+                    </div>
                   ))}
-                </nav>
-
-                <nav className="w-full max-w-[12rem] space-y-2 text-left" aria-label="Resource links">
-                  {resourceLinks.map((link) => (
-                    <a
-                      key={link.label}
-                      href={link.href}
-                      className="flex items-center gap-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-heading)] transition-colors"
-                      target={link.external ? '_blank' : undefined}
-                      rel={link.external ? 'noreferrer noopener' : undefined}
-                    >
-                      <span className="inline-flex h-3.5 w-3.5 items-center justify-center text-[var(--accent-olive)]">
-                        <SocialIcon kind={link.kind} />
-                      </span>
-                      <span>{link.label}</span>
-                    </a>
-                  ))}
-                </nav>
+                </div>
               </div>
             </div>
           </div>
+        </section>
+
+        <SectionDivider />
+
+        <section id="getting-started" className="section-shell alt-shell">
+          <div className="section-container max-w-4xl">
+            <div className="section-head reveal">
+              <p className="eyebrow">Quick start</p>
+              <h2>Get running in two minutes</h2>
+            </div>
+
+            <div className="mt-10 grid gap-5">
+              {[
+                'git clone <repo>',
+                'cd super-turtle\nclaude\n# or codex',
+                'say:\nSet up Super Turtle on this machine.',
+                'chat from Telegram\n(text or voice)',
+              ].map((command, index) => (
+                <div className="reveal step-card" key={index} style={{ animationDelay: `${280 + index * 100}ms` }}>
+                  <div className="step-label">Step {index + 1}</div>
+                  <div className="step-code">{command}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="relative section-shell footer-shell">
+        <div className="section-container text-center">
+          <p className="text-sm text-[var(--text-muted)]">
+            Super Turtle is built using Super Turtle. Runs locally today; cloud deployment is coming up.
+          </p>
         </div>
       </footer>
     </div>
