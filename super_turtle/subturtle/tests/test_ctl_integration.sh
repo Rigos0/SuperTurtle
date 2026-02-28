@@ -156,6 +156,18 @@ assert_file_contains() {
   grep -Fq "$needle" "$path" || fail "expected '$path' to contain '$needle'"
 }
 
+assert_equals() {
+  local actual="$1"
+  local expected="$2"
+  [[ "$actual" == "$expected" ]] || fail "expected '$expected', got '$actual'"
+}
+
+assert_not_empty() {
+  local value="$1"
+  local label="$2"
+  [[ -n "$value" ]] || fail "expected non-empty value for ${label}"
+}
+
 assert_pid_running() {
   local pid="$1"
   kill -0 "$pid" 2>/dev/null || fail "expected PID ${pid} to be running"
@@ -183,6 +195,161 @@ run_and_capture() {
 register_test() {
   local test_name="$1"
   ALL_TESTS+=("$test_name")
+}
+
+meta_value() {
+  local name="$1"
+  local key="$2"
+  local path="${SUBTURTLES_DIR}/${name}/subturtle.meta"
+  grep -m1 "^${key}=" "$path" 2>/dev/null | cut -d= -f2-
+}
+
+assert_cron_job_exists() {
+  local job_id="$1"
+  assert_not_empty "$job_id" "cron job id" || return 1
+
+  python3 - "$CRON_JOBS_FILE" "$job_id" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+cron_jobs_path = Path(sys.argv[1])
+job_id = sys.argv[2]
+raw = cron_jobs_path.read_text(encoding="utf-8").strip() if cron_jobs_path.exists() else ""
+jobs = json.loads(raw) if raw else []
+if not isinstance(jobs, list):
+    raise SystemExit(2)
+found = any(isinstance(job, dict) and str(job.get("id")) == job_id for job in jobs)
+raise SystemExit(0 if found else 1)
+PY
+}
+
+stop_subturtle_if_running() {
+  local name="$1"
+  "$CTL" stop "$name" >/dev/null 2>&1 || true
+}
+
+test_spawn_creates_workspace() {
+  local name state_path ws pid meta cron_job_id
+  name="$(make_test_name "spawn-workspace")"
+  state_path="${TMP_DIR}/${name}.md"
+  ws="${SUBTURTLES_DIR}/${name}"
+
+  cat > "$state_path" <<'STATE'
+# Current Task
+spawn workspace creation test
+STATE
+
+  if ! "$CTL" spawn "$name" --type yolo-codex --timeout 2m --state-file "$state_path" >/dev/null; then
+    fail "spawn failed for ${name}"
+    return 1
+  fi
+  track_subturtle "$name"
+
+  assert_dir_exists "$ws" || return 1
+  assert_file_exists "${ws}/CLAUDE.md" || return 1
+  assert_symlink_target "${ws}/AGENTS.md" "CLAUDE.md" || return 1
+  assert_file_exists "${ws}/subturtle.pid" || return 1
+  assert_file_exists "${ws}/subturtle.meta" || return 1
+
+  pid="$(cat "${ws}/subturtle.pid")"
+  assert_pid_running "$pid" || return 1
+
+  meta="$(meta_value "$name" "CRON_JOB_ID")"
+  cron_job_id="$meta"
+  assert_not_empty "$cron_job_id" "CRON_JOB_ID" || return 1
+  if ! assert_cron_job_exists "$cron_job_id"; then
+    fail "cron job ${cron_job_id} not present in ${CRON_JOBS_FILE}"
+    return 1
+  fi
+
+  stop_subturtle_if_running "$name"
+  return 0
+}
+
+test_spawn_stdin_state() {
+  local name ws
+  name="$(make_test_name "spawn-stdin")"
+  ws="${SUBTURTLES_DIR}/${name}"
+
+  if ! printf '%s\n' '# Current Task' 'stdin state test' '' '## Backlog' '- [ ] item' | \
+    "$CTL" spawn "$name" --type yolo-codex --timeout 2m --state-file - >/dev/null; then
+    fail "spawn with stdin state failed for ${name}"
+    return 1
+  fi
+  track_subturtle "$name"
+
+  assert_file_exists "${ws}/CLAUDE.md" || return 1
+  assert_file_contains "${ws}/CLAUDE.md" "stdin state test" || return 1
+  assert_file_contains "${ws}/CLAUDE.md" "- [ ] item" || return 1
+
+  stop_subturtle_if_running "$name"
+  return 0
+}
+
+test_spawn_file_state() {
+  local name state_path ws expected
+  name="$(make_test_name "spawn-file")"
+  state_path="${TMP_DIR}/${name}.md"
+  ws="${SUBTURTLES_DIR}/${name}"
+
+  cat > "$state_path" <<'STATE'
+# Current Task
+file state test
+
+## Backlog
+- [ ] one
+STATE
+  expected="$(cat "$state_path")"
+
+  if ! "$CTL" spawn "$name" --type yolo-codex --timeout 2m --state-file "$state_path" >/dev/null; then
+    fail "spawn with state file failed for ${name}"
+    return 1
+  fi
+  track_subturtle "$name"
+
+  assert_file_exists "${ws}/CLAUDE.md" || return 1
+  assert_equals "$(cat "${ws}/CLAUDE.md")" "$expected" || return 1
+
+  stop_subturtle_if_running "$name"
+  return 0
+}
+
+test_spawn_with_skills() {
+  local name state_path ws skills_json
+  name="$(make_test_name "spawn-skills")"
+  state_path="${TMP_DIR}/${name}.md"
+  ws="${SUBTURTLES_DIR}/${name}"
+
+  cat > "$state_path" <<'STATE'
+# Current Task
+spawn skills test
+STATE
+
+  if ! "$CTL" spawn "$name" --type yolo-codex --timeout 2m --state-file "$state_path" --skill frontend --skill testing >/dev/null; then
+    fail "spawn with skills failed for ${name}"
+    return 1
+  fi
+  track_subturtle "$name"
+
+  assert_file_exists "${ws}/subturtle.meta" || return 1
+  skills_json="$(meta_value "$name" "SKILLS")"
+  assert_not_empty "$skills_json" "SKILLS" || return 1
+
+  if ! python3 - "$skills_json" <<'PY'
+import json
+import sys
+
+skills = json.loads(sys.argv[1])
+raise SystemExit(0 if skills == ["frontend", "testing"] else 1)
+PY
+  then
+    fail "expected SKILLS to equal [\"frontend\", \"testing\"], got: ${skills_json}"
+    return 1
+  fi
+
+  stop_subturtle_if_running "$name"
+  return 0
 }
 
 run_test() {
@@ -217,6 +384,10 @@ test_harness_bootstrap() {
 }
 
 register_test test_harness_bootstrap
+register_test test_spawn_creates_workspace
+register_test test_spawn_stdin_state
+register_test test_spawn_file_state
+register_test test_spawn_with_skills
 
 run_all_tests() {
   local test_name

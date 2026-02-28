@@ -1,10 +1,13 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import { resolve } from "path";
-import { getAvailableModels } from "../session";
+import { codexSession } from "../codex-session";
+import { getAvailableModels, session } from "../session";
 
 process.env.TELEGRAM_BOT_TOKEN ||= "test-token";
 process.env.TELEGRAM_ALLOWED_USERS ||= "123";
 process.env.CLAUDE_WORKING_DIR ||= process.cwd();
+process.env.CODEX_ENABLED = "false";
 
 const {
   getCommandLines,
@@ -15,7 +18,55 @@ const {
   parseCtlListOutput,
   readMainLoopLogTail,
   MAIN_LOOP_LOG_PATH,
+  handleNew,
+  handleStatus,
+  handleCron,
 } = await import("./commands");
+
+type ReplyRecord = {
+  text: string;
+  extra?: { parse_mode?: string; reply_markup?: unknown };
+};
+
+function mockContext(messageText: string): {
+  ctx: {
+    from: { id: number };
+    message: { text: string };
+    reply: (text: string, extra?: { parse_mode?: string; reply_markup?: unknown }) => Promise<void>;
+  };
+  replies: ReplyRecord[];
+} {
+  const replies: ReplyRecord[] = [];
+  const authorizedUserId = Number((process.env.TELEGRAM_ALLOWED_USERS || "123").split(",")[0]?.trim() || "123");
+  return {
+    ctx: {
+      from: { id: authorizedUserId },
+      message: { text: messageText },
+      reply: async (text: string, extra?: { parse_mode?: string; reply_markup?: unknown }) => {
+        replies.push({ text, extra });
+      },
+    },
+    replies,
+  };
+}
+
+const cronJobsPath = resolve(import.meta.dir, "../../cron-jobs.json");
+const originalCronJobsText = existsSync(cronJobsPath) ? readFileSync(cronJobsPath, "utf-8") : null;
+const originalSessionStopTyping = session.stopTyping;
+const originalSessionKill = session.kill;
+const originalCodexKill = codexSession.kill;
+
+afterEach(() => {
+  session.stopTyping = originalSessionStopTyping;
+  session.kill = originalSessionKill;
+  codexSession.kill = originalCodexKill;
+
+  if (originalCronJobsText !== null) {
+    writeFileSync(cronJobsPath, originalCronJobsText);
+  } else if (existsSync(cronJobsPath)) {
+    writeFileSync(cronJobsPath, "[]\n");
+  }
+});
 
 describe("getCommandLines", () => {
   it("returns slash commands including all known commands", () => {
@@ -292,5 +343,140 @@ describe("readMainLoopLogTail", () => {
     } finally {
       Bun.spawnSync = originalSpawnSync;
     }
+  });
+});
+
+describe("handlers with mock Context", () => {
+  it("handleNew replies with HTML command overview and resets driver sessions", async () => {
+    let stopTypingCalls = 0;
+    let sessionKillCalls = 0;
+    let codexKillCalls = 0;
+
+    session.stopTyping = () => {
+      stopTypingCalls += 1;
+    };
+    session.kill = (async () => {
+      sessionKillCalls += 1;
+    }) as typeof session.kill;
+    codexSession.kill = (async () => {
+      codexKillCalls += 1;
+    }) as typeof codexSession.kill;
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response("{}", { status: 404 })) as typeof fetch;
+
+    const { ctx, replies } = mockContext("/new");
+    try {
+      await handleNew(ctx as any);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(replies).toHaveLength(1);
+    expect(replies[0]!.extra?.parse_mode).toBe("HTML");
+    expect(replies[0]!.text).toContain("<b>New session</b>");
+    expect(replies[0]!.text).toContain("<b>Commands:</b>");
+    expect(replies[0]!.text).toContain("/new - Fresh session");
+    expect(replies[0]!.text).toContain("/status - Detailed status");
+    expect(replies[0]!.text).toContain("/cron - Scheduled jobs");
+    expect(stopTypingCalls).toBe(1);
+    expect(sessionKillCalls).toBe(1);
+    expect(codexKillCalls).toBe(1);
+  });
+
+  it("handleStatus replies with HTML settings overview without resetting sessions", async () => {
+    let stopTypingCalls = 0;
+    let sessionKillCalls = 0;
+    let codexKillCalls = 0;
+
+    session.stopTyping = () => {
+      stopTypingCalls += 1;
+    };
+    session.kill = (async () => {
+      sessionKillCalls += 1;
+    }) as typeof session.kill;
+    codexSession.kill = (async () => {
+      codexKillCalls += 1;
+    }) as typeof codexSession.kill;
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response("{}", { status: 404 })) as typeof fetch;
+
+    const { ctx, replies } = mockContext("/status");
+    try {
+      await handleStatus(ctx as any);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(replies).toHaveLength(1);
+    expect(replies[0]!.extra?.parse_mode).toBe("HTML");
+    expect(replies[0]!.text).toContain("<b>Status</b>");
+    expect(replies[0]!.text).toContain("<b>Commands:</b>");
+    expect(stopTypingCalls).toBe(0);
+    expect(sessionKillCalls).toBe(0);
+    expect(codexKillCalls).toBe(0);
+  });
+
+  it("handleCron shows no-jobs message when cron job list is empty", async () => {
+    writeFileSync(cronJobsPath, "[]\n");
+
+    const { ctx, replies } = mockContext("/cron");
+    await handleCron(ctx as any);
+
+    expect(replies).toHaveLength(1);
+    expect(replies[0]!.extra?.parse_mode).toBe("HTML");
+    expect(replies[0]!.text).toContain("<b>Scheduled Jobs</b>");
+    expect(replies[0]!.text).toContain("No jobs scheduled");
+  });
+
+  it("handleCron shows jobs with cancel buttons", async () => {
+    const now = Date.now();
+    const longPrompt = "Run recurring maintenance task with a very long prompt to force truncation";
+    const expectedTruncatedPrompt = `${longPrompt.slice(0, 37)}...`;
+
+    writeFileSync(
+      cronJobsPath,
+      JSON.stringify(
+        [
+          {
+            id: "job-1",
+            prompt: "Do a quick status check",
+            chat_id: 123,
+            type: "one-shot",
+            interval_ms: null,
+            fire_at: now + 5 * 60 * 1000,
+            created_at: new Date(now).toISOString(),
+          },
+          {
+            id: "job-2",
+            prompt: longPrompt,
+            chat_id: 123,
+            type: "recurring",
+            interval_ms: 15 * 60 * 1000,
+            fire_at: now + 2 * 60 * 60 * 1000,
+            created_at: new Date(now).toISOString(),
+          },
+        ],
+        null,
+        2
+      )
+    );
+
+    const { ctx, replies } = mockContext("/cron");
+    await handleCron(ctx as any);
+
+    expect(replies).toHaveLength(1);
+    expect(replies[0]!.extra?.parse_mode).toBe("HTML");
+    expect(replies[0]!.text).toContain("<b>Scheduled Jobs</b>");
+    expect(replies[0]!.text).toContain("⏱️ <code>Do a quick status check</code>");
+    expect(replies[0]!.text).toContain(`🔁 <code>${expectedTruncatedPrompt}</code>`);
+
+    const keyboard = (replies[0]!.extra?.reply_markup as {
+      inline_keyboard?: Array<Array<{ callback_data?: string }>>;
+    })?.inline_keyboard;
+    expect(Array.isArray(keyboard)).toBe(true);
+    expect(keyboard?.flat().some((button) => button.callback_data === "cron_cancel:job-1")).toBe(true);
+    expect(keyboard?.flat().some((button) => button.callback_data === "cron_cancel:job-2")).toBe(true);
   });
 });
