@@ -7,11 +7,16 @@ import { pathToFileURL } from "url";
 const fixtureRoot = mkdtempSync(join(tmpdir(), "cron-test-"));
 const fixtureSrcDir = join(fixtureRoot, "src");
 const fixtureCronPath = join(fixtureSrcDir, "cron.ts");
+const fixtureLoggerPath = join(fixtureSrcDir, "logger.ts");
 const fixtureJobsFile = join(fixtureRoot, "cron-jobs.json");
 const realDateNow = Date.now;
 
 mkdirSync(fixtureSrcDir, { recursive: true });
 writeFileSync(fixtureCronPath, readFileSync(new URL("./cron.ts", import.meta.url), "utf-8"));
+writeFileSync(
+  fixtureLoggerPath,
+  `export const cronLog = { warn: () => {}, error: () => {}, info: () => {}, debug: () => {} };\n`
+);
 
 const cronModuleUrl = `${pathToFileURL(fixtureCronPath).href}?ts=${Date.now()}`;
 const { addJob, advanceRecurringJob, getDueJobs, loadJobs, reloadJobs, removeJob } = await import(

@@ -1,5 +1,5 @@
 # Current Task
-Replace console calls in cron files: cron.ts, cron-supervision-queue.ts, cron-scheduled-prompt.ts
+Replace console calls in drivers: claude-driver.ts, codex-driver.ts
 
 ## End Goal with Specs
 Every log call in the bot produces structured JSON via pino. A single log file that can be tailed with `pino-pretty` for a clean, colored, real-time view of everything happening — both Claude and Codex activity, cron jobs, MCP tools, SubTurtle operations.
@@ -89,8 +89,8 @@ MCP servers:
 - [x] Install pino + pino-pretty: `cd super_turtle/claude-telegram-bot && bun add pino pino-pretty`
 - [x] Create src/logger.ts with pino config and child loggers
 - [x] Replace console calls in core files: index.ts, config.ts, session.ts, codex-session.ts, utils.ts
-- [ ] Replace console calls in cron files: cron.ts, cron-supervision-queue.ts, cron-scheduled-prompt.ts <- current
-- [ ] Replace console calls in drivers: claude-driver.ts, codex-driver.ts
+- [x] Replace console calls in cron files: cron.ts, cron-supervision-queue.ts, cron-scheduled-prompt.ts
+- [ ] Replace console calls in drivers: claude-driver.ts, codex-driver.ts <- current
 - [ ] Replace console calls in handlers: streaming.ts, text.ts, commands.ts, callback.ts, stop.ts
 - [ ] Replace console calls in media handlers: photo.ts, video.ts, audio.ts, document.ts, media-group.ts
 - [ ] Replace console calls in MCP servers: bot_control, ask_user, send_turtle
