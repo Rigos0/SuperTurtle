@@ -13,6 +13,8 @@ const {
   parseClaudeStateSummary,
   formatBacklogSummary,
   parseCtlListOutput,
+  readMainLoopLogTail,
+  MAIN_LOOP_LOG_PATH,
 } = await import("./commands");
 
 describe("getCommandLines", () => {
@@ -235,5 +237,60 @@ describe("parseCtlListOutput", () => {
   it("returns empty array for header-only output", () => {
     const output = "NAME STATUS TYPE PID TIME TASK";
     expect(parseCtlListOutput(output)).toEqual([]);
+  });
+});
+
+describe("readMainLoopLogTail", () => {
+  it("returns ok=true with log text when tail succeeds", () => {
+    const expectedText = "line 1\nline 2\n";
+    const originalSpawnSync = Bun.spawnSync;
+    const spawnedCommands: string[][] = [];
+
+    Bun.spawnSync = ((cmd: unknown, opts?: unknown) => {
+      const parts = Array.isArray(cmd) ? cmd.map((part) => String(part)) : [String(cmd)];
+      spawnedCommands.push(parts);
+      if (parts[0] === "tail") {
+        return {
+          stdout: Buffer.from(expectedText),
+          stderr: Buffer.from(""),
+          success: true,
+          exitCode: 0,
+        } as ReturnType<typeof Bun.spawnSync>;
+      }
+      return originalSpawnSync(cmd as Parameters<typeof Bun.spawnSync>[0], opts as Parameters<typeof Bun.spawnSync>[1]);
+    }) as typeof Bun.spawnSync;
+
+    try {
+      expect(readMainLoopLogTail()).toEqual({ ok: true, text: expectedText });
+    } finally {
+      Bun.spawnSync = originalSpawnSync;
+    }
+
+    expect(spawnedCommands.some((parts) => parts[0] === "tail")).toBe(true);
+    expect(spawnedCommands.some((parts) => parts[0] === "tail" && parts.includes(MAIN_LOOP_LOG_PATH))).toBe(true);
+  });
+
+  it("returns ok=false with an error when tail fails", () => {
+    const originalSpawnSync = Bun.spawnSync;
+    const expectedError = `tail: ${MAIN_LOOP_LOG_PATH}: No such file or directory`;
+
+    Bun.spawnSync = ((cmd: unknown, opts?: unknown) => {
+      const parts = Array.isArray(cmd) ? cmd.map((part) => String(part)) : [String(cmd)];
+      if (parts[0] === "tail") {
+        return {
+          stdout: Buffer.from(""),
+          stderr: Buffer.from(expectedError),
+          success: false,
+          exitCode: 1,
+        } as ReturnType<typeof Bun.spawnSync>;
+      }
+      return originalSpawnSync(cmd as Parameters<typeof Bun.spawnSync>[0], opts as Parameters<typeof Bun.spawnSync>[1]);
+    }) as typeof Bun.spawnSync;
+
+    try {
+      expect(readMainLoopLogTail()).toEqual({ ok: false, error: expectedError });
+    } finally {
+      Bun.spawnSync = originalSpawnSync;
+    }
   });
 });
