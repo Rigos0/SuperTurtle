@@ -1,5 +1,5 @@
 # Current Task
-Run all tests, fix any failures.
+All backlog items complete.
 
 ## End Goal with Specs
 A single test script that exercises every `ctl` command with fake CLI binaries. Tests run in ~30 seconds, no real Claude/Codex calls, fully deterministic.
@@ -61,5 +61,8 @@ A single test script that exercises every `ctl` command with fake CLI binaries. 
 - [x] Write watchdog timeout test (5s timeout)
 - [x] Write gc and reschedule-cron tests
 - [x] Write CLI validation test (missing codex binary)
-- [ ] Run all tests, fix any failures <- current
-- [ ] Commit
+- [x] Run all tests, fix any failures
+- [x] Commit
+
+## Loop Control
+STOP
