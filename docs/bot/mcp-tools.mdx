@@ -39,22 +39,108 @@ Claude: Generating PDF...
 
 ### bot_control — Session Management
 
-Claude can control the bot's session directly:
-- Start a new session
-- Switch models
-- Toggle drivers (Claude ↔ Codex)
-- Stop active work
-- Trigger restarts
+`bot_control` is the bot's control-plane tool. It handles usage checks, model/driver switching, session management, and process restart.
 
-**Example:**
+**Tool input shape:**
 
+```json
+{
+  "action": "switch_model",
+  "params": {
+    "model": "claude-sonnet-4-6",
+    "effort": "high"
+  }
+}
 ```
-You: I want to switch to Opus for this
-Claude: [Internally calls bot_control to switch model]
-Claude: ✅ Switched to Opus. Ready for complex analysis.
-```
 
-Claude uses this automatically when it knows a task needs a different model or when stopping work.
+- `action` is required
+- `params` is optional and depends on action
+
+**IPC mechanism (how it works internally):**
+1. MCP server writes a pending request file to `/tmp/bot-control-<id>.json`
+2. The streaming handler scans `/tmp`, executes the action, then writes result back into the same file
+3. MCP server polls every 100ms, up to 10 seconds, and returns the result text to Claude
+4. Request files are deleted after completion/error (best-effort cleanup)
+
+**Action reference (quick table):**
+
+| Action | Params | What it does | Returns |
+|-------|--------|--------------|---------|
+| `usage` | none | Fetches Claude usage and, when enabled, Codex quota | Usage text block, or failure message |
+| `switch_model` | `model?: string`, `effort?: string` | Updates current session model/effort | Updated model/effort summary, or validation error |
+| `switch_driver` | `driver: "claude" \| "codex"` | Switches active driver and resets running driver sessions | `"Switched to Codex"` / `"Switched to Claude Code"`, or error |
+| `new_session` | none | Stops and kills current session so next message starts fresh | `"Session cleared. Next message will start a fresh session."` |
+| `list_sessions` | none | Lists saved sessions with title/date/ID prefix | Numbered list, or `"No saved sessions."` |
+| `resume_session` | `session_id: string` | Resumes a saved session by full ID or prefix | `Resumed: "..."`, or validation/failure message |
+| `restart` | none | Stops active driver sessions and exits process after a short delay | `"Restarting bot..."` |
+
+**Per-action details and examples:**
+
+#### `usage`
+- **Params:** none
+- **Example call:**
+  ```json
+  { "action": "usage" }
+  ```
+- **Return:** `USAGE DATA (show this to the user as-is, in a code block): ...` or `Failed to fetch usage data.`
+
+#### `switch_model`
+- **Params:**
+  - `model` (optional): model ID or display name
+  - `effort` (optional)
+- **Effort values:**
+  - Claude driver: `low`, `medium`, `high`
+  - Codex driver: `minimal`, `low`, `medium`, `high`, `xhigh`
+- **Example call:**
+  ```json
+  { "action": "switch_model", "params": { "model": "claude-opus-4-6", "effort": "high" } }
+  ```
+- **Return:** current or updated model/effort summary, or an `Unknown model...` / `Invalid effort...` message
+
+#### `switch_driver`
+- **Params:** `driver` required (`claude` or `codex`)
+- **Example call:**
+  ```json
+  { "action": "switch_driver", "params": { "driver": "codex" } }
+  ```
+- **Return:**
+  - Success: `"Switched to Codex"` or `"Switched to Claude Code"`
+  - Validation: `Invalid driver "...". Use: claude or codex`
+  - Availability failure: `Cannot switch to Codex: ...` if Codex is disabled/unavailable
+
+#### `new_session`
+- **Params:** none
+- **Example call:**
+  ```json
+  { "action": "new_session" }
+  ```
+- **Return:** `"Session cleared. Next message will start a fresh session."`
+
+#### `list_sessions`
+- **Params:** none
+- **Example call:**
+  ```json
+  { "action": "list_sessions" }
+  ```
+- **Return:** numbered lines in the format `"<index>. "<title>" (<date>) — ID: <prefix>..."` or `"No saved sessions."`
+
+#### `resume_session`
+- **Params:** `session_id` required (full ID or prefix)
+- **Example call:**
+  ```json
+  { "action": "resume_session", "params": { "session_id": "a1b2c3d4" } }
+  ```
+- **Return:**
+  - Success: `Resumed: "<title>"`
+  - Errors: `Missing session_id parameter.`, `No session found matching "..."`, or `Failed: ...`
+
+#### `restart`
+- **Params:** none
+- **Example call:**
+  ```json
+  { "action": "restart" }
+  ```
+- **Return:** `"Restarting bot..."`
 
 ### send_turtle — Spawn SubTurtles
 
