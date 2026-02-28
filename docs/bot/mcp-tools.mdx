@@ -11,31 +11,39 @@ The bot supports **Model Context Protocol (MCP)** servers that extend Claude's c
 
 ### ask_user — Interactive Buttons
 
-Claude presents options as tappable inline Telegram buttons. Perfect for confirmation, multiple-choice, or menu-based interactions.
+`ask_user` shows Telegram inline buttons in the active chat and pauses the turn so the user can pick an option.
 
-**What Claude can do:**
+**Tool input shape:**
 
+```json
+{
+  "question": "Which file format do you prefer?",
+  "options": ["PDF", "PNG", "HTML"]
+}
 ```
-Claude: Which file format do you prefer?
-[Inline buttons: PDF | PNG | HTML]
-```
 
-When you tap a button, Claude sees your choice and continues.
+- `question` is required
+- `options` is required
+- At least 2 options are required (schema allows up to 10; 2-6 is recommended)
+
+**IPC mechanism (how it works internally):**
+1. MCP server writes `/tmp/ask-user-<id>.json` with `status: "pending"` and the current `chat_id`
+2. The streaming handler scans `/tmp`, sends `❓ <question>` with inline buttons, then marks the request as `sent`
+3. When the user taps a button, callback handling loads the same request file, validates the selected index, and deletes the file
+4. The selected option text is injected as the user's next message, and the model continues from that choice
+
+**Return text to Claude:**
+- Success: `[Buttons sent to user. STOP HERE - do not output any more text. Wait for user to tap a button.]`
+- Invalid input: throws `question and at least 2 options required`
 
 **Example:**
 
 ```
 You: Prepare a report
-Claude: What format? (shows buttons)
+Claude: (calls ask_user with options PDF/PNG/HTML and stops)
 You: [Tap PDF]
 Claude: Generating PDF...
 ```
-
-**When to use:**
-- Confirmation dialogs ("Are you sure?")
-- Menu selection ("Which template?")
-- Multiple-choice decisions
-- Workflows that need user input
 
 ### bot_control — Session Management
 
