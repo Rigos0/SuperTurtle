@@ -170,7 +170,7 @@ body {
 
 @media (max-width: 640px) {
   .turtle-tip-bubble {
-    left: -85px !important;
+    left: -70px !important;
     top: 48%;
     font-size: 0.65rem;
   }
