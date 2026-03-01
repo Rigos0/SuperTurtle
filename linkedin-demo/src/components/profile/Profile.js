@@ -1,28 +1,32 @@
 import { Avatar, Button, Paper, Typography, Divider } from "@material-ui/core";
 import LocationOnIcon from "@material-ui/icons/LocationOn";
-import tadeasBibrAvatar from "../../assets/tadeas-bibr.jpg";
 import useConvexUser from "../../hooks/useConvexUser";
 import Style from "./Style";
 
 const DEFAULT_PROFILE = {
-  displayName: "Tadeáš Bíbr",
-  photoURL: tadeasBibrAvatar,
-  title: "📦 Co-Founder @ ReKrabice | Box Whisperer | Saving the planet one reusable package at a time",
-  location: "Prague, Czech Republic 🇨🇿",
+  displayName: "Alex Turner",
+  photoURL: "https://i.pravatar.cc/200?img=68",
+  title: "🐢 Full-Stack Developer | Building things that matter",
+  location: "San Francisco, CA",
   about:
-    "Serial box enthusiast. Co-founded ReKrabice because I saw a cardboard box in a dumpster and thought 'there has to be a better way.' Previously convinced the CEO of Slevomat that I was essential (still unconfirmed). When I'm not evangelizing reusable packaging, I'm probably at a Startup Night telling founders their MVP needs more boxes.",
+    "Passionate developer with a love for clean code and great UX. Previously built products at startups and scale-ups.",
   experience: [
-    "📦 Co-Founder — ReKrabice (Reusable boxes that come back like boomerangs)",
-    "📈 Business Development — Behavio (Reading people's minds, ethically)",
-    "⚙️ EA to CEO — Slevomat (Professional calendar Tetris champion)",
+    "🚀 Senior Developer — TechStartup (Building the future)",
+    "💡 Product Engineer — ScaleUp Inc (Shipping fast)",
+    "🎓 CS Graduate — State University",
   ],
-  connections: 842,
-  followers: 1337,
+  connections: 500,
+  followers: 750,
 };
 
+const DEFAULT_PROFILE_PHOTO = DEFAULT_PROFILE.photoURL;
+
 const resolveProfilePhoto = (photoURL) => {
-  if (typeof photoURL === "string" && photoURL.startsWith("/")) {
-    return tadeasBibrAvatar;
+  if (typeof photoURL !== "string" || photoURL.length === 0) {
+    return DEFAULT_PROFILE_PHOTO;
+  }
+  if (photoURL.startsWith("/")) {
+    return DEFAULT_PROFILE_PHOTO;
   }
   return photoURL;
 };
