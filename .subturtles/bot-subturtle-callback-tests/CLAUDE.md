@@ -1,5 +1,5 @@
 ## Current Task
-Commit callback SubTurtle/pinologs test coverage changes.
+All callback SubTurtle/pinologs coverage tasks are complete.
 
 ## End Goal with Specs
 Tests cover:
@@ -12,8 +12,11 @@ Tests cover:
 - [x] Add tests in `super_turtle/claude-telegram-bot/src/handlers/callback.subturtle.test.ts` (new)
 - [x] Mock `Bun.spawnSync` and log reads for deterministic outputs
 - [x] Run targeted bun tests for new coverage
-- [ ] Commit <- current
+- [x] Commit
 
 ## Notes
 Target files:
 - super_turtle/claude-telegram-bot/src/handlers/callback.ts
+
+## Loop Control
+STOP
