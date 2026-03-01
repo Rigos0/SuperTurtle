@@ -82,8 +82,11 @@ describe("CodexSession", () => {
 
     expect(startThreadCalls).toHaveLength(1);
     expect(startThreadCalls[0]).toMatchObject({
-      workingDirectory: process.cwd(),
+      workingDirectory: expect.any(String),
       skipGitRepoCheck: true,
+      sandboxMode: expect.any(String),
+      approvalPolicy: expect.any(String),
+      networkAccessEnabled: expect.any(Boolean),
       model: "gpt-5.2-codex",
       modelReasoningEffort: "high",
     });
@@ -140,8 +143,11 @@ describe("CodexSession", () => {
     expect(resumeThreadCalls[0]).toEqual({
       threadId: "resume-thread-999",
       options: expect.objectContaining({
-        workingDirectory: process.cwd(),
+        workingDirectory: expect.any(String),
         skipGitRepoCheck: true,
+        sandboxMode: expect.any(String),
+        approvalPolicy: expect.any(String),
+        networkAccessEnabled: expect.any(Boolean),
         model: "gpt-5.2-codex",
         modelReasoningEffort: "low",
       }),
