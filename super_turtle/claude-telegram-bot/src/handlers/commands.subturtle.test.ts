@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 
 process.env.TELEGRAM_BOT_TOKEN ||= "test-token";
 process.env.TELEGRAM_ALLOWED_USERS ||= "123";
-process.env.CLAUDE_WORKING_DIR ||= process.cwd();
+process.env.CLAUDE_WORKING_DIR ||= resolve(import.meta.dir, "../../../..");
 
 const { handleSubturtle } = await import("./commands");
 const { ALLOWED_USERS } = await import("../config");

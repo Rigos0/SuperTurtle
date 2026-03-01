@@ -3,7 +3,7 @@ import { resolve } from "path";
 
 process.env.TELEGRAM_BOT_TOKEN ||= "test-token";
 process.env.TELEGRAM_ALLOWED_USERS ||= "123";
-process.env.CLAUDE_WORKING_DIR ||= process.cwd();
+process.env.CLAUDE_WORKING_DIR ||= resolve(import.meta.dir, "../../../..");
 
 const { formatUnifiedUsage } = await import("./commands");
 
@@ -29,7 +29,7 @@ async function probeUsage(codexEnabled: "true" | "false"): Promise<UsageProbeRes
     ...process.env,
     TELEGRAM_BOT_TOKEN: "test-token",
     TELEGRAM_ALLOWED_USERS: "123",
-    CLAUDE_WORKING_DIR: process.cwd(),
+    CLAUDE_WORKING_DIR: resolve(import.meta.dir, "../../../.."),
     CODEX_ENABLED: codexEnabled,
     HOME: process.env.HOME || "/tmp",
   };
@@ -37,6 +37,15 @@ async function probeUsage(codexEnabled: "true" | "false"): Promise<UsageProbeRes
   const script = `
     const marker = ${JSON.stringify(marker)};
     const modulePath = ${JSON.stringify(commandsPath)};
+
+    const fs = require("fs");
+    const path = require("path");
+    const homeDir = process.env.HOME || "/tmp";
+    const credPath = path.join(homeDir, ".config", "claude-code", "credentials.json");
+    fs.mkdirSync(path.dirname(credPath), { recursive: true });
+    fs.writeFileSync(credPath, JSON.stringify({
+      claudeAiOauth: { accessToken: "test-claude-token" },
+    }));
 
     let codexFetchCalls = 0;
 
