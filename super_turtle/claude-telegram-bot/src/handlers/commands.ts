@@ -10,6 +10,7 @@ import {
   ALLOWED_USERS,
   RESTART_FILE,
   TELEGRAM_SAFE_LIMIT,
+  BUTTON_LABEL_MAX_LENGTH,
   CODEX_AVAILABLE,
   CODEX_CLI_AVAILABLE,
   CODEX_ENABLED,
@@ -450,64 +451,106 @@ export async function handleResume(ctx: Context): Promise<void> {
     await ctx.reply(`${getCodexUnavailableMessage()}\nFalling back to Claude sessions.`);
   }
 
-  // Get sessions based on active driver
-  let sessions: Array<{
+  const formatResumeButtonLabel = (
+    driverEmoji: "🔵" | "🟢",
+    savedAt: string,
+    title: string
+  ): string => {
+    const date = new Date(savedAt);
+    const dateStr = Number.isNaN(date.getTime())
+      ? "--/-- --:--"
+      : `${date.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit" })} ${date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`;
+    const rawTitle = title.trim() || "Untitled";
+    const base = `${driverEmoji} ${dateStr} ${rawTitle}`;
+    if (base.length <= BUTTON_LABEL_MAX_LENGTH) return base;
+    return `${base.slice(0, Math.max(1, BUTTON_LABEL_MAX_LENGTH - 1)).trimEnd()}…`;
+  };
+
+  // Gather both drivers so users can switch contexts without using /switch first.
+  let claudeSessions: Array<{
     session_id: string;
     saved_at: string;
     working_dir: string;
     title: string;
-  }>;
-  let driverName: string;
+  }> = session.getSessionList();
+  let codexSessions: Array<{
+    session_id: string;
+    saved_at: string;
+    working_dir: string;
+    title: string;
+  }> = [];
 
-  if (session.activeDriver === "codex") {
-    sessions = await codexSession.getSessionListLive(RESUME_SESSIONS_LIMIT);
-    if (sessions.length === 0) {
-      sessions = codexSession.getSessionList();
+  if (CODEX_AVAILABLE) {
+    codexSessions = await codexSession.getSessionListLive(RESUME_SESSIONS_LIMIT);
+    if (codexSessions.length === 0) {
+      codexSessions = codexSession.getSessionList();
     }
-    driverName = "Codex";
-  } else {
-    sessions = session.getSessionList();
-    driverName = "Claude";
   }
 
-  if (session.isActive || (session.activeDriver === "codex" && codexSession.isActive)) {
-    await ctx.reply(`${driverName} session already active. Use /new to start fresh.`);
+  // Hide currently linked sessions/threads for both drivers so picker options
+  // are always actionable and never a no-op.
+  const currentClaudeSessionId = session.sessionId;
+  const currentCodexSessionId = codexSession.getThreadId();
+  if (currentClaudeSessionId) {
+    claudeSessions = claudeSessions.filter((s) => s.session_id !== currentClaudeSessionId);
+  }
+  if (currentCodexSessionId) {
+    codexSessions = codexSessions.filter((s) => s.session_id !== currentCodexSessionId);
+  }
+
+  // Keep lists short for Telegram and quick scanning.
+  const byNewest = (a: { saved_at: string }, b: { saved_at: string }) =>
+    (Date.parse(b.saved_at || "") || 0) - (Date.parse(a.saved_at || "") || 0);
+  claudeSessions = claudeSessions.sort(byNewest).slice(0, RESUME_SESSIONS_LIMIT);
+  codexSessions = codexSessions.sort(byNewest).slice(0, RESUME_SESSIONS_LIMIT);
+
+  const hasCurrentSession =
+    (session.activeDriver === "claude" && Boolean(session.sessionId)) ||
+    (session.activeDriver === "codex" && Boolean(codexSession.getThreadId()));
+
+  if (!hasCurrentSession && claudeSessions.length === 0 && codexSessions.length === 0) {
+    await ctx.reply("❌ No saved sessions.");
     return;
   }
 
-  if (sessions.length === 0) {
-    await ctx.reply(`❌ No saved ${driverName} sessions.`);
-    return;
-  }
-  sessions = sessions.slice(0, RESUME_SESSIONS_LIMIT);
+  const buttons: Array<Array<{ text: string; callback_data: string }>> = [];
 
-  // Build inline keyboard with session list
-  const buttons = sessions.map((s) => {
-    // Format date: "18/01 10:30"
-    const date = new Date(s.saved_at);
-    const dateStr = date.toLocaleDateString("en-US", {
-      day: "2-digit",
-      month: "2-digit",
-    });
-    const timeStr = date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    // Truncate title for button (max ~40 chars to fit)
-    const titlePreview =
-      s.title.length > 35 ? s.title.slice(0, 32) + "..." : s.title;
-
-    const callbackPrefix = session.activeDriver === "codex" ? "codex_resume" : "resume";
-    return [
+  if (hasCurrentSession) {
+    const currentDriverName = session.activeDriver === "codex" ? "Codex 🟢" : "Claude 🔵";
+    buttons.push([
       {
-        text: `📅 ${dateStr} ${timeStr} - "${titlePreview}"`,
-        callback_data: `${callbackPrefix}:${s.session_id}`,
+        text: `▶ Continue current (${currentDriverName})`,
+        callback_data: "resume_current",
       },
-    ];
-  });
+    ]);
+  }
 
-  await ctx.reply(`📋 <b>${driverName} Sessions</b>\n\nSelect a session to resume:`, {
+  for (const s of claudeSessions) {
+    buttons.push([
+      {
+        text: formatResumeButtonLabel("🔵", s.saved_at, s.title),
+        callback_data: `resume:${s.session_id}`,
+      },
+    ]);
+  }
+
+  for (const s of codexSessions) {
+    buttons.push([
+      {
+        text: formatResumeButtonLabel("🟢", s.saved_at, s.title),
+        callback_data: `codex_resume:${s.session_id}`,
+      },
+    ]);
+  }
+
+  if (buttons.length === 0) {
+    await ctx.reply(
+      "ℹ️ No other saved sessions to resume. You're already linked to the latest one. Send a message to continue, or use /new for a fresh session."
+    );
+    return;
+  }
+
+  await ctx.reply("📋 <b>Resume Session</b>\n\n🔵 Claude + 🟢 Codex\nSelect a session to continue:", {
     parse_mode: "HTML",
     reply_markup: {
       inline_keyboard: buttons,

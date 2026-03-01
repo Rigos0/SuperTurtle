@@ -2,8 +2,10 @@ import { describe, expect, it } from "bun:test";
 import { resolve } from "path";
 
 type ResumeLimitProbe = {
-  claudeButtonCount: number;
-  codexButtonCount: number;
+  totalButtonCount: number;
+  resumeCallbacksCount: number;
+  codexResumeCallbacksCount: number;
+  hasResumeCurrentButton: boolean;
   codexLiveMaxArg: number | null;
   claudeAllResumeCallbacks: boolean;
   codexAllResumeCallbacks: boolean;
@@ -49,26 +51,26 @@ function runResumeLimitProbe(): { exitCode: number; stdout: string; stderr: stri
     let codexLiveMaxArg = null;
 
     session.activeDriver = "claude";
+    session.sessionId = null;
+    codexSession.getThreadId = () => null;
     session.getSessionList = () => claudeSessions;
-    await handleResume(ctx);
-    const claudeReply = replies.at(-1);
-    const claudeButtons = claudeReply?.extra?.reply_markup?.inline_keyboard || [];
-    const claudeCallbacks = claudeButtons.map((row) => row[0]?.callback_data || "");
-
-    session.activeDriver = "codex";
     codexSession.getSessionListLive = async (maxSessions = 50) => {
       codexLiveMaxArg = maxSessions;
       return codexSessions;
     };
-    codexSession.getSessionList = () => [];
+    codexSession.getSessionList = () => codexSessions;
     await handleResume(ctx);
-    const codexReply = replies.at(-1);
-    const codexButtons = codexReply?.extra?.reply_markup?.inline_keyboard || [];
-    const codexCallbacks = codexButtons.map((row) => row[0]?.callback_data || "");
+    const reply = replies.at(-1);
+    const buttons = reply?.extra?.reply_markup?.inline_keyboard || [];
+    const callbacks = buttons.flatMap((row) => row.map((button) => button?.callback_data || ""));
+    const claudeCallbacks = callbacks.filter((c) => String(c).startsWith("resume:"));
+    const codexCallbacks = callbacks.filter((c) => String(c).startsWith("codex_resume:"));
 
     const payload = {
-      claudeButtonCount: claudeButtons.length,
-      codexButtonCount: codexButtons.length,
+      totalButtonCount: buttons.length,
+      resumeCallbacksCount: claudeCallbacks.length,
+      codexResumeCallbacksCount: codexCallbacks.length,
+      hasResumeCurrentButton: callbacks.includes("resume_current"),
       codexLiveMaxArg,
       claudeAllResumeCallbacks: claudeCallbacks.every((c) => String(c).startsWith("resume:")),
       codexAllResumeCallbacks: codexCallbacks.every((c) => String(c).startsWith("codex_resume:")),
@@ -145,8 +147,10 @@ describe("/resume session list limits", () => {
     }
 
     expect(result.payload).not.toBeNull();
-    expect(result.payload?.claudeButtonCount).toBe(5);
-    expect(result.payload?.codexButtonCount).toBe(5);
+    expect(result.payload?.totalButtonCount).toBe(10);
+    expect(result.payload?.resumeCallbacksCount).toBe(5);
+    expect(result.payload?.codexResumeCallbacksCount).toBe(5);
+    expect(result.payload?.hasResumeCurrentButton).toBe(false);
     expect(result.payload?.codexLiveMaxArg).toBe(5);
     expect(result.payload?.claudeAllResumeCallbacks).toBe(true);
     expect(result.payload?.codexAllResumeCallbacks).toBe(true);

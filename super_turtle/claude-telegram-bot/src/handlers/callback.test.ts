@@ -304,3 +304,155 @@ describe("handleCallback Codex switching and controls", () => {
     expect(result.payload?.editTexts[0] || "").toContain("Reasoning Effort:</b> high");
   });
 });
+
+describe("handleCallback resume_current", () => {
+  it("continues the active Claude session", async () => {
+    const result = await runCallbackProbe<{
+      callbackAnswers: Array<{ text?: string; show_alert?: boolean }>;
+      replies: string[];
+      editTexts: string[];
+    }>(`
+      const { handleCallback } = await import(callbackPath);
+      const { session } = await import(sessionPath);
+
+      session.activeDriver = "claude";
+      session.sessionId = "claude-current-123";
+      session.recentMessages = [
+        { role: "user", text: "hello" },
+        { role: "assistant", text: "hi there" },
+      ];
+
+      const callbackAnswers = [];
+      const replies = [];
+      const editTexts = [];
+      const ctx = {
+        from: { id: 123, username: "tester" },
+        chat: { id: 123, type: "private" },
+        callbackQuery: { data: "resume_current" },
+        answerCallbackQuery: async (payload) => {
+          callbackAnswers.push(payload || {});
+        },
+        reply: async (text) => {
+          replies.push(String(text));
+        },
+        editMessageText: async (text) => {
+          editTexts.push(String(text));
+        },
+      };
+
+      await handleCallback(ctx);
+
+      console.log(marker + JSON.stringify({
+        callbackAnswers,
+        replies,
+        editTexts,
+      }));
+    `);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.payload).not.toBeNull();
+    expect(result.payload?.callbackAnswers[0]?.text).toBe("Continuing current Claude session");
+    expect(result.payload?.callbackAnswers[0]?.show_alert).toBeUndefined();
+    expect(result.payload?.editTexts[0]).toContain("Continuing current Claude session");
+    expect(result.payload?.replies[0]).toContain("📝 **Last messages:**");
+  });
+
+  it("continues the active Codex session", async () => {
+    const result = await runCallbackProbe<{
+      callbackAnswers: Array<{ text?: string; show_alert?: boolean }>;
+      replies: string[];
+      editTexts: string[];
+    }>(`
+      const { handleCallback } = await import(callbackPath);
+      const { session } = await import(sessionPath);
+      const { codexSession } = await import(codexPath);
+
+      session.activeDriver = "codex";
+      codexSession.getThreadId = () => "codex-thread-123";
+      codexSession.recentMessages = [
+        { role: "user", text: "continue codex" },
+        { role: "assistant", text: "continuing now" },
+      ];
+
+      const callbackAnswers = [];
+      const replies = [];
+      const editTexts = [];
+      const ctx = {
+        from: { id: 123, username: "tester" },
+        chat: { id: 123, type: "private" },
+        callbackQuery: { data: "resume_current" },
+        answerCallbackQuery: async (payload) => {
+          callbackAnswers.push(payload || {});
+        },
+        reply: async (text) => {
+          replies.push(String(text));
+        },
+        editMessageText: async (text) => {
+          editTexts.push(String(text));
+        },
+      };
+
+      await handleCallback(ctx);
+
+      console.log(marker + JSON.stringify({
+        callbackAnswers,
+        replies,
+        editTexts,
+      }));
+    `);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.payload).not.toBeNull();
+    expect(result.payload?.callbackAnswers[0]?.text).toBe("Continuing current Codex session");
+    expect(result.payload?.callbackAnswers[0]?.show_alert).toBeUndefined();
+    expect(result.payload?.editTexts[0]).toContain("Continuing current Codex session");
+    expect(result.payload?.replies[0]).toContain("📝 **Last messages:**");
+  });
+
+  it("shows alert when resume_current has no active session", async () => {
+    const result = await runCallbackProbe<{
+      callbackAnswers: Array<{ text?: string; show_alert?: boolean }>;
+      replies: string[];
+      editTexts: string[];
+    }>(`
+      const { handleCallback } = await import(callbackPath);
+      const { session } = await import(sessionPath);
+
+      session.activeDriver = "claude";
+      session.sessionId = null;
+
+      const callbackAnswers = [];
+      const replies = [];
+      const editTexts = [];
+      const ctx = {
+        from: { id: 123, username: "tester" },
+        chat: { id: 123, type: "private" },
+        callbackQuery: { data: "resume_current" },
+        answerCallbackQuery: async (payload) => {
+          callbackAnswers.push(payload || {});
+        },
+        reply: async (text) => {
+          replies.push(String(text));
+        },
+        editMessageText: async (text) => {
+          editTexts.push(String(text));
+        },
+      };
+
+      await handleCallback(ctx);
+
+      console.log(marker + JSON.stringify({
+        callbackAnswers,
+        replies,
+        editTexts,
+      }));
+    `);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.payload).not.toBeNull();
+    expect(result.payload?.callbackAnswers[0]?.show_alert).toBe(true);
+    expect(result.payload?.callbackAnswers[0]?.text).toBe("No active Claude session");
+    expect(result.payload?.replies).toHaveLength(0);
+    expect(result.payload?.editTexts).toHaveLength(0);
+  });
+});
