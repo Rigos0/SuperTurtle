@@ -30,6 +30,19 @@ Before anything else, confirm the user has Telegram installed:
 
 Do not proceed past this step until the user confirms Telegram is installed.
 
+Then verify local prerequisites (run commands yourself and report clearly):
+
+- `claude` CLI is installed (setup will fail without it)
+- `bun` is installed (bot dependencies use Bun)
+- `python3` is installed and version is **3.11+** (required for SubTurtle loops)
+- `npm` is installed **only if** you plan to install docs dependencies
+- `git` is installed (recommended for normal workflow)
+
+If any are missing:
+- Tell the user exactly which one is missing
+- Provide the official install link
+- Do **not** proceed until the missing tool is installed
+
 ### 1. Open with platform reality
 
 Always tell the user:

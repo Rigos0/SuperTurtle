@@ -97,6 +97,24 @@ have_cmd() {
   command -v "$1" >/dev/null 2>&1
 }
 
+ensure_python_version() {
+  local python_bin="$1"
+  local version
+  if ! version="$("$python_bin" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null)"; then
+    echo "[setup] Python 3.11+ is required but python3 is not working." >&2
+    exit 1
+  fi
+
+  local major="${version%%.*}"
+  local minor="${version#*.}"
+  minor="${minor%%.*}"
+
+  if [[ "${major}" -lt 3 || ( "${major}" -eq 3 && "${minor}" -lt 11 ) ]]; then
+    echo "[setup] Python 3.11+ is required. Found ${version}." >&2
+    exit 1
+  fi
+}
+
 prompt_if_missing() {
   local var_name="$1"
   local label="$2"
@@ -165,6 +183,12 @@ if [[ "${INSTALL_DEPS}" -eq 1 ]]; then
     echo "[setup] Bun is required for the bot setup. Install Bun first: https://bun.sh" >&2
     exit 1
   fi
+
+  if ! have_cmd python3; then
+    echo "[setup] Python 3.11+ is required. Install Python first: https://www.python.org/downloads/" >&2
+    exit 1
+  fi
+  ensure_python_version python3
 
   echo "[setup] Installing bot dependencies (bun install)..."
   (cd "${BOT_DIR}" && bun install)
