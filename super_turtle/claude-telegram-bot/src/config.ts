@@ -44,9 +44,14 @@ process.env.PATH = pathParts.join(PATH_SEPARATOR);
 
 // ============== Core Configuration ==============
 
-export const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
+const IS_TEST_ENV =
+  (process.env.NODE_ENV || "").toLowerCase() === "test" ||
+  typeof process.env.BUN_TEST !== "undefined";
+
+export const TELEGRAM_TOKEN =
+  process.env.TELEGRAM_BOT_TOKEN || (IS_TEST_ENV ? "test-token" : "");
 export const ALLOWED_USERS: number[] = (
-  process.env.TELEGRAM_ALLOWED_USERS || ""
+  process.env.TELEGRAM_ALLOWED_USERS || (IS_TEST_ENV ? "123" : "")
 )
   .split(",")
   .filter((x) => x.trim())
@@ -114,10 +119,6 @@ export const META_CODEX_APPROVAL_POLICY = parseCodexApprovalPolicy(
 export const META_CODEX_NETWORK_ACCESS = parseMetaCodexNetworkAccess(
   process.env.META_CODEX_NETWORK_ACCESS
 );
-
-const IS_TEST_ENV =
-  (process.env.NODE_ENV || "").toLowerCase() === "test" ||
-  typeof process.env.BUN_TEST !== "undefined";
 
 // ============== Claude CLI Path ==============
 
