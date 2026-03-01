@@ -1,5 +1,5 @@
 ## Current Task
-Re-run `bun test` to confirm export errors resolved.
+Fix remaining test failures (registry stop expectation, codex-session, stall-timeout).
 
 ## End Goal with Specs
 - `bun test` in `super_turtle/claude-telegram-bot` passes.
@@ -8,8 +8,8 @@ Re-run `bun test` to confirm export errors resolved.
 
 ## Backlog
 - [x] Update test mocks to merge actual exports (session, streaming, driver-routing)
-- [ ] Re-run `bun test` to confirm export errors resolved <- current
-- [ ] Fix remaining test failures (registry stop expectation, codex-session, stall-timeout)
+- [x] Re-run `bun test` to confirm export errors resolved
+- [ ] Fix remaining test failures (registry stop expectation, codex-session, stall-timeout) <- current
 - [ ] Re-run `bun test` and ensure full pass
 - [ ] Commit with clear message(s)
 
@@ -20,3 +20,12 @@ Target files likely include:
 - super_turtle/claude-telegram-bot/src/drivers/registry.test.ts
 - super_turtle/claude-telegram-bot/src/codex-session.test.ts
 - super_turtle/claude-telegram-bot/src/session.stall-timeout.test.ts
+
+Latest `bun test` run (2026-03-01) summary:
+- 156 passing, 7 failing, 163 total tests.
+- Export-related mock failures no longer present.
+- Remaining failures:
+  - src/codex-session.test.ts (2)
+  - src/drivers/registry.test.ts (1)
+  - src/handlers/commands.test.ts (2)
+  - src/handlers/driver-routing.test.ts (2)
