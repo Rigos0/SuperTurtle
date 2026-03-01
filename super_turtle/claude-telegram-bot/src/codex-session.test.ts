@@ -205,8 +205,9 @@ describe("CodexSession", () => {
       const server = serverConfig as Record<string, unknown>;
       expect(server.cwd).toBeDefined();
       expect(typeof server.cwd).toBe("string");
-      // cwd should match the project WORKING_DIR so relative imports resolve correctly
-      expect(server.cwd).toMatch(/agentic$/);
+      // cwd should match CLAUDE_WORKING_DIR (or HOME fallback) so relative imports resolve
+      const expectedCwd = process.env.CLAUDE_WORKING_DIR || process.env.HOME || "";
+      expect(server.cwd).toBe(expectedCwd);
     }
   });
 });

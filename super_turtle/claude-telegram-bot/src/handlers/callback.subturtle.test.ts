@@ -75,7 +75,7 @@ describe("subturtle callback actions", () => {
     const { ctx, callbackAnswers, edits } = makeCallbackCtx("subturtle_stop:worker-a");
     await handleCallback(ctx);
 
-    expect(commands.some((parts) => parts[0].endsWith("/super_turtle/subturtle/ctl"))).toBe(true);
+    expect(commands.some((parts) => parts[0]?.endsWith("/super_turtle/subturtle/ctl"))).toBe(true);
     expect(commands.some((parts) => parts[1] === "stop" && parts[2] === "worker-a")).toBe(true);
     expect(edits).toEqual([
       {
