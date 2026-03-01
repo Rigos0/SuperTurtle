@@ -1,5 +1,5 @@
 ## Current Task
-Update `linkedin-demo/src/components/posts/post/Post.js`: the `isTadeas` check compares against mockUser.displayName — update this to compare against the new featured user name "Alex Turner".
+Update `linkedin-demo/src/components/posts/Posts.js`: check for any Tadeáš/Bíbr references.
 
 ## End Goal with Specs
 - App name: "Turtle In" everywhere (header, title, manifest, tests, banner)
@@ -21,8 +21,8 @@ Update `linkedin-demo/src/components/posts/post/Post.js`: the `isTadeas` check c
 - [x] Replace mock user data in `linkedin-demo/src/mock/user.js`: change displayName to "Alex Turner", remove tadeas-bibr.jpg import (use "https://i.pravatar.cc/200?img=68" instead), title to "🐢 Full-Stack Developer | Building things that matter", headline to "Turning ideas into products", location to "San Francisco, CA", about to "Passionate developer with a love for clean code and great UX. Previously built products at startups and scale-ups.", experience to ["🚀 Senior Developer — TechStartup (Building the future)", "💡 Product Engineer — ScaleUp Inc (Shipping fast)", "🎓 CS Graduate — State University"], connections 500, followers 750
 - [x] Replace mock posts in `linkedin-demo/src/mock/posts.js`: change mockUsers.tadeas to use the new Alex Turner data (no tadeasBibrAvatar import, use pravatar URL). Update post descriptions to be generic professional LinkedIn-style posts (not Tadeáš box jokes). Keep the same structure and other users (Avery, Devin, Sofia) but remove any Tadeáš references from their posts too.
 - [x] Update seed data in `linkedin-demo/src/convex/seed.ts`: replace Tadeáš Bíbr with Alex Turner matching the mock user data above. Replace all Tadeáš-specific post text with the same generic professional posts. Keep 4 users + 9 posts structure.
-- [ ] Update `linkedin-demo/src/components/posts/post/Post.js`: the `isTadeas` check compares against mockUser.displayName — update this to compare against the new featured user name "Alex Turner" <- current
-- [ ] Update `linkedin-demo/src/components/posts/Posts.js`: check for any Tadeáš/Bíbr references
+- [x] Update `linkedin-demo/src/components/posts/post/Post.js`: the `isTadeas` check compares against mockUser.displayName — update this to compare against the new featured user name "Alex Turner"
+- [ ] Update `linkedin-demo/src/components/posts/Posts.js`: check for any Tadeáš/Bíbr references <- current
 - [ ] Delete the tadeas-bibr.jpg asset file at `linkedin-demo/src/assets/tadeas-bibr.jpg` if no longer imported
 - [ ] Run `cd linkedin-demo && npm run build` to verify build passes
 - [ ] Commit with message "Rebrand to Turtle In with green theme, replace demo content"
