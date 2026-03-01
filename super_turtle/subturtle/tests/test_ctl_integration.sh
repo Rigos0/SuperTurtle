@@ -154,6 +154,12 @@ assert_contains() {
   [[ "$haystack" == *"$needle"* ]] || fail "expected output to contain '$needle'"
 }
 
+assert_not_contains() {
+  local haystack="$1"
+  local needle="$2"
+  [[ "$haystack" != *"$needle"* ]] || fail "expected output to not contain '$needle'"
+}
+
 assert_file_contains() {
   local path="$1"
   local needle="$2"
@@ -427,6 +433,65 @@ STATE
   return 0
 }
 
+test_status_mocked_shell_output() {
+  local name state_path ws pid status_output mock_bin cron_job_id watchdog_pid
+  name="$(make_test_name "status-mocked-shell")"
+  state_path="${TMP_DIR}/${name}.md"
+  ws="${SUBTURTLES_DIR}/${name}"
+  mock_bin="${TMP_DIR}/mock-shell-${name}"
+
+  cat > "$state_path" <<'STATE'
+# Current Task
+status mocked shell output test
+STATE
+
+  if ! "$CTL" spawn "$name" --type yolo-codex --timeout 2m --state-file "$state_path" >/dev/null; then
+    fail "spawn failed for ${name}"
+    return 1
+  fi
+  track_subturtle "$name"
+
+  pid="$(cat "${ws}/subturtle.pid")"
+  cron_job_id="$(meta_value "$name" "CRON_JOB_ID")"
+  watchdog_pid="$(meta_value "$name" "WATCHDOG_PID")"
+
+  cat > "${ws}/subturtle.meta" <<META
+SPAWNED_AT=1700000000
+TIMEOUT_SECONDS=7200
+LOOP_TYPE=yolo-codex
+SKILLS=["frontend", "testing"]
+WATCHDOG_PID=${watchdog_pid}
+CRON_JOB_ID=${cron_job_id}
+META
+
+  mkdir -p "$mock_bin"
+  cat > "${mock_bin}/date" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "+%s" ]]; then
+  echo "1700003600"
+  exit 0
+fi
+exec /bin/date "$@"
+SH
+  chmod +x "${mock_bin}/date"
+
+  cat > "${mock_bin}/ps" <<'SH'
+#!/usr/bin/env bash
+echo "PID PPID PGID SESS STATE ELAPSED COMMAND"
+echo "${4:-0} 1 1 1 S 01:00:00 mock-process"
+SH
+  chmod +x "${mock_bin}/ps"
+
+  status_output="$(env PATH="${mock_bin}:${PATH}" "$CTL" status "$name")"
+  assert_contains "$status_output" "[subturtle:${name}] running as yolo-codex (PID ${pid})" || return 1
+  assert_contains "$status_output" "1h 0m elapsed, 1h 0m left" || return 1
+  assert_contains "$status_output" "[subturtle:${name}] skills: [\"frontend\", \"testing\"]" || return 1
+  assert_contains "$status_output" "mock-process" || return 1
+
+  stop_subturtle_if_running "$name"
+  return 0
+}
+
 test_status_stopped() {
   local name state_path status_output
   name="$(make_test_name "status-stopped")"
@@ -447,6 +512,23 @@ STATE
 
   status_output="$("$CTL" status "$name")"
   assert_contains "$status_output" "[subturtle:${name}] not running" || return 1
+  return 0
+}
+
+test_spawn_missing_state_file() {
+  local name missing_state out_file err_file output
+  name="$(make_test_name "spawn-missing-state-file")"
+  missing_state="${TMP_DIR}/${name}-does-not-exist.md"
+  out_file="${TMP_DIR}/${name}.out"
+  err_file="${TMP_DIR}/${name}.err"
+
+  if run_and_capture "$out_file" "$err_file" "$CTL" spawn "$name" --type yolo-codex --timeout 2m --state-file "$missing_state"; then
+    fail "spawn unexpectedly succeeded with missing state file for ${name}"
+    return 1
+  fi
+
+  output="$(cat "$out_file" "$err_file")"
+  assert_contains "$output" "ERROR: state file not found: ${missing_state}" || return 1
   return 0
 }
 
@@ -617,6 +699,63 @@ STATE
 
   stop_subturtle_if_running "$name_one"
   stop_subturtle_if_running "$name_two"
+  return 0
+}
+
+test_list_parses_current_task_with_mocked_time() {
+  local name state_path ws list_output row mock_bin cron_job_id watchdog_pid
+  name="$(make_test_name "list-parses-task")"
+  state_path="${TMP_DIR}/${name}.md"
+  ws="${SUBTURTLES_DIR}/${name}"
+  mock_bin="${TMP_DIR}/mock-shell-${name}"
+
+  cat > "$state_path" <<'STATE'
+# Current Task
+list parses current task test
+STATE
+
+  if ! "$CTL" spawn "$name" --type yolo-codex --timeout 2m --state-file "$state_path" >/dev/null; then
+    fail "spawn failed for ${name}"
+    return 1
+  fi
+  track_subturtle "$name"
+
+  cat > "${ws}/CLAUDE.md" <<'STATE'
+# Current task
+- [ ] List parser task <- current
+STATE
+
+  cron_job_id="$(meta_value "$name" "CRON_JOB_ID")"
+  watchdog_pid="$(meta_value "$name" "WATCHDOG_PID")"
+  cat > "${ws}/subturtle.meta" <<META
+SPAWNED_AT=1700000000
+TIMEOUT_SECONDS=3900
+LOOP_TYPE=yolo-codex
+SKILLS=["frontend"]
+WATCHDOG_PID=${watchdog_pid}
+CRON_JOB_ID=${cron_job_id}
+META
+
+  mkdir -p "$mock_bin"
+  cat > "${mock_bin}/date" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "+%s" ]]; then
+  echo "1700003600"
+  exit 0
+fi
+exec /bin/date "$@"
+SH
+  chmod +x "${mock_bin}/date"
+
+  list_output="$(env PATH="${mock_bin}:${PATH}" "$CTL" list)"
+  row="$(printf '%s\n' "$list_output" | grep -E "^[[:space:]]*${name}[[:space:]]" | head -n 1)"
+  assert_not_empty "$row" "list row for ${name}" || return 1
+  assert_contains "$row" "running" || return 1
+  assert_contains "$row" "5m left" || return 1
+  assert_contains "$row" "- [ ] List parser task" || return 1
+  assert_not_contains "$row" "<- current" || return 1
+
+  stop_subturtle_if_running "$name"
   return 0
 }
 
@@ -818,12 +957,15 @@ register_test test_spawn_stdin_state
 register_test test_spawn_file_state
 register_test test_spawn_with_skills
 register_test test_status_running
+register_test test_status_mocked_shell_output
 register_test test_status_stopped
+register_test test_spawn_missing_state_file
 register_test test_stop_kills_process
 register_test test_stop_cleans_cron
 register_test test_stop_archives_workspace
 register_test test_stop_already_dead
 register_test test_list_shows_subturtles
+register_test test_list_parses_current_task_with_mocked_time
 register_test test_list_shows_tunnel_url
 register_test test_watchdog_timeout
 register_test test_gc_archives_old
