@@ -46,6 +46,7 @@ export function getCommandLines(): string[] {
     `/context - Context usage`,
     `/status - Detailed status`,
     `/looplogs - Main loop logs`,
+    `/pinologs - Pino logs`,
     `/resume - Resume a session`,
     `/sub - SubTurtles`,
     `/cron - Scheduled jobs`,
