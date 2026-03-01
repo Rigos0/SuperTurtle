@@ -11,7 +11,8 @@ export default makeStyles((theme) => ({
     overflow: "hidden",
     [theme.breakpoints.down("xs")]: {
       borderRadius: 0,
-      height: "calc(100vh - 120px)",
+      height: "calc(100vh - 110px)",
+      minHeight: 0,
     },
   },
   listView: {
@@ -103,6 +104,9 @@ export default makeStyles((theme) => ({
   backButton: {
     color: "#2e7d32",
     backgroundColor: "#f1f8f1",
+    width: 44,
+    height: 44,
+    padding: 10,
     "&:hover": {
       backgroundColor: "#e3f2e5",
     },
@@ -164,6 +168,12 @@ export default makeStyles((theme) => ({
     alignItems: "center",
     gap: 8,
     backgroundColor: "#fff",
+    position: "sticky",
+    bottom: 0,
+    zIndex: 2,
+    [theme.breakpoints.down("xs")]: {
+      paddingBottom: "calc(10px + env(safe-area-inset-bottom, 0px))",
+    },
   },
   inputField: {
     flex: 1,

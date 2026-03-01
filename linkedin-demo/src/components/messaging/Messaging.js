@@ -195,7 +195,6 @@ const Messaging = () => {
       <div className={classes.threadHeader}>
         <IconButton
           className={classes.backButton}
-          size="small"
           onClick={() => {
             setSelectedConversationId(null);
             setBody("");
