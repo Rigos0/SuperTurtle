@@ -1,5 +1,5 @@
 ## Current Task
-Add command tests in `super_turtle/claude-telegram-bot/src/handlers/commands.test.ts`.
+All backlog items completed.
 
 ## End Goal with Specs
 Tests cover:
@@ -12,11 +12,14 @@ Tests cover:
 ## Backlog
 - [x] Review `super_turtle/claude-telegram-bot/src/handlers/callback.ts` switch and codex model/effort blocks
 - [x] Add callback tests in `super_turtle/claude-telegram-bot/src/handlers/callback.test.ts` (new) or extend existing tests
-- [ ] Add command tests in `super_turtle/claude-telegram-bot/src/handlers/commands.test.ts` <- current
+- [x] Add command tests in `super_turtle/claude-telegram-bot/src/handlers/commands.test.ts`
 - [x] Run targeted bun tests for new coverage
-- [ ] Commit
+- [x] Commit
 
 ## Notes
 Target files:
 - super_turtle/claude-telegram-bot/src/handlers/callback.ts
 - super_turtle/claude-telegram-bot/src/handlers/commands.ts
+
+## Loop Control
+STOP
