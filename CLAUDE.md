@@ -52,3 +52,31 @@ If `CLAUDE.md` does get overwritten during a merge:
 git checkout HEAD~1 -- CLAUDE.md
 git commit -m "restore branch-specific CLAUDE.md"
 ```
+
+---
+
+## Current task
+Debug and fix Codex MCP tool transport failures (`Transport closed`) in the MetaAgent runtime.
+
+## End goal with specs
+Codex-driven MetaAgent calls can successfully execute MCP tools (`send_turtle`, `bot_control`, `ask_user`, `pino_logs`) without transport crashes, with regression tests passing under Bun.
+
+## Roadmap (Completed)
+- (none yet)
+
+## Roadmap (Upcoming)
+- Reproduce transport failure in Codex path with deterministic local test
+- Identify root cause in Codex session/MCP config wiring
+- Implement fix and add focused regression tests
+- Verify MCP tools execute end-to-end in Codex mode
+- Summarize fix and residual risks
+
+## Backlog
+- [ ] Spawn dedicated SubTurtle for Codex MCP transport debugging <- current
+- [ ] Reproduce `Transport closed` from Codex tool calls
+- [ ] Patch MCP wiring/lifecycle to prevent transport shutdown
+- [ ] Add regression coverage for Codex MCP tool invocation path
+- [ ] Run targeted tests and report results
+
+## Notes
+- Priority shifted from coverage expansion to MCP transport stability for Codex mode.

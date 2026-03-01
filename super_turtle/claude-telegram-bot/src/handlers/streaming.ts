@@ -227,7 +227,9 @@ export async function checkPendingBotControlRequests(
   return handled;
 }
 
-const PINO_LEVELS: Record<string, number> = {
+type PinoLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
+
+const PINO_LEVELS: Record<PinoLevel, number> = {
   trace: 10,
   debug: 20,
   info: 30,
@@ -288,14 +290,15 @@ function buildLevelFilter(level?: string, levels?: string[]): Set<number> | null
   if (levels && levels.length > 0) {
     const exact = new Set<number>();
     for (const item of levels) {
-      const value = PINO_LEVELS[item] ?? null;
+      const value = (PINO_LEVELS as Record<string, number>)[item] ?? null;
       if (value !== null) exact.add(value);
     }
     return exact.size > 0 ? exact : null;
   }
 
   if (!level || level === "all") return null;
-  const min = PINO_LEVELS[level] ?? PINO_LEVELS.error;
+  const normalizedLevel = level in PINO_LEVELS ? (level as PinoLevel) : "error";
+  const min = PINO_LEVELS[normalizedLevel];
   const minSet = new Set<number>();
   for (const value of Object.values(PINO_LEVELS)) {
     if (value >= min) minSet.add(value);
@@ -557,15 +560,21 @@ async function executeBotControlAction(
       const sessionId = params.session_id;
       if (!sessionId) return "Missing session_id parameter.";
 
-      // Support both full ID and short prefix
-      const sessions = sessionObj.getSessionList();
+      const isCodexSession = "reasoningEffort" in sessionObj;
+      const sessions = isCodexSession
+        ? [
+          ...(await (sessionObj as CodexSession).getSessionListLive()),
+          ...sessionObj.getSessionList(),
+        ]
+        : sessionObj.getSessionList();
       const match = sessions.find(
         (s) => s.session_id === sessionId || s.session_id.startsWith(sessionId),
       );
       if (!match) return `No session found matching "${sessionId}".`;
 
-      const isCodexSession = "reasoningEffort" in sessionObj;
       let result: [success: boolean, message: string];
+
+      await sessionObj.stop();
 
       if (isCodexSession) {
         // Codex resumeSession is async
@@ -575,6 +584,7 @@ async function executeBotControlAction(
         result = (sessionObj as ClaudeSession).resumeSession(match.session_id);
       }
 
+      session.activeDriver = isCodexSession ? "codex" : "claude";
       const [success, message] = result;
       return success ? `Resumed: "${match.title}"` : `Failed: ${message}`;
     }

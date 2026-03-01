@@ -62,6 +62,38 @@ function codexUnavailableCallbackText(): string {
   return "Codex unavailable";
 }
 
+function formatSessionPreview(preview?: string): string | null {
+  if (!preview) return null;
+  const trimmed = preview.trim();
+  if (!trimmed) return null;
+  const lines = trimmed.split("\n").slice(0, 4);
+  const joined = lines.join("\n");
+  return joined.length > 350 ? `${joined.slice(0, 347)}...` : joined;
+}
+
+/**
+ * Format recentMessages array into a readable Telegram message.
+ * Shows the last few conversation turns with role labels.
+ */
+function formatRecentMessages(messages?: import("../types").RecentMessage[]): string | null {
+  if (!messages || messages.length === 0) return null;
+
+  // Show last 6 messages max (3 exchanges) to keep Telegram message manageable
+  const recent = messages.slice(-6);
+  const lines: string[] = [];
+
+  for (const msg of recent) {
+    const roleLabel = msg.role === "user" ? "👤 You" : "🤖 Assistant";
+    // Truncate long messages for display
+    const displayText = msg.text.length > 300
+      ? msg.text.slice(0, 297) + "..."
+      : msg.text;
+    lines.push(`${roleLabel}: ${displayText}`);
+  }
+
+  return lines.join("\n\n");
+}
+
 /**
  * Handle callback queries from inline keyboards.
  */
@@ -492,10 +524,9 @@ async function handleResumeCallback(
     return;
   }
 
-  // Check if session is already active
-  if (session.isActive) {
-    await ctx.answerCallbackQuery({ text: "Session already active" });
-    return;
+  if (isAnyDriverRunning()) {
+    await stopActiveDriverQuery();
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
   // Resume the selected session
@@ -513,33 +544,23 @@ async function handleResumeCallback(
     console.debug("Failed to edit resume message:", error);
   }
   await ctx.answerCallbackQuery({ text: "Session resumed!" });
+  session.activeDriver = "claude";
 
-  // Send a hidden recap prompt to Claude
-  const recapPrompt =
-    "Please write a very concise recap of where we are in this conversation, to refresh my memory. Max 2-3 sentences.";
+  const sessionEntry = session.getSessionList().find((s) => s.session_id === sessionId);
+  // Prefer in-memory buffer (current bot session) over persisted data
+  const inMemoryMessages = session.recentMessages.length > 0
+    ? session.recentMessages
+    : undefined;
+  const recentPreview = formatRecentMessages(
+    inMemoryMessages || sessionEntry?.recentMessages
+  );
+  const legacyPreview = formatSessionPreview(sessionEntry?.preview);
+  const displayPreview = recentPreview || legacyPreview;
 
-  const typing = startTypingIndicator(ctx);
-  session.typingController = typing;
-  const state = new StreamingState();
-  const statusCallback = createStatusCallback(ctx, state);
-
-  try {
-    // Ensure we're using Claude driver for Claude session recap
-    session.activeDriver = "claude";
-    await runMessageWithActiveDriver({
-      message: recapPrompt,
-      username,
-      userId,
-      chatId,
-      ctx,
-      statusCallback,
-    });
-  } catch (error) {
-    callbackLog.error({ err: error, sessionId, userId, chatId }, "Error getting recap");
-    // Don't show error to user - session is still resumed, recap just failed
-  } finally {
-    typing.stop();
-    session.typingController = null;
+  if (displayPreview) {
+    await ctx.reply(`📝 **Last messages:**\n\n${displayPreview}`);
+  } else {
+    await ctx.reply("ℹ️ Session resumed. Send a message to continue.");
   }
 }
 
@@ -565,10 +586,9 @@ async function handleCodexResumeCallback(
     return;
   }
 
-  // Check if Codex session is already active
-  if (codexSession.isActive) {
-    await ctx.answerCallbackQuery({ text: "Codex session already active" });
-    return;
+  if (isAnyDriverRunning()) {
+    await stopActiveDriverQuery();
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
   // Resume the selected Codex session
@@ -586,33 +606,27 @@ async function handleCodexResumeCallback(
     console.debug("Failed to edit Codex resume message:", error);
   }
   await ctx.answerCallbackQuery({ text: "Codex session resumed!" });
+  session.activeDriver = "codex";
 
-  // Send a hidden recap prompt to Codex
-  const recapPrompt =
-    "Please write a very concise recap of where we are in this conversation, to refresh my memory. Max 2-3 sentences.";
+  // Check both local (has recentMessages) and live (has preview) — prefer local for richer context
+  const localSessions = codexSession.getSessionList();
+  const localMatch = localSessions.find((s) => s.session_id === sessionId);
+  const liveSessions = await codexSession.getSessionListLive();
+  const liveMatch = liveSessions.find((s) => s.session_id === sessionId);
+  // Also check the in-memory buffer directly (populated during this bot session)
+  const inMemoryMessages = codexSession.recentMessages.length > 0
+    ? codexSession.recentMessages
+    : undefined;
+  const recentPreview = formatRecentMessages(
+    inMemoryMessages || localMatch?.recentMessages || liveMatch?.recentMessages
+  );
+  const legacyPreview = formatSessionPreview(localMatch?.preview || liveMatch?.preview);
+  const displayPreview = recentPreview || legacyPreview;
 
-  const typing = startTypingIndicator(ctx);
-  session.typingController = typing;
-  const state = new StreamingState();
-  const statusCallback = createStatusCallback(ctx, state);
-
-  try {
-    // Ensure we're using Codex driver for Codex session recap
-    session.activeDriver = "codex";
-    await runMessageWithActiveDriver({
-      message: recapPrompt,
-      username,
-      userId,
-      chatId,
-      ctx,
-      statusCallback,
-    });
-  } catch (error) {
-    callbackLog.error({ err: error, sessionId, userId, chatId }, "Error getting Codex recap");
-    // Don't show error to user - session is still resumed, recap just failed
-  } finally {
-    typing.stop();
-    session.typingController = null;
+  if (displayPreview) {
+    await ctx.reply(`📝 **Last messages:**\n\n${displayPreview}`);
+  } else {
+    await ctx.reply("ℹ️ Codex session resumed. Send a message to continue.");
   }
 }
 

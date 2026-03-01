@@ -34,6 +34,7 @@ import {
 } from "./handlers/streaming";
 import { checkCommandSafety, isPathAllowed } from "./security";
 import type {
+  RecentMessage,
   SavedSession,
   SessionHistory,
   StatusCallback,
@@ -169,7 +170,28 @@ export class ClaudeSession {
   lastErrorTime: Date | null = null;
   lastUsage: TokenUsage | null = null;
   lastMessage: string | null = null;
+  lastAssistantMessage: string | null = null;
   conversationTitle: string | null = null;
+  recentMessages: RecentMessage[] = []; // Rolling buffer for resume preview
+
+  private static readonly MAX_RECENT_MESSAGES = 10; // Keep last 10 turns (5 exchanges)
+  private static readonly MAX_MESSAGE_TEXT = 500; // Truncate individual messages
+
+  /** Push a user or assistant message into the rolling buffer. */
+  pushRecentMessage(role: "user" | "assistant", text: string): void {
+    const truncated = text.length > ClaudeSession.MAX_MESSAGE_TEXT
+      ? text.slice(0, ClaudeSession.MAX_MESSAGE_TEXT - 3) + "..."
+      : text;
+    this.recentMessages.push({
+      role,
+      text: truncated,
+      timestamp: new Date().toISOString(),
+    });
+    // Keep only the last N
+    if (this.recentMessages.length > ClaudeSession.MAX_RECENT_MESSAGES) {
+      this.recentMessages = this.recentMessages.slice(-ClaudeSession.MAX_RECENT_MESSAGES);
+    }
+  }
 
   // Driver selection
   private _activeDriver: "claude" | "codex" = "claude";
@@ -378,6 +400,10 @@ export class ClaudeSession {
       )}]\n\n`;
       messageToSend = datePrefix + message;
     }
+
+    // Store latest user message for session previews.
+    this.lastMessage = message;
+    this.pushRecentMessage("user", message);
 
     // Build SDK V1 options - supports all features
     const options: Options = {
@@ -777,6 +803,10 @@ export class ClaudeSession {
 
     await statusCallback("done", "");
 
+    this.lastAssistantMessage = responseText || null;
+    if (responseText) {
+      this.pushRecentMessage("assistant", responseText);
+    }
     return responseText || "No response from Claude.";
   }
 
@@ -787,6 +817,7 @@ export class ClaudeSession {
     this.sessionId = null;
     this.lastActivity = null;
     this.conversationTitle = null;
+    this.recentMessages = [];
     claudeLog.info("Session cleared");
   }
 
@@ -801,12 +832,25 @@ export class ClaudeSession {
       // Load existing session history
       const history = this.loadSessionHistory();
 
+      const previewParts: string[] = [];
+      if (this.lastMessage) {
+        previewParts.push(`You: ${this.lastMessage}`);
+      }
+      if (this.lastAssistantMessage) {
+        previewParts.push(`Assistant: ${this.lastAssistantMessage}`);
+      }
+      const previewRaw = previewParts.join("\n");
+      const preview =
+        previewRaw.length > 280 ? `${previewRaw.slice(0, 277)}...` : previewRaw;
+
       // Create new session entry
       const newSession: SavedSession = {
         session_id: this.sessionId,
         saved_at: new Date().toISOString(),
         working_dir: WORKING_DIR,
         title: this.conversationTitle || "Untitled session",
+        ...(preview ? { preview } : {}),
+        ...(this.recentMessages.length > 0 ? { recentMessages: this.recentMessages } : {}),
       };
 
       // Remove any existing entry with same session_id (update in place)
@@ -880,6 +924,7 @@ export class ClaudeSession {
     this.sessionId = sessionData.session_id;
     this.conversationTitle = sessionData.title;
     this.lastActivity = new Date();
+    this.recentMessages = sessionData.recentMessages || [];
 
     claudeLog.info(
       `Resumed session ${sessionData.session_id.slice(0, 8)}... - "${sessionData.title}"`

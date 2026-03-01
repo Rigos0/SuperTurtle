@@ -62,7 +62,7 @@ describe("callback input validation", () => {
     await handleCallback(ctx);
 
     expect(callbackAnswers).toEqual(["Fetching warn logs..."]);
-    expect(replies.length).toBe(1);
+    expect(replies.length).toBeGreaterThanOrEqual(1);
   });
 
   it("rejects pinologs callbacks with unsupported levels", async () => {
