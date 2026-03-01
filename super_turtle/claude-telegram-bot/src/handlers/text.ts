@@ -22,7 +22,7 @@ import {
   createStatusCallback,
   isAskUserPromptMessage,
 } from "./streaming";
-import { streamLog } from "../logger";
+import { eventLog, streamLog } from "../logger";
 
 export interface HandleTextOptions {
   silent?: boolean;
@@ -93,6 +93,13 @@ export async function handleText(
     }
     return;
   }
+  eventLog.info({
+    event: "user.message.text",
+    userId,
+    username,
+    chatId,
+    messageLength: message.length,
+  });
 
   // 1.5. Bare "stop" — intercept and abort (acts like /stop)
   if (isStopIntent(message)) {

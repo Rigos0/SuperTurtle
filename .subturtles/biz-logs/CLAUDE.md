@@ -1,5 +1,5 @@
 ## Current Task
-Add `eventLog` import and `user.message.text` business event log in `src/handlers/text.ts`.
+Add `eventLog` import and `user.message.voice` business event log in `src/handlers/voice.ts`.
 
 ## End Goal with Specs
 The bot's structured logs (at `/tmp/claude-telegram-bot.log.jsonl`) should tell the **story** of what's happening — not just technical plumbing. Every significant user-facing or system event should emit a structured Pino log line using the `eventLog` child logger (already created in `src/logger.ts`, module: "events").
@@ -27,8 +27,8 @@ The bot's structured logs (at `/tmp/claude-telegram-bot.log.jsonl`) should tell 
 
 ## Backlog
 - [x] Read existing logging in all target files to understand current state
-- [ ] Add eventLog import + user.message.text log to text.ts <- current
-- [ ] Add eventLog import + user.message.voice log to voice.ts
+- [x] Add eventLog import + user.message.text log to text.ts
+- [ ] Add eventLog import + user.message.voice log to voice.ts <- current
 - [ ] Add eventLog import + user.message.photo log to photo.ts
 - [ ] Add eventLog import + agent.response.start/complete/error logs to driver-routing.ts
 - [ ] Add eventLog import + cron.job.fired log to index.ts cron timer
