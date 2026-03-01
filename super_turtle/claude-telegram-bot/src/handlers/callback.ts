@@ -279,7 +279,13 @@ export async function handleCallback(ctx: Context): Promise<void> {
     return;
   }
 
-  // 7. Handle resume callbacks: resume:{session_id}
+  // 7. Handle current-session resume callback.
+  if (callbackData === "resume_current") {
+    await handleResumeCurrentCallback(ctx);
+    return;
+  }
+
+  // 7a. Handle resume callbacks: resume:{session_id}
   if (callbackData.startsWith("resume:")) {
     await handleResumeCallback(ctx, callbackData);
     return;
@@ -504,6 +510,59 @@ async function handleSubturtleStopCallback(
   } catch (error) {
     callbackLog.error({ err: error, name, chatId: ctx.chat?.id }, "Failed to stop SubTurtle");
     await ctx.answerCallbackQuery({ text: "Failed to stop SubTurtle" });
+  }
+}
+
+/**
+ * Handle resume current session callback (resume_current).
+ */
+async function handleResumeCurrentCallback(ctx: Context): Promise<void> {
+  if (session.activeDriver === "codex") {
+    if (!CODEX_AVAILABLE) {
+      await ctx.answerCallbackQuery({ text: codexUnavailableCallbackText(), show_alert: true });
+      return;
+    }
+
+    const currentThreadId = codexSession.getThreadId();
+    if (!currentThreadId) {
+      await ctx.answerCallbackQuery({ text: "No active Codex session", show_alert: true });
+      return;
+    }
+
+    try {
+      await ctx.editMessageText("✅ Continuing current Codex session.");
+    } catch (error) {
+      console.debug("Failed to edit resume_current message:", error);
+    }
+    await ctx.answerCallbackQuery({ text: "Continuing current Codex session" });
+
+    const recentPreview = formatRecentMessages(codexSession.recentMessages);
+    if (recentPreview) {
+      await ctx.reply(`📝 **Last messages:**\n\n${recentPreview}`);
+    } else {
+      await ctx.reply("ℹ️ Current Codex session is already linked. Send a message to continue.");
+    }
+    return;
+  }
+
+  const currentSessionId = session.sessionId;
+  if (!currentSessionId) {
+    await ctx.answerCallbackQuery({ text: "No active Claude session", show_alert: true });
+    return;
+  }
+
+  try {
+    await ctx.editMessageText("✅ Continuing current Claude session.");
+  } catch (error) {
+    console.debug("Failed to edit resume_current message:", error);
+  }
+  await ctx.answerCallbackQuery({ text: "Continuing current Claude session" });
+
+  const recentPreview = formatRecentMessages(session.recentMessages);
+  if (recentPreview) {
+    await ctx.reply(`📝 **Last messages:**\n\n${recentPreview}`);
+  } else {
+    await ctx.reply("ℹ️ Current Claude session is already linked. Send a message to continue.");
   }
 }
 

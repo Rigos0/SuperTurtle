@@ -17,14 +17,17 @@ These commands are currently wired with `bot.command(...)` in `index.ts`.
 |---------|---------|-------------|
 | `/new` | none | Resets both drivers (stopping active work), starts a fresh session overview |
 | `/status` | none | Shows the same overview as `/new` without resetting sessions |
-| `/looplogs` | none | Sends the last 50 lines from `/tmp/claude-telegram-bot-ts.log` |
+| `/looplogs` | none | Sends the last 50 lines from the raw run-loop log (`/tmp/claude-telegram-bot-ts.log`) |
+| `/pinologs` | none | Shows log-level buttons (Info/Warning/Errors) for filtered Pino logs (`/tmp/claude-telegram-bot.log.jsonl`) |
 | `/usage` | none | Shows unified Claude + Codex quota/usage (when available) |
 | `/context` | none | Shows Claude context usage for the active Claude session |
 | `/model` | none | Opens model/effort picker for the active driver |
 | `/switch` | none | Switches active driver (`claude` or `codex`) |
-| `/resume` | none | Shows up to 20 saved sessions and lets you resume one |
+| `/resume` | none | Unified picker across Claude + Codex sessions, with a `Continue current` button and compact driver-tagged entries |
 | `/sub` | `/subs`, `/subturtle`, `/subturtles`, `/turtle`, `/turtles` | Shows SubTurtle status with task/backlog summary and state/stop buttons |
 | `/cron` | none | Lists scheduled jobs with cancel buttons |
+| `/debug` | none | Shows internal diagnostics (driver/session/queue/background status) |
+| `/restart` | none | Restarts the bot process via restart marker + exit |
 
 ## Stop Intents (Command-Like)
 
@@ -38,16 +41,9 @@ These are handled as stop intents in text handling (not via `bot.command(...)` r
 
 When matched, the bot stops active driver work and attempts to stop running SubTurtles.
 
-## Implemented in `commands.ts` But Not Registered as Slash Commands
-
-The following handlers exist in `handlers/commands.ts` but are not currently wired in `index.ts` via `bot.command(...)`:
-
-| Command | Status | Behavior |
-|---------|--------|----------|
-| `/debug` | Implemented handler, not slash-registered | Builds an internal diagnostics snapshot (driver/session/background queue/deferred queue/log error summary) |
-| `/restart` | Implemented handler, not slash-registered | Writes restart marker info and exits so the process can be relaunched |
-
 ## Notes
 
 - `/cron` does **not** currently have a `/jobs` slash alias in source.
+- Use `/looplogs` for raw launcher/runtime output (`live.sh` + `run-loop.sh`, stdout/stderr).
+- Use `/pinologs` for structured app logs when you need level/module filtering.
 - Programmatic control-plane operations (usage/model/driver/session/restart) are documented in [MCP Tools](/docs/bot/mcp-tools) under `bot_control`.

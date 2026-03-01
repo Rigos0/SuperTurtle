@@ -103,10 +103,12 @@ Then send `/setcommands` to BotFather and paste this:
 ```
 start - Show status and user ID
 new - Start a fresh session
-resume - Pick from recent sessions to resume
+resume - Resume Claude/Codex session
 context - Show context usage
 stop - Interrupt current query
 status - Check what Claude is doing
+looplogs - Raw run-loop logs
+pinologs - Filtered app logs
 sub - SubTurtles
 ```
 
@@ -187,11 +189,12 @@ The bot includes a built-in `ask_user` MCP server that lets Claude present optio
 | ---------- | --------------------------------- |
 | `/start`   | Show status and your user ID      |
 | `/new`     | Start a fresh session             |
-| `/resume`  | Pick from last 5 sessions to resume (with recap) |
+| `/resume`  | Unified Claude+Codex session picker (+ continue current) |
 | `/context` | Show Claude context usage         |
 | `/stop`    | Interrupt current query (plain `stop`/`pause`/`abort` also work) |
 | `/status`  | Check what Claude is doing        |
-| `/looplogs`| Show last 50 lines of main run-loop log |
+| `/looplogs`| Show last 50 lines of raw main run-loop log |
+| `/pinologs`| Show filtered Pino app logs (Info/Warning/Errors) |
 | `/restart` | Restart the bot                   |
 
 ## Running as a Service (macOS)
