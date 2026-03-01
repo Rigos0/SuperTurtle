@@ -6,7 +6,7 @@ import Animation from "../animations/Animation";
 import Loading from "../../assets/images/loading-dots.json";
 import { mockPosts } from "../../mock/posts";
 
-const Posts = () => {
+const Posts = ({ onNavigateProfile }) => {
   const classes = Style();
 
   return (
@@ -24,6 +24,7 @@ const Posts = () => {
               description={post.data.description}
               fileType={post.data.fileType}
               fileData={post.data.fileData}
+              onNavigateProfile={onNavigateProfile}
             />
           ))}
         </FlipMove>

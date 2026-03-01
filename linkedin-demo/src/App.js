@@ -5,6 +5,7 @@ import { ThemeProvider, createMuiTheme } from "@material-ui/core";
 import Header from "./components/header/Header";
 import Form from "./components/form/Form";
 import Posts from "./components/posts/Posts";
+import Profile from "./components/profile/Profile";
 import Sidebar from "./components/sidebar/Sidebar";
 import Widgets from "./components/widgets/Widgets";
 import { LoginAction } from "./store/actions/auth";
@@ -17,6 +18,7 @@ const App = () => {
   const dispatch = useDispatch();
   const mode = useSelector((state) => state.util);
   const [activeTab, setActiveTab] = useState("home");
+  const [view, setView] = useState("feed");
 
   const muiTheme = createMuiTheme({
     palette: {
@@ -36,6 +38,8 @@ const App = () => {
     jobs: "Jobs",
   }[activeTab] || "This section";
 
+  const onNavigateProfile = () => setView("profile");
+
   return (
     <ThemeProvider theme={muiTheme}>
       <Grid
@@ -52,7 +56,11 @@ const App = () => {
           }}
         >
           {/* Header */}
-          <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+          <Header
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            onNavigateProfile={onNavigateProfile}
+          />
         </Grid>
         <Grid item container className={classes.app__body}>
           <Hidden smDown>
@@ -62,14 +70,16 @@ const App = () => {
             </Grid>
           </Hidden>
           <Grid item className={classes.body__feed} xs={12} sm={8} md={5}>
-            {activeTab === "home" ? (
+            {view === "profile" ? (
+              <Profile onBack={() => setView("feed")} />
+            ) : activeTab === "home" ? (
               <>
                 {/* Feed */}
                 <Grid item className={classes.feed__form}>
                   <Form />
                 </Grid>
                 <Grid item className={classes.feed__posts}>
-                  <Posts />
+                  <Posts onNavigateProfile={onNavigateProfile} />
                 </Grid>
               </>
             ) : (

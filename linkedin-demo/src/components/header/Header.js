@@ -14,7 +14,7 @@ import AppsIcon from "@material-ui/icons/Apps";
 import MenuItem from "./menuItem/MenuItem";
 import Style from "./Style";
 
-const Header = ({ activeTab, setActiveTab }) => {
+const Header = ({ activeTab, setActiveTab, onNavigateProfile }) => {
   const classes = Style();
   const dispatch = useDispatch();
   const mode = useSelector((state) => state.util);
@@ -58,7 +58,11 @@ const Header = ({ activeTab, setActiveTab }) => {
             <SearchIcon />
             <input placeholder="Search" />
           </div>
-          <Avatar src={photoURL} />
+          <Avatar
+            src={photoURL}
+            onClick={onNavigateProfile}
+            style={{ cursor: "pointer" }}
+          />
         </div>
         <div className={classes.header__nav}>
           {items.map(({ Icon, title, arrow, onClick }, i) => (
