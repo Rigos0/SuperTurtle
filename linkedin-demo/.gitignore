@@ -28,4 +28,5 @@ yarn-error.log*
 .env
 .eslintcache
 
-.vercel
+.vercel/*
+!.vercel/project.json

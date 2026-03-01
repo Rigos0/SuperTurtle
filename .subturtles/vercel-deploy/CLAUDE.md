@@ -1,5 +1,5 @@
 ## Current Task
-Commit any Vercel config files (`.vercel/project.json` etc) with message "Add Vercel deployment config for Bíbr In".
+All backlog items complete. Finalize loop control state.
 
 ## End Goal with Specs
 - App deployed to Vercel with a public URL
@@ -12,7 +12,7 @@ Commit any Vercel config files (`.vercel/project.json` etc) with message "Add Ve
 - [x] Set environment variable on Vercel: `vercel env add REACT_APP_CONVEX_URL production` with value `https://tough-mosquito-145.convex.cloud` — if interactive prompts fail, use `echo "https://tough-mosquito-145.convex.cloud" | vercel env add REACT_APP_CONVEX_URL production`
 - [x] Deploy to production: `vercel deploy --prod --yes` from the `linkedin-demo/` directory. The build command is `npm run build` and the output directory is `build`
 - [x] Verify the deployment URL loads and returns HTTP 200
-- [ ] Commit any Vercel config files (`.vercel/project.json` etc) with message "Add Vercel deployment config for Bíbr In" <- current
+- [x] Commit any Vercel config files (`.vercel/project.json` etc) with message "Add Vercel deployment config for Bíbr In"
 
 ## Notes
 - Working directory for ALL commands: `/Users/Richard.Mladek/Documents/projects/agentic/linkedin-demo`
@@ -23,3 +23,6 @@ Commit any Vercel config files (`.vercel/project.json` etc) with message "Add Ve
 - Do NOT include `.env.local` in the deployment (it contains the dev deployment key)
 - The Convex cloud URL for production is: `https://tough-mosquito-145.convex.cloud`
 - Verified `https://linkedin-demo.vercel.app/` returns HTTP 200 on 2026-03-01
+
+## Loop Control
+STOP
