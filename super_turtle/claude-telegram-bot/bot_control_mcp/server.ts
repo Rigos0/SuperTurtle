@@ -21,6 +21,8 @@ import { mcpLog } from "../src/logger";
 
 const POLL_INTERVAL_MS = 100;
 const POLL_TIMEOUT_MS = 10_000;
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 500;
 
 const VALID_ACTIONS = [
   "usage",
@@ -33,6 +35,17 @@ const VALID_ACTIONS = [
 ] as const;
 
 type Action = (typeof VALID_ACTIONS)[number];
+const VALID_LEVELS = [
+  "trace",
+  "debug",
+  "info",
+  "warn",
+  "error",
+  "fatal",
+  "all",
+] as const;
+
+type Level = (typeof VALID_LEVELS)[number];
 const botControlLog = mcpLog.child({ tool: "bot_control", server: "bot-control" });
 
 // Create the MCP server
@@ -102,6 +115,39 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
         },
         required: ["question", "options"],
+      },
+    },
+    {
+      name: "pino_logs",
+      description: [
+        "Fetch recent Pino logs from the Telegram bot.",
+        "Use 'levels' for exact levels (e.g., [\"error\",\"warn\"]).",
+        "Use 'level' for minimum severity (e.g., \"info\" includes warn/error).",
+      ].join("\n"),
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          level: {
+            type: "string",
+            enum: VALID_LEVELS as unknown as string[],
+            description: "Minimum severity (default: error).",
+          },
+          levels: {
+            type: "array",
+            items: { type: "string", enum: VALID_LEVELS as unknown as string[] },
+            description: "Exact levels to include (overrides level).",
+          },
+          limit: {
+            type: "integer",
+            description: "Max number of log entries to return (default: 50).",
+            minimum: 1,
+            maximum: MAX_LIMIT,
+          },
+          module: {
+            type: "string",
+            description: "Optional module filter (e.g., claude, streaming, bot).",
+          },
+        },
       },
     },
   ],
@@ -183,6 +229,53 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           text: "[Buttons sent to user. STOP HERE - do not output any more text. Wait for user to tap a button.]",
         },
       ],
+    };
+  }
+
+  if (request.params.name === "pino_logs") {
+    const args = request.params.arguments as {
+      level?: string;
+      levels?: string[];
+      limit?: number;
+      module?: string;
+    };
+
+    const level = (args.level || "error") as Level;
+    const levels =
+      args.levels?.filter((item) => VALID_LEVELS.includes(item as Level)) || [];
+    const limit = Math.max(
+      1,
+      Math.min(Number(args.limit || DEFAULT_LIMIT), MAX_LIMIT),
+    );
+    const moduleFilter = args.module ? String(args.module) : undefined;
+
+    if (!VALID_LEVELS.includes(level)) {
+      throw new Error(
+        `Invalid level: ${level}. Valid: ${VALID_LEVELS.join(", ")}`,
+      );
+    }
+
+    const requestUuid = crypto.randomUUID().slice(0, 8);
+    const chatId = process.env.TELEGRAM_CHAT_ID || "";
+
+    const requestData = {
+      request_id: requestUuid,
+      level,
+      levels,
+      limit,
+      module: moduleFilter,
+      status: "pending",
+      chat_id: chatId,
+      created_at: new Date().toISOString(),
+    };
+
+    const requestFile = `/tmp/pino-logs-${requestUuid}.json`;
+    await Bun.write(requestFile, JSON.stringify(requestData, null, 2));
+
+    const result = await pollForResult(requestFile);
+
+    return {
+      content: [{ type: "text" as const, text: result }],
     };
   }
 
