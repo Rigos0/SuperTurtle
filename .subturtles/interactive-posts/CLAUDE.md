@@ -1,5 +1,5 @@
 ## Current Task
-Push functions to Convex: `cd linkedin-demo && npx convex dev --once`
+All interactive-posts backlog items are complete.
 
 ## End Goal with Specs
 - Like button calls `toggleLike` mutation with current user ID, shows filled/unfilled state
@@ -17,7 +17,7 @@ Push functions to Convex: `cd linkedin-demo && npx convex dev --once`
 - [x] Add expandable comment section below the footer actions in `Post.js`. Add a `showComments` boolean state (default false). Clicking "Comment" action toggles `showComments`. When open: query `useQuery(api.comments.listComments, { postId })`. Render each comment as: Avatar (author.photoURL) + author.displayName + comment body + ReactTimeago timestamp. Add a comment input form at bottom: text input + Send button. On submit: call `addComment({ postId, authorId: user._id, body: commentText })`. Display real `commentsCount` prop (not random).
 - [x] Add delete button for own posts. In `Post.js`, accept `authorId` prop (passed from Posts.js as `post.authorId`). Compare `authorId === user?._id`. If match, show a Delete option in the three-dot menu (replace the static `MoreHorizOutlinedIcon` with a clickable menu). On delete click: call `deletePost({ postId })`. Import `deletePost` mutation.
 - [x] Update `Posts.js` to pass new props: `postId={post._id}`, `likesCount={post.likesCount}`, `commentsCount={post.commentsCount}`, `authorId={post.authorId}`.
-- [ ] Push functions to Convex: `cd linkedin-demo && npx convex dev --once` <- current
+- [x] Push functions to Convex: `cd linkedin-demo && npx convex dev --once`
 - [x] Build: `cd linkedin-demo && npm run build`
 - [x] Commit with message "Wire interactive posts: likes, comments, delete with auth user"
 
@@ -31,3 +31,6 @@ Push functions to Convex: `cd linkedin-demo && npx convex dev --once`
 - Post.js is a `forwardRef` component used by FlipMove — keep the forwardRef wrapper
 - Import solid thumb icon: `import ThumbUpAltIcon from "@material-ui/icons/ThumbUpAlt"`
 - Green accent color: #2e7d32
+
+## Loop Control
+STOP
