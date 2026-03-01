@@ -63,7 +63,8 @@ describe("ClaudeSession stall timeout", () => {
 
       expect(response).toBe("Normal response");
       expect(capturedSignal).not.toBeNull();
-      expect(capturedSignal?.aborted).toBe(false);
+      const signalState = capturedSignal as unknown as { aborted?: boolean } | null;
+      expect(signalState?.aborted ?? false).toBe(false);
       expect(warnings.some((entry) => entry.includes("Event stream stalled"))).toBe(false);
       expect(statuses.some((entry) => entry.type === "segment_end")).toBe(true);
       expect(statuses.some((entry) => entry.type === "done")).toBe(true);

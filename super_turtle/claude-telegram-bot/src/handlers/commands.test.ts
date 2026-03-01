@@ -470,7 +470,7 @@ describe("handlers with mock Context", () => {
     }) as typeof codexSession.kill;
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => new Response("{}", { status: 404 })) as typeof fetch;
+    globalThis.fetch = (async () => new Response("{}", { status: 404 })) as unknown as typeof fetch;
     const restoreSpawnSync = mockClaudeCredentialLookupFailure();
 
     const { ctx, replies } = mockContext("/new");
@@ -509,7 +509,7 @@ describe("handlers with mock Context", () => {
     }) as typeof codexSession.kill;
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => new Response("{}", { status: 404 })) as typeof fetch;
+    globalThis.fetch = (async () => new Response("{}", { status: 404 })) as unknown as typeof fetch;
     const restoreSpawnSync = mockClaudeCredentialLookupFailure();
 
     const { ctx, replies } = mockContext("/status");

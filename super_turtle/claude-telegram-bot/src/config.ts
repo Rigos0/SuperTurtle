@@ -115,6 +115,10 @@ export const META_CODEX_NETWORK_ACCESS = parseMetaCodexNetworkAccess(
   process.env.META_CODEX_NETWORK_ACCESS
 );
 
+const IS_TEST_ENV =
+  (process.env.NODE_ENV || "").toLowerCase() === "test" ||
+  typeof process.env.BUN_TEST !== "undefined";
+
 // ============== Claude CLI Path ==============
 
 function resolveClaudeCliPath(): string | null {
@@ -354,16 +358,18 @@ await Bun.write(`${TEMP_DIR}/.keep`, "");
 
 // ============== Validation ==============
 
-if (!TELEGRAM_TOKEN) {
-  configLog.error("ERROR: TELEGRAM_BOT_TOKEN environment variable is required");
-  process.exit(1);
-}
+if (!IS_TEST_ENV) {
+  if (!TELEGRAM_TOKEN) {
+    configLog.error("ERROR: TELEGRAM_BOT_TOKEN environment variable is required");
+    process.exit(1);
+  }
 
-if (ALLOWED_USERS.length === 0) {
-  configLog.error(
-    "ERROR: TELEGRAM_ALLOWED_USERS environment variable is required"
-  );
-  process.exit(1);
+  if (ALLOWED_USERS.length === 0) {
+    configLog.error(
+      "ERROR: TELEGRAM_ALLOWED_USERS environment variable is required"
+    );
+    process.exit(1);
+  }
 }
 
 configLog.info(

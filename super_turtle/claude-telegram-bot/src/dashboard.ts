@@ -12,7 +12,7 @@ type DashboardState = {
   turtles: TurtleView[];
   cronJobs: Array<{
     id: string;
-    type: "one-time" | "recurring";
+    type: "one-shot" | "recurring";
     promptPreview: string;
     fireInMs: number;
     chatId: number;
