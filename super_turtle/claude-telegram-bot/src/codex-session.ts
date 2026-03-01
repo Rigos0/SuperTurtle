@@ -218,7 +218,7 @@ async function hasExistingMcpConfig(): Promise<boolean> {
 
     const content = await file.text();
     // Check for any of our MCP server names in the config
-    const ourServers = ["send-turtle", "bot-control", "ask-user", "pino-logs"];
+    const ourServers = ["send-turtle", "bot-control"];
     const hasOurServers = ourServers.some((server) => content.includes(server));
     if (!hasOurServers) return false;
     // If config uses bare "bun" commands, prefer programmatic config with absolute path.
