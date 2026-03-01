@@ -1,5 +1,5 @@
 ## Current Task
-Run `bun test` in `super_turtle/claude-telegram-bot/` — fix ALL failures before proceeding.
+Delete `ask_user_mcp/` directory: `rm -rf super_turtle/claude-telegram-bot/ask_user_mcp/`
 
 ## End Goal with Specs
 - `bot-control` MCP server exposes ALL tools from `bot_control`, `pino_logs`, and `ask_user` in a single server process
@@ -23,8 +23,8 @@ Run `bun test` in `super_turtle/claude-telegram-bot/` — fix ALL failures befor
 - [x] Update `src/drivers/claude-driver.ts`: check if it references old server names and update if needed.
 - [x] Search codebase for any remaining references to `"ask-user"` or `"pino-logs"` as MCP server names (grep for them) and update.
 - [x] Update `src/mcp-transport.test.ts`: the `MCP_SERVERS` array lists all 4 servers for stdout purity tests. Remove `ask-user` and `pino-logs` entries (they no longer exist as separate servers).
-- [ ] Run `bun test` in `super_turtle/claude-telegram-bot/` — fix ALL failures before proceeding. <- current
-- [ ] Delete `ask_user_mcp/` directory: `rm -rf super_turtle/claude-telegram-bot/ask_user_mcp/`
+- [x] Run `bun test` in `super_turtle/claude-telegram-bot/` — fix ALL failures before proceeding.
+- [ ] Delete `ask_user_mcp/` directory: `rm -rf super_turtle/claude-telegram-bot/ask_user_mcp/` <- current
 - [ ] Delete `pino_logs_mcp/` directory: `rm -rf super_turtle/claude-telegram-bot/pino_logs_mcp/`
 - [ ] Run `bun test` again to confirm nothing broke from the deletions.
 - [ ] Commit everything with message: `refactor(mcp): consolidate ask-user and pino-logs into bot-control server`
