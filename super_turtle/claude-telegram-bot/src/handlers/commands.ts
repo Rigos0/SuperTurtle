@@ -2,7 +2,7 @@
  * Command handlers for Claude Telegram Bot.
  */
 
-import type { Context } from "grammy";
+import { InlineKeyboard, type Context } from "grammy";
 import { session, getAvailableModels, EFFORT_DISPLAY, type EffortLevel } from "../session";
 import { codexSession } from "../codex-session";
 import {
@@ -410,6 +410,25 @@ export async function handleLooplogs(ctx: Context): Promise<void> {
   for (const chunk of chunkText(result.text)) {
     await ctx.reply(chunk);
   }
+}
+
+/**
+ * /pinologs - Show inline options for selecting Pino log level.
+ */
+export async function handlePinologs(ctx: Context): Promise<void> {
+  const userId = ctx.from?.id;
+
+  if (!isAuthorized(userId, ALLOWED_USERS)) {
+    await ctx.reply("Unauthorized.");
+    return;
+  }
+
+  const keyboard = new InlineKeyboard()
+    .text("Info", "pinologs:info")
+    .text("Warning", "pinologs:warn")
+    .text("Errors", "pinologs:error");
+
+  await ctx.reply("Select log level:", { reply_markup: keyboard });
 }
 
 /**
