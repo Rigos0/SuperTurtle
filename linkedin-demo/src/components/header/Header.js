@@ -1,7 +1,8 @@
 import { useSelector, useDispatch } from "react-redux";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useQuery } from "convex/react";
 import { ChangeTheme } from "../../store/actions/util";
-import { Paper, Avatar, Button } from "@material-ui/core";
+import { Paper, Avatar, Badge, Button } from "@material-ui/core";
 import SearchIcon from "@material-ui/icons/Search";
 import HomeIcon from "@material-ui/icons/Home";
 import GroupIcon from "@material-ui/icons/Group";
@@ -12,6 +13,7 @@ import Brightness4Icon from "@material-ui/icons/Brightness4";
 import BrightnessHighIcon from "@material-ui/icons/BrightnessHigh";
 import AddBoxIcon from "@material-ui/icons/AddBox";
 import AppsIcon from "@material-ui/icons/Apps";
+import { api } from "../../convex/_generated/api";
 import useConvexUser from "../../hooks/useConvexUser";
 import MenuItem from "./menuItem/MenuItem";
 import Style from "./Style";
@@ -24,6 +26,10 @@ const Header = ({ activeTab, setActiveTab, onNavigateProfile }) => {
   const signOut = authActions?.signOut ?? (() => Promise.resolve());
   const user = useConvexUser();
   const photoURL = user?.photoURL;
+  const unreadCount = useQuery(
+    api.notifications.getUnreadCount,
+    user?._id ? { userId: user._id } : "skip"
+  );
 
   const items = [
     { Icon: <HomeIcon />, title: "Home", arrow: false, onClick: () => setActiveTab("home") },
@@ -31,7 +37,16 @@ const Header = ({ activeTab, setActiveTab, onNavigateProfile }) => {
     { Icon: <WorkIcon />, title: "Jobs", arrow: false, onClick: () => setActiveTab("jobs") },
     { Icon: <TelegramIcon />, title: "Messaging", arrow: false, onClick: () => setActiveTab("messaging") },
     {
-      Icon: <NotificationsIcon />,
+      Icon: (
+        <Badge
+          color="primary"
+          badgeContent={unreadCount ?? 0}
+          invisible={!unreadCount}
+          anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        >
+          <NotificationsIcon />
+        </Badge>
+      ),
       title: "Notifications",
       arrow: false,
       onClick: () => setActiveTab("notifications"),

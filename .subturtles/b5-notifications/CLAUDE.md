@@ -1,5 +1,5 @@
 ## Current Task
-Add unread badge to notifications icon in `Header.js`.
+Commit: "Add notifications: like/comment alerts, bell badge, notifications tab"
 
 ## End Goal with Specs
 - `notifications` table in Convex schema: userId (recipient), type ("like"|"comment"|"message"), fromUserId, postId (optional), conversationId (optional), read (boolean), createdAt
@@ -23,10 +23,10 @@ Add unread badge to notifications icon in `Header.js`.
 - [x] Create `linkedin-demo/src/components/notifications/Notifications.js`: Import useQuery, useMutation from convex/react, api, useConvexUser. Query listNotifications({userId: user._id}). Render a list: each notification shows Avatar(fromUser.photoURL) + message text ("X liked your post" / "X commented on your post" / "X sent you a message") + ReactTimeago timestamp. Unread items have a green left border (#2e7d32). Clicking marks as read. "Mark all as read" button at top.
 - [x] Create `linkedin-demo/src/components/notifications/Style.js`: makeStyles for notification list items, unread indicator (green left border), read state (no border), mark-all button.
 - [x] Wire in App.js: When `activeTab === "notifications"`, render `<Notifications />` instead of "Coming soon". Import Notifications component.
-- [ ] Add unread badge to header: In `linkedin-demo/src/components/header/Header.js`, query `api.notifications.getUnreadCount({userId: user?._id})`. Show a Badge component (from @material-ui/core) around the NotificationsIcon with the unread count. Import Badge. <- current
+- [x] Add unread badge to header: In `linkedin-demo/src/components/header/Header.js`, query `api.notifications.getUnreadCount({userId: user?._id})`. Show a Badge component (from @material-ui/core) around the NotificationsIcon with the unread count. Import Badge.
 - [x] Push: `cd linkedin-demo && npx convex dev --once`
 - [x] Build: `cd linkedin-demo && npm run build`
-- [ ] Commit: "Add notifications: like/comment alerts, bell badge, notifications tab"
+- [ ] Commit: "Add notifications: like/comment alerts, bell badge, notifications tab" <- current
 
 ## Notes
 - All paths from repo root: `/Users/Richard.Mladek/Documents/projects/agentic/`
