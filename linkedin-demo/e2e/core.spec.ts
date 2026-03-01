@@ -291,4 +291,21 @@ test.describe("Feed", () => {
 
     await deletePostIfPresent(page, editedText);
   });
+
+  test("Tab navigation", async ({ page }) => {
+    await waitForFeedPosts(page);
+
+    await page.getByText("My Network", { exact: true }).first().click();
+    await expect(page.getByPlaceholder("Search your network")).toBeVisible();
+
+    await page.getByText("Messaging", { exact: true }).first().click();
+    await expect(page.getByRole("heading", { name: "Messaging", exact: true })).toBeVisible();
+
+    await page.getByText("Notifications", { exact: true }).first().click();
+    await expect(page.getByRole("heading", { name: "Notifications", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Mark all as read" })).toBeVisible();
+
+    await page.getByText("Home", { exact: true }).first().click();
+    await expect(page.getByPlaceholder("Start a post")).toBeVisible();
+  });
 });
