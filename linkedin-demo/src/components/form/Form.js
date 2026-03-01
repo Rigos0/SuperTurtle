@@ -79,6 +79,12 @@ const Form = () => {
         ...(fileData ? { fileData } : {}),
       });
       resetState();
+      swal({
+        icon: "success",
+        title: "Post created!",
+        timer: 1500,
+        buttons: false,
+      });
     } catch (error) {
       console.error("Failed to create post:", error);
       swal("Post Failed", "Unable to publish your post right now.", "error");
