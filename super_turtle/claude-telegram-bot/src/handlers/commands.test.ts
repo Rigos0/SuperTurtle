@@ -24,11 +24,20 @@ const {
   handleStatus,
   handleCron,
   handleModel,
+  handlePinologs,
 } = await import("./commands");
 
 type ReplyRecord = {
   text: string;
   extra?: { parse_mode?: string; reply_markup?: unknown };
+};
+
+type SwitchCommandProbePayload = {
+  activeDriver: string;
+  replies: ReplyRecord[];
+  startNewThreadCalls: number;
+  sessionKillCalls: number;
+  codexKillCalls: number;
 };
 
 function mockContext(messageText: string): {
@@ -115,6 +124,7 @@ describe("getCommandLines", () => {
       "/context",
       "/status",
       "/looplogs",
+      "/pinologs",
       "/resume",
       "/sub",
       "/cron",
@@ -199,6 +209,146 @@ function runSwitchNoArgInIsolatedProcess(codexEnabled: boolean): ReplyRecord[] {
   expect(jsonEnd).toBeGreaterThanOrEqual(jsonStart);
   const jsonText = combinedOutput.slice(jsonStart, jsonEnd + 1);
   return JSON.parse(jsonText) as ReplyRecord[];
+}
+
+function runSwitchCommandProbeInIsolatedProcess(opts: {
+  command: string;
+  codexEnabled: boolean;
+  codexCliAvailable?: boolean;
+  forceStartThreadFailure?: boolean;
+}): SwitchCommandProbePayload {
+  const projectRoot = resolve(import.meta.dir, "../..");
+  const marker = "__SWITCH_COMMAND_PROBE__=";
+  const script = `
+    process.env.TELEGRAM_BOT_TOKEN = "test-token";
+    process.env.TELEGRAM_ALLOWED_USERS = "123";
+    process.env.CLAUDE_WORKING_DIR = process.cwd();
+    process.env.CODEX_ENABLED = ${JSON.stringify(opts.codexEnabled ? "true" : "false")};
+    process.env.CODEX_CLI_AVAILABLE_OVERRIDE = ${JSON.stringify(
+      opts.codexCliAvailable === undefined
+        ? (opts.codexEnabled ? "true" : "false")
+        : (opts.codexCliAvailable ? "true" : "false")
+    )};
+    console.log = () => {};
+    console.warn = () => {};
+    console.error = () => {};
+
+    const originalSpawnSync = Bun.spawnSync;
+    Bun.spawnSync = ((cmd, spawnOpts) => {
+      const parts = Array.isArray(cmd) ? cmd.map((part) => String(part)) : [String(cmd)];
+      if (parts[0] === "security" && parts[1] === "find-generic-password") {
+        return {
+          stdout: Buffer.from(""),
+          stderr: Buffer.from("mocked keychain miss"),
+          success: false,
+          exitCode: 1,
+        };
+      }
+      return originalSpawnSync(cmd, spawnOpts);
+    });
+
+    const originalSpawn = Bun.spawn;
+    Bun.spawn = ((cmd, spawnOpts) => {
+      const parts = Array.isArray(cmd) ? cmd.map((part) => String(part)) : [String(cmd)];
+      if (parts[0] === "codex" && parts[1] === "app-server") {
+        return { stdin: null };
+      }
+      return originalSpawn(cmd, spawnOpts);
+    });
+
+    const { handleSwitch } = await import("./src/handlers/commands.ts");
+    const { session } = await import("./src/session.ts");
+    const { codexSession } = await import("./src/codex-session.ts");
+
+    let startNewThreadCalls = 0;
+    let sessionKillCalls = 0;
+    let codexKillCalls = 0;
+    session.stopTyping = () => {};
+    session.kill = async () => {
+      sessionKillCalls += 1;
+    };
+    codexSession.kill = async () => {
+      codexKillCalls += 1;
+    };
+    codexSession.startNewThread = async () => {
+      startNewThreadCalls += 1;
+      if (${opts.forceStartThreadFailure ? "true" : "false"}) {
+        throw new Error("forced start failure for test");
+      }
+    };
+    session.activeDriver = "claude";
+
+    const replies = [];
+    const ctx = {
+      from: { id: 123 },
+      message: { text: ${JSON.stringify(opts.command)} },
+      reply: async (text, extra) => {
+        replies.push({ text: String(text), extra });
+      },
+    };
+
+    await handleSwitch(ctx);
+
+    process.stdout.write(
+      ${JSON.stringify(marker)} +
+        JSON.stringify({
+          activeDriver: session.activeDriver,
+          replies,
+          startNewThreadCalls,
+          sessionKillCalls,
+          codexKillCalls,
+        })
+    );
+  `;
+
+  const proc = Bun.spawnSync(["bun", "-e", script], { cwd: projectRoot });
+  expect(proc.exitCode).toBe(0);
+
+  const combinedOutput = `${proc.stdout.toString()}\n${proc.stderr.toString()}`;
+  const markerIndex = combinedOutput.indexOf(marker);
+  expect(markerIndex).toBeGreaterThanOrEqual(0);
+
+  const jsonStart = markerIndex + marker.length;
+  const tail = combinedOutput.slice(jsonStart);
+  const firstBrace = tail.indexOf("{");
+  expect(firstBrace).toBeGreaterThanOrEqual(0);
+
+  let depth = 0;
+  let inString = false;
+  let isEscaped = false;
+  let jsonEnd = -1;
+  for (let i = firstBrace; i < tail.length; i += 1) {
+    const ch = tail[i]!;
+    if (inString) {
+      if (isEscaped) {
+        isEscaped = false;
+      } else if (ch === "\\") {
+        isEscaped = true;
+      } else if (ch === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === "\"") {
+      inString = true;
+      continue;
+    }
+    if (ch === "{") {
+      depth += 1;
+      continue;
+    }
+    if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        jsonEnd = i;
+        break;
+      }
+    }
+  }
+
+  expect(jsonEnd).toBeGreaterThanOrEqual(firstBrace);
+  const jsonText = tail.slice(firstBrace, jsonEnd + 1);
+  return JSON.parse(jsonText) as SwitchCommandProbePayload;
 }
 
 describe("formatModelInfo", () => {
@@ -617,6 +767,24 @@ describe("handlers with mock Context", () => {
     expect(callbackData).toContain("effort:high");
   });
 
+  it("handlePinologs replies with inline keyboard level options", async () => {
+    const { ctx, replies } = mockContext("/pinologs");
+    await handlePinologs(ctx as any);
+
+    expect(replies).toHaveLength(1);
+    const reply = replies[0]!;
+    expect(reply.text).toBe("Select log level:");
+
+    const keyboard = getInlineKeyboard(reply);
+    expect(keyboard).toEqual([
+      [
+        { text: "Info", callback_data: "pinologs:info" },
+        { text: "Warning", callback_data: "pinologs:warn" },
+        { text: "Errors", callback_data: "pinologs:error" },
+      ],
+    ]);
+  });
+
   it("handleSwitch shows switch buttons when Codex is unavailable", () => {
     const replies = runSwitchNoArgInIsolatedProcess(false);
     expect(replies).toHaveLength(1);
@@ -641,5 +809,53 @@ describe("handlers with mock Context", () => {
     expect(callbackData).toContain("switch:claude");
     expect(callbackData).toContain("switch:codex");
     expect(callbackData).not.toContain("switch:codex_unavailable");
+  });
+
+  it("handleSwitch /switch codex returns unavailable message when Codex is disabled", () => {
+    const result = runSwitchCommandProbeInIsolatedProcess({
+      command: "/switch codex",
+      codexEnabled: false,
+      codexCliAvailable: false,
+    });
+
+    expect(result.activeDriver).toBe("claude");
+    expect(result.startNewThreadCalls).toBe(0);
+    expect(result.sessionKillCalls).toBe(0);
+    expect(result.codexKillCalls).toBe(0);
+    expect(result.replies).toHaveLength(1);
+    expect(result.replies[0]!.text).toContain("Codex is disabled in config");
+  });
+
+  it("handleSwitch /switch codex switches driver and resets sessions when Codex is available", () => {
+    const result = runSwitchCommandProbeInIsolatedProcess({
+      command: "/switch codex",
+      codexEnabled: true,
+      codexCliAvailable: true,
+    });
+
+    expect(result.activeDriver).toBe("codex");
+    expect(result.startNewThreadCalls).toBe(1);
+    expect(result.sessionKillCalls).toBe(1);
+    expect(result.codexKillCalls).toBe(1);
+    expect(result.replies).toHaveLength(1);
+    expect(result.replies[0]!.extra?.parse_mode).toBe("HTML");
+    expect(result.replies[0]!.text).toContain("Switched to Codex");
+  });
+
+  it("handleSwitch /switch codex reports failure when Codex thread start fails", () => {
+    const result = runSwitchCommandProbeInIsolatedProcess({
+      command: "/switch codex",
+      codexEnabled: true,
+      codexCliAvailable: true,
+      forceStartThreadFailure: true,
+    });
+
+    expect(result.activeDriver).toBe("claude");
+    expect(result.startNewThreadCalls).toBe(1);
+    expect(result.sessionKillCalls).toBe(1);
+    expect(result.codexKillCalls).toBe(1);
+    expect(result.replies).toHaveLength(1);
+    expect(result.replies[0]!.text).toContain("Failed to switch to Codex");
+    expect(result.replies[0]!.text).toContain("forced start failure for test");
   });
 });

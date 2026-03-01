@@ -560,15 +560,21 @@ async function executeBotControlAction(
       const sessionId = params.session_id;
       if (!sessionId) return "Missing session_id parameter.";
 
-      // Support both full ID and short prefix
-      const sessions = sessionObj.getSessionList();
+      const isCodexSession = "reasoningEffort" in sessionObj;
+      const sessions = isCodexSession
+        ? [
+          ...(await (sessionObj as CodexSession).getSessionListLive()),
+          ...sessionObj.getSessionList(),
+        ]
+        : sessionObj.getSessionList();
       const match = sessions.find(
         (s) => s.session_id === sessionId || s.session_id.startsWith(sessionId),
       );
       if (!match) return `No session found matching "${sessionId}".`;
 
-      const isCodexSession = "reasoningEffort" in sessionObj;
       let result: [success: boolean, message: string];
+
+      await sessionObj.stop();
 
       if (isCodexSession) {
         // Codex resumeSession is async
@@ -578,6 +584,7 @@ async function executeBotControlAction(
         result = (sessionObj as ClaudeSession).resumeSession(match.session_id);
       }
 
+      session.activeDriver = isCodexSession ? "codex" : "claude";
       const [success, message] = result;
       return success ? `Resumed: "${match.title}"` : `Failed: ${message}`;
     }

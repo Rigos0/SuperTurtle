@@ -21,6 +21,8 @@ import { mcpLog } from "../src/logger";
 
 const POLL_INTERVAL_MS = 100;
 const POLL_TIMEOUT_MS = 10_000;
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 500;
 
 const VALID_ACTIONS = [
   "usage",
@@ -33,6 +35,17 @@ const VALID_ACTIONS = [
 ] as const;
 
 type Action = (typeof VALID_ACTIONS)[number];
+const VALID_LEVELS = [
+  "trace",
+  "debug",
+  "info",
+  "warn",
+  "error",
+  "fatal",
+  "all",
+] as const;
+
+type Level = (typeof VALID_LEVELS)[number];
 const botControlLog = mcpLog.child({ tool: "bot_control", server: "bot-control" });
 
 // Create the MCP server
@@ -81,6 +94,62 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ["action"],
       },
     },
+    {
+      name: "ask_user",
+      description:
+        "Present options to the user as tappable inline buttons in Telegram. IMPORTANT: After calling this tool, STOP and wait. Do NOT add any text after calling this tool - the user will tap a button and their choice becomes their next message. Just call the tool and end your turn.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          question: {
+            type: "string",
+            description: "The question to ask the user",
+          },
+          options: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "List of options for the user to choose from (2-6 options recommended)",
+            minItems: 2,
+            maxItems: 10,
+          },
+        },
+        required: ["question", "options"],
+      },
+    },
+    {
+      name: "pino_logs",
+      description: [
+        "Fetch recent Pino logs from the Telegram bot.",
+        "Use 'levels' for exact levels (e.g., [\"error\",\"warn\"]).",
+        "Use 'level' for minimum severity (e.g., \"info\" includes warn/error).",
+      ].join("\n"),
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          level: {
+            type: "string",
+            enum: VALID_LEVELS as unknown as string[],
+            description: "Minimum severity (default: error).",
+          },
+          levels: {
+            type: "array",
+            items: { type: "string", enum: VALID_LEVELS as unknown as string[] },
+            description: "Exact levels to include (overrides level).",
+          },
+          limit: {
+            type: "integer",
+            description: "Max number of log entries to return (default: 50).",
+            minimum: 1,
+            maximum: MAX_LIMIT,
+          },
+          module: {
+            type: "string",
+            description: "Optional module filter (e.g., claude, streaming, bot).",
+          },
+        },
+      },
+    },
   ],
 }));
 
@@ -123,6 +192,93 @@ async function pollForResult(filepath: string): Promise<string> {
 
 // Handle tool calls
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  if (request.params.name === "ask_user") {
+    const args = request.params.arguments as {
+      question?: string;
+      options?: string[];
+    };
+
+    const question = args.question || "";
+    const options = args.options || [];
+
+    if (!question || !options || options.length < 2) {
+      throw new Error("question and at least 2 options required");
+    }
+
+    // Generate request ID and get chat context from environment
+    const requestUuid = crypto.randomUUID().slice(0, 8);
+    const chatId = process.env.TELEGRAM_CHAT_ID || "";
+
+    // Write request file for the bot to pick up
+    const requestData = {
+      request_id: requestUuid,
+      question,
+      options,
+      status: "pending",
+      chat_id: chatId,
+      created_at: new Date().toISOString(),
+    };
+
+    const requestFile = `/tmp/ask-user-${requestUuid}.json`;
+    await Bun.write(requestFile, JSON.stringify(requestData, null, 2));
+
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: "[Buttons sent to user. STOP HERE - do not output any more text. Wait for user to tap a button.]",
+        },
+      ],
+    };
+  }
+
+  if (request.params.name === "pino_logs") {
+    const args = request.params.arguments as {
+      level?: string;
+      levels?: string[];
+      limit?: number;
+      module?: string;
+    };
+
+    const level = (args.level || "error") as Level;
+    const levels =
+      args.levels?.filter((item) => VALID_LEVELS.includes(item as Level)) || [];
+    const limit = Math.max(
+      1,
+      Math.min(Number(args.limit || DEFAULT_LIMIT), MAX_LIMIT),
+    );
+    const moduleFilter = args.module ? String(args.module) : undefined;
+
+    if (!VALID_LEVELS.includes(level)) {
+      throw new Error(
+        `Invalid level: ${level}. Valid: ${VALID_LEVELS.join(", ")}`,
+      );
+    }
+
+    const requestUuid = crypto.randomUUID().slice(0, 8);
+    const chatId = process.env.TELEGRAM_CHAT_ID || "";
+
+    const requestData = {
+      request_id: requestUuid,
+      level,
+      levels,
+      limit,
+      module: moduleFilter,
+      status: "pending",
+      chat_id: chatId,
+      created_at: new Date().toISOString(),
+    };
+
+    const requestFile = `/tmp/pino-logs-${requestUuid}.json`;
+    await Bun.write(requestFile, JSON.stringify(requestData, null, 2));
+
+    const result = await pollForResult(requestFile);
+
+    return {
+      content: [{ type: "text" as const, text: result }],
+    };
+  }
+
   if (request.params.name !== "bot_control") {
     throw new Error(`Unknown tool: ${request.params.name}`);
   }

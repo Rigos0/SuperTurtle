@@ -38,6 +38,7 @@ import {
 } from "./handlers";
 import { buildSessionOverviewLines } from "./handlers/commands";
 import { resetAllDriverSessions } from "./handlers/commands";
+import { handlePinologs } from "./handlers/commands";
 import { session } from "./session";
 import { getDueJobs, getJobs, advanceRecurringJob, removeJob } from "./cron";
 import { bot } from "./bot";
@@ -575,6 +576,7 @@ bot.use(
 bot.command("new", handleNew);
 bot.command("status", handleStatus);
 bot.command("looplogs", handleLooplogs);
+bot.command("pinologs", handlePinologs);
 bot.command("usage", handleUsage);
 bot.command("context", handleContext);
 bot.command("model", handleModel);

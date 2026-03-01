@@ -2,8 +2,41 @@ import pino from "pino";
 
 export const PINO_LOG_PATH = "/tmp/claude-telegram-bot.log.jsonl";
 
+/**
+ * Detect if we're running inside an MCP server subprocess.
+ * MCP servers use stdout as the JSON-RPC transport, so we MUST NOT
+ * write any log output to stdout (fd 1) — it would corrupt the protocol
+ * and cause "Transport closed" / "serde error" failures in the client.
+ *
+ * We detect this via the MCP_SERVER env var that we set in mcp-config.ts,
+ * OR by checking if the script path contains "mcp" directory markers.
+ */
+const IS_MCP_SERVER =
+  process.env.MCP_SERVER === "1" ||
+  (typeof Bun !== "undefined" && Bun.main?.includes("_mcp/"));
+
 function createLogger() {
   try {
+    // MCP servers: log ONLY to file — never to stdout (which is the JSON-RPC transport)
+    if (IS_MCP_SERVER) {
+      return pino({
+        level: process.env.LOG_LEVEL || "info",
+        transport: {
+          targets: [
+            {
+              target: "pino-pretty",
+              options: { destination: 2 }, // stderr, safe for MCP
+            },
+            {
+              target: "pino/file",
+              options: { destination: PINO_LOG_PATH },
+            },
+          ],
+        },
+      });
+    }
+
+    // Normal bot process: log to stdout (pretty) + file
     return pino({
       level: process.env.LOG_LEVEL || "info",
       transport: {

@@ -2,7 +2,7 @@
  * Command handlers for Claude Telegram Bot.
  */
 
-import type { Context } from "grammy";
+import { InlineKeyboard, type Context } from "grammy";
 import { session, getAvailableModels, EFFORT_DISPLAY, type EffortLevel } from "../session";
 import { codexSession } from "../codex-session";
 import {
@@ -30,6 +30,7 @@ import { cmdLog } from "../logger";
 // Canonical main-loop log written by live.sh (tmux + caffeinate + run-loop).
 export const MAIN_LOOP_LOG_PATH = "/tmp/claude-telegram-bot-ts.log";
 const LOOPLOGS_LINE_COUNT = 50;
+const RESUME_SESSIONS_LIMIT = 5;
 
 /**
  * Shared command list for display in /new and /status, and new_session bot-control.
@@ -46,6 +47,7 @@ export function getCommandLines(): string[] {
     `/context - Context usage`,
     `/status - Detailed status`,
     `/looplogs - Main loop logs`,
+    `/pinologs - Pino logs`,
     `/resume - Resume a session`,
     `/sub - SubTurtles`,
     `/cron - Scheduled jobs`,
@@ -413,6 +415,25 @@ export async function handleLooplogs(ctx: Context): Promise<void> {
 }
 
 /**
+ * /pinologs - Show inline options for selecting Pino log level.
+ */
+export async function handlePinologs(ctx: Context): Promise<void> {
+  const userId = ctx.from?.id;
+
+  if (!isAuthorized(userId, ALLOWED_USERS)) {
+    await ctx.reply("Unauthorized.");
+    return;
+  }
+
+  const keyboard = new InlineKeyboard()
+    .text("Info", "pinologs:info")
+    .text("Warning", "pinologs:warn")
+    .text("Errors", "pinologs:error");
+
+  await ctx.reply("Select log level:", { reply_markup: keyboard });
+}
+
+/**
  * /resume - Show list of sessions to resume with inline keyboard.
  * Routes to Claude or Codex based on activeDriver.
  */
@@ -439,7 +460,7 @@ export async function handleResume(ctx: Context): Promise<void> {
   let driverName: string;
 
   if (session.activeDriver === "codex") {
-    sessions = await codexSession.getSessionListLive();
+    sessions = await codexSession.getSessionListLive(RESUME_SESSIONS_LIMIT);
     if (sessions.length === 0) {
       sessions = codexSession.getSessionList();
     }
@@ -458,7 +479,7 @@ export async function handleResume(ctx: Context): Promise<void> {
     await ctx.reply(`❌ No saved ${driverName} sessions.`);
     return;
   }
-  sessions = sessions.slice(0, 20);
+  sessions = sessions.slice(0, RESUME_SESSIONS_LIMIT);
 
   // Build inline keyboard with session list
   const buttons = sessions.map((s) => {
@@ -1203,7 +1224,7 @@ export async function getCodexQuotaLines(): Promise<string[]> {
 }
 
 
-function chunkText(text: string, chunkSize = TELEGRAM_SAFE_LIMIT): string[] {
+export function chunkText(text: string, chunkSize = TELEGRAM_SAFE_LIMIT): string[] {
   const chunks: string[] = [];
   for (let i = 0; i < text.length; i += chunkSize) {
     chunks.push(text.slice(i, i + chunkSize));

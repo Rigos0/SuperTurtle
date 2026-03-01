@@ -25,12 +25,21 @@ export interface RateLimitBucket {
   lastUpdate: number;
 }
 
+// Recent message turn for session resume preview
+export interface RecentMessage {
+  role: "user" | "assistant";
+  text: string; // Truncated to ~500 chars per message
+  timestamp: string; // ISO 8601
+}
+
 // Session persistence
 export interface SavedSession {
   session_id: string;
   saved_at: string;
   working_dir: string;
   title: string; // First message truncated (max ~50 chars)
+  preview?: string; // Legacy single-exchange preview
+  recentMessages?: RecentMessage[]; // Last few conversation turns for resume display
 }
 
 export interface SessionHistory {
