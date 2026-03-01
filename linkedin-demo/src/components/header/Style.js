@@ -96,6 +96,7 @@ export default makeStyles((theme) => ({
     overflowY: "auto",
     borderRadius: 8,
     padding: "4px 0",
+    backgroundColor: theme.palette.background.paper,
   },
   searchSectionHeader: {
     padding: "6px 12px 4px",
@@ -111,7 +112,7 @@ export default makeStyles((theme) => ({
     cursor: "pointer",
     transition: "background-color 0.15s ease",
     "&:hover": {
-      backgroundColor: theme.palette.type === "dark" ? darkSecondary : "#f5f5f5",
+      backgroundColor: theme.palette.action.hover,
     },
   },
   searchResultAvatar: {

@@ -1,5 +1,5 @@
 ## Current Task
-Fix search dropdown dark mode in `linkedin-demo/src/components/header/Style.js`: The `searchDropdown` class (line 89) has no background color set — needs `backgroundColor: theme.palette.background.paper`. Verify `searchResultItem` hover colors use theme.
+Fix login card dark mode in `linkedin-demo/src/components/login/loginCard/LoginCard.js` and its Style.js: Ensure login card background adapts. Check text colors.
 
 ## End Goal with Specs
 - Toggle dark mode via Theme button in header
@@ -15,8 +15,8 @@ Fix search dropdown dark mode in `linkedin-demo/src/components/header/Style.js`:
 - [x] Fix notifications dark mode in `linkedin-demo/src/components/notifications/Style.js`: Replace `backgroundColor: "#fff"` in items with `theme.palette.background.paper`. Replace `#f8fcf8` unread bg with a dark-mode-friendly subtle green tint: `theme.palette.type === "dark" ? "rgba(46,125,50,0.08)" : "#f8fcf8"`. Replace `#f4f8f4` hover with `theme.palette.action.hover`. Fix `#1d2226` text to `theme.palette.text.primary`. Fix borders `#eceff1`/`#f1f3f4` to `theme.palette.divider`.
 - [x] Fix network cards dark mode in `linkedin-demo/src/components/network/Style.js`: Replace card `backgroundColor: "#fff"` with `theme.palette.background.paper`. Replace search field `backgroundColor: "#fff"` with `theme.palette.background.paper`.
 - [x] Fix post edit textarea dark mode in `linkedin-demo/src/components/posts/post/Style.js`: In `editTextarea` class, add dark mode: `backgroundColor: theme.palette.background.paper`, `color: theme.palette.text.primary`, `border: "1px solid " + theme.palette.divider`. In `cancelButton`, adapt border color. In `comment__form`, check input colors (line 261-262 already has dark mode — verify it works).
-- [ ] Fix search dropdown dark mode in `linkedin-demo/src/components/header/Style.js`: The `searchDropdown` class (line 89) has no background color set — needs `backgroundColor: theme.palette.background.paper`. Verify `searchResultItem` hover colors use theme. <- current
-- [ ] Fix login card dark mode in `linkedin-demo/src/components/login/loginCard/LoginCard.js` and its Style.js: Ensure login card background adapts. Check text colors.
+- [x] Fix search dropdown dark mode in `linkedin-demo/src/components/header/Style.js`: The `searchDropdown` class (line 89) has no background color set — needs `backgroundColor: theme.palette.background.paper`. Verify `searchResultItem` hover colors use theme.
+- [ ] Fix login card dark mode in `linkedin-demo/src/components/login/loginCard/LoginCard.js` and its Style.js: Ensure login card background adapts. Check text colors. <- current
 - [ ] Push: `cd linkedin-demo && npx convex dev --once`
 - [ ] Build: `cd linkedin-demo && npm run build`
 - [ ] Commit: "Fix dark mode: theme-aware colors across all components"
