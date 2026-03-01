@@ -11,7 +11,7 @@ export default makeStyles((theme) => ({
   searchField: {
     width: "100%",
     "& .MuiOutlinedInput-root": {
-      backgroundColor: "#fff",
+      backgroundColor: theme.palette.background.paper,
     },
   },
   stateCard: {
@@ -27,7 +27,7 @@ export default makeStyles((theme) => ({
   card: {
     width: "100%",
     boxSizing: "border-box",
-    backgroundColor: "#fff",
+    backgroundColor: theme.palette.background.paper,
     padding: theme.spacing(1.5, 2),
     display: "flex",
     alignItems: "center",
