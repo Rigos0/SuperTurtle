@@ -1,5 +1,5 @@
 ## Current Task
-Update `mcp-config.ts`: remove `ask-user` and `pino-logs` entries. Only `send-turtle` and `bot-control` remain.
+Update `src/codex-session.ts`: in `hasExistingMcpConfig()`, update the `ourServers` array to only check for `send-turtle` and `bot-control`.
 
 ## End Goal with Specs
 - `bot-control` MCP server exposes ALL tools from `bot_control`, `pino_logs`, and `ask_user` in a single server process
@@ -17,8 +17,8 @@ Update `mcp-config.ts`: remove `ask-user` and `pino-logs` entries. Only `send-tu
 - [x] Read the 3 source server files to understand their full tool definitions and imports: `bot_control_mcp/server.ts`, `ask_user_mcp/server.ts`, `pino_logs_mcp/server.ts`
 - [x] Add `ask_user` tool to `bot_control_mcp/server.ts`: copy the ListTools entry and CallTool handler from `ask_user_mcp/server.ts`. Keep the `/tmp/ask-user-{uuid}.json` file pattern and the exact response text.
 - [x] Add `pino_logs` tool to `bot_control_mcp/server.ts`: copy the ListTools entry and CallTool handler from `pino_logs_mcp/server.ts`. Keep the `/tmp/pino-logs-{uuid}.json` file pattern.
-- [ ] Update `mcp-config.ts`: remove `ask-user` and `pino-logs` entries. Only `send-turtle` and `bot-control` remain. <- current
-- [ ] Update `src/codex-session.ts`: in `hasExistingMcpConfig()`, update the `ourServers` array to only check for `send-turtle` and `bot-control`.
+- [x] Update `mcp-config.ts`: remove `ask-user` and `pino-logs` entries. Only `send-turtle` and `bot-control` remain.
+- [ ] Update `src/codex-session.ts`: in `hasExistingMcpConfig()`, update the `ourServers` array to only check for `send-turtle` and `bot-control`. <- current
 - [ ] Update `src/drivers/codex-driver.ts`: the `mcpCompletionCallback` currently checks `item.server` to route tool completions. After merge, `ask_user` and `pino_logs` tool calls will come from server `bot-control`. Change routing to use `normalizedTool` (which is already computed from `item.tool`) instead of `item.server`.
 - [ ] Update `src/drivers/claude-driver.ts`: check if it references old server names and update if needed.
 - [ ] Search codebase for any remaining references to `"ask-user"` or `"pino-logs"` as MCP server names (grep for them) and update.
