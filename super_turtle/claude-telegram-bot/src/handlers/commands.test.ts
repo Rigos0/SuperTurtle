@@ -447,7 +447,7 @@ describe("parseClaudeStateSummary", () => {
   });
 
   it("parses real-world CLAUDE.md content", async () => {
-    const statePath = resolve(import.meta.dir, "../../../../.subturtles/mcp-merge/CLAUDE.md");
+    const statePath = resolve(import.meta.dir, "./__fixtures__/real-world-claude.md");
     const content = await Bun.file(statePath).text();
 
     const summary = parseClaudeStateSummary(content);
