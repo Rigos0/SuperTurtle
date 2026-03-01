@@ -17,12 +17,18 @@ import {
 } from "../config";
 import { isAuthorized } from "../security";
 import { auditLog, startTypingIndicator } from "../utils";
-import { StreamingState, createStatusCallback, isAskUserPromptMessage } from "./streaming";
+import {
+  StreamingState,
+  createStatusCallback,
+  isAskUserPromptMessage,
+  checkPendingPinoLogsRequests,
+} from "./streaming";
 import { isAnyDriverRunning, runMessageWithActiveDriver, stopActiveDriverQuery } from "./driver-routing";
 import { escapeHtml, convertMarkdownToHtml } from "../formatting";
 import { removeJob } from "../cron";
 import {
   buildSessionOverviewLines,
+  chunkText,
   resetAllDriverSessions,
   readClaudeStateSummary,
   readClaudeBacklogItems,
@@ -32,6 +38,7 @@ import { streamLog } from "../logger";
 
 const SAFE_CALLBACK_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const SAFE_CALLBACK_OPTION_INDEX = /^\d+$/;
+const PINOLOG_LEVELS = new Set(["info", "warn", "error"]);
 const callbackLog = streamLog.child({ handler: "callback" });
 
 function isSafeCallbackId(value: string): boolean {
@@ -249,6 +256,12 @@ export async function handleCallback(ctx: Context): Promise<void> {
   // 7b. Handle Codex resume callbacks: codex_resume:{session_id}
   if (callbackData.startsWith("codex_resume:")) {
     await handleCodexResumeCallback(ctx, callbackData);
+    return;
+  }
+
+  // 7c. Handle pinologs callbacks: pinologs:{level}
+  if (callbackData.startsWith("pinologs:")) {
+    await handlePinologsCallback(ctx, callbackData);
     return;
   }
 
@@ -600,6 +613,86 @@ async function handleCodexResumeCallback(
   } finally {
     typing.stop();
     session.typingController = null;
+  }
+}
+
+/**
+ * Handle pino logs callback (pinologs:{level}).
+ */
+async function handlePinologsCallback(
+  ctx: Context,
+  callbackData: string
+): Promise<void> {
+  const chatId = ctx.chat?.id;
+  const level = callbackData.replace("pinologs:", "").trim().toLowerCase();
+
+  if (!chatId) {
+    await ctx.answerCallbackQuery({ text: "Invalid chat" });
+    return;
+  }
+
+  if (!PINOLOG_LEVELS.has(level)) {
+    await ctx.answerCallbackQuery({ text: "Invalid log level" });
+    return;
+  }
+
+  const requestId = `pinologs-callback-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
+  const requestFile = `/tmp/pino-logs-${requestId}.json`;
+
+  try {
+    await ctx.answerCallbackQuery({ text: `Fetching ${level} logs...` });
+    await Bun.write(
+      requestFile,
+      JSON.stringify(
+        {
+          request_id: requestId,
+          level,
+          limit: 50,
+          status: "pending",
+          chat_id: String(chatId),
+          created_at: new Date().toISOString(),
+        },
+        null,
+        2
+      )
+    );
+
+    let response: { status?: string; result?: string } | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await checkPendingPinoLogsRequests(chatId);
+      const responseText = await Bun.file(requestFile).text();
+      const parsed = JSON.parse(responseText) as {
+        status?: string;
+        result?: string;
+      };
+      if (parsed.status === "completed") {
+        response = parsed;
+        break;
+      }
+      if (attempt < 2) {
+        await Bun.sleep(100);
+      }
+    }
+
+    if (!response || response.status !== "completed") {
+      throw new Error("Pino logs request was not completed");
+    }
+
+    const payload = (response.result || "").trim() || "No matching log entries.";
+    for (const chunk of chunkText(payload)) {
+      await ctx.reply(chunk);
+    }
+  } catch (error) {
+    callbackLog.error({ err: error, callbackData, chatId }, "Failed to fetch pino logs");
+    await ctx.reply("❌ Failed to fetch logs. Please try again.");
+  } finally {
+    try {
+      unlinkSync(requestFile);
+    } catch {
+      // Best-effort cleanup for transient request files.
+    }
   }
 }
 
