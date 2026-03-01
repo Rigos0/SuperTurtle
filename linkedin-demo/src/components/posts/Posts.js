@@ -5,7 +5,8 @@ import Post from "./post/Post";
 import Animation from "../animations/Animation";
 import Loading from "../../assets/images/loading-dots.json";
 import useConvexPosts from "../../hooks/useConvexPosts";
-import tadeasBibrAvatar from "../../assets/tadeas-bibr.jpg";
+
+const DEFAULT_PROFILE_PHOTO = "https://i.pravatar.cc/200?img=68";
 
 const Posts = ({ onNavigateProfile }) => {
   const classes = Style();
@@ -13,7 +14,7 @@ const Posts = ({ onNavigateProfile }) => {
 
   const getProfilePhoto = (photoURL) => {
     if (typeof photoURL === "string" && photoURL.startsWith("/")) {
-      return tadeasBibrAvatar;
+      return DEFAULT_PROFILE_PHOTO;
     }
     return photoURL;
   };
