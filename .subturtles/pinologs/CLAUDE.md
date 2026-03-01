@@ -1,5 +1,5 @@
 ## Current Task
-Register /pinologs in `super_turtle/claude-telegram-bot/src/index.ts`.
+Add callback handler for pinologs:* in `super_turtle/claude-telegram-bot/src/handlers/callback.ts`.
 
 ## End Goal with Specs
 - /pinologs command exists and is listed in /status command list.
@@ -15,8 +15,8 @@ Register /pinologs in `super_turtle/claude-telegram-bot/src/index.ts`.
 
 ## Backlog
 - [x] Add /pinologs command handler in `super_turtle/claude-telegram-bot/src/handlers/commands.ts`
-- [ ] Register /pinologs in `super_turtle/claude-telegram-bot/src/index.ts` <- current
-- [ ] Add callback handler for pinologs:* in `super_turtle/claude-telegram-bot/src/handlers/callback.ts`
+- [x] Register /pinologs in `super_turtle/claude-telegram-bot/src/index.ts`
+- [ ] Add callback handler for pinologs:* in `super_turtle/claude-telegram-bot/src/handlers/callback.ts` <- current
 - [ ] Add command to list in `getCommandLines()` in `super_turtle/claude-telegram-bot/src/handlers/commands.ts`
 - [ ] Add tests: command list includes /pinologs + callback parses + handler shows keyboard
 - [ ] Commit
