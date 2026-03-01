@@ -1,5 +1,5 @@
 ## Current Task
-Write like + comment tests in `linkedin-demo/e2e/core.spec.ts` (tests 3-4).
+Write create/edit/delete post tests in `linkedin-demo/e2e/core.spec.ts` (tests 5-6).
 
 ## End Goal with Specs
 Comprehensive Playwright e2e test suite at `linkedin-demo/e2e/` that tests all core user flows against the live app at `https://linkedin-demo-iota.vercel.app`. Tests must pass reliably in CI (headless Chromium).
@@ -53,7 +53,7 @@ Comprehensive Playwright e2e test suite at `linkedin-demo/e2e/` that tests all c
 ## Backlog
 - [x] Install Playwright, create config and helper files
 - [x] Write auth + feed tests (tests 1-2)
-- [ ] Write like + comment tests (tests 3-4) <- current
-- [ ] Write create/edit/delete post tests (tests 5-6)
+- [x] Write like + comment tests (tests 3-4)
+- [ ] Write create/edit/delete post tests (tests 5-6) <- current
 - [ ] Write tab navigation test (test 7)
 - [ ] Run full suite, fix failures, commit
