@@ -35,4 +35,14 @@ export default defineSchema({
     body: v.string(),
     createdAt: v.number(),
   }),
+  conversations: defineTable({
+    participants: v.array(v.id("users")),
+    createdAt: v.number(),
+  }),
+  messages: defineTable({
+    conversationId: v.id("conversations"),
+    senderId: v.id("users"),
+    body: v.string(),
+    createdAt: v.number(),
+  }),
 });
