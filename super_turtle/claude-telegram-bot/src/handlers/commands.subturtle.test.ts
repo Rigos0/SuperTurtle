@@ -1,21 +1,38 @@
 import { describe, expect, it } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "fs";
-import { join, resolve } from "path";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { join } from "path";
 
 process.env.TELEGRAM_BOT_TOKEN ||= "test-token";
 process.env.TELEGRAM_ALLOWED_USERS ||= "123";
-process.env.CLAUDE_WORKING_DIR ||= resolve(import.meta.dir, "../../../..");
+process.env.CLAUDE_WORKING_DIR ||= process.cwd();
 
 const { handleSubturtle } = await import("./commands");
-const { ALLOWED_USERS } = await import("../config");
-const authorizedUserId = ALLOWED_USERS[0] ?? Number((process.env.TELEGRAM_ALLOWED_USERS || "123").split(",")[0]?.trim() || "123");
+const { ALLOWED_USERS, WORKING_DIR } = await import("../config");
+const authorizedUserId =
+  ALLOWED_USERS[0] ??
+  Number((process.env.TELEGRAM_ALLOWED_USERS || "123").split(",")[0]?.trim() || "123");
 
 describe("/subturtle", () => {
   it("shows parsed sub state and root summary instead of raw task text", async () => {
-    const workdir = process.env.CLAUDE_WORKING_DIR || process.cwd();
+    const workdir = WORKING_DIR;
     const turtleName = "test-sub-ux";
     const turtleDir = join(workdir, ".subturtles", turtleName);
     mkdirSync(turtleDir, { recursive: true });
+    const rootStatePath = join(workdir, "CLAUDE.md");
+    const hadRootState = existsSync(rootStatePath);
+    const originalRootState = hadRootState ? readFileSync(rootStatePath, "utf-8") : "";
+
+    writeFileSync(
+      rootStatePath,
+      [
+        "## Current Task",
+        "Keep root summary available.",
+        "",
+        "## Backlog",
+        "- [x] Root seed",
+        "- [ ] Another root item <- current",
+      ].join("\n")
+    );
     writeFileSync(
       join(turtleDir, "CLAUDE.md"),
       [
@@ -63,6 +80,11 @@ describe("/subturtle", () => {
       await handleSubturtle(ctx);
     } finally {
       Bun.spawnSync = originalSpawnSync;
+      if (hadRootState) {
+        writeFileSync(rootStatePath, originalRootState);
+      } else {
+        rmSync(rootStatePath, { force: true });
+      }
       rmSync(turtleDir, { recursive: true, force: true });
     }
 
