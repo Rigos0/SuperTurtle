@@ -20,7 +20,7 @@ export default makeStyles((theme) => ({
     paddingBottom: 50,
     [theme.breakpoints.down("xs")]: {
       paddingTop: 10,
-      paddingBottom: 55,
+      paddingBottom: 60,
     },
   },
 
@@ -39,7 +39,7 @@ export default makeStyles((theme) => ({
     paddingBottom: 25,
     [theme.breakpoints.down("xs")]: {
       minWidth: 0,
-      padding: 0,
+      padding: "0 8px",
     },
   },
 
