@@ -109,3 +109,7 @@ Then message your bot in Telegram and ask it to build something.
 
 Full documentation: https://superturtle.mintlify.app
 Platform support details: https://superturtle.mintlify.app/config/platform-support
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Rigos0/superturtle&type=Date)](https://star-history.com/#Rigos0/superturtle&Date)
