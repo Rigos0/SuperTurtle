@@ -24,8 +24,9 @@ export class CodexDriver implements ChatDriver {
     process.env.TELEGRAM_CHAT_ID = String(input.chatId);
 
     // MCP completion callback: fires when an mcp_tool_call completes
-    const mcpCompletionCallback: McpCompletionCallback = async (server, tool) => {
-      const normalizedTool = tool.replace(/-/g, "_");
+    const mcpCompletionCallback: McpCompletionCallback = async (_server, tool) => {
+      // Route by tool name, not MCP server, so merged bot-control tools still resolve.
+      const normalizedTool = tool.toLowerCase().replace(/-/g, "_");
 
       // Detect ask-user tool and handle inline
       if (normalizedTool === "ask_user") {

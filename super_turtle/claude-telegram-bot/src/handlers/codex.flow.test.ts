@@ -157,7 +157,7 @@ async function probeCodexFlow(): Promise<CodexFlowResult> {
         })
       );
 
-      await mcpCompletionCallback?.("ask-user", "ask_user");
+      await mcpCompletionCallback?.("bot-control", "ask_user");
       await mcpCompletionCallback?.("bot-control", "bot_control");
 
       await statusCallback?.("text", "Streaming Codex reply", 0);
