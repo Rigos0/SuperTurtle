@@ -1,8 +1,10 @@
 import { WORKING_DIR } from "../config";
 import { session } from "../session";
 import { stopActiveDriverQuery } from "./driver-routing";
+import { streamLog } from "../logger";
 
 const CTL_PATH = `${WORKING_DIR}/super_turtle/subturtle/ctl`;
+const stopLog = streamLog.child({ handler: "stop" });
 
 export interface StopSubturtlesResult {
   attempted: string[];
@@ -40,7 +42,7 @@ export function stopAllRunningSubturtles(): StopSubturtlesResult {
     const listOutput = `${listProc.stdout.toString()}\n${listProc.stderr.toString()}`;
     runningNames = parseRunningSubturtleNames(listOutput);
   } catch (error) {
-    console.warn("Failed to list running SubTurtles:", error);
+    stopLog.warn({ err: error }, "Failed to list running SubTurtles");
     return { attempted: [], stopped: [], failed: [] };
   }
 
@@ -56,7 +58,7 @@ export function stopAllRunningSubturtles(): StopSubturtlesResult {
         failed.push(name);
       }
     } catch (error) {
-      console.warn(`Failed to stop SubTurtle ${name}:`, error);
+      stopLog.warn({ err: error, name }, "Failed to stop SubTurtle");
       failed.push(name);
     }
   }

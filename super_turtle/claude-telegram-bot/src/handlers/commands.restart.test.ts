@@ -32,6 +32,7 @@ async function probeRestart(): Promise<RestartProbeResult> {
     TELEGRAM_BOT_TOKEN: "test-token",
     TELEGRAM_ALLOWED_USERS: "123",
     CLAUDE_WORKING_DIR: process.cwd(),
+    SUPERTURTLE_RUN_LOOP: "0",
   };
 
   const script = `
@@ -136,7 +137,6 @@ describe("/restart self-reexec", () => {
         (entry) => entry.path.endsWith("claude-telegram-restart.json") || entry.path.endsWith(".restart-pending.json")
       )
     ).toBe(true);
-    expect(result.payload?.writes.some((entry) => entry.path.endsWith(".restart-self"))).toBe(true);
 
     expect(result.payload?.spawnCmd.length).toBeGreaterThan(0);
     expect(result.payload?.spawnOpts?.detached).toBe(true);

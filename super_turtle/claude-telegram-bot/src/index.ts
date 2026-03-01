@@ -65,6 +65,7 @@ import {
 import { buildCronScheduledPrompt } from "./cron-scheduled-prompt";
 import { UpdateDedupeCache } from "./update-dedupe";
 import { startTurtleGreetings } from "./turtle-greetings";
+import { botLog, cronLog } from "./logger";
 
 // Re-export for any existing consumers
 export { bot };
@@ -240,7 +241,7 @@ function acquireInstanceLockOrExit(): () => void {
     }
 
     if (Number.isFinite(holderPid) && holderPid > 0 && isPidAlive(holderPid)) {
-      console.error(
+      botLog.error(
         `[startup] Another bot instance is already running (PID ${holderPid}). Exiting to avoid Telegram getUpdates 409 conflict.`
       );
       process.exit(1);
@@ -460,7 +461,10 @@ async function drainPreparedSnapshotsWhenIdle(): Promise<void> {
     beginBackgroundRun();
     try {
       if (wasBackgroundRunPreempted()) {
-        console.log(`[snapshot:${snapshot.jobId}] skipped before start due to user-priority preemption`);
+        cronLog.info(
+          { cronJobId: snapshot.jobId, action: "snapshot_skip_pre_start" },
+          `[snapshot:${snapshot.jobId}] skipped before start due to user-priority preemption`
+        );
         continue;
       }
 
@@ -493,7 +497,10 @@ async function drainPreparedSnapshotsWhenIdle(): Promise<void> {
       }
     } catch (error) {
       if (wasBackgroundRunPreempted() && isLikelyCancellationError(error)) {
-        console.log(`[snapshot:${snapshot.jobId}] preempted by interactive update`);
+        cronLog.info(
+          { cronJobId: snapshot.jobId, action: "snapshot_preempted" },
+          `[snapshot:${snapshot.jobId}] preempted by interactive update`
+        );
         continue;
       }
       const errorSummary = summarizeCronError(error);
@@ -528,7 +535,7 @@ bot.use(async (ctx, next) => {
   if (isAllowedInteractiveUpdate(ctx) && isBackgroundRunActive()) {
     const interrupted = await preemptBackgroundRunForUserPriority();
     if (interrupted) {
-      console.log("Preempted background run to prioritize interactive user update");
+      botLog.info("Preempted background run to prioritize interactive user update");
     }
   }
   await next();
@@ -611,7 +618,7 @@ bot.on("callback_query:data", handleCallback);
 // ============== Error Handler ==============
 
 bot.catch((err) => {
-  console.error("Bot error:", err);
+  botLog.error({ err }, "Bot error");
 });
 
 // ============== Cron Timer Loop ==============
@@ -657,7 +664,7 @@ const startCronTimer = () => {
         try {
           // Bail if no allowed users are configured — can't authenticate
           if (ALLOWED_USERS.length === 0) {
-            console.error(`Cron job ${job.id} skipped: ALLOWED_USERS is empty`);
+            cronLog.error({ cronJobId: job.id }, `Cron job ${job.id} skipped: ALLOWED_USERS is empty`);
             continue;
           }
           const resolvedUserId = userId!;
@@ -683,7 +690,7 @@ const startCronTimer = () => {
           if (job.prompt.startsWith(BOT_MESSAGE_ONLY_PREFIX)) {
             const message = job.prompt.slice(BOT_MESSAGE_ONLY_PREFIX.length);
             if (message.trim().length === 0) {
-              console.warn(`Cron job ${job.id} skipped: BOT_MESSAGE_ONLY payload is empty`);
+              cronLog.warn({ cronJobId: job.id }, `Cron job ${job.id} skipped: BOT_MESSAGE_ONLY payload is empty`);
               continue;
             }
             await bot.api.sendMessage(resolvedChatId, message);
@@ -718,7 +725,10 @@ const startCronTimer = () => {
             beginBackgroundRun();
             try {
               if (wasBackgroundRunPreempted()) {
-                console.log(`[cron:${job.id}] skipped before start due to user-priority preemption`);
+                cronLog.info(
+                  { cronJobId: job.id, action: "cron_skip_pre_start" },
+                  `[cron:${job.id}] skipped before start due to user-priority preemption`
+                );
                 continue;
               }
 
@@ -756,7 +766,13 @@ const startCronTimer = () => {
                 driverUsed = fallbackDriver;
               }
 
-              console.log(
+              cronLog.info(
+                {
+                  cronJobId: job.id,
+                  driverUsed,
+                  primaryDriver,
+                  fallbackAttempted,
+                },
                 `[cron:${job.id}] primary_driver=${primaryDriver} fallback_attempted=${fallbackAttempted} driver_used=${driverUsed}`
               );
 
@@ -782,7 +798,10 @@ const startCronTimer = () => {
                 wasBackgroundRunPreempted() &&
                 isLikelyCancellationError(error)
               ) {
-                console.log(`[cron:${job.id}] preempted by interactive update`);
+                cronLog.info(
+                  { cronJobId: job.id, action: "cron_preempted" },
+                  `[cron:${job.id}] preempted by interactive update`
+                );
                 continue;
               }
               throw error;
@@ -797,7 +816,10 @@ const startCronTimer = () => {
             beginBackgroundRun();
             try {
               if (wasBackgroundRunPreempted()) {
-                console.log(`[cron:${job.id}] skipped before start due to user-priority preemption`);
+                cronLog.info(
+                  { cronJobId: job.id, action: "cron_skip_pre_start" },
+                  `[cron:${job.id}] skipped before start due to user-priority preemption`
+                );
                 continue;
               }
               const primaryDriver: DriverId = session.activeDriver;
@@ -832,7 +854,10 @@ const startCronTimer = () => {
                 wasBackgroundRunPreempted() &&
                 isLikelyCancellationError(error)
               ) {
-                console.log(`[cron:${job.id}] preempted by interactive update`);
+                cronLog.info(
+                  { cronJobId: job.id, action: "cron_preempted" },
+                  `[cron:${job.id}] preempted by interactive update`
+                );
                 continue;
               }
               throw error;
@@ -843,7 +868,7 @@ const startCronTimer = () => {
         } catch (error) {
           // No retries — report failure and continue with future jobs
           const errorSummary = summarizeCronError(error);
-          console.error(`Cron job ${job.id} failed (no retry): ${errorSummary}`);
+          cronLog.error({ cronJobId: job.id, err: error }, `Cron job ${job.id} failed (no retry): ${errorSummary}`);
 
           if (chatId) {
             try {
@@ -856,7 +881,8 @@ const startCronTimer = () => {
               );
             } catch (notifyError) {
               const notifySummary = summarizeCronError(notifyError);
-              console.error(
+              cronLog.error(
+                { cronJobId: job.id, err: notifyError },
                 `Failed to notify Telegram about cron error for ${job.id}: ${notifySummary}`
               );
             }
@@ -865,25 +891,31 @@ const startCronTimer = () => {
       }
       await drainPreparedSnapshotsWhenIdle();
     } catch (error) {
-      console.error("Cron timer loop error:", error);
+      cronLog.error({ err: error }, "Cron timer loop error");
     }
   }, 10000); // 10 seconds
 };
 
 // ============== Startup ==============
 
-console.log("=".repeat(50));
-console.log("Claude Telegram Bot - TypeScript Edition");
-console.log("=".repeat(50));
-console.log(`Working directory: ${WORKING_DIR}`);
-console.log(`Allowed users: ${ALLOWED_USERS.length}`);
-console.log(
+botLog.info("=".repeat(50));
+botLog.info("Claude Telegram Bot - TypeScript Edition");
+botLog.info("=".repeat(50));
+botLog.info({ workingDir: WORKING_DIR }, `Working directory: ${WORKING_DIR}`);
+botLog.info({ allowedUsers: ALLOWED_USERS.length }, `Allowed users: ${ALLOWED_USERS.length}`);
+botLog.info(
+  {
+    claudeCli: CLAUDE_CLI_AVAILABLE,
+    codexPref: CODEX_USER_ENABLED,
+    codexCli: CODEX_CLI_AVAILABLE,
+    codexAvailable: CODEX_AVAILABLE,
+  },
   `Driver capabilities: claude_cli=${CLAUDE_CLI_AVAILABLE} codex_pref=${CODEX_USER_ENABLED} codex_cli=${CODEX_CLI_AVAILABLE} codex_available=${CODEX_AVAILABLE}`
 );
-console.log("Starting bot...");
+botLog.info("Starting bot...");
 
 if (!CLAUDE_CLI_AVAILABLE) {
-  console.error(
+  botLog.error(
     "Claude CLI is required for the meta-agent runtime. Install Claude Code or set CLAUDE_CLI_PATH."
   );
   process.exit(1);
@@ -893,13 +925,13 @@ const releaseInstanceLock = acquireInstanceLockOrExit();
 
 // Get bot info first
 const botInfo = await bot.api.getMe();
-console.log(`Bot started: @${botInfo.username}`);
+botLog.info({ username: botInfo.username }, `Bot started: @${botInfo.username}`);
 
 // Start cron timer
 startCronTimer();
 if (process.env.TURTLE_GREETINGS !== "false" && ALLOWED_USERS.length > 0) {
   startTurtleGreetings(bot, ALLOWED_USERS[0]!);
-  console.log("Turtle greetings enabled (8am/8pm Europe/Prague)");
+  botLog.info("Turtle greetings enabled (8am/8pm Europe/Prague)");
 }
 startDashboardServer();
 
@@ -937,7 +969,7 @@ if (existsSync(RESTART_FILE)) {
     }
     unlinkSync(RESTART_FILE);
   } catch (e) {
-    console.warn("Failed to update restart message:", e);
+    botLog.warn({ err: e }, "Failed to update restart message");
     // Attempt cleanup of restart file; ignore if it doesn't exist or unlink fails
     try { unlinkSync(RESTART_FILE); } catch {}
   }
@@ -955,20 +987,20 @@ const runner = run(bot, {
 // Graceful shutdown
 const stopRunner = () => {
   if (runner.isRunning()) {
-    console.log("Stopping bot...");
+    botLog.info("Stopping bot...");
     runner.stop();
   }
   releaseInstanceLock();
 };
 
 process.on("SIGINT", () => {
-  console.log("Received SIGINT");
+  botLog.info("Received SIGINT");
   stopRunner();
   process.exit(0);
 });
 
 process.on("SIGTERM", () => {
-  console.log("Received SIGTERM");
+  botLog.info("Received SIGTERM");
   stopRunner();
   process.exit(0);
 });

@@ -9,6 +9,7 @@
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
+import { cronLog } from "./logger";
 
 // Job type definition
 export interface CronJob {
@@ -87,7 +88,7 @@ export function loadJobs(): CronJob[] {
           try {
             return normalizeJob(job);
           } catch (error) {
-            console.warn(`Skipping invalid cron job at index ${index}:`, error);
+            cronLog.warn({ index, err: error }, "Skipping invalid cron job while loading jobs");
             return null;
           }
         })
@@ -96,7 +97,7 @@ export function loadJobs(): CronJob[] {
       jobsCache = [];
     }
   } catch (error) {
-    console.error("Failed to load cron jobs (keeping existing cache):", error);
+    cronLog.error({ err: error }, "Failed to load cron jobs (keeping existing cache)");
     // Leave jobsCache as-is so in-memory jobs survive a transient read/parse error
   }
 

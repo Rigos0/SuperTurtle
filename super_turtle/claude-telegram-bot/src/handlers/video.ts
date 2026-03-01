@@ -12,6 +12,9 @@ import { auditLog, auditLogRateLimit, startTypingIndicator } from "../utils";
 import { getDriverAuditType, isActiveDriverSessionActive, runMessageWithActiveDriver } from "./driver-routing";
 import { StreamingState, createStatusCallback } from "./streaming";
 import { handleProcessingError } from "./media-group";
+import { streamLog } from "../logger";
+
+const videoLog = streamLog.child({ handler: "video" });
 
 // Max video size (50MB - reasonable for short clips/voice memos)
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024;
@@ -80,7 +83,7 @@ export async function handleVideo(ctx: Context): Promise<void> {
     return;
   }
 
-  console.log(`Received video from @${username}`);
+  videoLog.info({ userId, username, chatId, msgType: "video" }, "Received video message");
 
   // 4. Download video
   let videoPath: string;
@@ -89,7 +92,7 @@ export async function handleVideo(ctx: Context): Promise<void> {
   try {
     videoPath = await downloadVideo(ctx);
   } catch (error) {
-    console.error("Failed to download video:", error);
+    videoLog.error({ err: error, userId, username, chatId }, "Failed to download video");
     await ctx.api.editMessageText(
       chatId,
       statusMsg.message_id,
@@ -151,7 +154,10 @@ export async function handleVideo(ctx: Context): Promise<void> {
       // Ignore deletion errors
     }
   } catch (error) {
-    console.error("Video processing error:", error);
+    videoLog.error(
+      { err: error, userId, username, chatId, videoPath },
+      "Video processing failed"
+    );
 
     // Delete status message on error
     try {

@@ -1,6 +1,7 @@
 import { WORKING_DIR, DASHBOARD_ENABLED, DASHBOARD_AUTH_TOKEN, DASHBOARD_BIND_ADDR, DASHBOARD_PORT } from "./config";
 import { getJobs } from "./cron";
 import { parseCtlListOutput, getSubTurtleElapsed, type ListedSubTurtle } from "./handlers/commands";
+import { logger } from "./logger";
 
 type TurtleView = ListedSubTurtle & {
   elapsed: string;
@@ -18,6 +19,8 @@ type DashboardState = {
   }>;
 };
 
+const dashboardLog = logger.child({ module: "dashboard" });
+
 function unauthorizedResponse(): Response {
   return new Response("Unauthorized", {
     status: 401,
@@ -25,12 +28,21 @@ function unauthorizedResponse(): Response {
   });
 }
 
-function isAuthorized(request: Request): boolean {
+export function isAuthorized(request: Request): boolean {
   if (!DASHBOARD_AUTH_TOKEN) return true;
   const url = new URL(request.url);
   const tokenFromQuery = url.searchParams.get("token") || "";
   const tokenFromHeader = request.headers.get("x-dashboard-token") || "";
-  return tokenFromQuery === DASHBOARD_AUTH_TOKEN || tokenFromHeader === DASHBOARD_AUTH_TOKEN;
+  const authorization = request.headers.get("authorization") || "";
+  const tokenFromAuthorization = authorization.toLowerCase().startsWith("bearer ")
+    ? authorization.slice(7).trim()
+    : authorization.trim();
+
+  return (
+    tokenFromQuery === DASHBOARD_AUTH_TOKEN
+    || tokenFromHeader === DASHBOARD_AUTH_TOKEN
+    || tokenFromAuthorization === DASHBOARD_AUTH_TOKEN
+  );
 }
 
 async function readSubturtles(): Promise<ListedSubTurtle[]> {
@@ -44,7 +56,7 @@ async function readSubturtles(): Promise<ListedSubTurtle[]> {
   }
 }
 
-function safeSubstring(input: string, max: number): string {
+export function safeSubstring(input: string, max: number): string {
   return input.length <= max ? input : `${input.slice(0, max)}...`;
 }
 
@@ -321,9 +333,15 @@ export function startDashboardServer(): void {
   }
 
   if (!DASHBOARD_AUTH_TOKEN) {
-    console.log(`Starting dashboard on http://${DASHBOARD_BIND_ADDR}:${DASHBOARD_PORT}/dashboard`);
+    dashboardLog.info(
+      { host: DASHBOARD_BIND_ADDR, port: DASHBOARD_PORT, authEnabled: false },
+      `Starting dashboard on http://${DASHBOARD_BIND_ADDR}:${DASHBOARD_PORT}/dashboard`
+    );
   } else {
-    console.log(`Starting dashboard on http://${DASHBOARD_BIND_ADDR}:${DASHBOARD_PORT}/dashboard?token=<redacted>`);
+    dashboardLog.info(
+      { host: DASHBOARD_BIND_ADDR, port: DASHBOARD_PORT, authEnabled: true },
+      `Starting dashboard on http://${DASHBOARD_BIND_ADDR}:${DASHBOARD_PORT}/dashboard?token=<redacted>`
+    );
   }
 
   Bun.serve({

@@ -5,7 +5,8 @@ process.env.TELEGRAM_ALLOWED_USERS ||= "123";
 process.env.CLAUDE_WORKING_DIR ||= process.cwd();
 
 const { handleCallback } = await import("./callback");
-const authorizedUserId = Number((process.env.TELEGRAM_ALLOWED_USERS || "123").split(",")[0]?.trim() || "123");
+const { ALLOWED_USERS } = await import("../config");
+const authorizedUserId = ALLOWED_USERS[0] ?? Number((process.env.TELEGRAM_ALLOWED_USERS || "123").split(",")[0]?.trim() || "123");
 
 function makeCallbackCtx(callbackData: string) {
   const callbackAnswers: string[] = [];

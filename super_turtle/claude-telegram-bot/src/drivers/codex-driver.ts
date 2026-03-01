@@ -1,6 +1,7 @@
 import { codexSession, mapThinkingToReasoningEffort } from "../codex-session";
 import type { ChatDriver, DriverRunInput, DriverStatusSnapshot } from "./types";
 import type { McpCompletionCallback } from "../types";
+import { codexLog } from "../logger";
 
 async function wait(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -27,7 +28,10 @@ export class CodexDriver implements ChatDriver {
 
       // Detect ask-user tool and handle inline
       if (normalizedTool === "ask_user") {
-        console.log("Ask-user tool completed, checking for pending requests");
+        codexLog.info(
+          { driver: this.id, tool: normalizedTool, chatId: input.chatId },
+          "Ask-user tool completed, checking for pending requests"
+        );
         // Small delay to let MCP server write the file
         await new Promise((resolve) => setTimeout(resolve, 200));
 
@@ -38,7 +42,10 @@ export class CodexDriver implements ChatDriver {
             input.chatId
           );
           if (buttonsSent) {
-            console.log("Ask-user buttons sent, ask_user triggered");
+            codexLog.info(
+              { driver: this.id, tool: normalizedTool, chatId: input.chatId, attempt: attempt + 1 },
+              "Ask-user buttons sent, ask_user triggered"
+            );
             return true; // Signal to break event loop
           }
           if (attempt < 2) {
@@ -49,7 +56,10 @@ export class CodexDriver implements ChatDriver {
 
       // Detect send-turtle tool and handle inline
       if (normalizedTool === "send_turtle") {
-        console.log("Send-turtle tool completed, checking for pending requests");
+        codexLog.info(
+          { driver: this.id, tool: normalizedTool, chatId: input.chatId },
+          "Send-turtle tool completed, checking for pending requests"
+        );
         // Small delay to let MCP server write the file
         await new Promise((resolve) => setTimeout(resolve, 200));
 
@@ -68,7 +78,10 @@ export class CodexDriver implements ChatDriver {
 
       // Detect bot-control tool and handle inline
       if (normalizedTool === "bot_control") {
-        console.log("Bot-control tool completed, checking for pending requests");
+        codexLog.info(
+          { driver: this.id, tool: normalizedTool, chatId: input.chatId },
+          "Bot-control tool completed, checking for pending requests"
+        );
         // Small delay to let MCP server write the file
         await new Promise((resolve) => setTimeout(resolve, 200));
 
@@ -96,7 +109,10 @@ export class CodexDriver implements ChatDriver {
           await checkPendingSendTurtleRequests(input.ctx, input.chatId);
           await checkPendingBotControlRequests(codexSession, input.chatId);
         } catch (error) {
-          console.warn("Failed to process pending Codex MCP request:", error);
+          codexLog.warn(
+            { err: error, driver: this.id, chatId: input.chatId },
+            "Failed to process pending Codex MCP request"
+          );
         }
         if (keepPolling) {
           await wait(100);

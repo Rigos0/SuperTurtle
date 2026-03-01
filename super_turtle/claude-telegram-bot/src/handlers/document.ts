@@ -14,6 +14,9 @@ import { getDriverAuditType, isActiveDriverSessionActive, runMessageWithActiveDr
 import { StreamingState, createStatusCallback } from "./streaming";
 import { createMediaGroupBuffer, handleProcessingError } from "./media-group";
 import { isAudioFile, processAudioFile } from "./audio";
+import { streamLog } from "../logger";
+
+const documentLog = streamLog.child({ handler: "document" });
 
 // Supported text file extensions
 const TEXT_EXTENSIONS = [
@@ -95,7 +98,7 @@ async function extractText(
       const result = await Bun.$`pdftotext -layout ${filePath} -`.quiet();
       return result.text();
     } catch (error) {
-      console.error("PDF parsing failed:", error);
+      documentLog.error({ err: error, filePath, mimeType }, "PDF parsing failed");
       return "[PDF parsing failed - ensure pdftotext is installed: macOS: brew install poppler | Ubuntu/Debian: sudo apt install poppler-utils | Fedora: sudo dnf install poppler-utils]";
     }
   }
@@ -228,10 +231,13 @@ async function processArchive(
 
   try {
     // Extract archive
-    console.log(`Extracting archive: ${fileName}`);
+    documentLog.info({ userId, username, chatId, fileName }, "Extracting archive");
     const extractDir = await extractArchive(archivePath, fileName);
     const { tree, contents } = await extractArchiveContent(extractDir);
-    console.log(`Extracted: ${tree.length} files, ${contents.length} readable`);
+    documentLog.info(
+      { userId, username, chatId, fileName, fileCount: tree.length, readableFileCount: contents.length },
+      "Archive extracted"
+    );
 
     // Update status
     await ctx.api.editMessageText(
@@ -291,7 +297,7 @@ async function processArchive(
       // Ignore deletion errors
     }
   } catch (error) {
-    console.error("Archive processing error:", error);
+    documentLog.error({ err: error, userId, username, chatId, fileName }, "Archive processing failed");
     // Delete status message on error
     try {
       await ctx.api.deleteMessage(statusMsg.chat.id, statusMsg.message_id);
@@ -398,7 +404,10 @@ async function processDocumentPaths(
       const content = await extractText(path);
       documents.push({ path, name, content });
     } catch (error) {
-      console.error(`Failed to extract ${path}:`, error);
+      documentLog.error(
+        { err: error, userId, username, chatId, path },
+        "Failed to extract document from media group"
+      );
     }
   }
 
@@ -446,7 +455,10 @@ export async function handleDocument(ctx: Context): Promise<void> {
 
   // Check if it's an audio file sent as a document
   if (!isPdf && !isText && !isArchiveFile && isAudioFile(fileName, doc.mime_type)) {
-    console.log(`Received audio document: ${fileName} from @${username}`);
+    documentLog.info(
+      { userId, username, chatId, fileName, msgType: "audio-document" },
+      "Received audio document"
+    );
 
     // Rate limit check
     const [allowed, retryAfter] = rateLimiter.check(userId);
@@ -463,7 +475,10 @@ export async function handleDocument(ctx: Context): Promise<void> {
     try {
       docPath = await downloadDocument(ctx);
     } catch (error) {
-      console.error("Failed to download audio document:", error);
+      documentLog.error(
+        { err: error, userId, username, chatId, fileName },
+        "Failed to download audio document"
+      );
       await ctx.reply("❌ Failed to download audio file.");
       return;
     }
@@ -487,14 +502,17 @@ export async function handleDocument(ctx: Context): Promise<void> {
   try {
     docPath = await downloadDocument(ctx);
   } catch (error) {
-    console.error("Failed to download document:", error);
+    documentLog.error({ err: error, userId, username, chatId, fileName }, "Failed to download document");
     await ctx.reply("❌ Failed to download document.");
     return;
   }
 
   // 5. Archive files - process separately (no media group support)
   if (isArchiveFile) {
-    console.log(`Received archive: ${fileName} from @${username}`);
+    documentLog.info(
+      { userId, username, chatId, fileName, msgType: "archive" },
+      "Received archive document"
+    );
     const [allowed, retryAfter] = rateLimiter.check(userId);
     if (!allowed) {
       await auditLogRateLimit(userId, username, retryAfter!);
@@ -518,7 +536,10 @@ export async function handleDocument(ctx: Context): Promise<void> {
 
   // 6. Single document - process immediately
   if (!mediaGroupId) {
-    console.log(`Received document: ${fileName} from @${username}`);
+    documentLog.info(
+      { userId, username, chatId, fileName, msgType: "document" },
+      "Received document"
+    );
     // Rate limit
     const [allowed, retryAfter] = rateLimiter.check(userId);
     if (!allowed) {
@@ -540,7 +561,10 @@ export async function handleDocument(ctx: Context): Promise<void> {
         chatId
       );
     } catch (error) {
-      console.error("Failed to extract document:", error);
+      documentLog.error(
+        { err: error, userId, username, chatId, fileName },
+        "Failed to extract document"
+      );
       await ctx.reply(
         `❌ Failed to process document: ${String(error).slice(0, 100)}`
       );

@@ -25,6 +25,7 @@ import { getJobs } from "../cron";
 import { isAnyDriverRunning, isBackgroundRunActive, wasBackgroundRunPreempted, stopActiveDriverQuery } from "./driver-routing";
 import { clearPreparedSnapshots, getPreparedSnapshotCount } from "../cron-supervision-queue";
 import { getAllDeferredQueues } from "../deferred-queue";
+import { cmdLog } from "../logger";
 
 // Canonical main-loop log written by live.sh (tmux + caffeinate + run-loop).
 export const MAIN_LOOP_LOG_PATH = "/tmp/claude-telegram-bot-ts.log";
@@ -229,6 +230,14 @@ export function parseCtlListOutput(output: string): ListedSubTurtle[] {
   for (const rawLine of output.split("\n")) {
     const line = rawLine.trim();
     if (!line || line === "No SubTurtles found.") continue;
+
+    // Skip optional table headers/separators from `ctl list`.
+    if (/^(name|subturtle)\s+status\b/i.test(line) || /^[-|:\s]+$/.test(line)) {
+      continue;
+    }
+    if (line.startsWith("|") && /status/i.test(line)) {
+      continue;
+    }
 
     // Tunnel lines are emitted as: "→ https://..."
     if (line.startsWith("→")) {
@@ -1445,7 +1454,7 @@ export async function handleRestart(ctx: Context): Promise<void> {
         })
       );
     } catch (e) {
-      console.warn("Failed to save restart info:", e);
+      cmdLog.warn({ err: e, chatId }, "Failed to save restart info");
     }
   }
 

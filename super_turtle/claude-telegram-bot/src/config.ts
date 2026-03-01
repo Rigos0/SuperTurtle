@@ -8,6 +8,9 @@ import { homedir, platform } from "os";
 import { resolve, dirname } from "path";
 import { existsSync, readFileSync } from "fs";
 import type { McpServerConfig } from "./types";
+import { logger } from "./logger";
+
+const configLog = logger.child({ module: "config" });
 
 // ============== Environment Setup ==============
 
@@ -72,7 +75,7 @@ function parseCodexSandboxMode(raw: string | undefined): CodexSandboxMode {
   if (value === "read-only" || value === "workspace-write" || value === "danger-full-access") {
     return value;
   }
-  console.warn(
+  configLog.warn(
     `Invalid META_CODEX_SANDBOX_MODE="${raw}". Falling back to "workspace-write".`
   );
   return "workspace-write";
@@ -83,7 +86,7 @@ function parseCodexApprovalPolicy(raw: string | undefined): CodexApprovalPolicy 
   if (value === "never" || value === "on-request" || value === "on-failure" || value === "untrusted") {
     return value;
   }
-  console.warn(
+  configLog.warn(
     `Invalid META_CODEX_APPROVAL_POLICY="${raw}". Falling back to "never".`
   );
   return "never";
@@ -96,7 +99,7 @@ function parseMetaCodexNetworkAccess(raw: string | undefined): boolean {
   const value = raw.toLowerCase();
   if (value === "true") return true;
   if (value === "false") return false;
-  console.warn(
+  configLog.warn(
     `Invalid META_CODEX_NETWORK_ACCESS="${raw}". Falling back to "false".`
   );
   return false;
@@ -188,12 +191,12 @@ try {
   const mcpModule = await import(mcpConfigPath).catch(() => null);
   if (mcpModule?.MCP_SERVERS) {
     MCP_SERVERS = mcpModule.MCP_SERVERS;
-    console.log(
+    configLog.info(
       `Loaded ${Object.keys(MCP_SERVERS).length} MCP servers from mcp-config.ts`
     );
   }
 } catch {
-  console.log("No mcp-config.ts found - running without MCPs");
+  configLog.info("No mcp-config.ts found - running without MCPs");
 }
 
 export { MCP_SERVERS };
@@ -222,9 +225,9 @@ let META_PROMPT = "";
 try {
   const metaPath = resolve(WORKING_DIR, "super_turtle/meta/META_SHARED.md");
   META_PROMPT = readFileSync(metaPath, "utf-8").trim();
-  console.log(`Loaded meta prompt from ${metaPath}`);
+  configLog.info({ metaPath }, `Loaded meta prompt from ${metaPath}`);
 } catch {
-  console.warn("Failed to load META_SHARED.md - running without meta prompt");
+  configLog.warn("Failed to load META_SHARED.md - running without meta prompt");
 }
 
 export { META_PROMPT };
@@ -352,17 +355,17 @@ await Bun.write(`${TEMP_DIR}/.keep`, "");
 // ============== Validation ==============
 
 if (!TELEGRAM_TOKEN) {
-  console.error("ERROR: TELEGRAM_BOT_TOKEN environment variable is required");
+  configLog.error("ERROR: TELEGRAM_BOT_TOKEN environment variable is required");
   process.exit(1);
 }
 
 if (ALLOWED_USERS.length === 0) {
-  console.error(
+  configLog.error(
     "ERROR: TELEGRAM_ALLOWED_USERS environment variable is required"
   );
   process.exit(1);
 }
 
-console.log(
+configLog.info(
   `Config loaded: ${ALLOWED_USERS.length} allowed users, working dir: ${WORKING_DIR}`
 );

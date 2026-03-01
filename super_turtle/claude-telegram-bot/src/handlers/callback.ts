@@ -28,9 +28,11 @@ import {
   readClaudeBacklogItems,
   formatBacklogSummary,
 } from "./commands";
+import { streamLog } from "../logger";
 
 const SAFE_CALLBACK_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const SAFE_CALLBACK_OPTION_INDEX = /^\d+$/;
+const callbackLog = streamLog.child({ handler: "callback" });
 
 function isSafeCallbackId(value: string): boolean {
   if (!SAFE_CALLBACK_ID.test(value)) {
@@ -287,7 +289,7 @@ export async function handleCallback(ctx: Context): Promise<void> {
     const text = await file.text();
     requestData = JSON.parse(text);
   } catch (error) {
-    console.error(`Failed to load ask-user request ${requestId}:`, error);
+    callbackLog.error({ err: error, requestId, userId, chatId }, "Failed to load ask-user request");
     await ctx.answerCallbackQuery({ text: "Request expired or invalid" });
     return;
   }
@@ -324,7 +326,7 @@ export async function handleCallback(ctx: Context): Promise<void> {
 
   // Interrupt any running query - button responses are always immediate
   if (isAnyDriverRunning()) {
-    console.log("Interrupting current query for button response");
+    callbackLog.info({ requestId, userId, chatId }, "Interrupting current query for button response");
     await stopActiveDriverQuery();
     // Small delay to ensure clean interruption
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -350,7 +352,7 @@ export async function handleCallback(ctx: Context): Promise<void> {
 
     await auditLog(userId, username, "CALLBACK", message, response);
   } catch (error) {
-    console.error("Error processing callback:", error);
+    callbackLog.error({ err: error, callbackData, userId, chatId }, "Error processing callback");
 
     for (const toolMsg of state.toolMessages) {
       if (isAskUserPromptMessage(toolMsg)) continue;
@@ -419,7 +421,7 @@ async function handleSubturtleLogsCallback(
     await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
     await ctx.answerCallbackQuery({ text: `State for ${name}` });
   } catch (error) {
-    console.error(`Failed to read state for ${name}:`, error);
+    callbackLog.error({ err: error, name, chatId: ctx.chat?.id }, "Failed to read SubTurtle state");
     await ctx.answerCallbackQuery({ text: "Failed to read state" });
   }
 }
@@ -455,7 +457,7 @@ async function handleSubturtleStopCallback(
       await ctx.answerCallbackQuery({ text: `Failed to stop ${name}` });
     }
   } catch (error) {
-    console.error(`Failed to stop SubTurtle ${name}:`, error);
+    callbackLog.error({ err: error, name, chatId: ctx.chat?.id }, "Failed to stop SubTurtle");
     await ctx.answerCallbackQuery({ text: "Failed to stop SubTurtle" });
   }
 }
@@ -520,7 +522,7 @@ async function handleResumeCallback(
       statusCallback,
     });
   } catch (error) {
-    console.error("Error getting recap:", error);
+    callbackLog.error({ err: error, sessionId, userId, chatId }, "Error getting recap");
     // Don't show error to user - session is still resumed, recap just failed
   } finally {
     typing.stop();
@@ -593,7 +595,7 @@ async function handleCodexResumeCallback(
       statusCallback,
     });
   } catch (error) {
-    console.error("Error getting Codex recap:", error);
+    callbackLog.error({ err: error, sessionId, userId, chatId }, "Error getting Codex recap");
     // Don't show error to user - session is still resumed, recap just failed
   } finally {
     typing.stop();

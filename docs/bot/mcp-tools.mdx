@@ -11,64 +11,178 @@ The bot supports **Model Context Protocol (MCP)** servers that extend Claude's c
 
 ### ask_user — Interactive Buttons
 
-Claude presents options as tappable inline Telegram buttons. Perfect for confirmation, multiple-choice, or menu-based interactions.
+`ask_user` shows Telegram inline buttons in the active chat and pauses the turn so the user can pick an option.
 
-**What Claude can do:**
+**Tool input shape:**
 
+```json
+{
+  "question": "Which file format do you prefer?",
+  "options": ["PDF", "PNG", "HTML"]
+}
 ```
-Claude: Which file format do you prefer?
-[Inline buttons: PDF | PNG | HTML]
-```
 
-When you tap a button, Claude sees your choice and continues.
+- `question` is required
+- `options` is required
+- At least 2 options are required (schema allows up to 10; 2-6 is recommended)
+
+**IPC mechanism (how it works internally):**
+1. MCP server writes `/tmp/ask-user-<id>.json` with `status: "pending"` and the current `chat_id`
+2. The streaming handler scans `/tmp`, sends `❓ <question>` with inline buttons, then marks the request as `sent`
+3. When the user taps a button, callback handling loads the same request file, validates the selected index, and deletes the file
+4. The selected option text is injected as the user's next message, and the model continues from that choice
+
+**Return text to Claude:**
+- Success: `[Buttons sent to user. STOP HERE - do not output any more text. Wait for user to tap a button.]`
+- Invalid input: throws `question and at least 2 options required`
 
 **Example:**
 
 ```
 You: Prepare a report
-Claude: What format? (shows buttons)
+Claude: (calls ask_user with options PDF/PNG/HTML and stops)
 You: [Tap PDF]
 Claude: Generating PDF...
 ```
 
-**When to use:**
-- Confirmation dialogs ("Are you sure?")
-- Menu selection ("Which template?")
-- Multiple-choice decisions
-- Workflows that need user input
-
 ### bot_control — Session Management
 
-Claude can control the bot's session directly:
-- Start a new session
-- Switch models
-- Toggle drivers (Claude ↔ Codex)
-- Stop active work
-- Trigger restarts
+`bot_control` is the bot's control-plane tool. It handles usage checks, model/driver switching, session management, and process restart.
+
+**Tool input shape:**
+
+```json
+{
+  "action": "switch_model",
+  "params": {
+    "model": "claude-sonnet-4-6",
+    "effort": "high"
+  }
+}
+```
+
+- `action` is required
+- `params` is optional and depends on action
+
+**IPC mechanism (how it works internally):**
+1. MCP server writes a pending request file to `/tmp/bot-control-<id>.json`
+2. The streaming handler scans `/tmp`, executes the action, then writes result back into the same file
+3. MCP server polls every 100ms, up to 10 seconds, and returns the result text to Claude
+4. Request files are deleted after completion/error (best-effort cleanup)
+
+**Action reference (quick table):**
+
+| Action | Params | What it does | Returns |
+|-------|--------|--------------|---------|
+| `usage` | none | Fetches Claude usage and, when enabled, Codex quota | Usage text block, or failure message |
+| `switch_model` | `model?: string`, `effort?: string` | Updates current session model/effort | Updated model/effort summary, or validation error |
+| `switch_driver` | `driver: "claude" \| "codex"` | Switches active driver and resets running driver sessions | `"Switched to Codex"` / `"Switched to Claude Code"`, or error |
+| `new_session` | none | Stops and kills current session so next message starts fresh | `"Session cleared. Next message will start a fresh session."` |
+| `list_sessions` | none | Lists saved sessions with title/date/ID prefix | Numbered list, or `"No saved sessions."` |
+| `resume_session` | `session_id: string` | Resumes a saved session by full ID or prefix | `Resumed: "..."`, or validation/failure message |
+| `restart` | none | Stops active driver sessions and exits process after a short delay | `"Restarting bot..."` |
+
+**Per-action details and examples:**
+
+#### `usage`
+- **Params:** none
+- **Example call:**
+  ```json
+  { "action": "usage" }
+  ```
+- **Return:** `USAGE DATA (show this to the user as-is, in a code block): ...` or `Failed to fetch usage data.`
+
+#### `switch_model`
+- **Params:**
+  - `model` (optional): model ID or display name
+  - `effort` (optional)
+- **Effort values:**
+  - Claude driver: `low`, `medium`, `high`
+  - Codex driver: `minimal`, `low`, `medium`, `high`, `xhigh`
+- **Example call:**
+  ```json
+  { "action": "switch_model", "params": { "model": "claude-opus-4-6", "effort": "high" } }
+  ```
+- **Return:** current or updated model/effort summary, or an `Unknown model...` / `Invalid effort...` message
+
+#### `switch_driver`
+- **Params:** `driver` required (`claude` or `codex`)
+- **Example call:**
+  ```json
+  { "action": "switch_driver", "params": { "driver": "codex" } }
+  ```
+- **Return:**
+  - Success: `"Switched to Codex"` or `"Switched to Claude Code"`
+  - Validation: `Invalid driver "...". Use: claude or codex`
+  - Availability failure: `Cannot switch to Codex: ...` if Codex is disabled/unavailable
+
+#### `new_session`
+- **Params:** none
+- **Example call:**
+  ```json
+  { "action": "new_session" }
+  ```
+- **Return:** `"Session cleared. Next message will start a fresh session."`
+
+#### `list_sessions`
+- **Params:** none
+- **Example call:**
+  ```json
+  { "action": "list_sessions" }
+  ```
+- **Return:** numbered lines in the format `"<index>. "<title>" (<date>) — ID: <prefix>..."` or `"No saved sessions."`
+
+#### `resume_session`
+- **Params:** `session_id` required (full ID or prefix)
+- **Example call:**
+  ```json
+  { "action": "resume_session", "params": { "session_id": "a1b2c3d4" } }
+  ```
+- **Return:**
+  - Success: `Resumed: "<title>"`
+  - Errors: `Missing session_id parameter.`, `No session found matching "..."`, or `Failed: ...`
+
+#### `restart`
+- **Params:** none
+- **Example call:**
+  ```json
+  { "action": "restart" }
+  ```
+- **Return:** `"Restarting bot..."`
+
+### send_turtle — Emoji Kitchen Turtle Stickers
+
+`send_turtle` sends a turtle mashup sticker to the current Telegram chat. It combines 🐢 with another emoji using Google's Emoji Kitchen images.
+
+**Tool input shape:**
+
+```json
+{
+  "emoji": "😍",
+  "caption": "Mood"
+}
+```
+
+- `emoji` is optional. It accepts either a Unicode emoji (`"😍"`) or hex codepoint (`"1f60d"`). If omitted, it sends turtle + turtle.
+- `caption` is optional text.
+
+**What happens internally:**
+1. MCP server resolves the emoji combo to a prebuilt Emoji Kitchen URL
+2. It writes `/tmp/send-turtle-<id>.json`
+3. The streaming handler sends the sticker to Telegram for the active chat
+4. If sticker upload fails, it falls back to sending the URL as a text message
+
+**Return text to Claude:**
+- Success: `[Turtle sticker sent to chat: 🐢 + <emoji>]`
+- Missing combo: `[No turtle combo found for emoji "..." (codepoint: ...). Try a different emoji ...]`
 
 **Example:**
 
 ```
-You: I want to switch to Opus for this
-Claude: [Internally calls bot_control to switch model]
-Claude: ✅ Switched to Opus. Ready for complex analysis.
+You: Send me a turtle sticker with heart eyes
+Claude: (uses send_turtle with emoji "😍")
+Claude: 🐢 sticker sent
 ```
-
-Claude uses this automatically when it knows a task needs a different model or when stopping work.
-
-### send_turtle — Spawn SubTurtles
-
-For complex tasks, Claude can spawn SubTurtles (parallel agents) to work on different aspects in parallel:
-
-```
-Claude: This needs 3 parallel workers. Spawning...
-[SubTurtle: frontend] Building UI
-[SubTurtle: backend] Setting up API
-[SubTurtle: docs] Writing documentation
-Claude: (supervises and merges results)
-```
-
-Claude uses this automatically when Meta Agent decides work should be parallelized. You control this via environment variables in the `.subturtles` directory.
 
 ## Custom MCP Servers
 

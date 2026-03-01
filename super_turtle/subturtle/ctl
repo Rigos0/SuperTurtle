@@ -421,7 +421,7 @@ for key in list(env):
     if key.startswith('CLAUDECODE'):
         del env[key]
 # Strip ALL Codex session/sandbox vars so inner codex processes start fresh.
-# Same pattern as CLAUDECODE* stripping above. The inner `codex exec` must
+# Same pattern as CLAUDECODE* stripping above. The inner codex exec must
 # not inherit session IDs, thread IDs, or sandbox flags from the outer
 # Codex session (when the meta-agent is Codex). This prevents concurrent
 # session conflicts and auth errors.

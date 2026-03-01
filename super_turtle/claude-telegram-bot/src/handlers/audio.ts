@@ -18,6 +18,9 @@ import {
 } from "../utils";
 import { getDriverAuditType, isActiveDriverSessionActive, runMessageWithActiveDriver } from "./driver-routing";
 import { StreamingState, createStatusCallback } from "./streaming";
+import { streamLog } from "../logger";
+
+const audioLog = streamLog.child({ handler: "audio" });
 
 // Supported audio file extensions
 const AUDIO_EXTENSIONS = [
@@ -123,7 +126,10 @@ export async function processAudioFile(
     // Audit log
     await auditLog(userId, username, getDriverAuditType("AUDIO"), transcript, response);
   } catch (error) {
-    console.error("Error processing audio:", error);
+    audioLog.error(
+      { err: error, userId, username, chatId, filePath },
+      "Audio processing failed"
+    );
 
     if (String(error).includes("abort") || String(error).includes("cancel")) {
       const wasInterrupt = session.consumeInterruptFlag();
@@ -141,7 +147,7 @@ export async function processAudioFile(
     try {
       unlinkSync(filePath);
     } catch (error) {
-      console.debug("Failed to delete audio file:", error);
+      audioLog.debug({ err: error, filePath }, "Failed to delete audio file");
     }
   }
 }
@@ -175,7 +181,7 @@ export async function handleAudio(ctx: Context): Promise<void> {
     return;
   }
 
-  console.log(`Received audio from @${username}`);
+  audioLog.info({ userId, username, chatId, msgType: "audio" }, "Received audio message");
 
   // 3. Download audio file
   let audioPath: string;
@@ -191,7 +197,7 @@ export async function handleAudio(ctx: Context): Promise<void> {
     const buffer = await response.arrayBuffer();
     await Bun.write(audioPath, buffer);
   } catch (error) {
-    console.error("Failed to download audio:", error);
+    audioLog.error({ err: error, userId, username, chatId }, "Failed to download audio");
     await ctx.reply("❌ Failed to download audio file.");
     return;
   }

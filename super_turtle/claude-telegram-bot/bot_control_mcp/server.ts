@@ -17,6 +17,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { mcpLog } from "../src/logger";
 
 const POLL_INTERVAL_MS = 100;
 const POLL_TIMEOUT_MS = 10_000;
@@ -32,6 +33,7 @@ const VALID_ACTIONS = [
 ] as const;
 
 type Action = (typeof VALID_ACTIONS)[number];
+const botControlLog = mcpLog.child({ tool: "bot_control", server: "bot-control" });
 
 // Create the MCP server
 const server = new Server(
@@ -164,7 +166,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Bot Control MCP server running on stdio");
+  botControlLog.info({ action: "startup" }, "Bot Control MCP server running on stdio");
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  botControlLog.error({ err: error, action: "startup" }, "Bot Control MCP server failed");
+  process.exitCode = 1;
+});

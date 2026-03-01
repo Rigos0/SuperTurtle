@@ -1,5 +1,6 @@
 import { session } from "../session";
 import type { ChatDriver, DriverRunInput, DriverStatusSnapshot } from "./types";
+import { claudeLog } from "../logger";
 
 export class ClaudeDriver implements ChatDriver {
   readonly id = "claude" as const;
@@ -7,18 +8,43 @@ export class ClaudeDriver implements ChatDriver {
   readonly auditEvent = "TEXT" as const;
 
   async runMessage(input: DriverRunInput): Promise<string> {
-    return session.sendMessageStreaming(
-      input.message,
-      input.username,
-      input.userId,
-      input.statusCallback,
-      input.chatId,
-      input.ctx
-    );
+    const startedAt = Date.now();
+    const logContext = {
+      driver: this.id,
+      userId: input.userId,
+      username: input.username,
+      chatId: input.chatId,
+      sessionId: session.sessionId,
+    };
+
+    claudeLog.info(logContext, "Starting Claude driver message run");
+
+    try {
+      const response = await session.sendMessageStreaming(
+        input.message,
+        input.username,
+        input.userId,
+        input.statusCallback,
+        input.chatId,
+        input.ctx
+      );
+      claudeLog.info(
+        { ...logContext, elapsed: Date.now() - startedAt, sessionId: session.sessionId },
+        "Completed Claude driver message run"
+      );
+      return response;
+    } catch (error) {
+      claudeLog.error(
+        { ...logContext, err: error, elapsed: Date.now() - startedAt },
+        "Claude driver message run failed"
+      );
+      throw error;
+    }
   }
 
   async stop() {
     if (!session.isRunning) {
+      claudeLog.info({ driver: this.id }, "Claude stop requested with no active query");
       return false;
     }
 
@@ -27,10 +53,12 @@ export class ClaudeDriver implements ChatDriver {
       await Bun.sleep(100);
       session.clearStopRequested();
     }
+    claudeLog.info({ driver: this.id, stopped: Boolean(result) }, "Claude stop completed");
     return result;
   }
 
   async kill(): Promise<void> {
+    claudeLog.warn({ driver: this.id }, "Killing Claude driver session");
     await session.kill();
   }
 

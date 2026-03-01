@@ -7,7 +7,8 @@ process.env.TELEGRAM_ALLOWED_USERS ||= "123";
 process.env.CLAUDE_WORKING_DIR ||= process.cwd();
 
 const { handleSubturtle } = await import("./commands");
-const authorizedUserId = Number((process.env.TELEGRAM_ALLOWED_USERS || "123").split(",")[0]?.trim() || "123");
+const { ALLOWED_USERS } = await import("../config");
+const authorizedUserId = ALLOWED_USERS[0] ?? Number((process.env.TELEGRAM_ALLOWED_USERS || "123").split(",")[0]?.trim() || "123");
 
 describe("/subturtle", () => {
   it("shows parsed sub state and root summary instead of raw task text", async () => {
