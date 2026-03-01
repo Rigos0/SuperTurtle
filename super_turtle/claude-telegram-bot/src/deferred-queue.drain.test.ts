@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import type { Context } from "grammy";
+import { session } from "./session";
 
 type DeferredQueueModule = typeof import("./deferred-queue");
 
@@ -9,14 +10,10 @@ let auditLogMock: ReturnType<typeof mock>;
 let startTypingIndicatorMock: ReturnType<typeof mock>;
 let createStatusCallbackMock: ReturnType<typeof mock>;
 let startProcessingMock: ReturnType<typeof mock>;
+let typingStopMock: ReturnType<typeof mock>;
 
-const sessionMock: {
-  typingController: { stop: () => void } | null;
-  startProcessing: ReturnType<typeof mock>;
-} = {
-  typingController: null,
-  startProcessing: mock(() => () => {}),
-};
+const originalSessionTypingController = session.typingController;
+const originalSessionStartProcessing = session.startProcessing;
 
 async function loadDeferredQueueModule(): Promise<DeferredQueueModule> {
   return import(`./deferred-queue.ts?drain-test=${Date.now()}-${Math.random()}`);
@@ -34,7 +31,7 @@ function makeCtx() {
 }
 
 beforeEach(async () => {
-  const typingStop = mock(() => {});
+  typingStopMock = mock(() => {});
   const actualImportSuffix = `${Date.now()}-${Math.random()}`;
   const actualDriverRouting = await import(
     `./handlers/driver-routing.ts?actual=${actualImportSuffix}`
@@ -43,17 +40,16 @@ beforeEach(async () => {
   const actualStreaming = await import(
     `./handlers/streaming.ts?actual=${actualImportSuffix}`
   );
-  const actualSession = await import(`./session.ts?actual=${actualImportSuffix}`);
 
   isAnyDriverRunningMock = mock(() => false);
   runMessageWithActiveDriverMock = mock(async () => "queued response");
   auditLogMock = mock(async () => {});
   createStatusCallbackMock = mock(() => async () => {});
-  startTypingIndicatorMock = mock(() => ({ stop: typingStop }));
+  startTypingIndicatorMock = mock(() => ({ stop: typingStopMock }));
   startProcessingMock = mock(() => () => {});
 
-  sessionMock.typingController = null;
-  sessionMock.startProcessing = startProcessingMock;
+  session.typingController = null;
+  session.startProcessing = startProcessingMock as unknown as typeof session.startProcessing;
 
   mock.module("./handlers/driver-routing", () => ({
     ...actualDriverRouting,
@@ -73,14 +69,11 @@ beforeEach(async () => {
     createStatusCallback: (ctx: Context, state: unknown) =>
       createStatusCallbackMock(ctx, state),
   }));
-
-  mock.module("./session", () => ({
-    ...actualSession,
-    session: sessionMock,
-  }));
 });
 
 afterEach(() => {
+  session.typingController = originalSessionTypingController;
+  session.startProcessing = originalSessionStartProcessing;
   mock.restore();
 });
 
@@ -151,7 +144,7 @@ describe("drainDeferredQueue", () => {
       "queued response"
     );
     expect(deferredQueue.getDeferredQueueSize(chatId)).toBe(1);
-    expect(sessionMock.typingController).toBeNull();
+    expect(typingStopMock).toHaveBeenCalledTimes(1);
   });
 
   it("replies once on non-cancel error and stops draining", async () => {

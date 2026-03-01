@@ -2,14 +2,12 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { codexSession } from "../codex-session";
 import { getDriver } from "../drivers/registry";
 import { session } from "../session";
-import {
-  beginBackgroundRun,
-  endBackgroundRun,
-  isAnyDriverRunning,
-  preemptBackgroundRunForUserPriority,
-  stopActiveDriverQuery,
-  wasBackgroundRunPreempted,
-} from "./driver-routing";
+
+type DriverRoutingModule = typeof import("./driver-routing");
+
+async function loadDriverRoutingModule(): Promise<DriverRoutingModule> {
+  return import(`./driver-routing.ts?driver-routing-test=${Date.now()}-${Math.random()}`);
+}
 
 const originalSessionDriver = session.activeDriver;
 
@@ -17,17 +15,18 @@ afterEach(() => {
   session.activeDriver = originalSessionDriver;
   (codexSession as unknown as { isQueryRunning: boolean }).isQueryRunning = false;
   (session as unknown as { _isProcessing: boolean })._isProcessing = false;
-  endBackgroundRun();
 });
 
 describe("driver routing", () => {
-  it("treats Codex activity as running", () => {
+  it("treats Codex activity as running", async () => {
+    const { isAnyDriverRunning } = await loadDriverRoutingModule();
     (session as unknown as { _isProcessing: boolean })._isProcessing = false;
     (codexSession as unknown as { isQueryRunning: boolean }).isQueryRunning = true;
     expect(isAnyDriverRunning()).toBe(true);
   });
 
   it("falls back to the other driver when active driver has nothing to stop", async () => {
+    const { stopActiveDriverQuery } = await loadDriverRoutingModule();
     const claudeDriver = getDriver("claude");
     const codexDriver = getDriver("codex");
     const originalClaudeStop = claudeDriver.stop;
@@ -57,6 +56,12 @@ describe("driver routing", () => {
   });
 
   it("marks and preempts active background runs", async () => {
+    const {
+      beginBackgroundRun,
+      endBackgroundRun,
+      preemptBackgroundRunForUserPriority,
+      wasBackgroundRunPreempted,
+    } = await loadDriverRoutingModule();
     const claudeDriver = getDriver("claude");
     const originalClaudeStop = claudeDriver.stop;
     let stopCalls = 0;

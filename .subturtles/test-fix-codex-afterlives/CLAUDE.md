@@ -1,5 +1,5 @@
 ## Current Task
-Fix remaining test failures (registry stop expectation, commands/driver-routing).
+All backlog items completed.
 
 ## End Goal with Specs
 - `bun test` in `super_turtle/claude-telegram-bot` passes.
@@ -9,9 +9,9 @@ Fix remaining test failures (registry stop expectation, commands/driver-routing)
 ## Backlog
 - [x] Update test mocks to merge actual exports (session, streaming, driver-routing)
 - [x] Re-run `bun test` to confirm export errors resolved
-- [ ] Fix remaining test failures (registry stop expectation, commands/driver-routing) <- current
-- [ ] Re-run `bun test` and ensure full pass
-- [ ] Commit with clear message(s)
+- [x] Fix remaining test failures (registry stop expectation, commands/driver-routing)
+- [x] Re-run `bun test` and ensure full pass
+- [x] Commit with clear message(s)
 
 ## Notes
 Target files likely include:
@@ -32,3 +32,8 @@ Latest `bun test` run (2026-03-01) summary:
 Progress update (this loop):
 - Fixed `src/codex-session.test.ts` expectations for runtime policy options and working directory handling.
 - Verified with: `bun test src/codex-session.test.ts` (3 passing).
+- Fixed cross-suite test isolation issues in `src/deferred-queue.drain.test.ts` and `src/handlers/driver-routing.test.ts`.
+- Verified with: `bun test` (163 passing, 0 failing).
+
+## Loop Control
+STOP
