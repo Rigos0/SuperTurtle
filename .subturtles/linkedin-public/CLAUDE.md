@@ -1,5 +1,5 @@
 ## Current Task
-Ensure viewport meta tag is present and correct for mobile.
+Update `linkedin-demo/public/manifest.json` name and short_name to "LinkedOut" (or "LinkedOut Demo").
 
 ## End Goal with Specs
 - Browser title shows "LinkedOut" and indicates demo.
@@ -9,8 +9,8 @@ Ensure viewport meta tag is present and correct for mobile.
 
 ## Backlog
 - [x] Update `linkedin-demo/public/index.html` title to "LinkedOut" and add a brief demo description meta
-- [ ] Ensure viewport meta tag is present and correct for mobile <- current
-- [ ] Update `linkedin-demo/public/manifest.json` name and short_name to "LinkedOut" (or "LinkedOut Demo")
+- [x] Ensure viewport meta tag is present and correct for mobile
+- [ ] Update `linkedin-demo/public/manifest.json` name and short_name to "LinkedOut" (or "LinkedOut Demo") <- current
 - [ ] Add a small demo banner in `linkedin-demo/public/index.html` (e.g., in root div comment or noscript) without touching React files
 
 ## Notes
