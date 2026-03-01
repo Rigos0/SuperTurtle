@@ -24,14 +24,14 @@ export default makeStyles((theme) => ({
   },
   header: {
     padding: "14px 16px",
-    borderBottom: "1px solid #eceff1",
+    borderBottom: `1px solid ${theme.palette.divider}`,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
     position: "sticky",
     top: 0,
-    backgroundColor: "#fff",
+    backgroundColor: theme.palette.background.paper,
     zIndex: 1,
     [theme.breakpoints.down("xs")]: {
       padding: "12px",
@@ -43,7 +43,7 @@ export default makeStyles((theme) => ({
   title: {
     fontSize: 18,
     fontWeight: 700,
-    color: "#1d2226",
+    color: theme.palette.text.primary,
     [theme.breakpoints.down("xs")]: {
       fontSize: 17,
     },
@@ -74,7 +74,7 @@ export default makeStyles((theme) => ({
   item: {
     width: "100%",
     border: 0,
-    background: "#fff",
+    background: theme.palette.background.paper,
     textAlign: "left",
     display: "flex",
     alignItems: "center",
@@ -83,10 +83,10 @@ export default makeStyles((theme) => ({
     minHeight: 72,
     cursor: "pointer",
     transition: "background-color 0.2s ease",
-    borderBottom: "1px solid #f1f3f4",
+    borderBottom: `1px solid ${theme.palette.divider}`,
     touchAction: "manipulation",
     "&:hover": {
-      backgroundColor: "#f4f8f4",
+      backgroundColor: theme.palette.action.hover,
     },
     "&:active": {
       backgroundColor: "#edf6ed",
@@ -100,7 +100,8 @@ export default makeStyles((theme) => ({
   unreadItem: {
     borderLeft: "4px solid #2e7d32",
     paddingLeft: 12,
-    backgroundColor: "#f8fcf8",
+    backgroundColor:
+      theme.palette.type === "dark" ? "rgba(46,125,50,0.08)" : "#f8fcf8",
     [theme.breakpoints.down("xs")]: {
       paddingLeft: 8,
     },
@@ -131,7 +132,7 @@ export default makeStyles((theme) => ({
   message: {
     fontSize: 14,
     fontWeight: 500,
-    color: "#1d2226",
+    color: theme.palette.text.primary,
     lineHeight: 1.35,
   },
   timestamp: {
