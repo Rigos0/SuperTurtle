@@ -1,6 +1,5 @@
 import { useSelector, useDispatch } from "react-redux";
 import { ChangeTheme } from "../../store/actions/util";
-import Logo from "../../assets/images/logo.png";
 import { Paper, Avatar } from "@material-ui/core";
 import SearchIcon from "@material-ui/icons/Search";
 import HomeIcon from "@material-ui/icons/Home";
@@ -44,7 +43,17 @@ const Header = ({ activeTab, setActiveTab }) => {
     <Paper elevation={0} className={classes.header}>
       <div className={classes.header__container}>
         <div className={classes.header__logo}>
-          <img src={Logo} alt="logo" />
+          <span
+            style={{
+              color: "#0a66c2",
+              fontSize: 32,
+              lineHeight: 1,
+              fontWeight: 800,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            LinkedOut
+          </span>
           <div className={classes.search}>
             <SearchIcon />
             <input placeholder="Search" />
