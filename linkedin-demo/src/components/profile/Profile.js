@@ -9,11 +9,13 @@ import {
   Tabs,
   Tab,
 } from "@material-ui/core";
+import Skeleton from "@material-ui/lab/Skeleton";
 import ArrowBackIcon from "@material-ui/icons/ArrowBack";
 import LocationOnIcon from "@material-ui/icons/LocationOn";
 import { api } from "../../convex/_generated/api";
 import useConvexUser from "../../hooks/useConvexUser";
 import Post from "../posts/post/Post";
+import PostSkeleton from "../skeletons/PostSkeleton";
 import Style from "./Style";
 
 const DEFAULT_PROFILE = {
@@ -56,6 +58,7 @@ const Profile = ({ onBack, userId = null }) => {
     api.posts.listPostsByUser,
     resolvedUserId ? { authorId: resolvedUserId } : "skip",
   );
+  const isUserLoading = userId ? profileUser === undefined : resolvedUser === null;
 
   const [activeTab, setActiveTab] = useState(0);
 
@@ -94,59 +97,85 @@ const Profile = ({ onBack, userId = null }) => {
           </Button>
         </div>
 
-        <div className={classes.coverArea}>
-          <Avatar src={userAvatar} className={classes.avatar} />
-        </div>
+        {isUserLoading ? (
+          <div style={{ width: "100%" }}>
+            <div style={{ position: "relative", width: "100%" }}>
+              <Skeleton variant="rect" width="100%" height={200} animation="wave" />
+              <Skeleton
+                variant="circle"
+                width={104}
+                height={104}
+                animation="wave"
+                style={{
+                  position: "absolute",
+                  left: 16,
+                  bottom: -52,
+                  border: "4px solid #fff",
+                }}
+              />
+            </div>
+            <div style={{ width: "100%", padding: "58px 16px 0", boxSizing: "border-box" }}>
+              <Skeleton variant="text" width="42%" height={34} animation="wave" />
+              <Skeleton variant="text" width="62%" height={24} animation="wave" />
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className={classes.coverArea}>
+              <Avatar src={userAvatar} className={classes.avatar} />
+            </div>
 
-        <Typography variant="h6" className={classes.name}>
-          {userName}
-        </Typography>
-        <Typography variant="body2" className={classes.title}>
-          {userTitle}
-        </Typography>
-
-        <div className={classes.metaRow}>
-          {location && (
-            <Typography variant="body2" color="textSecondary" className={classes.metaItem}>
-              <LocationOnIcon style={{ fontSize: 16, marginRight: 4 }} />
-              <span>{location}</span>
+            <Typography variant="h6" className={classes.name}>
+              {userName}
             </Typography>
-          )}
-          <Typography variant="body2" className={classes.networkMeta}>
-            {connections} connections · {followers} followers
-          </Typography>
-        </div>
+            <Typography variant="body2" className={classes.title}>
+              {userTitle}
+            </Typography>
 
-        <div className={classes.actionRow}>
-          <Button
-            variant="contained"
-            size="small"
-            style={{
-              backgroundColor: "#2e7d32",
-              color: "#fff",
-              textTransform: "none",
-              borderRadius: 16,
-              fontWeight: 600,
-              padding: "4px 16px",
-            }}
-          >
-            Connect
-          </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            style={{
-              textTransform: "none",
-              borderRadius: 16,
-              borderColor: "#2e7d32",
-              color: "#2e7d32",
-              fontWeight: 600,
-              padding: "4px 16px",
-            }}
-          >
-            Message
-          </Button>
-        </div>
+            <div className={classes.metaRow}>
+              {location && (
+                <Typography variant="body2" color="textSecondary" className={classes.metaItem}>
+                  <LocationOnIcon style={{ fontSize: 16, marginRight: 4 }} />
+                  <span>{location}</span>
+                </Typography>
+              )}
+              <Typography variant="body2" className={classes.networkMeta}>
+                {connections} connections · {followers} followers
+              </Typography>
+            </div>
+
+            <div className={classes.actionRow}>
+              <Button
+                variant="contained"
+                size="small"
+                style={{
+                  backgroundColor: "#2e7d32",
+                  color: "#fff",
+                  textTransform: "none",
+                  borderRadius: 16,
+                  fontWeight: 600,
+                  padding: "4px 16px",
+                }}
+              >
+                Connect
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                style={{
+                  textTransform: "none",
+                  borderRadius: 16,
+                  borderColor: "#2e7d32",
+                  color: "#2e7d32",
+                  fontWeight: 600,
+                  padding: "4px 16px",
+                }}
+              >
+                Message
+              </Button>
+            </div>
+          </>
+        )}
 
         <Divider style={{ margin: "16px 0 0" }} />
 
@@ -165,9 +194,10 @@ const Profile = ({ onBack, userId = null }) => {
         {activeTab === 0 && (
           <div className={`${classes.section} ${classes.postsSection}`}>
             {posts === undefined ? (
-              <Typography variant="body2" color="textSecondary">
-                Loading posts...
-              </Typography>
+              <>
+                <PostSkeleton />
+                <PostSkeleton />
+              </>
             ) : userPosts.length === 0 ? (
               <Typography variant="body2" color="textSecondary">
                 No posts yet.

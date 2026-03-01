@@ -1,5 +1,5 @@
 ## Current Task
-Wire skeleton loaders into the Profile view (`Profile.js`) with a skeleton header while user data loads and `PostSkeleton` cards while profile posts load.
+Wire skeleton loaders into Messaging (`Messaging.js`) so conversation list shows 4 loading rows (circle avatar + two text lines) while conversations query is `undefined`.
 
 ## End Goal with Specs
 - Feed shows skeleton post cards while loading (pulsing grey rectangles mimicking post layout)
@@ -17,8 +17,8 @@ Wire skeleton loaders into the Profile view (`Profile.js`) with a skeleton heade
 - [x] Create skeleton component `linkedin-demo/src/components/skeletons/UserCardSkeleton.js`: Circle skeleton (avatar 56x56), two text skeletons (name + title), rect skeleton (button, height 36). For network page.
 - [x] Create skeleton component `linkedin-demo/src/components/skeletons/NotificationSkeleton.js`: Circle skeleton (avatar 36x36), two text lines. For notifications list.
 - [x] Wire skeletons into feed: In `linkedin-demo/src/components/posts/Posts.js`, check if posts query is loading (result is `undefined`). If loading, render 3x `<PostSkeleton />`. Import PostSkeleton.
-- [ ] Wire skeletons into Profile: In `linkedin-demo/src/components/profile/Profile.js`, if user query is `undefined`, show a skeleton header (rect 200px height for cover, circle for avatar, text lines for name/title). If posts are `undefined`, show 2x PostSkeleton. <- current
-- [ ] Wire skeletons into Messaging: In `linkedin-demo/src/components/messaging/Messaging.js`, if conversations query is `undefined`, show 4 skeleton rows (circle + two text lines each).
+- [x] Wire skeletons into Profile: In `linkedin-demo/src/components/profile/Profile.js`, if user query is `undefined`, show a skeleton header (rect 200px height for cover, circle for avatar, text lines for name/title). If posts are `undefined`, show 2x PostSkeleton.
+- [ ] Wire skeletons into Messaging: In `linkedin-demo/src/components/messaging/Messaging.js`, if conversations query is `undefined`, show 4 skeleton rows (circle + two text lines each). <- current
 - [ ] Wire skeletons into Network: In `linkedin-demo/src/components/network/Network.js`, if users query is `undefined`, show 6x UserCardSkeleton.
 - [ ] Wire skeletons into Notifications: In `linkedin-demo/src/components/notifications/Notifications.js`, if notifications query is `undefined`, show 5x NotificationSkeleton.
 - [ ] Create Error Boundary: `linkedin-demo/src/components/ErrorBoundary.js`. Class component with `componentDidCatch`. Renders fallback: centered Paper with "Something went wrong" text + green Retry button (onClick resets state). Wrap the main content area in App.js with `<ErrorBoundary>`.
