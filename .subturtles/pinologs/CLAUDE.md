@@ -1,5 +1,5 @@
 ## Current Task
-Add tests: command list includes /pinologs + callback parses + handler shows keyboard.
+All backlog items complete.
 
 ## End Goal with Specs
 - /pinologs command exists and is listed in /status command list.
@@ -18,11 +18,14 @@ Add tests: command list includes /pinologs + callback parses + handler shows key
 - [x] Register /pinologs in `super_turtle/claude-telegram-bot/src/index.ts`
 - [x] Add callback handler for pinologs:* in `super_turtle/claude-telegram-bot/src/handlers/callback.ts`
 - [x] Add command to list in `getCommandLines()` in `super_turtle/claude-telegram-bot/src/handlers/commands.ts`
-- [ ] Add tests: command list includes /pinologs + callback parses + handler shows keyboard <- current
-- [ ] Commit
+- [x] Add tests: command list includes /pinologs + callback parses + handler shows keyboard
+- [x] Commit
 
 ## Notes
 - Use InlineKeyboard from grammy for buttons.
 - Reuse existing chunkText() helper from commands.ts for splitting long logs.
 - MCP tool is available as `mcp__pino-logs__pino_logs` in Claude/Codex context; for bot-side callback, call the MCP tool via session API if needed, otherwise read from /tmp/claude-telegram-bot.log.jsonl via shared helper.
 - Prefer server-side log read by calling checkPendingPinoLogsRequests flow (write request file in /tmp and wait for response) if MCP tool is not directly invokable from handler.
+
+## Loop Control
+STOP

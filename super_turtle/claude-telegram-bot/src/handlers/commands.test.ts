@@ -24,6 +24,7 @@ const {
   handleStatus,
   handleCron,
   handleModel,
+  handlePinologs,
 } = await import("./commands");
 
 type ReplyRecord = {
@@ -115,6 +116,7 @@ describe("getCommandLines", () => {
       "/context",
       "/status",
       "/looplogs",
+      "/pinologs",
       "/resume",
       "/sub",
       "/cron",
@@ -615,6 +617,24 @@ describe("handlers with mock Context", () => {
     expect(callbackData).toContain("effort:low");
     expect(callbackData).toContain("effort:medium");
     expect(callbackData).toContain("effort:high");
+  });
+
+  it("handlePinologs replies with inline keyboard level options", async () => {
+    const { ctx, replies } = mockContext("/pinologs");
+    await handlePinologs(ctx as any);
+
+    expect(replies).toHaveLength(1);
+    const reply = replies[0]!;
+    expect(reply.text).toBe("Select log level:");
+
+    const keyboard = getInlineKeyboard(reply);
+    expect(keyboard).toEqual([
+      [
+        { text: "Info", callback_data: "pinologs:info" },
+        { text: "Warning", callback_data: "pinologs:warn" },
+        { text: "Errors", callback_data: "pinologs:error" },
+      ],
+    ]);
   });
 
   it("handleSwitch shows switch buttons when Codex is unavailable", () => {
