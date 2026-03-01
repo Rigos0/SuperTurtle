@@ -8,7 +8,6 @@ const SidebarTop = () => {
   const classes = Style();
   const user = useConvexUser();
   const connections = user?.connections ?? 0;
-  const viewed = Math.floor((user?.connections ?? 100) / 2);
 
   return (
     <Paper className={classes.sidebar}>
@@ -23,10 +22,6 @@ const SidebarTop = () => {
       <p className={classes.subtitle}>{user?.title ?? "Turtle In member"}</p>
       <div className={classes.stats}>
         <Divider />
-        <div className={classes.stat}>
-          <h4>Who viewed your profile</h4>
-          <p>{viewed}</p>
-        </div>
         <div className={classes.stat}>
           <h4>Connections</h4>
           <p>{connections}</p>
