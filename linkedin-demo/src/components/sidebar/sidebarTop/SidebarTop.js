@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { useSelector } from "react-redux";
 import { Paper, Avatar, Divider } from "@material-ui/core";
 import LabelImportantIcon from "@material-ui/icons/LabelImportant";
+import useConvexUser from "../../../hooks/useConvexUser";
 import Style from "./Style";
 
 const SidebarTop = () => {
   const classes = Style();
-  const { photoURL, displayName } = useSelector((state) => state.user);
+  const user = useConvexUser();
   const [viewed, setViewed] = useState(1);
   const [connections, setConnections] = useState(1);
 
@@ -23,8 +23,8 @@ const SidebarTop = () => {
           backgroundImage: `url("https://tandsgo.com/wp-content/uploads/2020/02/Abstract-blue-and-orange-pattern.jpg")`,
         }}
       ></div>
-      <Avatar src={photoURL} />
-      <h4>{displayName}</h4>
+      <Avatar src={user?.photoURL} />
+      <h4>{user?.displayName ?? "Guest User"}</h4>
       <div className={classes.stats}>
         <Divider />
         <div className={classes.stat}>

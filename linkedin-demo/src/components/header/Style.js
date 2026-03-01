@@ -74,7 +74,7 @@ export default makeStyles((theme) => ({
     },
   },
   header__nav: {
-    flex: 6,
+    flex: 5.5,
     height: "100%",
     display: "flex",
     justifyContent: "space-between",
@@ -93,6 +93,23 @@ export default makeStyles((theme) => ({
     "& > div:nth-child(6)": {
       borderLeft: `1px solid ${theme.palette.type === "dark" ? darkPrimary : "lightgrey"}`,
       borderRight: `1px solid ${theme.palette.type === "dark" ? darkPrimary : "lightgrey"}`,
+    },
+    [theme.breakpoints.down("xs")]: {
+      display: "none",
+    },
+  },
+  signOutButton: {
+    marginLeft: 10,
+    textTransform: "none",
+    borderColor: "#2e7d32",
+    color: "#2e7d32",
+    fontWeight: 600,
+    borderRadius: 999,
+    minWidth: 100,
+    "&:hover": {
+      borderColor: "#1b5e20",
+      color: "#1b5e20",
+      backgroundColor: "rgba(46, 125, 50, 0.08)",
     },
     [theme.breakpoints.down("xs")]: {
       display: "none",

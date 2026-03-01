@@ -1,6 +1,7 @@
 import { useSelector, useDispatch } from "react-redux";
+import { useAuthActions } from "@convex-dev/auth/react";
 import { ChangeTheme } from "../../store/actions/util";
-import { Paper, Avatar } from "@material-ui/core";
+import { Paper, Avatar, Button } from "@material-ui/core";
 import SearchIcon from "@material-ui/icons/Search";
 import HomeIcon from "@material-ui/icons/Home";
 import GroupIcon from "@material-ui/icons/Group";
@@ -11,6 +12,7 @@ import Brightness4Icon from "@material-ui/icons/Brightness4";
 import BrightnessHighIcon from "@material-ui/icons/BrightnessHigh";
 import AddBoxIcon from "@material-ui/icons/AddBox";
 import AppsIcon from "@material-ui/icons/Apps";
+import useConvexUser from "../../hooks/useConvexUser";
 import MenuItem from "./menuItem/MenuItem";
 import Style from "./Style";
 
@@ -18,8 +20,10 @@ const Header = ({ activeTab, setActiveTab, onNavigateProfile }) => {
   const classes = Style();
   const dispatch = useDispatch();
   const mode = useSelector((state) => state.util);
-
-  const { photoURL } = useSelector((state) => state.user);
+  const authActions = useAuthActions();
+  const signOut = authActions?.signOut ?? (() => Promise.resolve());
+  const user = useConvexUser();
+  const photoURL = user?.photoURL;
 
   const items = [
     { Icon: <HomeIcon />, title: "Home", arrow: false },
@@ -77,6 +81,9 @@ const Header = ({ activeTab, setActiveTab, onNavigateProfile }) => {
             onClick={() => dispatch(ChangeTheme())}
           />
         </div>
+        <Button className={classes.signOutButton} onClick={() => signOut()} variant="outlined">
+          Sign Out
+        </Button>
         <Paper className={classes.header__bottom__nav}>
           {tabItems.map(({ key, icon: Icon }) => (
             <Icon

@@ -1,26 +1,25 @@
 import { useEffect, useState } from "react";
-import { useMutation } from "convex/react";
-import { useSelector, useDispatch } from "react-redux";
+import { useConvexAuth, useMutation } from "convex/react";
+import { useSelector } from "react-redux";
 import { Grid, Hidden, Paper, Typography } from "@material-ui/core";
 import { ThemeProvider, createMuiTheme } from "@material-ui/core";
 import Header from "./components/header/Header";
 import Form from "./components/form/Form";
+import Login from "./components/login/Login";
 import Posts from "./components/posts/Posts";
 import Profile from "./components/profile/Profile";
 import Sidebar from "./components/sidebar/Sidebar";
 import Widgets from "./components/widgets/Widgets";
-import { LoginAction } from "./store/actions/auth";
 import { api } from "./convex/_generated/api";
-import { mockUser } from "./mock/user";
 import Styles from "./Style";
 import { LinkedInBgColor, darkPrimary } from "./assets/Colors";
 
 const App = () => {
   const classes = Styles();
-  const dispatch = useDispatch();
   const mode = useSelector((state) => state.util);
   const [activeTab, setActiveTab] = useState("home");
   const [view, setView] = useState("feed");
+  const { isAuthenticated, isLoading } = useConvexAuth();
   const seedData = useMutation(api.seed.seedData);
 
   const muiTheme = createMuiTheme({
@@ -28,10 +27,6 @@ const App = () => {
       type: mode ? "dark" : "light",
     },
   });
-
-  useEffect(() => {
-    dispatch(LoginAction(mockUser));
-  }, [dispatch]);
 
   useEffect(() => {
     const runSeed = async () => {
@@ -54,6 +49,24 @@ const App = () => {
   }[activeTab] || "This section";
 
   const onNavigateProfile = () => setView("profile");
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <ThemeProvider theme={muiTheme}>
+        <Grid
+          container
+          className={classes.app}
+          style={{ backgroundColor: mode ? darkPrimary : LinkedInBgColor }}
+        >
+          <Login />
+        </Grid>
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider theme={muiTheme}>

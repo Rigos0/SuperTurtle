@@ -9,124 +9,94 @@ export default makeStyles((theme) => ({
       borderRadius: 0,
       boxShadow: "none",
     },
-    height: 500,
+    minHeight: 420,
     display: "flex",
     flexDirection: "column",
-    justifyContent: "space-between",
+    justifyContent: "center",
     alignItems: "center",
+    gap: 28,
   },
 
   header: {
-    width: "100%",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 20,
-    "& > img": {
-      width: "auto",
-      height: 35,
-    },
-  },
-
-  form: {
-    width: 250,
-    height: 200,
     display: "flex",
     flexDirection: "column",
-    justifyContent: "space-evenly",
-    "& > input": {
-      outlineWidth: 0,
-      height: 35,
-      border: "1px solid lightgrey",
-      borderRadius: 2,
-      padding: "0 10px",
-    },
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  brand: {
+    margin: 0,
+    color: "#2e7d32",
+    fontSize: 36,
+    lineHeight: 1,
+    letterSpacing: "-0.03em",
+  },
+
+  subtitle: {
+    margin: 0,
+    color: "#5f6368",
+    fontSize: 14,
+  },
+
+  authButtons: {
+    width: 280,
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
     "& > button": {
-      height: 30,
-      border: "1px solid lightgrey",
-      borderRadius: 4,
-      color: "white",
+      height: 42,
+      borderRadius: 999,
+      border: "1px solid transparent",
+      cursor: "pointer",
       fontSize: 14,
       fontWeight: 600,
-      backgroundColor: "#5d98d4",
+      transition: "all 0.2s ease",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      "&:hover": {
+        transform: "translateY(-1px)",
+      },
     },
   },
 
-  google: {
-    width: "100%",
+  guestBtn: {
+    backgroundColor: "#2e7d32",
+    color: "#ffffff",
+    "&:hover": {
+      backgroundColor: "#1b5e20",
+    },
+  },
+
+  githubBtn: {
+    backgroundColor: "#24292e",
+    color: "#ffffff",
+    "&:hover": {
+      backgroundColor: "#171b20",
+    },
+  },
+
+  googleBtn: {
+    backgroundColor: "#ffffff",
+    color: "#202124",
+    borderColor: "#dadce0",
+    "&:hover": {
+      backgroundColor: "#f7f8f8",
+    },
+  },
+
+  googleMark: {
+    width: 18,
+    height: 18,
     display: "flex",
-    flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
-    "& > section": {
-      width: "100%",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      padding: "0 10px",
-      "& > div": {
-        flex: 1,
-        height: 1,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: "lightgrey",
-        opacity: 0.5,
-      },
-      "& > p": {
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: "0 10px",
-        fontSize: 12,
-        color: "grey",
-      },
-    },
-  },
-
-  about: {
-    width: "100%",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    "& > section": {
-      width: "100%",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      padding: "0 10px",
-      marginBottom: 5,
-      "& > div": {
-        flex: 1,
-        height: 1,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: "lightgrey",
-        opacity: 0.5,
-      },
-      "& > p": {
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: "0 10px",
-        fontSize: 10,
-        color: "grey",
-      },
-    },
-  },
-
-  social__links: {
-    width: "100%",
-    display: "flex",
-    justifyContent: "space-evenly",
-    alignItems: "center",
-    margin: "4px 0",
-    "& > a": {
-      color: "grey",
-      "& > .MuiSvgIcon-root": {
-        fontSize: 18,
-      },
-    },
+    fontWeight: 700,
+    fontSize: 16,
+    background: "linear-gradient(45deg, #4285f4 25%, #ea4335 25%, #ea4335 50%, #fbbc05 50%, #fbbc05 75%, #34a853 75%)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
   },
 }));

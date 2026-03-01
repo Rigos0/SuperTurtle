@@ -4,10 +4,23 @@ import { applyMiddleware, createStore } from "redux";
 import thunk from "redux-thunk";
 import App from "./App";
 import reducers from "./store/reducers";
-import { mockUser } from "./mock/user";
+import { useConvexAuth, useMutation } from "convex/react";
 
 jest.mock("lottie-web", () => ({
   loadAnimation: jest.fn(),
+}));
+
+jest.mock("convex/react", () => ({
+  useConvexAuth: jest.fn(),
+  useMutation: jest.fn(),
+  useQuery: jest.fn(),
+}));
+
+jest.mock("@convex-dev/auth/react", () => ({
+  useAuthActions: jest.fn(() => ({
+    signIn: jest.fn(),
+    signOut: jest.fn(),
+  })),
 }));
 
 const renderApp = () => {
@@ -22,15 +35,23 @@ const renderApp = () => {
   return store;
 };
 
-test("renders the feed shell without login or Firebase auth UI", async () => {
-  const store = renderApp();
+test("renders Convex Auth login screen when unauthenticated", async () => {
+  const seedMutation = jest.fn().mockResolvedValue({ seeded: false });
+  useConvexAuth.mockReturnValue({
+    isAuthenticated: false,
+    isLoading: false,
+  });
+  useMutation.mockReturnValue(seedMutation);
 
-  expect(screen.getByText("Turtle In")).not.toBeNull();
-  expect(screen.getByPlaceholderText("Start a post")).not.toBeNull();
-  expect(screen.queryByText("Log In")).toBeNull();
-  expect(screen.queryByText("contact author")).toBeNull();
+  renderApp();
+
+  expect(screen.getByText("🐢 Turtle In")).not.toBeNull();
+  expect(screen.getByRole("button", { name: "🐢 Continue as Guest" })).not.toBeNull();
+  expect(screen.getByRole("button", { name: "Sign in with GitHub" })).not.toBeNull();
+  expect(screen.getByRole("button", { name: /Sign in with Google/ })).not.toBeNull();
+  expect(screen.queryByPlaceholderText("Start a post")).toBeNull();
 
   await waitFor(() => {
-    expect(store.getState().user.displayName).toBe(mockUser.displayName);
+    expect(seedMutation).toHaveBeenCalled();
   });
 });
