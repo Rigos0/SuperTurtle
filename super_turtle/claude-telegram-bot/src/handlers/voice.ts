@@ -25,7 +25,7 @@ import {
 import { StreamingState, createStatusCallback } from "./streaming";
 import { drainDeferredQueue, enqueueDeferredMessage } from "../deferred-queue";
 import { stopAllRunningWork } from "./stop";
-import { streamLog } from "../logger";
+import { eventLog, streamLog } from "../logger";
 
 const voiceLog = streamLog.child({ handler: "voice" });
 
@@ -100,6 +100,20 @@ export async function handleVoice(ctx: Context): Promise<void> {
       );
       return;
     }
+    eventLog.info({
+      event: "user.message.voice",
+      userId,
+      username,
+      chatId,
+      transcriptLength: transcript.length,
+      transcript:
+        transcript.length > 500
+          ? `${transcript.slice(0, 500)}...`
+          : transcript,
+      transcriptTruncated: transcript.length > 500,
+      voiceDurationSec: voice.duration,
+      voiceFileId: voice.file_id,
+    });
 
     // 8. Show transcript (truncate display if needed - full transcript still sent to Claude)
     const maxDisplay = 4000; // Leave room for 🎤 "" wrapper within 4096 limit

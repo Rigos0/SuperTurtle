@@ -99,6 +99,11 @@ export async function handleText(
     username,
     chatId,
     messageLength: message.length,
+    message:
+      message.length > 500
+        ? `${message.slice(0, 500)}...`
+        : message,
+    messageTruncated: message.length > 500,
   });
 
   // 1.5. Bare "stop" — intercept and abort (acts like /stop)

@@ -39,3 +39,4 @@ export const codexLog = logger.child({ module: "codex" });
 export const mcpLog = logger.child({ module: "mcp" });
 export const streamLog = logger.child({ module: "streaming" });
 export const cmdLog = logger.child({ module: "commands" });
+export const eventLog = logger.child({ module: "events" });
