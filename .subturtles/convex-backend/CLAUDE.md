@@ -1,5 +1,5 @@
 ## Current Task
-Run `npx convex dev --once` to push functions and verify no errors.
+All backlog items complete.
 
 ## End Goal with Specs
 Convex backend with:
@@ -14,8 +14,8 @@ Convex backend with:
 - [x] Create `convex/users.ts` with `getUser` query (by id) and `getFeaturedUser` query (isFeatured === true)
 - [x] Create `convex/posts.ts` with `listPosts` query that fetches all posts sorted by createdAt desc, and for each post resolves the author from the users table (returning author displayName, photoURL, title alongside post data)
 - [x] Create `convex/seed.ts` with a `seedData` mutation that checks if posts table is empty, then inserts 4 users and 9 posts with the exact data below
-- [ ] Run `npx convex dev --once` to push functions and verify no errors <- current
-- [ ] Commit with message "Add Convex schema, queries, and seed data for Bíbr In"
+- [x] Run `npx convex dev --once` to push functions and verify no errors
+- [x] Commit with message "Add Convex schema, queries, and seed data for Bíbr In"
 
 ## Seed Data — Users
 1. Tadeáš Bíbr: displayName "Tadeáš Bíbr", photoURL "/tadeas-bibr.jpg" (will be resolved on frontend), title "📦 Co-Founder @ ReKrabice | Box Whisperer | Saving the planet one reusable package at a time", headline "I put things in boxes so you don't have to throw them away.", location "Prague, Czech Republic 🇨🇿", about "Serial box enthusiast. Co-founded ReKrabice because I saw a cardboard box in a dumpster and thought 'there has to be a better way.' Previously convinced the CEO of Slevomat that I was essential (still unconfirmed). When I'm not evangelizing reusable packaging, I'm probably at a Startup Night telling founders their MVP needs more boxes.", experience ["📦 Co-Founder — ReKrabice (Reusable boxes that come back like boomerangs)", "📈 Business Development — Behavio (Reading people's minds, ethically)", "⚙️ EA to CEO — Slevomat (Professional calendar Tetris champion)"], connections 842, followers 1337, isFeatured true
@@ -45,3 +45,6 @@ Post 9: author=Tadeáš, 320min ago, "I used to be EA to the CEO of Slevomat..."
 - Use `ctx.db.query("posts").collect()` pattern for queries
 - Use `ctx.db.insert("users", {...})` for inserts
 - After creating schema.ts, run `npx convex dev --once` to push — this validates the schema
+
+## Loop Control
+STOP
