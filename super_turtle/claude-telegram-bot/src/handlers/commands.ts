@@ -30,6 +30,7 @@ import { cmdLog } from "../logger";
 // Canonical main-loop log written by live.sh (tmux + caffeinate + run-loop).
 export const MAIN_LOOP_LOG_PATH = "/tmp/claude-telegram-bot-ts.log";
 const LOOPLOGS_LINE_COUNT = 50;
+const RESUME_SESSIONS_LIMIT = 5;
 
 /**
  * Shared command list for display in /new and /status, and new_session bot-control.
@@ -459,7 +460,7 @@ export async function handleResume(ctx: Context): Promise<void> {
   let driverName: string;
 
   if (session.activeDriver === "codex") {
-    sessions = await codexSession.getSessionListLive();
+    sessions = await codexSession.getSessionListLive(RESUME_SESSIONS_LIMIT);
     if (sessions.length === 0) {
       sessions = codexSession.getSessionList();
     }
@@ -478,7 +479,7 @@ export async function handleResume(ctx: Context): Promise<void> {
     await ctx.reply(`❌ No saved ${driverName} sessions.`);
     return;
   }
-  sessions = sessions.slice(0, 20);
+  sessions = sessions.slice(0, RESUME_SESSIONS_LIMIT);
 
   // Build inline keyboard with session list
   const buttons = sessions.map((s) => {
