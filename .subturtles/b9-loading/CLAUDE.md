@@ -1,5 +1,5 @@
 ## Current Task
-Wire skeleton loaders into Notifications (`Notifications.js`) so list shows 5 loading rows while notifications query is `undefined`.
+Create Error Boundary: `linkedin-demo/src/components/ErrorBoundary.js`. Class component with `componentDidCatch`. Renders fallback: centered Paper with "Something went wrong" text + green Retry button (onClick resets state). Wrap the main content area in App.js with `<ErrorBoundary>`.
 
 ## End Goal with Specs
 - Feed shows skeleton post cards while loading (pulsing grey rectangles mimicking post layout)
@@ -20,8 +20,8 @@ Wire skeleton loaders into Notifications (`Notifications.js`) so list shows 5 lo
 - [x] Wire skeletons into Profile: In `linkedin-demo/src/components/profile/Profile.js`, if user query is `undefined`, show a skeleton header (rect 200px height for cover, circle for avatar, text lines for name/title). If posts are `undefined`, show 2x PostSkeleton.
 - [x] Wire skeletons into Messaging: In `linkedin-demo/src/components/messaging/Messaging.js`, if conversations query is `undefined`, show 4 skeleton rows (circle + two text lines each).
 - [x] Wire skeletons into Network: In `linkedin-demo/src/components/network/Network.js`, if users query is `undefined`, show 6x UserCardSkeleton.
-- [ ] Wire skeletons into Notifications: In `linkedin-demo/src/components/notifications/Notifications.js`, if notifications query is `undefined`, show 5x NotificationSkeleton. <- current
-- [ ] Create Error Boundary: `linkedin-demo/src/components/ErrorBoundary.js`. Class component with `componentDidCatch`. Renders fallback: centered Paper with "Something went wrong" text + green Retry button (onClick resets state). Wrap the main content area in App.js with `<ErrorBoundary>`.
+- [x] Wire skeletons into Notifications: In `linkedin-demo/src/components/notifications/Notifications.js`, if notifications query is `undefined`, show 5x NotificationSkeleton.
+- [ ] Create Error Boundary: `linkedin-demo/src/components/ErrorBoundary.js`. Class component with `componentDidCatch`. Renders fallback: centered Paper with "Something went wrong" text + green Retry button (onClick resets state). Wrap the main content area in App.js with `<ErrorBoundary>`. <- current
 - [ ] Push: `cd linkedin-demo && npx convex dev --once`
 - [ ] Build: `cd linkedin-demo && npm run build`
 - [ ] Commit: "Add skeleton loaders and error boundary for polished loading states"

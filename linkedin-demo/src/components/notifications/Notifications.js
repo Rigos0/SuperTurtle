@@ -1,11 +1,12 @@
 import { useMemo } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { Avatar, Button, CircularProgress, Paper, Typography } from "@material-ui/core";
+import { Avatar, Button, Paper, Typography } from "@material-ui/core";
 import { useTheme } from "@material-ui/core/styles";
 import useMediaQuery from "@material-ui/core/useMediaQuery";
 import ReactTimeago from "react-timeago";
 import { api } from "../../convex/_generated/api";
 import useConvexUser from "../../hooks/useConvexUser";
+import NotificationSkeleton from "../skeletons/NotificationSkeleton";
 import Style from "./Style";
 
 const DEFAULT_PHOTO = "https://i.pravatar.cc/200?img=68";
@@ -93,8 +94,12 @@ const Notifications = () => {
 
   if (notifications === undefined) {
     return (
-      <Paper className={classes.stateCard} elevation={1}>
-        <CircularProgress size={26} style={{ color: "#2e7d32" }} />
+      <Paper className={classes.root} elevation={1}>
+        <div className={classes.list}>
+          {Array.from({ length: 5 }).map((_, index) => (
+            <NotificationSkeleton key={`notification-skeleton-${index}`} />
+          ))}
+        </div>
       </Paper>
     );
   }
