@@ -134,3 +134,15 @@ export const deletePost = mutation({
     await ctx.db.delete(args.postId);
   },
 });
+
+export const updatePost = mutation({
+  args: {
+    postId: v.id("posts"),
+    description: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.postId, {
+      description: args.description,
+    });
+  },
+});

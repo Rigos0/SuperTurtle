@@ -41,10 +41,13 @@ const Post = forwardRef(
     const toggleLike = useMutation(api.likes.toggleLike);
     const addComment = useMutation(api.comments.addComment);
     const deletePost = useMutation(api.posts.deletePost);
+    const updatePost = useMutation(api.posts.updatePost);
 
     const [showComments, setShowComments] = React.useState(false);
     const [commentText, setCommentText] = React.useState("");
     const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);
+    const [isEditing, setIsEditing] = React.useState(false);
+    const [editText, setEditText] = React.useState(description ?? "");
 
     const liked = useQuery(
       api.likes.getLikeStatus,
@@ -62,6 +65,12 @@ const Post = forwardRef(
     const canNavigateProfile =
       (typeof onViewProfile === "function" && Boolean(authorId)) ||
       typeof onNavigateProfile === "function";
+
+    React.useEffect(() => {
+      if (!isEditing) {
+        setEditText(description ?? "");
+      }
+    }, [description, isEditing]);
 
     const capitalize = (_string = "") => {
       return _string.charAt(0).toUpperCase() + _string.slice(1);
@@ -128,6 +137,39 @@ const Post = forwardRef(
       }
     };
 
+    const handleEditClick = () => {
+      if (!isOwnPost) {
+        return;
+      }
+
+      setEditText(description ?? "");
+      setIsEditing(true);
+      handleMenuClose();
+    };
+
+    const handleEditSave = async () => {
+      if (!isOwnPost) {
+        return;
+      }
+
+      const nextDescription = editText.trim();
+      if (!nextDescription) {
+        return;
+      }
+
+      try {
+        await updatePost({ postId, description: nextDescription });
+        setIsEditing(false);
+      } catch (error) {
+        console.error("Failed to update post:", error);
+      }
+    };
+
+    const handleEditCancel = () => {
+      setEditText(description ?? "");
+      setIsEditing(false);
+    };
+
     const handleProfileClick = () => {
       if (typeof onViewProfile === "function" && authorId) {
         onViewProfile(authorId);
@@ -185,12 +227,42 @@ const Post = forwardRef(
             open={isMenuOpen}
             onClose={handleMenuClose}
           >
+            {isOwnPost && <MenuItem onClick={handleEditClick}>Edit</MenuItem>}
             {isOwnPost && <MenuItem onClick={handleDeleteClick}>Delete</MenuItem>}
           </Menu>
         </div>
         <div className={classes.post__body}>
           <div className={classes.body__description}>
-            <p>{description}</p>
+            {isEditing ? (
+              <div style={{ width: "100%" }}>
+                <textarea
+                  className={classes.editTextarea}
+                  value={editText}
+                  onChange={(event) => setEditText(event.target.value)}
+                  rows={3}
+                  aria-label="Edit post description"
+                />
+                <div className={classes.editActions}>
+                  <button
+                    type="button"
+                    className={classes.saveButton}
+                    onClick={handleEditSave}
+                    disabled={!editText.trim()}
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    className={classes.cancelButton}
+                    onClick={handleEditCancel}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p>{description}</p>
+            )}
           </div>
           {fileData && (
             <div className={classes.body__image}>
