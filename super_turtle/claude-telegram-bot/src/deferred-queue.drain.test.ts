@@ -33,8 +33,17 @@ function makeCtx() {
   return { ctx, replies };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   const typingStop = mock(() => {});
+  const actualImportSuffix = `${Date.now()}-${Math.random()}`;
+  const actualDriverRouting = await import(
+    `./handlers/driver-routing.ts?actual=${actualImportSuffix}`
+  );
+  const actualUtils = await import(`./utils.ts?actual=${actualImportSuffix}`);
+  const actualStreaming = await import(
+    `./handlers/streaming.ts?actual=${actualImportSuffix}`
+  );
+  const actualSession = await import(`./session.ts?actual=${actualImportSuffix}`);
 
   isAnyDriverRunningMock = mock(() => false);
   runMessageWithActiveDriverMock = mock(async () => "queued response");
@@ -47,22 +56,26 @@ beforeEach(() => {
   sessionMock.startProcessing = startProcessingMock;
 
   mock.module("./handlers/driver-routing", () => ({
+    ...actualDriverRouting,
     isAnyDriverRunning: () => isAnyDriverRunningMock(),
     runMessageWithActiveDriver: (input: unknown) => runMessageWithActiveDriverMock(input),
   }));
 
   mock.module("./utils", () => ({
+    ...actualUtils,
     auditLog: (...args: unknown[]) => auditLogMock(...args),
     startTypingIndicator: (ctx: Context) => startTypingIndicatorMock(ctx),
   }));
 
   mock.module("./handlers/streaming", () => ({
+    ...actualStreaming,
     StreamingState: class StreamingState {},
     createStatusCallback: (ctx: Context, state: unknown) =>
       createStatusCallbackMock(ctx, state),
   }));
 
   mock.module("./session", () => ({
+    ...actualSession,
     session: sessionMock,
   }));
 });
