@@ -1,5 +1,5 @@
 ## Current Task
-Write `ci.yml` with push-to-main-only trigger, typecheck job, and test job.
+Verify YAML is valid (check syntax).
 
 ## End Goal with Specs
 A `.github/workflows/ci.yml` file that:
@@ -20,6 +20,6 @@ A `.github/workflows/ci.yml` file that:
 
 ## Backlog
 - [x] Create `.github/workflows/` directory
-- [ ] Write `ci.yml` with push-to-main-only trigger, typecheck job, and test job <- current
-- [ ] Verify YAML is valid (check syntax)
+- [x] Write `ci.yml` with push-to-main-only trigger, typecheck job, and test job
+- [ ] Verify YAML is valid (check syntax) <- current
 - [ ] Commit with message: "ci: add GitHub Actions workflow for main branch (typecheck + tests)"
