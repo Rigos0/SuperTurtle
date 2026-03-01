@@ -118,6 +118,40 @@ Claude: Generating PDF...
 
 #### `new_session`
 - **Params:** none
+
+### pino_logs — Pino Log Tail
+
+`pino_logs` returns recent entries from the bot's Pino log file with simple filters.
+
+**Tool input shape:**
+
+```json
+{
+  "level": "error",
+  "limit": 50,
+  "module": "claude"
+}
+```
+
+- `level` is the minimum severity (default: `error`)
+- `levels` (optional) is an exact list of levels like `["error","warn"]` (overrides `level`)
+- `limit` controls how many entries to return (1-500)
+- `module` filters by `module` field (e.g., `claude`, `streaming`, `bot`)
+
+**IPC mechanism (how it works internally):**
+1. MCP server writes `/tmp/pino-logs-<id>.json` with `status: "pending"` and the current `chat_id`
+2. The streaming handler scans `/tmp`, tails the log file, filters entries, and writes the result back
+3. MCP server polls every 100ms, up to 10 seconds, and returns the result text to Claude
+
+**Example calls:**
+
+```json
+{ "level": "error", "limit": 100 }
+```
+
+```json
+{ "levels": ["error", "warn"], "module": "streaming" }
+```
 - **Example call:**
   ```json
   { "action": "new_session" }

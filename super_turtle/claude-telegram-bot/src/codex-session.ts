@@ -205,7 +205,7 @@ function getErrorMessage(error: unknown): string {
 
 /**
  * Check if MCP servers are already configured in ~/.codex/config.toml.
- * Returns true if any of our 3 servers are found.
+ * Returns true if any of our built-in servers are found.
  */
 async function hasExistingMcpConfig(): Promise<boolean> {
   try {
@@ -218,7 +218,7 @@ async function hasExistingMcpConfig(): Promise<boolean> {
 
     const content = await file.text();
     // Check for any of our MCP server names in the config
-    const ourServers = ["send-turtle", "bot-control", "ask-user"];
+    const ourServers = ["send-turtle", "bot-control", "ask-user", "pino-logs"];
     return ourServers.some((server) => content.includes(server));
   } catch {
     return false;

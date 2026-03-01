@@ -4,7 +4,31 @@ process.env.TELEGRAM_BOT_TOKEN ||= "test-token";
 process.env.TELEGRAM_ALLOWED_USERS ||= "123";
 process.env.CLAUDE_WORKING_DIR ||= process.cwd();
 
-const { createAskUserKeyboard, isAskUserPromptMessage } = await import("./streaming");
+const { createAskUserKeyboard, isAskUserPromptMessage, checkPendingPinoLogsRequests } = await import("./streaming");
+const { PINO_LOG_PATH } = await import("../logger");
+
+async function withTempPinoLogs(lines: string[], fn: () => Promise<void>) {
+  const file = Bun.file(PINO_LOG_PATH);
+  let original: string | null = null;
+  if (await file.exists()) {
+    original = await file.text();
+  }
+  await Bun.write(PINO_LOG_PATH, lines.join("\n") + "\n");
+  try {
+    await fn();
+  } finally {
+    if (original === null) {
+      try {
+        const { unlinkSync } = await import("fs");
+        unlinkSync(PINO_LOG_PATH);
+      } catch {
+        /* best-effort cleanup */
+      }
+    } else {
+      await Bun.write(PINO_LOG_PATH, original);
+    }
+  }
+}
 
 describe("isAskUserPromptMessage()", () => {
   it("detects messages with inline keyboards", () => {
@@ -50,6 +74,78 @@ describe("createAskUserKeyboard()", () => {
       expect(rows[idx]).toEqual([
         { text: option, callback_data: `askuser:req-6:${idx}` },
       ]);
+    });
+  });
+});
+
+describe("checkPendingPinoLogsRequests()", () => {
+  it("filters by minimum level and returns formatted entries", async () => {
+    const logLines = [
+      JSON.stringify({ level: 30, time: 1710000000000, module: "bot", msg: "hello" }),
+      JSON.stringify({
+        level: 50,
+        time: 1710000005000,
+        module: "claude",
+        msg: "processing failed",
+        err: { message: "boom" },
+      }),
+      JSON.stringify({ level: 40, time: 1710000010000, module: "streaming", msg: "warned" }),
+    ];
+
+    await withTempPinoLogs(logLines, async () => {
+      const requestId = "pino-logs-test-error";
+      const requestFile = `/tmp/pino-logs-${requestId}.json`;
+      const request = {
+        request_id: requestId,
+        level: "error",
+        limit: 50,
+        status: "pending",
+        chat_id: "123",
+        created_at: new Date().toISOString(),
+      };
+      await Bun.write(requestFile, JSON.stringify(request, null, 2));
+
+      await checkPendingPinoLogsRequests(123);
+
+      const result = JSON.parse(await Bun.file(requestFile).text());
+      expect(result.status).toBe("completed");
+      expect(result.result).toContain("ERROR");
+      expect(result.result).toContain("[claude]");
+      expect(result.result).toContain("processing failed");
+      expect(result.result).toContain("(boom)");
+      expect(result.result).not.toContain("WARN");
+    });
+  });
+
+  it("filters by exact levels and module", async () => {
+    const logLines = [
+      JSON.stringify({ level: 30, time: 1710000100000, module: "bot", msg: "hello" }),
+      JSON.stringify({ level: 40, time: 1710000105000, module: "streaming", msg: "warned" }),
+      JSON.stringify({ level: 50, time: 1710000110000, module: "streaming", msg: "error" }),
+    ];
+
+    await withTempPinoLogs(logLines, async () => {
+      const requestId = "pino-logs-test-warn";
+      const requestFile = `/tmp/pino-logs-${requestId}.json`;
+      const request = {
+        request_id: requestId,
+        levels: ["warn"],
+        module: "streaming",
+        limit: 10,
+        status: "pending",
+        chat_id: "123",
+        created_at: new Date().toISOString(),
+      };
+      await Bun.write(requestFile, JSON.stringify(request, null, 2));
+
+      await checkPendingPinoLogsRequests(123);
+
+      const result = JSON.parse(await Bun.file(requestFile).text());
+      expect(result.status).toBe("completed");
+      expect(result.result).toContain("WARN");
+      expect(result.result).toContain("[streaming]");
+      expect(result.result).toContain("warned");
+      expect(result.result).not.toContain("ERROR");
     });
   });
 });

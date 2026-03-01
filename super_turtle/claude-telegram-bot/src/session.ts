@@ -26,7 +26,12 @@ import {
   WORKING_DIR,
 } from "./config";
 import { formatToolStatus } from "./formatting";
-import { checkPendingAskUserRequests, checkPendingBotControlRequests, checkPendingSendTurtleRequests } from "./handlers/streaming";
+import {
+  checkPendingAskUserRequests,
+  checkPendingBotControlRequests,
+  checkPendingPinoLogsRequests,
+  checkPendingSendTurtleRequests,
+} from "./handlers/streaming";
 import { checkCommandSafety, isPathAllowed } from "./security";
 import type {
   SavedSession,
@@ -569,7 +574,8 @@ export class ClaudeSession {
               if (
                 !toolName.startsWith("mcp__ask-user") &&
                 !toolName.startsWith("mcp__send-turtle") &&
-                !toolName.startsWith("mcp__bot-control")
+                !toolName.startsWith("mcp__bot-control") &&
+                !toolName.startsWith("mcp__pino-logs")
               ) {
                 await statusCallback("tool", toolDisplay);
               }
@@ -623,6 +629,19 @@ export class ClaudeSession {
                     this,
                     chatId
                   );
+                  if (handled) break;
+                  if (attempt < 2) {
+                    await new Promise((resolve) => setTimeout(resolve, 100));
+                  }
+                }
+              }
+
+              // Fulfil pino-logs requests (read recent pino log entries).
+              if (toolName.startsWith("mcp__pino-logs") && chatId) {
+                await new Promise((resolve) => setTimeout(resolve, 200));
+
+                for (let attempt = 0; attempt < 3; attempt++) {
+                  const handled = await checkPendingPinoLogsRequests(chatId);
                   if (handled) break;
                   if (attempt < 2) {
                     await new Promise((resolve) => setTimeout(resolve, 100));

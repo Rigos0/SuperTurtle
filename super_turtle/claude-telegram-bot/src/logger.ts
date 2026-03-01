@@ -1,6 +1,6 @@
 import pino from "pino";
 
-const LOG_FILE_PATH = "/tmp/claude-telegram-bot.log.jsonl";
+export const PINO_LOG_PATH = "/tmp/claude-telegram-bot.log.jsonl";
 
 function createLogger() {
   try {
@@ -14,7 +14,7 @@ function createLogger() {
           },
           {
             target: "pino/file",
-            options: { destination: LOG_FILE_PATH },
+            options: { destination: PINO_LOG_PATH },
           },
         ],
       },
@@ -25,7 +25,7 @@ function createLogger() {
       {
         level: process.env.LOG_LEVEL || "info",
       },
-      pino.destination(LOG_FILE_PATH)
+      pino.destination(PINO_LOG_PATH)
     );
   }
 }

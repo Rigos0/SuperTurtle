@@ -16,6 +16,7 @@ export class CodexDriver implements ChatDriver {
     const {
       checkPendingAskUserRequests,
       checkPendingBotControlRequests,
+      checkPendingPinoLogsRequests,
       checkPendingSendTurtleRequests,
     } = await import("../handlers/streaming");
 
@@ -98,6 +99,22 @@ export class CodexDriver implements ChatDriver {
         }
       }
 
+      if (normalizedTool === "pino_logs") {
+        codexLog.info(
+          { driver: this.id, tool: normalizedTool, chatId: input.chatId },
+          "Pino-logs tool completed, checking for pending requests"
+        );
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const handled = await checkPendingPinoLogsRequests(input.chatId);
+          if (handled) break;
+          if (attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+        }
+      }
+
       return false; // Only ask-user triggers event loop break
     };
 
@@ -108,6 +125,7 @@ export class CodexDriver implements ChatDriver {
           await checkPendingAskUserRequests(input.ctx, input.chatId);
           await checkPendingSendTurtleRequests(input.ctx, input.chatId);
           await checkPendingBotControlRequests(codexSession, input.chatId);
+          await checkPendingPinoLogsRequests(input.chatId);
         } catch (error) {
           codexLog.warn(
             { err: error, driver: this.id, chatId: input.chatId },
@@ -141,6 +159,7 @@ export class CodexDriver implements ChatDriver {
       await checkPendingAskUserRequests(input.ctx, input.chatId);
       await checkPendingSendTurtleRequests(input.ctx, input.chatId);
       await checkPendingBotControlRequests(codexSession, input.chatId);
+      await checkPendingPinoLogsRequests(input.chatId);
       if (attempt < 2) {
         await wait(100);
       }

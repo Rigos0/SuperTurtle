@@ -35,6 +35,10 @@ export const MCP_SERVERS: Record<
     command: "bun",
     args: ["run", `${REPO_ROOT}/ask_user_mcp/server.ts`],
   },
+  "pino-logs": {
+    command: "bun",
+    args: ["run", `${REPO_ROOT}/pino_logs_mcp/server.ts`],
+  },
 
   // Optional: Typefully - draft and schedule social posts
   // Docs: https://support.typefully.com/en/articles/13128440-typefully-mcp-server
