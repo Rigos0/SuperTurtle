@@ -1,5 +1,5 @@
 ## Current Task
-Wait for Convex backend files (`convex/schema.ts`, `convex/posts.ts`, `convex/users.ts`, `convex/seed.ts`) to appear, then continue frontend wiring.
+Wait for Convex backend files (`convex/schema.ts`, `convex/posts.ts`, `convex/users.ts`, `convex/seed.ts`) to appear; continue retry checks until unblocked, then proceed with frontend wiring.
 
 ## End Goal with Specs
 - App fetches posts and user data from Convex instead of static mock imports
@@ -32,3 +32,4 @@ Wait for Convex backend files (`convex/schema.ts`, `convex/posts.ts`, `convex/us
 - Keep the existing UI/styling — only change data sources
 - `.env.local` already has REACT_APP_CONVEX_URL set
 - Progress (2026-03-01): Ran all 5 required retries (`ls` + 30s waits). Files are still missing at repo root, so this item remains blocked.
+- Progress (2026-03-01, follow-up loop): Re-ran the full 5-retry availability check; `convex/schema.ts`, `convex/posts.ts`, `convex/users.ts`, and `convex/seed.ts` are still missing, so backlog item 1 remains `<- current`.
