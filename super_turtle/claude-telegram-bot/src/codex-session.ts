@@ -16,7 +16,7 @@ import {
   META_CODEX_SANDBOX_MODE,
 } from "./config";
 import { formatCodexToolStatus } from "./formatting";
-import type { StatusCallback, McpCompletionCallback, SavedSession, SessionHistory } from "./types";
+import type { StatusCallback, McpCompletionCallback, RecentMessage, SavedSession, SessionHistory } from "./types";
 import { codexLog } from "./logger";
 
 // Prefs file for Codex (separate from Claude)
@@ -219,7 +219,13 @@ async function hasExistingMcpConfig(): Promise<boolean> {
     const content = await file.text();
     // Check for any of our MCP server names in the config
     const ourServers = ["send-turtle", "bot-control", "ask-user", "pino-logs"];
-    return ourServers.some((server) => content.includes(server));
+    const hasOurServers = ourServers.some((server) => content.includes(server));
+    if (!hasOurServers) return false;
+    // If config uses bare "bun" commands, prefer programmatic config with absolute path.
+    if (/\bcommand\s*=\s*"bun"\b/.test(content)) {
+      return false;
+    }
+    return true;
   } catch {
     return false;
   }
@@ -227,17 +233,31 @@ async function hasExistingMcpConfig(): Promise<boolean> {
 
 /**
  * Convert MCP server config to Codex SDK format.
- * Codex config expects: { mcp_servers: { name: { command: ..., args: ... } } }
+ * Codex config expects: { mcp_servers: { name: { command: ..., args: ..., cwd: ... } } }
+ *
+ * CRITICAL: Set cwd to WORKING_DIR so relative imports in MCP servers resolve correctly.
+ * Without this, `import { mcpLog } from "../src/logger"` fails when Codex spawns the subprocess
+ * from a different working directory, causing "Transport closed" errors.
  */
 function buildCodexMcpConfig(): Record<string, unknown> {
   const mcpServers: Record<string, Record<string, unknown>> = {};
+  const bunPath = Bun.which("bun") || "/opt/homebrew/bin/bun";
+  const envPath = process.env.PATH || "";
 
   for (const [name, config] of Object.entries(MCP_SERVERS)) {
     if ("command" in config && "args" in config) {
+      const resolvedCommand = config.command === "bun" ? bunPath : config.command;
+      const env = config.env ? { ...config.env } : {};
+      if (envPath && !env.PATH) {
+        env.PATH = envPath;
+      }
+
       mcpServers[name] = {
-        command: config.command,
+        command: resolvedCommand,
         ...(config.args && { args: config.args }),
-        ...(config.env && { env: config.env }),
+        ...(Object.keys(env).length > 0 ? { env } : {}),
+        // Set working directory so relative imports in MCP servers resolve correctly
+        cwd: WORKING_DIR,
       };
     }
   }
@@ -558,6 +578,7 @@ async function fetchConversationsFromAppServer(
         saved_at: item.updatedAt || item.timestamp || new Date().toISOString(),
         working_dir: item.cwd || WORKING_DIR,
         title: firstLine.length > 80 ? firstLine.slice(0, 77) + "..." : firstLine,
+        ...(preview ? { preview } : {}),
       });
     }
 
@@ -609,7 +630,27 @@ export class CodexSession {
   lastError: string | null = null;
   lastErrorTime: Date | null = null;
   lastMessage: string | null = null;
+  lastAssistantMessage: string | null = null;
   lastUsage: { input_tokens: number; output_tokens: number } | null = null;
+  recentMessages: RecentMessage[] = []; // Rolling buffer for resume preview
+
+  private static readonly MAX_RECENT_MESSAGES = 10;
+  private static readonly MAX_MESSAGE_TEXT = 500;
+
+  /** Push a user or assistant message into the rolling buffer. */
+  pushRecentMessage(role: "user" | "assistant", text: string): void {
+    const truncated = text.length > CodexSession.MAX_MESSAGE_TEXT
+      ? text.slice(0, CodexSession.MAX_MESSAGE_TEXT - 3) + "..."
+      : text;
+    this.recentMessages.push({
+      role,
+      text: truncated,
+      timestamp: new Date().toISOString(),
+    });
+    if (this.recentMessages.length > CodexSession.MAX_RECENT_MESSAGES) {
+      this.recentMessages = this.recentMessages.slice(-CodexSession.MAX_RECENT_MESSAGES);
+    }
+  }
 
   get model(): string { return this._model; }
   set model(value: string) {
@@ -828,6 +869,7 @@ export class CodexSession {
 
     // Store for debugging
     this.lastMessage = userMessage;
+    this.pushRecentMessage("user", userMessage);
 
     try {
       // Prepend system prompt and date/time prefix to first message in a new thread.
@@ -1137,6 +1179,10 @@ ${messageToSend}`;
       const title = userMessage.length > 50 ? userMessage.slice(0, 47) + "..." : userMessage;
       this.saveSession(title);
 
+      this.lastAssistantMessage = combinedResponse || null;
+      if (combinedResponse) {
+        this.pushRecentMessage("assistant", combinedResponse);
+      }
       return combinedResponse || "No response from Codex.";
     } catch (error) {
       const errorMessage = getErrorMessage(error);
@@ -1168,12 +1214,25 @@ ${messageToSend}`;
       // Load existing session history
       const history = this.loadSessionHistory();
 
+      const previewParts: string[] = [];
+      if (this.lastMessage) {
+        previewParts.push(`You: ${this.lastMessage}`);
+      }
+      if (this.lastAssistantMessage) {
+        previewParts.push(`Assistant: ${this.lastAssistantMessage}`);
+      }
+      const previewRaw = previewParts.join("\n");
+      const preview =
+        previewRaw.length > 280 ? `${previewRaw.slice(0, 277)}...` : previewRaw;
+
       // Create new session entry
       const newSession: SavedSession = {
         session_id: this.threadId,
         saved_at: new Date().toISOString(),
         working_dir: WORKING_DIR,
         title: title || "Codex session",
+        ...(preview ? { preview } : {}),
+        ...(this.recentMessages.length > 0 ? { recentMessages: this.recentMessages } : {}),
       };
 
       // Remove any existing entry with same session_id (update in place)
@@ -1272,6 +1331,7 @@ ${messageToSend}`;
 
     try {
       await this.resumeThread(sessionId);
+      this.recentMessages = sessionData.recentMessages || [];
       this.saveSession(sessionData.title);
       codexLog.info(
         `Resumed Codex session ${sessionData.session_id.slice(0, 8)}... - "${sessionData.title}"`

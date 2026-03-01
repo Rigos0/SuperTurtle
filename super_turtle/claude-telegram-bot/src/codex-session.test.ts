@@ -170,4 +170,43 @@ describe("CodexSession", () => {
 
     await expect(codex.startNewThread()).rejects.toThrow("Failed to initialize Codex SDK:");
   });
+
+  it("passes MCP servers config with cwd to ensure relative imports resolve correctly", async () => {
+    const constructorCalls: Array<Record<string, unknown> | undefined> = [];
+
+    mock.module("@openai/codex-sdk", () => ({
+      Codex: class {
+        constructor(options?: Record<string, unknown>) {
+          constructorCalls.push(options);
+        }
+
+        startThread() {
+          return {
+            id: "thread-mcp-123",
+            runStreamed: async () => ({ events: (async function* () {})() }),
+          };
+        }
+      },
+    }));
+
+    const { CodexSession } = await loadCodexSessionModule("mcp-config-test");
+    const codex = new CodexSession();
+    await codex.startNewThread();
+
+    expect(constructorCalls).toHaveLength(1);
+    const config = constructorCalls[0] as Record<string, unknown>;
+    expect(config.config).toBeDefined();
+
+    const mcpServers = (config.config as Record<string, unknown>).mcp_servers as Record<string, unknown>;
+    expect(mcpServers).toBeDefined();
+
+    // Verify that each MCP server has a cwd option set
+    for (const [serverName, serverConfig] of Object.entries(mcpServers)) {
+      const server = serverConfig as Record<string, unknown>;
+      expect(server.cwd).toBeDefined();
+      expect(typeof server.cwd).toBe("string");
+      // cwd should match the project WORKING_DIR so relative imports resolve correctly
+      expect(server.cwd).toMatch(/agentic$/);
+    }
+  });
 });
