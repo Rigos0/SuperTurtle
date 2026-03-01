@@ -1,4 +1,5 @@
-import { query } from "./_generated/server";
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
 
 export const listPosts = query({
   args: {},
@@ -22,5 +23,34 @@ export const listPosts = query({
         };
       }),
     );
+  },
+});
+
+export const createPost = mutation({
+  args: {
+    authorId: v.id("users"),
+    description: v.string(),
+    fileType: v.optional(v.string()),
+    fileData: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("posts", {
+      authorId: args.authorId,
+      description: args.description,
+      createdAt: Date.now(),
+      likesCount: 0,
+      commentsCount: 0,
+      ...(args.fileType ? { fileType: args.fileType } : {}),
+      ...(args.fileData ? { fileData: args.fileData } : {}),
+    });
+  },
+});
+
+export const deletePost = mutation({
+  args: {
+    postId: v.id("posts"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.delete(args.postId);
   },
 });

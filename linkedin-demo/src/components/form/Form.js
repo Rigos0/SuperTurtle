@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useMutation } from "convex/react";
 import { Chip, Paper } from "@material-ui/core";
 import { useTheme } from "@material-ui/core";
 import VideocamRoundedIcon from "@material-ui/icons/VideocamRounded";
@@ -12,10 +13,14 @@ import swal from "@sweetalert/with-react";
 import InsertLinkIcon from "@material-ui/icons/InsertLink";
 import HighlightOffIcon from "@material-ui/icons/HighlightOff";
 import { imageUploadHandler } from "./form.utils";
+import { api } from "../../convex/_generated/api";
+import useConvexUser from "../../hooks/useConvexUser";
 
 const Form = () => {
   const classes = Styles();
   const theme = useTheme();
+  const createPost = useMutation(api.posts.createPost);
+  const featuredUser = useConvexUser();
 
   const [uploadData, setUploadData] = useState({
     description: "",
@@ -29,11 +34,17 @@ const Form = () => {
   const [openURL, setOpenURL] = useState(false);
   const [URL, setURL] = useState("");
 
-  const handleSubmitButton = (e) => {
+  const handleSubmitButton = async (e) => {
     e.preventDefault();
+    const description = uploadData.description.trim();
 
-    if (!uploadData.description && !uploadData.file.data && !URL) {
+    if (!description && !uploadData.file.data && !URL) {
       swal("Empty Post", "Please enter something","warning");
+      return;
+    }
+
+    if (!featuredUser?._id) {
+      swal("Please wait", "User profile is still loading.", "warning");
       return;
     }
 
@@ -57,8 +68,21 @@ const Form = () => {
       }
     }
 
-    swal("Demo Mode", "Posting is disabled in this demo build.", "info");
-    resetState();
+    const fileType = URL ? "image" : uploadData.file.type || undefined;
+    const fileData = URL || uploadData.file.data || undefined;
+
+    try {
+      await createPost({
+        authorId: featuredUser._id,
+        description,
+        ...(fileType ? { fileType } : {}),
+        ...(fileData ? { fileData } : {}),
+      });
+      resetState();
+    } catch (error) {
+      console.error("Failed to create post:", error);
+      swal("Post Failed", "Unable to publish your post right now.", "error");
+    }
   };
 
   const resetState = () => {
