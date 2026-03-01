@@ -40,8 +40,6 @@ const BUN_PATH = Bun.which("bun") || "/opt/homebrew/bin/bun";
 const MCP_SERVERS = [
   { name: "send-turtle", path: "send_turtle_mcp/server.ts" },
   { name: "bot-control", path: "bot_control_mcp/server.ts" },
-  { name: "ask-user", path: "ask_user_mcp/server.ts" },
-  { name: "pino-logs", path: "pino_logs_mcp/server.ts" },
 ];
 
 // Codex integration tests are expensive (need CLI + API key + real API calls).

@@ -201,13 +201,14 @@ describe("CodexSession", () => {
     expect(mcpServers).toBeDefined();
 
     // Verify that each MCP server has a cwd option set
+    // Import WORKING_DIR from the same config module that buildCodexMcpConfig() uses,
+    // so the expected value always matches regardless of env var load order.
+    const { WORKING_DIR } = await import("./config");
     for (const [serverName, serverConfig] of Object.entries(mcpServers)) {
       const server = serverConfig as Record<string, unknown>;
       expect(server.cwd).toBeDefined();
       expect(typeof server.cwd).toBe("string");
-      // cwd should match CLAUDE_WORKING_DIR (or HOME fallback) so relative imports resolve
-      const expectedCwd = process.env.CLAUDE_WORKING_DIR || process.env.HOME || "";
-      expect(server.cwd).toBe(expectedCwd);
+      expect(server.cwd).toBe(WORKING_DIR);
     }
   });
 });
