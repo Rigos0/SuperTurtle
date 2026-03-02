@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useMutation } from "convex/react";
+import { useConvexAuth, useMutation } from "convex/react";
 import { Chip, Paper } from "@material-ui/core";
 import VideocamRoundedIcon from "@material-ui/icons/VideocamRounded";
 import YouTubeIcon from "@material-ui/icons/YouTube";
@@ -17,7 +17,8 @@ import useConvexUser from "../../hooks/useConvexUser";
 const Form = () => {
   const classes = Styles();
   const createPost = useMutation(api.posts.createPost);
-  const featuredUser = useConvexUser();
+  const { isAuthenticated } = useConvexAuth();
+  const user = useConvexUser();
 
   const [uploadData, setUploadData] = useState({
     description: "",
@@ -40,7 +41,7 @@ const Form = () => {
       return;
     }
 
-    if (!featuredUser?._id) {
+    if (!user?._id) {
       swal("Please wait", "User profile is still loading.", "warning");
       return;
     }
@@ -70,7 +71,7 @@ const Form = () => {
 
     try {
       await createPost({
-        authorId: featuredUser._id,
+        authorId: user._id,
         description,
         ...(fileType ? { fileType } : {}),
         ...(fileData ? { fileData } : {}),
@@ -118,6 +119,10 @@ const Form = () => {
       setOpenURL(true);
     }
   };
+
+  if (!isAuthenticated || !user?._id) {
+    return null;
+  }
 
   return (
     <Paper className={classes.upload}>
