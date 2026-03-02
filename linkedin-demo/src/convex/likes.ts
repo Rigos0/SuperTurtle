@@ -91,6 +91,11 @@ export const setReaction = mutation({
     reactionType: reactionTypeValidator,
   },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
     const post = await ctx.db.get(args.postId);
     if (!post) {
       throw new Error("Post not found");
@@ -100,7 +105,7 @@ export const setReaction = mutation({
     const existingReaction = await ctx.db
       .query("reactions")
       .withIndex("byUserAndPost", (q) =>
-        q.eq("userId", args.userId).eq("postId", args.postId),
+        q.eq("userId", userId).eq("postId", args.postId),
       )
       .first();
 
@@ -118,7 +123,7 @@ export const setReaction = mutation({
     }
 
     await ctx.db.insert("reactions", {
-      userId: args.userId,
+      userId,
       postId: args.postId,
       reactionType: args.reactionType,
       createdAt: now,
@@ -129,11 +134,11 @@ export const setReaction = mutation({
       likesCount: post.likesCount + 1,
     });
 
-    if (post.authorId !== args.userId) {
+    if (post.authorId !== userId) {
       await ctx.runMutation(internal.notifications.createNotification, {
         userId: post.authorId,
         type: "like",
-        fromUserId: args.userId,
+        fromUserId: userId,
         postId: args.postId,
       });
     }
@@ -148,6 +153,11 @@ export const removeReaction = mutation({
     postId: v.id("posts"),
   },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
     const post = await ctx.db.get(args.postId);
     if (!post) {
       throw new Error("Post not found");
