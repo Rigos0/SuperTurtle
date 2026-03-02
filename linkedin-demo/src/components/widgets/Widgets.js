@@ -5,6 +5,7 @@ import InfoOutlinedIcon from "@material-ui/icons/InfoOutlined";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 import HeaderInfo from "../../components/util/HeadLine";
 import { LinkedInLightBlue } from "../../assets/Colors";
+import CompanySuggestions from "../company/CompanySuggestions";
 import Style from "./Style";
 
 const Widgets = () => {
@@ -49,6 +50,9 @@ const Widgets = () => {
           <ExpandMoreIcon style={{ transform: expand ? "rotate(180deg)" : "" }} />
         </div>
       </Paper>
+      <div className={classes.widgets__suggestions}>
+        <CompanySuggestions />
+      </div>
       <div className={classes.widgets__bottom}>
         <Paper className={classes.addBanner}>
           <h4>🐢 TurtleIn Premium</h4>

@@ -49,6 +49,9 @@ export default makeStyles((theme) => ({
     top: "8vh",
     marginTop: 10,
   },
+  widgets__suggestions: {
+    marginTop: 10,
+  },
   addBanner: {
     width: "100%",
     display: "flex",
