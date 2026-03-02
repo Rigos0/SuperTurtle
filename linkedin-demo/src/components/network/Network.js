@@ -2,18 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { Avatar, Button, Paper, TextField, Typography } from "@material-ui/core";
 import { api } from "../../convex/_generated/api";
-import { DEFAULT_PHOTO } from "../../constants";
 import useConvexUser from "../../hooks/useConvexUser";
+import useErrorToast from "../../hooks/useErrorToast";
+import { resolvePhoto } from "../../utils/photo";
 import LoadingGate from "../LoadingGate";
 import Style from "./Style";
-
-const resolvePhoto = (photoURL) => {
-  if (!photoURL || (typeof photoURL === "string" && photoURL.startsWith("/"))) {
-    return DEFAULT_PHOTO;
-  }
-
-  return photoURL;
-};
 
 const NetworkUserCard = ({
   candidateUser,
@@ -27,6 +20,7 @@ const NetworkUserCard = ({
   removeConnection,
   followUser,
   unfollowUser,
+  showError,
 }) => {
   const connectionStatus = useQuery(
     api.connections.getConnectionStatus,
@@ -80,6 +74,7 @@ const NetworkUserCard = ({
       });
     } catch (error) {
       console.error("Failed to send connection request:", error);
+      showError("Failed to send connection request. Please try again.");
     } finally {
       setIsConnectionActionPending(false);
     }
@@ -96,6 +91,7 @@ const NetworkUserCard = ({
       await acceptConnection({ connectionId: connectionStatus.connectionId });
     } catch (error) {
       console.error("Failed to accept connection request:", error);
+      showError("Failed to accept connection request. Please try again.");
     } finally {
       setIsConnectionActionPending(false);
     }
@@ -112,6 +108,7 @@ const NetworkUserCard = ({
       await rejectConnection({ connectionId: connectionStatus.connectionId });
     } catch (error) {
       console.error("Failed to reject connection request:", error);
+      showError("Failed to reject connection request. Please try again.");
     } finally {
       setIsConnectionActionPending(false);
     }
@@ -129,6 +126,7 @@ const NetworkUserCard = ({
       setIsConnectedActionHovered(false);
     } catch (error) {
       console.error("Failed to remove connection:", error);
+      showError("Failed to remove connection. Please try again.");
     } finally {
       setIsConnectionActionPending(false);
     }
@@ -155,6 +153,7 @@ const NetworkUserCard = ({
       }
     } catch (error) {
       console.error("Failed to update follow state:", error);
+      showError("Failed to update follow state. Please try again.");
     } finally {
       setIsFollowActionPending(false);
     }
@@ -315,6 +314,7 @@ const Network = ({ onNavigateProfile }) => {
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [pendingRequestActionIds, setPendingRequestActionIds] = useState(() => new Set());
+  const { showError, ErrorToast } = useErrorToast();
   const canConnect = Boolean(authUser?._id);
   const normalizedTerm = searchTerm.trim().toLowerCase();
   const filteredUsers = useMemo(() => {
@@ -430,6 +430,7 @@ const Network = ({ onNavigateProfile }) => {
                               await acceptConnection({ connectionId: request.connectionId });
                             } catch (error) {
                               console.error("Failed to accept request:", error);
+                              showError("Failed to accept connection request. Please try again.");
                             } finally {
                               setPendingRequestActionIds((prev) => {
                                 const next = new Set(prev);
@@ -462,6 +463,7 @@ const Network = ({ onNavigateProfile }) => {
                               await rejectConnection({ connectionId: request.connectionId });
                             } catch (error) {
                               console.error("Failed to reject request:", error);
+                              showError("Failed to reject connection request. Please try again.");
                             } finally {
                               setPendingRequestActionIds((prev) => {
                                 const next = new Set(prev);
@@ -499,6 +501,7 @@ const Network = ({ onNavigateProfile }) => {
                 removeConnection={removeConnection}
                 followUser={followUser}
                 unfollowUser={unfollowUser}
+                showError={showError}
               />
             ))}
           </div>
@@ -513,6 +516,7 @@ const Network = ({ onNavigateProfile }) => {
           )}
         </>
       </LoadingGate>
+      <ErrorToast />
     </div>
   );
 };
