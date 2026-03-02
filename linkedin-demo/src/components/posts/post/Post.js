@@ -1,6 +1,5 @@
 import React, { forwardRef } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
-import Avatar from "@material-ui/core/Avatar";
 import Dialog from "@material-ui/core/Dialog";
 import DialogActions from "@material-ui/core/DialogActions";
 import DialogContent from "@material-ui/core/DialogContent";
@@ -11,7 +10,6 @@ import TextField from "@material-ui/core/TextField";
 import FiberManualRecordRoundedIcon from "@material-ui/icons/FiberManualRecordRounded";
 import RepeatIcon from "@material-ui/icons/Repeat";
 import ReactPlayer from "react-player";
-import ReactTimeago from "react-timeago";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../../convex/_generated/api";
 import { DEFAULT_PHOTO } from "../../../constants";
@@ -23,6 +21,7 @@ import ReportDialog from "../report/ReportDialog";
 import PostActions from "./PostActions";
 import PostComments from "./PostComments";
 import PostHeader from "./PostHeader";
+import RepostCard from "./RepostCard";
 import { getLinkPreviewFromText } from "./post.utils";
 import Style from "./Style";
 import { REACTION_ITEMS } from "../../../utils/reactions";
@@ -254,7 +253,6 @@ const Post = forwardRef(
       [articleBody, description],
     );
     const hasDescription = typeof description === "string" && description.trim().length > 0;
-    const originalAuthorDisplayName = originalPost?.author?.displayName ?? "Unknown user";
 
     React.useEffect(() => {
       if (!isEditing) {
@@ -889,46 +887,16 @@ const Post = forwardRef(
             )}
             {!isEditing && !isRepost && !isArticlePost && <PollDisplay postId={postId} />}
             {isRepost && originalPost && (
-              <div className={classes.repost__embed}>
-                <div className={classes.repost__embedHeader}>
-                  <Avatar
-                    className={classes.repost__embedAvatar}
-                    src={resolvePhoto(originalPost.author?.photoURL)}
-                    onClick={canNavigateOriginalProfile ? handleOriginalProfileClick : undefined}
-                    style={canNavigateOriginalProfile ? { cursor: "pointer" } : undefined}
-                  />
-                  <div className={classes.repost__embedInfo}>
-                    <h5
-                      onClick={canNavigateOriginalProfile ? handleOriginalProfileClick : undefined}
-                      style={
-                        canNavigateOriginalProfile
-                          ? { cursor: "pointer" }
-                          : { cursor: "default" }
-                      }
-                    >
-                      {originalAuthorDisplayName}
-                    </h5>
-                    <p>
-                      <ReactTimeago
-                        date={new Date(originalPost.createdAt).toUTCString()}
-                        units="minute"
-                      />
-                    </p>
-                  </div>
-                </div>
-                {typeof originalPost.description === "string" &&
-                  originalPost.description.trim().length > 0 && (
-                    <p className={classes.repost__embedDescription}>
-                      {originalPost.description}
-                    </p>
-                )}
-                {renderMedia(
-                  originalPost.fileType,
-                  originalPost.fileData,
-                  originalPostImages,
-                  `embedded-${postId}`,
-                )}
-              </div>
+              <RepostCard
+                classes={classes}
+                originalPost={originalPost}
+                postId={postId}
+                canNavigateOriginalProfile={canNavigateOriginalProfile}
+                onOriginalProfileClick={handleOriginalProfileClick}
+                resolvePhoto={resolvePhoto}
+                renderMedia={renderMedia}
+                originalPostImages={originalPostImages}
+              />
             )}
             {!isRepost && renderMedia(fileType, fileData, postImages, postId)}
           </div>

@@ -1,5 +1,5 @@
 ## Current Task
-Extract RepostCard.js — the embedded original post display for reposts
+Update Post.js to compose from extracted subcomponents — verify same behavior
 
 ## End Goal with Specs
 Break Post.js and Profile.js into smaller, focused components. Post.js → 5-6 files. Profile.js sections → extracted components.
@@ -9,8 +9,8 @@ Break Post.js and Profile.js into smaller, focused components. Post.js → 5-6 f
 - [x] Extract PostHeader.js — author avatar, name, timestamp, "Edited" badge, overflow menu (report, delete, edit triggers)
 - [x] Extract PostActions.js — like/reaction button, comment toggle, repost button, bookmark button, share. Include reaction picker logic.
 - [x] Extract PostComments.js — comment list + comment input form. Move comment state and handlers.
-- [ ] Extract RepostCard.js — the embedded original post display for reposts <- current
-- [ ] Update Post.js to compose from extracted subcomponents — verify same behavior
+- [x] Extract RepostCard.js — the embedded original post display for reposts
+- [ ] Update Post.js to compose from extracted subcomponents — verify same behavior <- current
 - [ ] Read `linkedin-demo/src/components/profile/Profile.js` (2162 lines) and map sections
 - [ ] Extract ExperienceSection.js from Profile.js — experience list + add/edit dialog
 - [ ] Extract EducationSection.js from Profile.js — education list + add/edit dialog
