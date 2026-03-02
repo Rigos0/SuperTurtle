@@ -1,13 +1,19 @@
 import React from "react";
+import { useQuery } from "convex/react";
 import { Paper, Avatar, Divider } from "@material-ui/core";
 import LabelImportantIcon from "@material-ui/icons/LabelImportant";
+import { api } from "../../../convex/_generated/api";
 import useConvexUser from "../../../hooks/useConvexUser";
 import Style from "./Style";
 
 const SidebarTop = () => {
   const classes = Style();
   const user = useConvexUser();
-  const connections = user?.connections ?? 0;
+  const connectionCount = useQuery(
+    api.connections.getConnectionCount,
+    user?._id ? { userId: user._id } : "skip",
+  );
+  const connections = connectionCount ?? 0;
 
   return (
     <Paper className={classes.sidebar}>

@@ -1,5 +1,5 @@
 ## Current Task
-Update Sidebar top connections count to use real Convex query data.
+All connections-frontend backlog items are complete.
 
 ## End Goal with Specs
 - Connect button on Profile and Network calls `sendConnectionRequest` mutation
@@ -29,11 +29,11 @@ Update Sidebar top connections count to use real Convex query data.
   - Wire Connect button to `sendConnectionRequest` mutation
   - Add a "Pending Requests" section at top: query `api.connections.listPendingRequests({ userId: user._id })`. Show Accept/Reject buttons for each.
   - Show connection count on each user card
-- [ ] Update `linkedin-demo/src/components/sidebar/sidebarTop/SidebarTop.js`: <- current
+- [x] Update `linkedin-demo/src/components/sidebar/sidebarTop/SidebarTop.js`:
   - Import `useQuery` and query `api.connections.getConnectionCount({ userId: user._id })` for real count
   - Replace `user?.connections ?? 0` with the real query result
-- [ ] Run `cd linkedin-demo && npm run build` to verify build passes
-- [ ] Commit: "Wire connections frontend: real mutations, status states, connections list, real counts"
+- [x] Run `cd linkedin-demo && npm run build` to verify build passes
+- [x] Commit: "Wire connections frontend: real mutations, status states, connections list, real counts"
 
 ## Notes
 - All paths from repo root: `/Users/Richard.Mladek/Documents/projects/agentic/`
@@ -53,3 +53,6 @@ Update Sidebar top connections count to use real Convex query data.
 - `useConvexUser()` returns the auth user or null
 - Green colors: primary #2e7d32, light #66bb6a, dark #1b5e20
 - Skip queries when user is null (unauthenticated): use `useQuery(api.connections.X, user?._id ? { ... } : "skip")`
+
+## Loop Control
+STOP
