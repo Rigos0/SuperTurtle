@@ -22,3 +22,6 @@ All Convex mutations properly authenticate the calling user and reject unauthori
 - Guest users: the app supports anonymous/guest browsing — mutations should handle `userId === null` gracefully (return early or throw)
 - Schema: `linkedin-demo/src/convex/schema.ts`
 - The app uses `@convex-dev/auth` for auth — check existing patterns in `linkedin-demo/src/convex/connections.ts` or `linkedin-demo/src/convex/messaging.ts` for how they do auth checks
+
+## Loop Control
+STOP

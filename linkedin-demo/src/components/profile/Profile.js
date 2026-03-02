@@ -25,7 +25,6 @@ import { api } from "../../convex/_generated/api";
 import { DEFAULT_PHOTO } from "../../constants";
 import useConvexUser from "../../hooks/useConvexUser";
 import useErrorToast from "../../hooks/useErrorToast";
-import { resolvePhoto } from "../../utils/photo";
 import LoadingGate from "../LoadingGate";
 import Post from "../posts/post/Post";
 import Style from "./Style";
@@ -42,6 +41,18 @@ const MAX_PROFILE_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
 const MAX_COVER_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
 const MAX_FEATURED_POSTS = 3;
 
+const resolveProfilePhoto = (photoURL) => {
+  if (typeof photoURL !== "string" || photoURL.length === 0) {
+    return DEFAULT_PHOTO;
+  }
+
+  if (photoURL.startsWith("/")) {
+    return DEFAULT_PHOTO;
+  }
+
+  return photoURL;
+};
+
 const resolveProfileText = (value, fallback = "") => {
   if (typeof value !== "string") {
     return fallback;
@@ -49,6 +60,18 @@ const resolveProfileText = (value, fallback = "") => {
 
   const trimmedValue = value.trim();
   return trimmedValue.length > 0 ? trimmedValue : fallback;
+};
+
+const resolveCoverPhoto = (coverURL) => {
+  if (typeof coverURL !== "string" || coverURL.length === 0) {
+    return "";
+  }
+
+  if (coverURL.startsWith("/")) {
+    return "";
+  }
+
+  return coverURL;
 };
 
 const buildProfileFormData = (user) => ({
@@ -170,8 +193,8 @@ const computeProfileCompleteness = ({
   skills,
 }) => {
   const checks = [
-    resolvePhoto(photoURL).length > 0,
-    resolvePhoto(coverURL, "").length > 0,
+    resolveProfilePhoto(photoURL).length > 0,
+    resolveCoverPhoto(coverURL).length > 0,
     resolveProfileText(title).length > 0,
     resolveProfileText(headline).length > 0,
     resolveProfileText(location).length > 0,
@@ -333,10 +356,10 @@ const Profile = ({
   const profilePhotoInputRef = useRef(null);
   const coverPhotoInputRef = useRef(null);
 
-  const userAvatar = resolvePhoto(
+  const userAvatar = resolveProfilePhoto(
     resolvedUser?.photoURL ?? resolvedUser?.image ?? DEFAULT_PROFILE.photoURL,
   );
-  const coverPhotoURL = resolvePhoto(resolvedUser?.coverURL, "");
+  const coverPhotoURL = resolveCoverPhoto(resolvedUser?.coverURL);
   const userName =
     resolveProfileText(resolvedUser?.displayName) ||
     resolveProfileText(resolvedUser?.name, DEFAULT_PROFILE.displayName);
@@ -1345,7 +1368,7 @@ const Profile = ({
                           }}
                         >
                           <Avatar
-                            src={resolvePhoto(connection.user.photoURL)}
+                            src={resolveProfilePhoto(connection.user.photoURL)}
                             alt={connection.user.displayName}
                             className={classes.connectionAvatar}
                           />
@@ -1426,7 +1449,7 @@ const Profile = ({
                                 profileUserReactions?.[post._id] ?? undefined
                               }
                               reactionCounts={profileReactionCounts?.[post._id]}
-                              profile={resolvePhoto(post.author?.photoURL ?? userAvatar)}
+                              profile={resolveProfilePhoto(post.author?.photoURL ?? userAvatar)}
                               username={post.author?.displayName ?? userName}
                               timestamp={post.createdAt}
                               isEdited={Boolean(post.isEdited)}
@@ -1493,7 +1516,7 @@ const Profile = ({
                                 profileUserReactions?.[post._id] ?? undefined
                               }
                               reactionCounts={profileReactionCounts?.[post._id]}
-                              profile={resolvePhoto(post.author?.photoURL ?? userAvatar)}
+                              profile={resolveProfilePhoto(post.author?.photoURL ?? userAvatar)}
                               username={post.author?.displayName ?? userName}
                               timestamp={post.createdAt}
                               isEdited={Boolean(post.isEdited)}

@@ -9,8 +9,8 @@ import Typography from "@material-ui/core/Typography";
 import { makeStyles } from "@material-ui/core/styles";
 import ReactTimeago from "react-timeago";
 import { api } from "../../convex/_generated/api";
+import { DEFAULT_PHOTO } from "../../constants";
 import useConvexUser from "../../hooks/useConvexUser";
-import { resolvePhoto } from "../../utils/photo";
 import { REACTION_ITEMS } from "../../utils/reactions";
 
 const renderInlineRichText = (line, lineIndex) => {
@@ -49,6 +49,14 @@ const renderBody = (value) => {
       {lineIndex < lines.length - 1 && <br />}
     </React.Fragment>
   ));
+};
+
+const resolvePhoto = (photoURL) => {
+  if (!photoURL || (typeof photoURL === "string" && photoURL.startsWith("/"))) {
+    return DEFAULT_PHOTO;
+  }
+
+  return photoURL;
 };
 
 const useStyles = makeStyles((theme) => ({

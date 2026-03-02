@@ -1,5 +1,5 @@
 ## Current Task
-Add error toasts to Notifications.js mark-read mutations so failures are user-visible.
+Add error toasts to Messaging.js send message mutation so failures are user-visible.
 
 ## End Goal with Specs
 Every mutation that can fail shows a user-facing Snackbar/toast on error. No more silent console.error failures. Consistent pattern across all components.
@@ -9,8 +9,8 @@ Every mutation that can fail shows a user-facing Snackbar/toast on error. No mor
 - [x] Add error toasts to Post.js mutations (lines ~367, 468, 492, 525, 551, 619, 643) — like, comment, delete, edit, bookmark, repost all need user feedback on failure
 - [x] Add error toasts to Profile.js mutations (lines ~467, 483, 499, 521, 553, 622, 694, 717, 790, 816, 850, 868, 894, 957, 1006) — experience, education, skills, photo uploads, profile edits
 - [x] Add error toasts to Network.js mutations (lines ~82, 98, 114, 131, 157, 432, 464) — connect, accept, reject, follow
-- [x] Add error toasts to Messaging.js (line ~123) — send message failure
-- [ ] Add error toasts to Notifications.js (lines ~69, 106) — mark read, clear all <- current
+- [ ] Add error toasts to Messaging.js (line ~123) — send message failure <- current
+- [ ] Add error toasts to Notifications.js (lines ~69, 106) — mark read, clear all
 - [ ] Add confirm dialogs for destructive actions: delete post, remove connection, remove experience/education — use MUI Dialog with "Are you sure?" pattern
 - [ ] Test build: `cd linkedin-demo && npm run build`
 - [ ] Commit
