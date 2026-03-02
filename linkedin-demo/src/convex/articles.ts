@@ -57,6 +57,32 @@ const buildAuthorSummary = async (ctx: QueryCtx, authorId: Id<"users">) => {
   };
 };
 
+const canViewConnectionsOnlyArticle = async (
+  ctx: QueryCtx,
+  viewerId: Id<"users">,
+  authorId: Id<"users">,
+) => {
+  if (viewerId === authorId) {
+    return true;
+  }
+
+  const [viewerRequestedConnection, viewerReceivedConnection] = await Promise.all([
+    ctx.db
+      .query("connections")
+      .withIndex("byUsers", (q) => q.eq("userId1", viewerId).eq("userId2", authorId))
+      .first(),
+    ctx.db
+      .query("connections")
+      .withIndex("byUsers", (q) => q.eq("userId1", authorId).eq("userId2", viewerId))
+      .first(),
+  ]);
+
+  return (
+    viewerRequestedConnection?.status === "accepted" ||
+    viewerReceivedConnection?.status === "accepted"
+  );
+};
+
 export const createArticle = mutation({
   args: {
     title: v.string(),
@@ -92,9 +118,25 @@ export const getArticle = query({
     postId: v.id("posts"),
   },
   handler: async (ctx, args) => {
+    const viewerId = await getAuthUserId(ctx);
     const article = await ctx.db.get(args.postId);
     if (!article || article.type !== "article") {
       return null;
+    }
+
+    if (article.visibility === "connections") {
+      if (!viewerId) {
+        return null;
+      }
+
+      const canView = await canViewConnectionsOnlyArticle(
+        ctx,
+        viewerId,
+        article.authorId,
+      );
+      if (!canView) {
+        return null;
+      }
     }
 
     return {
