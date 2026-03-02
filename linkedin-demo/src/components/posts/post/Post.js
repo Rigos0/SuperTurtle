@@ -1,5 +1,5 @@
 import React, { forwardRef } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import Avatar from "@material-ui/core/Avatar";
 import Menu from "@material-ui/core/Menu";
 import MenuItem from "@material-ui/core/MenuItem";
@@ -46,6 +46,7 @@ const Post = forwardRef(
   ) => {
     const classes = Style();
     const user = useConvexUser();
+    const { isAuthenticated } = useConvexAuth();
     const toggleLike = useMutation(api.likes.toggleLike);
     const addComment = useMutation(api.comments.addComment);
     const deletePost = useMutation(api.posts.deletePost);
@@ -74,7 +75,8 @@ const Post = forwardRef(
       }
     }, [liked]);
     const commentsList = comments ?? [];
-    const isOwnPost = Boolean(authorId && user?._id && authorId === user._id);
+    const canInteract = Boolean(isAuthenticated && user?._id);
+    const isOwnPost = Boolean(canInteract && authorId && authorId === user._id);
     const isMenuOpen = Boolean(menuAnchorEl);
     const canNavigateProfile = typeof onNavigateProfile === "function";
 
@@ -95,7 +97,7 @@ const Post = forwardRef(
     });
 
     const handleLikeClick = async () => {
-      if (!user?._id) {
+      if (!canInteract) {
         return;
       }
 
@@ -113,7 +115,7 @@ const Post = forwardRef(
 
     const handleCommentSubmit = async (event) => {
       event.preventDefault();
-      if (!user?._id) {
+      if (!canInteract) {
         return;
       }
 
@@ -306,14 +308,18 @@ const Post = forwardRef(
         </div>
         <div className={classes.post__footer}>
           <Reactions />
-          <div className={classes.footer__actions}>
-            <div className={classes.action__icons} onClick={handleLikeClick}>
-              {isLiked ? (
+            <div className={classes.footer__actions}>
+            <div
+              className={classes.action__icons}
+              onClick={canInteract ? handleLikeClick : undefined}
+              style={!canInteract ? { opacity: 0.45, cursor: "not-allowed", pointerEvents: "none" } : undefined}
+            >
+              {canInteract && isLiked ? (
                 <ThumbUpAltIcon style={{ transform: "scaleX(-1)", color: "#2e7d32" }} />
               ) : (
                 <ThumbUpAltOutlinedIcon style={{ transform: "scaleX(-1)" }} />
               )}
-              <h4 style={isLiked ? { color: "#2e7d32" } : undefined}>Like</h4>
+              <h4 style={canInteract && isLiked ? { color: "#2e7d32" } : undefined}>Like</h4>
             </div>
             <div className={classes.action__icons} onClick={() => setShowComments((prev) => !prev)}>
               <CommentOutlinedIcon style={showComments ? { color: "#2e7d32" } : undefined} />
@@ -351,18 +357,20 @@ const Post = forwardRef(
                 ))}
               </div>
 
-              <form className={classes.comment__form} onSubmit={handleCommentSubmit}>
-                <input
-                  type="text"
-                  value={commentText}
-                  onChange={(event) => setCommentText(event.target.value)}
-                  placeholder="Add a comment"
-                  aria-label="Add a comment"
-                />
-                <button type="submit" disabled={!commentText.trim() || !user?._id}>
-                  Send
-                </button>
-              </form>
+              {canInteract && (
+                <form className={classes.comment__form} onSubmit={handleCommentSubmit}>
+                  <input
+                    type="text"
+                    value={commentText}
+                    onChange={(event) => setCommentText(event.target.value)}
+                    placeholder="Add a comment"
+                    aria-label="Add a comment"
+                  />
+                  <button type="submit" disabled={!commentText.trim()}>
+                    Send
+                  </button>
+                </form>
+              )}
             </div>
           )}
         </div>
