@@ -1,6 +1,7 @@
 import React from "react";
 import { useQuery } from "convex/react";
 import {
+  Avatar,
   Button,
   Dialog,
   DialogActions,
@@ -11,6 +12,7 @@ import {
   Typography,
 } from "@material-ui/core";
 import { Autocomplete } from "@material-ui/lab";
+import BusinessIcon from "@material-ui/icons/Business";
 import { fade, useTheme } from "@material-ui/core/styles";
 import { api } from "../../convex/_generated/api";
 
@@ -27,6 +29,14 @@ const formatExperienceDateRange = (startDate, endDate) => {
   }
 
   return "";
+};
+
+const normalizeCompanyName = (value) => {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.trim().toLowerCase();
 };
 
 const ExperienceSection = ({
@@ -47,7 +57,26 @@ const ExperienceSection = ({
 }) => {
   const theme = useTheme();
   const companies = useQuery(api.companies.listCompanyNames);
-  const companyOptions = Array.isArray(companies) ? companies : [];
+  const companyOptions = React.useMemo(
+    () => (Array.isArray(companies) ? companies : []),
+    [companies],
+  );
+  const companyById = React.useMemo(
+    () => new Map(companyOptions.map((company) => [company._id, company])),
+    [companyOptions],
+  );
+  const companyByName = React.useMemo(() => {
+    const byName = new Map();
+
+    companyOptions.forEach((company) => {
+      const normalizedName = normalizeCompanyName(company.name);
+      if (normalizedName && !byName.has(normalizedName)) {
+        byName.set(normalizedName, company);
+      }
+    });
+
+    return byName;
+  }, [companyOptions]);
   const selectedCompanyOption =
     experienceFormData.companyId && companyOptions.length > 0
       ? companyOptions.find((company) => company._id === experienceFormData.companyId) ?? null
@@ -92,6 +121,11 @@ const ExperienceSection = ({
 
     {experienceEntries.map((entry) => {
       const dateRange = formatExperienceDateRange(entry.startDate, entry.endDate);
+      const matchedCompany =
+        (entry.companyId ? companyById.get(entry.companyId) : null) ??
+        companyByName.get(normalizeCompanyName(entry.company));
+      const companyLogoURL = matchedCompany?.logoURL ?? null;
+
       return (
         <div
           key={entry.id}
@@ -105,13 +139,35 @@ const ExperienceSection = ({
           <Typography variant="subtitle2" style={{ fontWeight: 700, marginBottom: 2 }}>
             {entry.title}
           </Typography>
-          <Typography
-            variant="body2"
-            color="textSecondary"
-            style={{ fontWeight: 600, marginBottom: dateRange ? 2 : 6 }}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: dateRange ? 2 : 6,
+            }}
           >
-            {entry.company}
-          </Typography>
+            <Avatar
+              src={companyLogoURL ?? undefined}
+              alt={entry.company}
+              style={{
+                width: 24,
+                height: 24,
+                backgroundColor: fade(theme.palette.primary.main, 0.12),
+                color: theme.palette.text.secondary,
+                fontSize: "0.75rem",
+              }}
+            >
+              {!companyLogoURL ? <BusinessIcon style={{ fontSize: 16 }} /> : null}
+            </Avatar>
+            <Typography
+              variant="body2"
+              color="textSecondary"
+              style={{ fontWeight: 600 }}
+            >
+              {entry.company}
+            </Typography>
+          </div>
           {dateRange && (
             <Typography
               variant="body2"

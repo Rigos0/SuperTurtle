@@ -248,14 +248,17 @@ export const listCompanyNames = query({
   handler: async (ctx) => {
     const companies = await ctx.db.query("companies").collect();
 
-    return companies
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map((company) => ({
-        _id: company._id,
-        name: company.name,
-        slug: company.slug,
-        logoStorageId: company.logoStorageId ?? null,
-      }));
+    return await Promise.all(
+      companies
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(async (company) => ({
+          _id: company._id,
+          name: company.name,
+          slug: company.slug,
+          logoStorageId: company.logoStorageId ?? null,
+          logoURL: company.logoStorageId ? await ctx.storage.getUrl(company.logoStorageId) : null,
+        })),
+    );
   },
 });
 
