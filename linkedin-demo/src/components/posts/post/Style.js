@@ -83,7 +83,7 @@ export default makeStyles((theme) => ({
   },
   saveButton: {
     backgroundColor: "#2e7d32",
-    color: "white",
+    color: theme.palette.common.white,
     border: "none",
     padding: "6px 16px",
     borderRadius: 4,
@@ -272,8 +272,8 @@ export default makeStyles((theme) => ({
       height: 36,
       borderRadius: 18,
       border: `1px solid ${theme.palette.type === "dark" ? "#455a64" : "#cfd8dc"}`,
-      backgroundColor: theme.palette.type === "dark" ? "#263238" : "white",
-      color: theme.palette.type === "dark" ? "lightgrey" : "#1d2226",
+      backgroundColor: theme.palette.background.paper,
+      color: theme.palette.text.primary,
       padding: "0 12px",
       outline: "none",
       fontSize: 13,
@@ -289,7 +289,7 @@ export default makeStyles((theme) => ({
       cursor: "pointer",
       fontSize: 13,
       fontWeight: 600,
-      color: "white",
+      color: theme.palette.common.white,
       backgroundColor: "#2e7d32",
       transition: "opacity 0.2s ease",
       "&:disabled": {

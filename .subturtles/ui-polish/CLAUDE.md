@@ -1,5 +1,5 @@
 ## Current Task
-Fix dark mode colors in `linkedin-demo/src/components/posts/post/Style.js`.
+Fix dark mode in `linkedin-demo/src/components/messaging/Style.js`.
 
 ## End Goal with Specs
 - All hardcoded white/black colors replaced with theme-aware values
@@ -14,11 +14,11 @@ Fix dark mode colors in `linkedin-demo/src/components/posts/post/Style.js`.
 ## Backlog
 - [x] Fix empty posts feed bug in `linkedin-demo/src/components/posts/Posts.js`: When `posts.length === 0`, show "No posts yet" message instead of loading animation. The loading state should only show when `posts === undefined` (still loading from Convex), not when it's an empty array.
 - [x] Fix ErrorBoundary dark mode in `linkedin-demo/src/components/ErrorBoundary.js`: Replace hardcoded `background: "#ffffff"`, `color` values with theme-aware colors. Use `useTheme` hook or pass theme via context. The error page should look good in both light and dark mode.
-- [ ] Fix dark mode colors in `linkedin-demo/src/components/posts/post/Style.js`: <- current
+- [x] Fix dark mode colors in `linkedin-demo/src/components/posts/post/Style.js`:
   - Line ~86: Save button `color: "white"` — change to `color: theme.palette.common.white` (this is intentional white-on-green)
   - Line ~275: Comment input `backgroundColor: "white"` → use `theme.palette.background.paper`
   - Line ~292: Comment submit button text color — verify contrast in dark mode
-- [ ] Fix dark mode in `linkedin-demo/src/components/messaging/Style.js`:
+- [ ] Fix dark mode in `linkedin-demo/src/components/messaging/Style.js`: <- current
   - Line ~150: Other user bubble `backgroundColor: "#e0e0e0"` → use `theme.palette.type === "dark" ? "#37474f" : "#e0e0e0"`
 - [ ] Fix dark mode in `linkedin-demo/src/components/profile/Style.js`:
   - Line ~56: Avatar border `border: "4px solid #fff"` → use `theme.palette.background.paper`
