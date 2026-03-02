@@ -36,6 +36,10 @@ const NetworkUserCard = ({
     api.connections.getConnectionCount,
     candidateUser?._id ? { userId: candidateUser._id } : "skip",
   );
+  const candidateProfile = useQuery(
+    api.users.getUser,
+    candidateUser?._id ? { id: candidateUser._id } : "skip",
+  );
   const mutualConnectionsCount = useQuery(
     api.connections.getMutualConnectionsCount,
     authUserId
@@ -45,6 +49,7 @@ const NetworkUserCard = ({
   const [isConnectionActionPending, setIsConnectionActionPending] = useState(false);
   const [isConnectedActionHovered, setIsConnectedActionHovered] = useState(false);
   const connectionState = connectionStatus?.status ?? "none";
+  const candidateUsername = candidateProfile?.username ?? candidateUser?.username ?? null;
 
   useEffect(() => {
     if (connectionState !== "accepted") {
@@ -204,11 +209,19 @@ const NetworkUserCard = ({
       className={classes.card}
       role="button"
       tabIndex={0}
-      onClick={() => onNavigateProfile(candidateUser._id)}
+      onClick={() =>
+        onNavigateProfile({
+          username: candidateUsername,
+          userId: candidateUser._id,
+        })
+      }
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          onNavigateProfile(candidateUser._id);
+          onNavigateProfile({
+            username: candidateUsername,
+            userId: candidateUser._id,
+          });
         }
       }}
     >
@@ -318,11 +331,19 @@ const Network = ({ onNavigateProfile }) => {
                       className={classes.pendingRequestCard}
                       role="button"
                       tabIndex={0}
-                      onClick={() => onNavigateProfile(request.user._id)}
+                      onClick={() =>
+                        onNavigateProfile({
+                          username: request.user.username ?? null,
+                          userId: request.user._id,
+                        })
+                      }
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
-                          onNavigateProfile(request.user._id);
+                          onNavigateProfile({
+                            username: request.user.username ?? null,
+                            userId: request.user._id,
+                          });
                         }
                       }}
                     >

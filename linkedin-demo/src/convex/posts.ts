@@ -28,6 +28,7 @@ export const listPosts = query({
                 displayName: author.displayName ?? author.name ?? "Guest User",
                 photoURL: author.photoURL ?? author.image ?? "",
                 title: author.title ?? "",
+                username: author.username ?? "",
               }
             : null,
         };
@@ -68,6 +69,7 @@ export const listPostsByUser = query({
                 displayName: author.displayName ?? author.name ?? "Guest User",
                 photoURL: author.photoURL ?? author.image ?? "",
                 title: author.title ?? "",
+                username: author.username ?? "",
               }
             : null,
         };
@@ -108,6 +110,7 @@ export const searchPosts = query({
                 displayName: author.displayName ?? author.name ?? "Guest User",
                 photoURL: author.photoURL ?? author.image ?? "",
                 title: author.title ?? "",
+                username: author.username ?? "",
               }
             : null,
         };

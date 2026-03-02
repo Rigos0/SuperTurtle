@@ -47,6 +47,7 @@ const Posts = ({ onNavigateProfile }) => {
                 key={post._id}
                 postId={post._id}
                 authorId={post.authorId}
+                authorUsername={post.author?.username ?? null}
                 likesCount={post.likesCount}
                 commentsCount={post.commentsCount}
                 liked={likeStatuses?.[post._id] ?? undefined}

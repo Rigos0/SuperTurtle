@@ -31,6 +31,7 @@ const Post = forwardRef(
     {
       postId,
       authorId,
+      authorUsername,
       likesCount = 0,
       commentsCount = 0,
       liked,
@@ -78,7 +79,8 @@ const Post = forwardRef(
     const canInteract = Boolean(isAuthenticated && user?._id);
     const isOwnPost = Boolean(canInteract && authorId && authorId === user._id);
     const isMenuOpen = Boolean(menuAnchorEl);
-    const canNavigateProfile = typeof onNavigateProfile === "function";
+    const canNavigateProfile =
+      typeof onNavigateProfile === "function" && Boolean(authorId || authorUsername);
 
     React.useEffect(() => {
       if (!isEditing) {
@@ -190,8 +192,11 @@ const Post = forwardRef(
     };
 
     const handleProfileClick = () => {
-      if (typeof onNavigateProfile === "function") {
-        onNavigateProfile(authorId);
+      if (canNavigateProfile) {
+        onNavigateProfile({
+          username: authorUsername ?? null,
+          userId: authorId ?? null,
+        });
       }
     };
 

@@ -108,8 +108,11 @@ const Header = ({
     }
   };
 
-  const handleUserResultClick = (userId) => {
-    onNavigateProfile(userId);
+  const handleUserResultClick = (resultUser) => {
+    onNavigateProfile({
+      username: resultUser?.username ?? null,
+      userId: resultUser?._id ?? null,
+    });
     clearSearch();
   };
 
@@ -179,7 +182,11 @@ const Header = ({
           Icon: <Avatar src={photoURL} />,
           title: "Me",
           arrow: true,
-          onClick: () => onNavigateProfile(user?._id ?? null),
+          onClick: () =>
+            onNavigateProfile({
+              username: user?.username ?? null,
+              userId: user?._id ?? null,
+            }),
           isActive: false,
         }
       : {
@@ -225,7 +232,10 @@ const Header = ({
       icon: PersonIcon,
       onClick: () => {
         if (isAuthenticated) {
-          onNavigateProfile(user?._id ?? null);
+          onNavigateProfile({
+            username: user?.username ?? null,
+            userId: user?._id ?? null,
+          });
           return;
         }
         onSignInClick?.();
@@ -281,10 +291,10 @@ const Header = ({
                           <div
                             key={resultUser._id}
                             className={classes.searchResultItem}
-                            onClick={() => handleUserResultClick(resultUser._id)}
+                            onClick={() => handleUserResultClick(resultUser)}
                             onKeyDown={(event) =>
                               handleResultKeyDown(event, () =>
-                                handleUserResultClick(resultUser._id)
+                                handleUserResultClick(resultUser)
                               )
                             }
                             role="button"
@@ -350,7 +360,12 @@ const Header = ({
           {isAuthenticated ? (
             <Avatar
               src={photoURL}
-              onClick={() => onNavigateProfile(user?._id ?? null)}
+              onClick={() =>
+                onNavigateProfile({
+                  username: user?.username ?? null,
+                  userId: user?._id ?? null,
+                })
+              }
               style={{ cursor: "pointer" }}
             />
           ) : (

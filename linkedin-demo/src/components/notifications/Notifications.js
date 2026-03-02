@@ -84,8 +84,14 @@ const Notifications = ({ onViewPost, onNavigateProfile, onNavigateMessaging }) =
       return;
     }
 
-    if (typeof onNavigateProfile === "function" && notification.fromUser?._id) {
-      onNavigateProfile(notification.fromUser._id);
+    if (
+      typeof onNavigateProfile === "function" &&
+      (notification.fromUser?._id || notification.fromUser?.username)
+    ) {
+      onNavigateProfile({
+        username: notification.fromUser?.username ?? null,
+        userId: notification.fromUser?._id ?? null,
+      });
     }
   };
 
