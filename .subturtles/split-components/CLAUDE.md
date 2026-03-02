@@ -1,5 +1,5 @@
 ## Current Task
-Extract `SkillsSection.js` from `linkedin-demo/src/components/profile/Profile.js` — skills tags + add/remove
+Update `Profile.js` to compose from extracted subcomponents
 
 ## End Goal with Specs
 Break Post.js and Profile.js into smaller, focused components. Post.js → 5-6 files. Profile.js sections → extracted components.
@@ -14,8 +14,8 @@ Break Post.js and Profile.js into smaller, focused components. Post.js → 5-6 f
 - [x] Read `linkedin-demo/src/components/profile/Profile.js` (2162 lines) and map sections
 - [x] Extract ExperienceSection.js from Profile.js — experience list + add/edit dialog
 - [x] Extract EducationSection.js from Profile.js — education list + add/edit dialog
-- [ ] Extract SkillsSection.js from Profile.js — skills tags + add/remove <- current
-- [ ] Update Profile.js to compose from extracted subcomponents
+- [x] Extract SkillsSection.js from Profile.js — skills tags + add/remove
+- [ ] Update Profile.js to compose from extracted subcomponents <- current
 - [x] Test build: `cd linkedin-demo && npm run build`
 - [ ] Commit
 

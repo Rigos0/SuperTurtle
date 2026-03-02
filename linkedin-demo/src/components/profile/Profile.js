@@ -15,7 +15,6 @@ import {
   DialogActions,
   TextField,
   IconButton,
-  Chip,
   LinearProgress,
 } from "@material-ui/core";
 import ArrowBackIcon from "@material-ui/icons/ArrowBack";
@@ -26,10 +25,12 @@ import { api } from "../../convex/_generated/api";
 import { DEFAULT_PHOTO } from "../../constants";
 import useConvexUser from "../../hooks/useConvexUser";
 import useErrorToast from "../../hooks/useErrorToast";
+import ConfirmDialog from "../common/ConfirmDialog";
 import LoadingGate from "../LoadingGate";
 import Post from "../posts/post/Post";
 import EducationSection from "./EducationSection";
 import ExperienceSection from "./ExperienceSection";
+import SkillsSection from "./SkillsSection";
 import Style from "./Style";
 
 const DEFAULT_PROFILE = {
@@ -306,6 +307,7 @@ const Profile = ({
   const [activeTab, setActiveTab] = useState(0);
   const [isStartingConversation, setIsStartingConversation] = useState(false);
   const [isConnectionActionPending, setIsConnectionActionPending] = useState(false);
+  const [isRemoveConnectionDialogOpen, setIsRemoveConnectionDialogOpen] = useState(false);
   const [isFollowActionPending, setIsFollowActionPending] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isProfileSavePending, setIsProfileSavePending] = useState(false);
@@ -313,10 +315,12 @@ const Profile = ({
   const [isExperienceDialogOpen, setIsExperienceDialogOpen] = useState(false);
   const [editingExperienceId, setEditingExperienceId] = useState(null);
   const [experienceFormData, setExperienceFormData] = useState(() => buildExperienceFormData());
+  const [experienceToRemoveId, setExperienceToRemoveId] = useState(null);
   const [isExperienceSavePending, setIsExperienceSavePending] = useState(false);
   const [isEducationDialogOpen, setIsEducationDialogOpen] = useState(false);
   const [editingEducationId, setEditingEducationId] = useState(null);
   const [educationFormData, setEducationFormData] = useState(() => buildEducationFormData());
+  const [educationToRemoveId, setEducationToRemoveId] = useState(null);
   const [isEducationSavePending, setIsEducationSavePending] = useState(false);
   const [isPhotoUploadPending, setIsPhotoUploadPending] = useState(false);
   const [isCoverUploadPending, setIsCoverUploadPending] = useState(false);
@@ -390,13 +394,16 @@ const Profile = ({
 
   React.useEffect(() => {
     setShowConnections(false);
+    setIsRemoveConnectionDialogOpen(false);
     setIsEditDialogOpen(false);
     setIsExperienceDialogOpen(false);
     setEditingExperienceId(null);
     setExperienceFormData(buildExperienceFormData());
+    setExperienceToRemoveId(null);
     setIsEducationDialogOpen(false);
     setEditingEducationId(null);
     setEducationFormData(buildEducationFormData());
+    setEducationToRemoveId(null);
     setPhotoUploadError("");
     setCoverUploadError("");
     setSkillInputValue("");
@@ -481,13 +488,24 @@ const Profile = ({
     }
   };
 
-  const handleRemoveConnection = async () => {
+  const handleRemoveConnection = () => {
     if (!connectionStatus?.connectionId || isConnectionActionPending) {
       return;
     }
 
-    if (!isConnectedActionHovered) {
-      setIsConnectedActionHovered(true);
+    setIsRemoveConnectionDialogOpen(true);
+  };
+
+  const handleCloseRemoveConnectionDialog = () => {
+    if (isConnectionActionPending) {
+      return;
+    }
+
+    setIsRemoveConnectionDialogOpen(false);
+  };
+
+  const handleConfirmRemoveConnection = async () => {
+    if (!connectionStatus?.connectionId || isConnectionActionPending) {
       return;
     }
 
@@ -496,6 +514,7 @@ const Profile = ({
     try {
       await removeConnection({ connectionId: connectionStatus.connectionId });
       setIsConnectedActionHovered(false);
+      setIsRemoveConnectionDialogOpen(false);
     } catch (error) {
       console.error("Failed to remove connection:", error);
       showError("Failed to remove connection. Please try again.");
@@ -680,22 +699,35 @@ const Profile = ({
     }
   };
 
-  const handleRemoveExperience = async (entryId) => {
+  const handleRemoveExperience = (entryId) => {
     if (!isOwnProfile || !entryId || isExperienceSavePending) {
       return;
     }
 
-    if (!window.confirm("Remove this experience entry?")) {
+    setExperienceToRemoveId(entryId);
+  };
+
+  const handleCloseRemoveExperienceDialog = () => {
+    if (isExperienceSavePending) {
+      return;
+    }
+
+    setExperienceToRemoveId(null);
+  };
+
+  const handleConfirmRemoveExperience = async () => {
+    if (!isOwnProfile || !experienceToRemoveId || isExperienceSavePending) {
       return;
     }
 
     setIsExperienceSavePending(true);
 
     try {
-      await removeExperience({ entryId });
-      if (editingExperienceId === entryId) {
+      await removeExperience({ entryId: experienceToRemoveId });
+      if (editingExperienceId === experienceToRemoveId) {
         handleCloseExperienceDialog(true);
       }
+      setExperienceToRemoveId(null);
     } catch (error) {
       console.error("Failed to remove experience:", error);
       showError("Failed to remove experience. Please try again.");
@@ -778,22 +810,35 @@ const Profile = ({
     }
   };
 
-  const handleRemoveEducation = async (entryId) => {
+  const handleRemoveEducation = (entryId) => {
     if (!isOwnProfile || !entryId || isEducationSavePending) {
       return;
     }
 
-    if (!window.confirm("Remove this education entry?")) {
+    setEducationToRemoveId(entryId);
+  };
+
+  const handleCloseRemoveEducationDialog = () => {
+    if (isEducationSavePending) {
+      return;
+    }
+
+    setEducationToRemoveId(null);
+  };
+
+  const handleConfirmRemoveEducation = async () => {
+    if (!isOwnProfile || !educationToRemoveId || isEducationSavePending) {
       return;
     }
 
     setIsEducationSavePending(true);
 
     try {
-      await removeEducation({ entryId });
-      if (editingEducationId === entryId) {
+      await removeEducation({ entryId: educationToRemoveId });
+      if (editingEducationId === educationToRemoveId) {
         handleCloseEducationDialog(true);
       }
+      setEducationToRemoveId(null);
     } catch (error) {
       console.error("Failed to remove education:", error);
       showError("Failed to remove education. Please try again.");
@@ -1606,89 +1651,49 @@ const Profile = ({
                   onEducationFieldChange={handleEducationFieldChange}
                 />
 
-                <Typography variant="subtitle2" style={{ fontWeight: 700, marginBottom: 8 }}>
-                  Skills
-                </Typography>
-
-                {isOwnProfile && (
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 8,
-                      alignItems: "flex-start",
-                      marginBottom: 8,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <TextField
-                      value={skillInputValue}
-                      onChange={handleSkillInputChange}
-                      variant="outlined"
-                      margin="dense"
-                      placeholder="Add a skill"
-                      size="small"
-                      disabled={isSkillMutationPending}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          handleAddSkill();
-                        }
-                      }}
-                      style={{ minWidth: 200, flexGrow: 1 }}
-                    />
-                    <Button
-                      size="small"
-                      variant="contained"
-                      onClick={handleAddSkill}
-                      disabled={isSkillMutationPending}
-                      style={{
-                        textTransform: "none",
-                        backgroundColor: theme.palette.primary.main,
-                        color: "#fff",
-                        fontWeight: 600,
-                        minHeight: 40,
-                        borderRadius: 18,
-                        padding: "0 16px",
-                      }}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                )}
-
-                {skillError && (
-                  <Typography
-                    variant="body2"
-                    style={{ color: "#c62828", fontSize: "0.8rem", marginBottom: 8 }}
-                  >
-                    {skillError}
-                  </Typography>
-                )}
-
-                {skills.length === 0 ? (
-                  <Typography variant="body2" color="textSecondary">
-                    No skills added yet.
-                  </Typography>
-                ) : (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {skills.map((skill, index) => (
-                      <Chip
-                        key={`${skill}-${index}`}
-                        label={skill}
-                        size="small"
-                        onDelete={isOwnProfile ? () => handleRemoveSkill(skill) : undefined}
-                        disabled={isSkillMutationPending}
-                        style={{
-                          backgroundColor: "rgba(46, 125, 50, 0.12)",
-                          color: "#1b5e20",
-                          fontWeight: 600,
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
+                <SkillsSection
+                  isOwnProfile={isOwnProfile}
+                  skills={skills}
+                  skillInputValue={skillInputValue}
+                  skillError={skillError}
+                  isSkillMutationPending={isSkillMutationPending}
+                  primaryColor={theme.palette.primary.main}
+                  onSkillInputChange={handleSkillInputChange}
+                  onAddSkill={handleAddSkill}
+                  onRemoveSkill={handleRemoveSkill}
+                />
               </div>
             )}
+
+            <ConfirmDialog
+              open={isRemoveConnectionDialogOpen}
+              onClose={handleCloseRemoveConnectionDialog}
+              onConfirm={handleConfirmRemoveConnection}
+              description={`Remove ${userName} from your connections?`}
+              confirmLabel="Remove connection"
+              isPending={isConnectionActionPending}
+              dialogId="profile-remove-connection-dialog-title"
+            />
+
+            <ConfirmDialog
+              open={Boolean(experienceToRemoveId)}
+              onClose={handleCloseRemoveExperienceDialog}
+              onConfirm={handleConfirmRemoveExperience}
+              description="Remove this experience entry?"
+              confirmLabel="Delete experience"
+              isPending={isExperienceSavePending}
+              dialogId="profile-remove-experience-dialog-title"
+            />
+
+            <ConfirmDialog
+              open={Boolean(educationToRemoveId)}
+              onClose={handleCloseRemoveEducationDialog}
+              onConfirm={handleConfirmRemoveEducation}
+              description="Remove this education entry?"
+              confirmLabel="Delete education"
+              isPending={isEducationSavePending}
+              dialogId="profile-remove-education-dialog-title"
+            />
 
             <Dialog
               open={isEditDialogOpen}
