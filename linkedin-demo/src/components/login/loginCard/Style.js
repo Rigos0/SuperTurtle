@@ -37,7 +37,7 @@ export default makeStyles((theme) => ({
 
   brand: {
     margin: 0,
-    color: "#2e7d32",
+    color: theme.palette.primary.main,
     fontSize: 36,
     lineHeight: 1,
     letterSpacing: "-0.03em",

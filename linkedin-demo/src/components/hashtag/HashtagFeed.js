@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "convex/react";
 import { Typography } from "@material-ui/core";
+import { useTheme } from "@material-ui/core/styles";
 import LoadingGate from "../LoadingGate";
 import Post from "../posts/post/Post";
 import { api } from "../../convex/_generated/api";
@@ -14,6 +15,7 @@ const normalizeHashtag = (value) =>
     .toLowerCase();
 
 const HashtagFeed = ({ tag, onNavigateProfile }) => {
+  const theme = useTheme();
   const normalizedTag = useMemo(() => normalizeHashtag(tag ?? ""), [tag]);
   const posts = useQuery(
     api.hashtags.getPostsByHashtag,
@@ -43,7 +45,7 @@ const HashtagFeed = ({ tag, onNavigateProfile }) => {
     <div style={{ width: "100%" }}>
       <Typography
         variant="h6"
-        style={{ fontWeight: 700, padding: "4px 0 12px", color: "#2e7d32" }}
+        style={{ fontWeight: 700, padding: "4px 0 12px", color: theme.palette.primary.main }}
       >
         #{normalizedTag}
       </Typography>

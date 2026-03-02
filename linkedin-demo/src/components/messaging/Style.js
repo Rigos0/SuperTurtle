@@ -105,7 +105,7 @@ export default makeStyles((theme) => ({
     backgroundColor: theme.palette.background.paper,
   },
   backButton: {
-    color: "#2e7d32",
+    color: theme.palette.primary.main,
     backgroundColor: "#f1f8f1",
     width: 44,
     height: 44,
@@ -145,7 +145,7 @@ export default makeStyles((theme) => ({
     boxShadow: "0 1px 1px rgba(0, 0, 0, 0.08)",
   },
   ownBubble: {
-    backgroundColor: "#2e7d32",
+    backgroundColor: theme.palette.primary.main,
     color: "#fff",
     borderBottomRightRadius: 6,
   },
@@ -183,7 +183,7 @@ export default makeStyles((theme) => ({
   },
   sendButton: {
     minWidth: 90,
-    backgroundColor: "#2e7d32",
+    backgroundColor: theme.palette.primary.main,
     color: "#fff",
     textTransform: "none",
     "&:hover": {

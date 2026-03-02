@@ -59,7 +59,7 @@ export default makeStyles((theme) => ({
     border: `1px solid ${LinkedInLightBlue}`,
     background:
       theme.palette.type === "dark"
-        ? "linear-gradient(120deg, #2e7d32 0%, #1b5e20 100%)"
+        ? `linear-gradient(120deg, ${theme.palette.primary.main} 0%, #1b5e20 100%)`
         : "linear-gradient(120deg, #e8f5e9 0%, #c8e6c9 100%)",
     "& > h4": {
       margin: 0,
@@ -71,7 +71,7 @@ export default makeStyles((theme) => ({
       margin: "8px 0 0 0",
       fontSize: 13,
       lineHeight: 1.4,
-      color: theme.palette.type === "dark" ? "#c8e6c9" : "#2e7d32",
+      color: theme.palette.type === "dark" ? "#c8e6c9" : theme.palette.primary.main,
     },
   },
 }));

@@ -114,7 +114,7 @@ export default makeStyles((theme) => ({
     marginTop: theme.spacing(0.25),
   },
   mutualConnectionCount: {
-    color: "#2e7d32",
+    color: theme.palette.primary.main,
     fontSize: "0.75rem",
     marginTop: theme.spacing(0.25),
   },
@@ -125,14 +125,14 @@ export default makeStyles((theme) => ({
     marginLeft: theme.spacing(1),
   },
   connectButton: {
-    borderColor: "#2e7d32",
-    color: "#2e7d32",
+    borderColor: theme.palette.primary.main,
+    color: theme.palette.primary.main,
     borderRadius: 16,
     textTransform: "none",
     fontWeight: 600,
     minWidth: 92,
     "&:hover": {
-      borderColor: "#2e7d32",
+      borderColor: theme.palette.primary.main,
       backgroundColor: "rgba(46, 125, 50, 0.08)",
     },
   },
@@ -140,7 +140,7 @@ export default makeStyles((theme) => ({
     opacity: 0.6,
   },
   acceptButton: {
-    backgroundColor: "#2e7d32",
+    backgroundColor: theme.palette.primary.main,
     color: "#fff",
     borderRadius: 16,
     textTransform: "none",
@@ -163,15 +163,15 @@ export default makeStyles((theme) => ({
     textTransform: "none",
     fontWeight: 600,
     minWidth: 92,
-    borderColor: "#2e7d32",
-    color: "#2e7d32",
+    borderColor: theme.palette.primary.main,
+    color: theme.palette.primary.main,
     "&:hover": {
-      borderColor: "#2e7d32",
+      borderColor: theme.palette.primary.main,
       backgroundColor: "rgba(46, 125, 50, 0.08)",
     },
   },
   followButtonFollowing: {
-    backgroundColor: "#2e7d32",
+    backgroundColor: theme.palette.primary.main,
     color: "#fff",
     "&:hover": {
       backgroundColor: "#1b5e20",

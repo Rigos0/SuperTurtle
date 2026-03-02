@@ -23,3 +23,4 @@ All raw HTML buttons, inputs, textareas replaced with MUI equivalents. Consisten
 - Skeleton is in `@material-ui/lab`: `import { Skeleton } from '@material-ui/lab'`
 - Keep functionality identical — only change presentation layer
 - Test that dark mode still works after all changes
+- Progress: converted most hardcoded `#2e7d32` usages to `theme.palette.primary.main`; remaining replacements are pending in files with overlapping refactors.

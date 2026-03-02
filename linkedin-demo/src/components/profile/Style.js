@@ -36,14 +36,14 @@ export default makeStyles((theme) => ({
     minHeight: 44,
     borderRadius: 22,
     textTransform: "none",
-    color: "#2e7d32",
+    color: theme.palette.primary.main,
     fontWeight: 600,
     padding: theme.spacing(0.75, 1.5),
   },
   coverArea: {
     width: "100%",
     height: "clamp(88px, 24vw, 120px)",
-    background: "linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%)",
+    background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, #1b5e20 100%)`,
     position: "relative",
     marginBottom: 52,
     [theme.breakpoints.down("xs")]: {
@@ -78,7 +78,7 @@ export default makeStyles((theme) => ({
     bottom: 12,
     textTransform: "none",
     borderRadius: 16,
-    backgroundColor: "#2e7d32",
+    backgroundColor: theme.palette.primary.main,
     color: "#fff",
     fontWeight: 600,
     padding: theme.spacing(0.5, 1.5),
@@ -103,7 +103,7 @@ export default makeStyles((theme) => ({
     width: 32,
     height: 32,
     backgroundColor: "rgba(255, 255, 255, 0.92)",
-    color: "#2e7d32",
+    color: theme.palette.primary.main,
     border: "1px solid rgba(46, 125, 50, 0.35)",
     "&:hover": {
       backgroundColor: "#fff",
@@ -173,7 +173,7 @@ export default makeStyles((theme) => ({
     fontSize: "0.86rem",
   },
   completenessPercent: {
-    color: "#2e7d32",
+    color: theme.palette.primary.main,
     fontWeight: 700,
     fontSize: "0.82rem",
   },
@@ -183,7 +183,7 @@ export default makeStyles((theme) => ({
     borderRadius: 999,
     backgroundColor: "rgba(46, 125, 50, 0.16)",
     "& .MuiLinearProgress-barColorPrimary": {
-      backgroundColor: "#2e7d32",
+      backgroundColor: theme.palette.primary.main,
     },
   },
   completenessSummary: {
@@ -199,7 +199,7 @@ export default makeStyles((theme) => ({
     minWidth: 0,
   },
   networkMeta: {
-    color: "#2e7d32",
+    color: theme.palette.primary.main,
     fontSize: "0.8rem",
     wordBreak: "break-word",
   },
@@ -230,7 +230,7 @@ export default makeStyles((theme) => ({
   },
   closeConnectionsButton: {
     textTransform: "none",
-    color: "#2e7d32",
+    color: theme.palette.primary.main,
     minHeight: 36,
     borderRadius: 18,
     fontWeight: 600,
@@ -340,7 +340,7 @@ export default makeStyles((theme) => ({
     textTransform: "none",
     borderRadius: 16,
     borderColor: "rgba(46, 125, 50, 0.5)",
-    color: "#2e7d32",
+    color: theme.palette.primary.main,
     fontWeight: 600,
     minHeight: 32,
     "&.MuiButton-text": {

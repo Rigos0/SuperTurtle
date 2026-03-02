@@ -67,7 +67,7 @@ export default makeStyles((theme) => ({
     backgroundColor: theme.palette.type === "dark" ? darkSecondary : "#eef3f8",
     transition: "border-color 0.2s ease, box-shadow 0.2s ease",
     "&:focus-within": {
-      borderColor: "#2e7d32",
+      borderColor: theme.palette.primary.main,
       boxShadow: "0 0 0 1px rgba(46, 125, 50, 0.15)",
     },
     "& > .MuiSvgIcon-root": {
@@ -177,14 +177,14 @@ export default makeStyles((theme) => ({
       bottom: 0,
       height: 3,
       borderRadius: "3px 3px 0 0",
-      backgroundColor: "#2e7d32",
+      backgroundColor: theme.palette.primary.main,
     },
   },
   signOutButton: {
     marginLeft: 10,
     textTransform: "none",
-    borderColor: "#2e7d32",
-    color: "#2e7d32",
+    borderColor: theme.palette.primary.main,
+    color: theme.palette.primary.main,
     fontWeight: 600,
     borderRadius: 999,
     minWidth: 100,
@@ -200,7 +200,7 @@ export default makeStyles((theme) => ({
   signInButton: {
     marginLeft: 10,
     textTransform: "none",
-    backgroundColor: "#2e7d32",
+    backgroundColor: theme.palette.primary.main,
     color: "#fff",
     fontWeight: 600,
     borderRadius: 999,
@@ -220,7 +220,7 @@ export default makeStyles((theme) => ({
       display: "inline-flex",
       marginLeft: 10,
       textTransform: "none",
-      backgroundColor: "#2e7d32",
+      backgroundColor: theme.palette.primary.main,
       color: "#fff",
       fontWeight: 600,
       borderRadius: 999,
@@ -259,6 +259,6 @@ export default makeStyles((theme) => ({
     transition: "color 0.2s ease",
   },
   bottomNavIconActive: {
-    color: "#2e7d32",
+    color: theme.palette.primary.main,
   },
 }));

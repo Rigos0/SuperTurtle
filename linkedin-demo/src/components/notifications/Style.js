@@ -49,15 +49,15 @@ export default makeStyles((theme) => ({
     },
   },
   markAllButton: {
-    color: "#2e7d32",
-    borderColor: "#2e7d32",
+    color: theme.palette.primary.main,
+    borderColor: theme.palette.primary.main,
     textTransform: "none",
     fontWeight: 600,
     whiteSpace: "nowrap",
     minHeight: 36,
     flexShrink: 0,
     "&:hover": {
-      borderColor: "#2e7d32",
+      borderColor: theme.palette.primary.main,
       backgroundColor: "rgba(46, 125, 50, 0.08)",
     },
     [theme.breakpoints.down("xs")]: {
@@ -102,7 +102,7 @@ export default makeStyles((theme) => ({
     },
   },
   unreadItem: {
-    borderLeft: "4px solid #2e7d32",
+    borderLeft: `4px solid ${theme.palette.primary.main}`,
     paddingLeft: 12,
     backgroundColor:
       theme.palette.type === "dark" ? "rgba(46,125,50,0.08)" : "#f8fcf8",

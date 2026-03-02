@@ -64,13 +64,13 @@ const SavedPosts = ({ onNavigateProfile }) => {
   );
 };
 
-const useStyles = makeStyles(() => ({
+const useStyles = makeStyles((theme) => ({
   root: {
     width: "100%",
   },
   title: {
     fontWeight: 700,
-    color: "#2e7d32",
+    color: theme.palette.primary.main,
     marginBottom: 12,
   },
 }));

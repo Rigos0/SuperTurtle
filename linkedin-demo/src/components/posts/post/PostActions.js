@@ -1,4 +1,5 @@
 import React from "react";
+import { useTheme } from "@material-ui/core/styles";
 import ThumbUpAltIcon from "@material-ui/icons/ThumbUpAlt";
 import ThumbUpAltOutlinedIcon from "@material-ui/icons/ThumbUpAltOutlined";
 import CommentOutlinedIcon from "@material-ui/icons/CommentOutlined";
@@ -21,6 +22,7 @@ const PostActions = ({
   isBookmarked,
   onBookmarkClick,
 }) => {
+  const theme = useTheme();
   const [isReactionPickerOpen, setIsReactionPickerOpen] = React.useState(false);
   const reactionPickerCloseTimeoutRef = React.useRef(null);
   const reactionPickerLongPressTimeoutRef = React.useRef(null);
@@ -166,7 +168,7 @@ const PostActions = ({
             <ThumbUpAltIcon
               style={{
                 transform: "scaleX(-1)",
-                color: selectedReactionItem?.color ?? "#2e7d32",
+                color: selectedReactionItem?.color ?? theme.palette.primary.main,
               }}
             />
           ) : (
@@ -175,7 +177,7 @@ const PostActions = ({
           <h4
             style={
               canInteract && selectedReaction
-                ? { color: selectedReactionItem?.color ?? "#2e7d32" }
+                ? { color: selectedReactionItem?.color ?? theme.palette.primary.main }
                 : undefined
             }
           >
@@ -184,8 +186,10 @@ const PostActions = ({
         </div>
       </div>
       <div className={classes.action__icons} onClick={onToggleComments}>
-        <CommentOutlinedIcon style={showComments ? { color: "#2e7d32" } : undefined} />
-        <h4 style={showComments ? { color: "#2e7d32" } : undefined}>Comment</h4>
+        <CommentOutlinedIcon
+          style={showComments ? { color: theme.palette.primary.main } : undefined}
+        />
+        <h4 style={showComments ? { color: theme.palette.primary.main } : undefined}>Comment</h4>
       </div>
       <div
         className={classes.action__icons}
@@ -200,8 +204,12 @@ const PostActions = ({
         onClick={canBookmark ? onBookmarkClick : undefined}
         style={!canInteract ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
       >
-        {isBookmarked ? <BookmarkIcon style={{ color: "#2e7d32" }} /> : <BookmarkBorderOutlinedIcon />}
-        <h4 style={isBookmarked ? { color: "#2e7d32" } : undefined}>
+        {isBookmarked ? (
+          <BookmarkIcon style={{ color: theme.palette.primary.main }} />
+        ) : (
+          <BookmarkBorderOutlinedIcon />
+        )}
+        <h4 style={isBookmarked ? { color: theme.palette.primary.main } : undefined}>
           {isBookmarked ? "Saved" : "Save"}
         </h4>
       </div>

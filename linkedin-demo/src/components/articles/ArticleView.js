@@ -67,7 +67,7 @@ const useStyles = makeStyles((theme) => ({
   },
   title: {
     fontWeight: 800,
-    color: "#2e7d32",
+    color: theme.palette.primary.main,
     lineHeight: 1.25,
     wordBreak: "break-word",
   },
@@ -141,7 +141,7 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   activeReactionButton: {
-    borderColor: "#2e7d32",
+    borderColor: theme.palette.primary.main,
     backgroundColor: "rgba(46,125,50,0.08)",
   },
   reactionCount: {

@@ -3,12 +3,13 @@ import FavoriteIcon from "@material-ui/icons/Favorite";
 import EmojiEventsIcon from "@material-ui/icons/EmojiEvents";
 import EmojiObjectsIcon from "@material-ui/icons/EmojiObjects";
 import SentimentVerySatisfiedIcon from "@material-ui/icons/SentimentVerySatisfied";
+import { green } from "@material-ui/core/colors";
 
 export const REACTION_ITEMS = [
   {
     key: "like",
     label: "Like",
-    color: "#2e7d32",
+    color: green[800],
     Icon: ThumbUpAltIcon,
   },
   {

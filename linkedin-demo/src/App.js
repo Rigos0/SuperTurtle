@@ -22,7 +22,7 @@ import Sidebar from "./components/sidebar/Sidebar";
 import Widgets from "./components/widgets/Widgets";
 import { api } from "./convex/_generated/api";
 import Styles from "./Style";
-import { LinkedInBgColor, darkPrimary } from "./assets/Colors";
+import { LinkedInBgColor, LinkedInBlue, darkPrimary } from "./assets/Colors";
 
 const normalizeHashtag = (value) =>
   value
@@ -81,6 +81,9 @@ const AppShell = () => {
       createMuiTheme({
         palette: {
           type: mode ? "dark" : "light",
+          primary: {
+            main: LinkedInBlue,
+          },
         },
       }),
     [mode],
@@ -220,7 +223,7 @@ const AppShell = () => {
             <img src="/turtle-mascot.png" alt="TurtleIn" style={{ height: 64 }} />
             <Typography
               variant="h6"
-              style={{ color: "#2e7d32", fontWeight: 700, marginTop: 8 }}
+              style={{ color: muiTheme.palette.primary.main, fontWeight: 700, marginTop: 8 }}
             >
               TurtleIn
             </Typography>

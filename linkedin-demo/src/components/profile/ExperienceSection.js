@@ -9,6 +9,7 @@ import {
   TextField,
   Typography,
 } from "@material-ui/core";
+import { useTheme } from "@material-ui/core/styles";
 
 const formatExperienceDateRange = (startDate, endDate) => {
   const hasStartDate = typeof startDate === "string" && startDate.trim().length > 0;
@@ -39,8 +40,11 @@ const ExperienceSection = ({
   onCloseDialog,
   onSaveExperience,
   onExperienceFieldChange,
-}) => (
-  <>
+}) => {
+  const theme = useTheme();
+
+  return (
+    <>
     <div
       style={{
         display: "flex",
@@ -60,7 +64,7 @@ const ExperienceSection = ({
           onClick={onOpenCreateDialog}
           style={{
             textTransform: "none",
-            color: "#2e7d32",
+            color: theme.palette.primary.main,
             fontWeight: 600,
             minHeight: 32,
           }}
@@ -126,8 +130,8 @@ const ExperienceSection = ({
                 style={{
                   textTransform: "none",
                   borderRadius: 16,
-                  borderColor: "#2e7d32",
-                  color: "#2e7d32",
+                  borderColor: theme.palette.primary.main,
+                  color: theme.palette.primary.main,
                   fontWeight: 600,
                   padding: "2px 10px",
                 }}
@@ -242,7 +246,8 @@ const ExperienceSection = ({
         </Button>
       </DialogActions>
     </Dialog>
-  </>
-);
+    </>
+  );
+};
 
 export default ExperienceSection;

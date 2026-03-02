@@ -83,7 +83,7 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: 500,
   },
   optionMetaSelected: {
-    color: theme.palette.type === "dark" ? "#81c784" : "#2e7d32",
+    color: theme.palette.type === "dark" ? "#81c784" : theme.palette.primary.main,
     fontWeight: 700,
   },
   footer: {
@@ -95,7 +95,7 @@ const useStyles = makeStyles((theme) => ({
     gap: 8,
   },
   footerStatus: {
-    color: theme.palette.type === "dark" ? "#81c784" : "#2e7d32",
+    color: theme.palette.type === "dark" ? "#81c784" : theme.palette.primary.main,
     fontWeight: 600,
   },
   footerError: {

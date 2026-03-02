@@ -30,7 +30,7 @@ const useStyles = makeStyles((theme) => ({
   },
   title: {
     fontWeight: 700,
-    color: "#2e7d32",
+    color: theme.palette.primary.main,
   },
   subtitle: {
     color: theme.palette.text.secondary,
@@ -62,7 +62,7 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing(1),
   },
   publishButton: {
-    backgroundColor: "#2e7d32",
+    backgroundColor: theme.palette.primary.main,
     color: "#fff",
     fontWeight: 700,
     textTransform: "none",

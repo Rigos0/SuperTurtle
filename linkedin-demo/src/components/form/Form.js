@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useNavigate } from "react-router-dom";
 import { Chip, Paper, Snackbar, TextField } from "@material-ui/core";
+import { useTheme } from "@material-ui/core/styles";
 import Alert from "@material-ui/lab/Alert";
 import VideocamRoundedIcon from "@material-ui/icons/VideocamRounded";
 import YouTubeIcon from "@material-ui/icons/YouTube";
@@ -60,6 +61,7 @@ const getActiveMention = (value, caretPosition) => {
 
 const Form = () => {
   const classes = Styles();
+  const theme = useTheme();
   const navigate = useNavigate();
   const createPost = useMutation(api.posts.createPost);
   const createPoll = useMutation(api.polls.createPoll);
@@ -571,7 +573,7 @@ const Form = () => {
           className={classes.media__options}
         >
           <PhotoSizeSelectActualIcon
-            style={{ color: "#2e7d32" }}
+            style={{ color: theme.palette.primary.main }}
           />
           <h4>Photo</h4>
         </label>
@@ -588,7 +590,7 @@ const Form = () => {
           <h4>URL</h4>
         </div>
         <div className={classes.media__options} onClick={togglePollComposer}>
-          <PollIcon style={{ color: "#2e7d32" }} />
+          <PollIcon style={{ color: theme.palette.primary.main }} />
           <h4>{isPollComposerOpen ? "Cancel Poll" : "Create Poll"}</h4>
         </div>
       </div>

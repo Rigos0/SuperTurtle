@@ -1,4 +1,6 @@
-export const LinkedInBlue = "#2e7d32";
+import { green } from "@material-ui/core/colors";
+
+export const LinkedInBlue = green[800];
 
 export const LinkedInLightBlue = "#66bb6a";
 

@@ -203,10 +203,10 @@ const Messaging = () => {
         </div>
 
         <div className={classes.messageList}>
-          {messages === undefined ? (
-            <div className={classes.loadingState}>
-              <CircularProgress size={22} style={{ color: "#2e7d32" }} />
-            </div>
+        {messages === undefined ? (
+          <div className={classes.loadingState}>
+            <CircularProgress size={22} color="primary" />
+          </div>
           ) : messages.length === 0 ? (
             <div className={classes.emptyState}>
               <Typography variant="body2">No messages yet. Start the conversation.</Typography>

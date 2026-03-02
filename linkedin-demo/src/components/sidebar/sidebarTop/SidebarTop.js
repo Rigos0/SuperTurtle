@@ -1,6 +1,7 @@
 import React from "react";
 import { useQuery } from "convex/react";
 import { Paper, Avatar, Divider } from "@material-ui/core";
+import { useTheme } from "@material-ui/core/styles";
 import LabelImportantIcon from "@material-ui/icons/LabelImportant";
 import BookmarkIcon from "@material-ui/icons/Bookmark";
 import { Link } from "react-router-dom";
@@ -10,6 +11,7 @@ import Style from "./Style";
 
 const SidebarTop = () => {
   const classes = Style();
+  const theme = useTheme();
   const user = useConvexUser();
   const connectionCount = useQuery(
     api.connections.getConnectionCount,
@@ -22,7 +24,7 @@ const SidebarTop = () => {
       <div
         className={classes.cover}
         style={{
-          backgroundImage: "linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%)",
+          backgroundImage: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, #1b5e20 100%)`,
         }}
       ></div>
       <Avatar src={user?.photoURL} />

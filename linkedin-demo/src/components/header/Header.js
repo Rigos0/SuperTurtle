@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useQuery } from "convex/react";
+import { useTheme } from "@material-ui/core/styles";
 import { ChangeTheme } from "../../store/actions/util";
 import {
   Paper,
@@ -32,6 +33,7 @@ const Header = ({
   onSignInClick,
 }) => {
   const classes = Style();
+  const theme = useTheme();
   const dispatch = useDispatch();
   const mode = useSelector((state) => state.util);
   const authActions = useAuthActions();
@@ -260,7 +262,7 @@ const Header = ({
           >
             <img src="/turtle-mascot.png" alt="TurtleIn" style={{ height: 28 }} />
             <span style={{
-              color: "#2e7d32",
+              color: theme.palette.primary.main,
               fontSize: 22,
               lineHeight: 1,
               fontWeight: 700,
