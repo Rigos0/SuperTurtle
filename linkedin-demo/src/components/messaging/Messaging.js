@@ -156,11 +156,12 @@ const Messaging = () => {
                 const timestamp = conversation.latestMessage?.createdAt ?? conversation.createdAt;
 
                 return (
-                  <button
+                  <Button
                     type="button"
                     key={conversation._id}
                     className={classes.conversationItem}
                     onClick={() => setSelectedConversationId(conversation._id)}
+                    disableRipple
                   >
                     <Avatar src={photoURL} alt={displayName} />
                     <div className={classes.conversationMain}>
@@ -170,7 +171,7 @@ const Messaging = () => {
                       </div>
                       <p className={classes.conversationPreview}>{truncatePreview(preview, 50)}</p>
                     </div>
-                  </button>
+                  </Button>
                 );
               })
             )}
