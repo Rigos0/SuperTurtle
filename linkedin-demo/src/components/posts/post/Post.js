@@ -15,6 +15,7 @@ import { api } from "../../../convex/_generated/api";
 import useConvexUser from "../../../hooks/useConvexUser";
 import useErrorToast from "../../../hooks/useErrorToast";
 import { resolvePhoto } from "../../../utils/photo";
+import ConfirmDialog from "../../common/ConfirmDialog";
 import EditHistoryDialog from "../editHistory/EditHistoryDialog";
 import PollDisplay from "../poll/PollDisplay";
 import ReportDialog from "../report/ReportDialog";
@@ -132,6 +133,8 @@ const Post = forwardRef(
     const [isBookmarkMutationPending, setIsBookmarkMutationPending] = React.useState(false);
     const [optimisticReaction, setOptimisticReaction] = React.useState(undefined);
     const [isReactionMutationPending, setIsReactionMutationPending] = React.useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+    const [isDeletePending, setIsDeletePending] = React.useState(false);
     const [isReportDialogOpen, setIsReportDialogOpen] = React.useState(false);
     const [isReportSubmitting, setIsReportSubmitting] = React.useState(false);
     const [hasReportedOptimistic, setHasReportedOptimistic] = React.useState(false);
@@ -372,17 +375,38 @@ const Post = forwardRef(
       setMenuAnchorEl(null);
     };
 
-    const handleDeleteClick = async () => {
+    const handleDeleteClick = () => {
       if (!isOwnPost) {
         return;
       }
 
       handleMenuClose();
+      setIsDeleteDialogOpen(true);
+    };
+
+    const handleDeleteDialogClose = () => {
+      if (isDeletePending) {
+        return;
+      }
+
+      setIsDeleteDialogOpen(false);
+    };
+
+    const handleDeleteConfirm = async () => {
+      if (!isOwnPost || isDeletePending) {
+        return;
+      }
+
+      setIsDeletePending(true);
+
       try {
         await deletePost({ postId });
+        setIsDeleteDialogOpen(false);
       } catch (error) {
         console.error("Failed to delete post:", error);
         showError("Failed to delete post. Please try again.");
+      } finally {
+        setIsDeletePending(false);
       }
     };
 
@@ -961,6 +985,16 @@ const Post = forwardRef(
             </button>
           </DialogActions>
         </Dialog>
+
+        <ConfirmDialog
+          open={isDeleteDialogOpen}
+          onClose={handleDeleteDialogClose}
+          onConfirm={handleDeleteConfirm}
+          description="This post will be permanently deleted."
+          confirmLabel="Delete post"
+          isPending={isDeletePending}
+          dialogId={`delete-post-dialog-title-${postId}`}
+        />
 
         <ReportDialog
           open={isReportDialogOpen}
