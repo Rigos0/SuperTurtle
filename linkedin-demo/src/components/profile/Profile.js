@@ -13,8 +13,10 @@ import {
   DialogContent,
   DialogActions,
   TextField,
+  IconButton,
 } from "@material-ui/core";
 import ArrowBackIcon from "@material-ui/icons/ArrowBack";
+import CameraAltIcon from "@material-ui/icons/CameraAlt";
 import LocationOnIcon from "@material-ui/icons/LocationOn";
 import { api } from "../../convex/_generated/api";
 import { DEFAULT_PHOTO } from "../../constants";
@@ -32,6 +34,7 @@ const DEFAULT_PROFILE = {
   about: "",
 };
 const MAX_PROFILE_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_COVER_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
 
 const resolveProfilePhoto = (photoURL) => {
   if (typeof photoURL !== "string" || photoURL.length === 0) {
@@ -52,6 +55,18 @@ const resolveProfileText = (value, fallback = "") => {
 
   const trimmedValue = value.trim();
   return trimmedValue.length > 0 ? trimmedValue : fallback;
+};
+
+const resolveCoverPhoto = (coverURL) => {
+  if (typeof coverURL !== "string" || coverURL.length === 0) {
+    return "";
+  }
+
+  if (coverURL.startsWith("/")) {
+    return "";
+  }
+
+  return coverURL;
 };
 
 const buildProfileFormData = (user) => ({
@@ -106,6 +121,8 @@ const Profile = ({
   const removeExperience = useMutation(api.users.removeExperience);
   const generateProfilePhotoUploadUrl = useMutation(api.users.generateUploadUrl);
   const saveProfilePhoto = useMutation(api.users.saveProfilePhoto);
+  const generateCoverPhotoUploadUrl = useMutation(api.users.generateCoverUploadUrl);
+  const saveCoverPhoto = useMutation(api.users.saveCoverPhoto);
   const profileUser = useQuery(api.users.getUser, userId ? { id: userId } : "skip");
   const resolvedUser = profileUser ?? (!userId ? authUser : null);
   const resolvedUserId = userId ?? authUser?._id ?? null;
@@ -155,12 +172,16 @@ const Profile = ({
   const [experienceFormData, setExperienceFormData] = useState(() => buildExperienceFormData());
   const [isExperienceSavePending, setIsExperienceSavePending] = useState(false);
   const [isPhotoUploadPending, setIsPhotoUploadPending] = useState(false);
+  const [isCoverUploadPending, setIsCoverUploadPending] = useState(false);
   const [photoUploadError, setPhotoUploadError] = useState("");
+  const [coverUploadError, setCoverUploadError] = useState("");
   const profilePhotoInputRef = useRef(null);
+  const coverPhotoInputRef = useRef(null);
 
   const userAvatar = resolveProfilePhoto(
     resolvedUser?.photoURL ?? resolvedUser?.image ?? DEFAULT_PROFILE.photoURL,
   );
+  const coverPhotoURL = resolveCoverPhoto(resolvedUser?.coverURL);
   const userName =
     resolveProfileText(resolvedUser?.displayName) ||
     resolveProfileText(resolvedUser?.name, DEFAULT_PROFILE.displayName);
@@ -206,6 +227,8 @@ const Profile = ({
     setIsExperienceDialogOpen(false);
     setEditingExperienceId(null);
     setExperienceFormData(buildExperienceFormData());
+    setPhotoUploadError("");
+    setCoverUploadError("");
   }, [resolvedUserId]);
 
   const handleMessageClick = async () => {
@@ -369,11 +392,114 @@ const Profile = ({
     }
   };
 
+  const handleOpenCreateExperienceDialog = () => {
+    if (!isOwnProfile) {
+      return;
+    }
+
+    setEditingExperienceId(null);
+    setExperienceFormData(buildExperienceFormData());
+    setIsExperienceDialogOpen(true);
+  };
+
+  const handleOpenEditExperienceDialog = (entry) => {
+    if (!isOwnProfile || !entry) {
+      return;
+    }
+
+    setEditingExperienceId(entry.id);
+    setExperienceFormData(buildExperienceFormData(entry));
+    setIsExperienceDialogOpen(true);
+  };
+
+  const handleCloseExperienceDialog = (force = false) => {
+    if (isExperienceSavePending && !force) {
+      return;
+    }
+
+    setIsExperienceDialogOpen(false);
+    setEditingExperienceId(null);
+    setExperienceFormData(buildExperienceFormData());
+  };
+
+  const handleExperienceFieldChange = (fieldName) => (event) => {
+    const nextValue = event.target.value;
+    setExperienceFormData((previousData) => ({
+      ...previousData,
+      [fieldName]: nextValue,
+    }));
+  };
+
+  const handleSaveExperience = async () => {
+    if (!isOwnProfile || isExperienceSavePending) {
+      return;
+    }
+
+    setIsExperienceSavePending(true);
+
+    try {
+      if (editingExperienceId) {
+        await updateExperience({
+          entryId: editingExperienceId,
+          title: experienceFormData.title,
+          company: experienceFormData.company,
+          startDate: experienceFormData.startDate,
+          endDate: experienceFormData.endDate,
+          description: experienceFormData.description,
+        });
+      } else {
+        await addExperience({
+          title: experienceFormData.title,
+          company: experienceFormData.company,
+          startDate: experienceFormData.startDate,
+          endDate: experienceFormData.endDate,
+          description: experienceFormData.description,
+        });
+      }
+
+      handleCloseExperienceDialog(true);
+    } catch (error) {
+      console.error("Failed to save experience:", error);
+    } finally {
+      setIsExperienceSavePending(false);
+    }
+  };
+
+  const handleRemoveExperience = async (entryId) => {
+    if (!isOwnProfile || !entryId || isExperienceSavePending) {
+      return;
+    }
+
+    if (!window.confirm("Remove this experience entry?")) {
+      return;
+    }
+
+    setIsExperienceSavePending(true);
+
+    try {
+      await removeExperience({ entryId });
+      if (editingExperienceId === entryId) {
+        handleCloseExperienceDialog(true);
+      }
+    } catch (error) {
+      console.error("Failed to remove experience:", error);
+    } finally {
+      setIsExperienceSavePending(false);
+    }
+  };
+
   const handleSelectProfilePhoto = () => {
     if (!isOwnProfile || isPhotoUploadPending) {
       return;
     }
     profilePhotoInputRef.current?.click();
+  };
+
+  const handleSelectCoverPhoto = () => {
+    if (!isOwnProfile || isCoverUploadPending) {
+      return;
+    }
+    coverPhotoInputRef.current?.click();
   };
 
   const handleProfilePhotoChange = async (event) => {
@@ -425,6 +551,55 @@ const Profile = ({
     }
   };
 
+  const handleCoverPhotoChange = async (event) => {
+    const selectedFile = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!selectedFile || !isOwnProfile || isCoverUploadPending) {
+      return;
+    }
+
+    if (!selectedFile.type.startsWith("image/")) {
+      setCoverUploadError("Please choose an image file.");
+      return;
+    }
+
+    if (selectedFile.size > MAX_COVER_PHOTO_SIZE_BYTES) {
+      setCoverUploadError("Cover photo must be 5MB or smaller.");
+      return;
+    }
+
+    setCoverUploadError("");
+    setIsCoverUploadPending(true);
+
+    try {
+      const uploadUrl = await generateCoverPhotoUploadUrl({});
+      const uploadResult = await fetch(uploadUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": selectedFile.type || "application/octet-stream",
+        },
+        body: selectedFile,
+      });
+
+      if (!uploadResult.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const { storageId } = await uploadResult.json();
+      if (!storageId) {
+        throw new Error("Missing storage ID");
+      }
+
+      await saveCoverPhoto({ storageId });
+    } catch (error) {
+      console.error("Failed to upload cover photo:", error);
+      setCoverUploadError("Cover photo upload failed. Please try again.");
+    } finally {
+      setIsCoverUploadPending(false);
+    }
+  };
+
   return (
     <div className={classes.profile}>
       <Paper elevation={1} className={classes.card}>
@@ -441,10 +616,34 @@ const Profile = ({
 
         <LoadingGate isLoading={isUserLoading}>
           <>
-            <div className={classes.coverArea}>
+            <div
+              className={`${classes.coverArea} ${coverPhotoURL ? classes.coverAreaWithImage : ""}`}
+              style={
+                coverPhotoURL
+                  ? {
+                      backgroundImage: `url(${coverPhotoURL})`,
+                    }
+                  : undefined
+              }
+            >
               <Avatar src={userAvatar} className={classes.avatar} />
               {isOwnProfile && (
                 <>
+                  <input
+                    ref={coverPhotoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleCoverPhotoChange}
+                    className={classes.hiddenInput}
+                  />
+                  <IconButton
+                    onClick={handleSelectCoverPhoto}
+                    disabled={isCoverUploadPending}
+                    className={classes.coverUploadButton}
+                    aria-label="Update cover photo"
+                  >
+                    <CameraAltIcon fontSize="small" />
+                  </IconButton>
                   <input
                     ref={profilePhotoInputRef}
                     type="file"
@@ -479,6 +678,11 @@ const Profile = ({
             {photoUploadError && isOwnProfile && (
               <Typography variant="body2" className={classes.photoUploadError}>
                 {photoUploadError}
+              </Typography>
+            )}
+            {coverUploadError && isOwnProfile && (
+              <Typography variant="body2" className={classes.photoUploadError}>
+                {coverUploadError}
               </Typography>
             )}
 
@@ -762,10 +966,122 @@ const Profile = ({
 
                 <Divider style={{ margin: "16px 0 12px" }} />
 
-                <Typography variant="subtitle2" style={{ fontWeight: 700, marginBottom: 6 }}>
-                  Experience
-                </Typography>
-                {experience.map((exp, index) => (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    marginBottom: 6,
+                  }}
+                >
+                  <Typography variant="subtitle2" style={{ fontWeight: 700 }}>
+                    Experience
+                  </Typography>
+                  {isOwnProfile && (
+                    <Button
+                      size="small"
+                      variant="text"
+                      onClick={handleOpenCreateExperienceDialog}
+                      style={{
+                        textTransform: "none",
+                        color: "#2e7d32",
+                        fontWeight: 600,
+                        minHeight: 32,
+                      }}
+                    >
+                      Add experience
+                    </Button>
+                  )}
+                </div>
+
+                {experienceEntries.length === 0 && legacyExperience.length === 0 && (
+                  <Typography variant="body2" color="textSecondary">
+                    No experience added yet.
+                  </Typography>
+                )}
+
+                {experienceEntries.map((entry) => {
+                  const dateRange = formatExperienceDateRange(entry.startDate, entry.endDate);
+                  return (
+                    <div
+                      key={entry.id}
+                      style={{
+                        border: "1px solid rgba(46, 125, 50, 0.2)",
+                        borderRadius: 10,
+                        padding: "10px 12px",
+                        marginBottom: 10,
+                      }}
+                    >
+                      <Typography variant="subtitle2" style={{ fontWeight: 700, marginBottom: 2 }}>
+                        {entry.title}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        color="textSecondary"
+                        style={{ fontWeight: 600, marginBottom: dateRange ? 2 : 6 }}
+                      >
+                        {entry.company}
+                      </Typography>
+                      {dateRange && (
+                        <Typography
+                          variant="body2"
+                          color="textSecondary"
+                          style={{ fontSize: "0.8rem", marginBottom: entry.description ? 6 : 2 }}
+                        >
+                          {dateRange}
+                        </Typography>
+                      )}
+                      {entry.description && (
+                        <Typography
+                          variant="body2"
+                          color="textSecondary"
+                          style={{ whiteSpace: "pre-line", lineHeight: 1.55, marginBottom: 6 }}
+                        >
+                          {entry.description}
+                        </Typography>
+                      )}
+                      {isOwnProfile && (
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleOpenEditExperienceDialog(entry)}
+                            disabled={isExperienceSavePending}
+                            style={{
+                              textTransform: "none",
+                              borderRadius: 16,
+                              borderColor: "#2e7d32",
+                              color: "#2e7d32",
+                              fontWeight: 600,
+                              padding: "2px 10px",
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleRemoveExperience(entry.id)}
+                            disabled={isExperienceSavePending}
+                            style={{
+                              textTransform: "none",
+                              borderRadius: 16,
+                              borderColor: "#c62828",
+                              color: "#c62828",
+                              fontWeight: 600,
+                              padding: "2px 10px",
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {legacyExperience.map((exp, index) => (
                   <Typography
                     key={`${exp}-${index}`}
                     variant="body2"
@@ -777,6 +1093,83 @@ const Profile = ({
                 ))}
               </div>
             )}
+
+            <Dialog
+              open={isExperienceDialogOpen}
+              onClose={() => handleCloseExperienceDialog()}
+              fullWidth
+              maxWidth="sm"
+              aria-labelledby="experience-dialog-title"
+            >
+              <DialogTitle id="experience-dialog-title">
+                {editingExperienceId ? "Edit experience" : "Add experience"}
+              </DialogTitle>
+              <DialogContent dividers>
+                <TextField
+                  label="Title"
+                  value={experienceFormData.title}
+                  onChange={handleExperienceFieldChange("title")}
+                  variant="outlined"
+                  margin="dense"
+                  fullWidth
+                  required
+                />
+                <TextField
+                  label="Company"
+                  value={experienceFormData.company}
+                  onChange={handleExperienceFieldChange("company")}
+                  variant="outlined"
+                  margin="dense"
+                  fullWidth
+                  required
+                />
+                <TextField
+                  label="Start date"
+                  placeholder="e.g. Jan 2022"
+                  value={experienceFormData.startDate}
+                  onChange={handleExperienceFieldChange("startDate")}
+                  variant="outlined"
+                  margin="dense"
+                  fullWidth
+                  required
+                />
+                <TextField
+                  label="End date"
+                  placeholder="e.g. Present"
+                  value={experienceFormData.endDate}
+                  onChange={handleExperienceFieldChange("endDate")}
+                  variant="outlined"
+                  margin="dense"
+                  fullWidth
+                />
+                <TextField
+                  label="Description"
+                  value={experienceFormData.description}
+                  onChange={handleExperienceFieldChange("description")}
+                  variant="outlined"
+                  margin="dense"
+                  fullWidth
+                  multiline
+                  rows={3}
+                />
+              </DialogContent>
+              <DialogActions>
+                <Button
+                  onClick={() => handleCloseExperienceDialog()}
+                  disabled={isExperienceSavePending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveExperience}
+                  variant="contained"
+                  color="primary"
+                  disabled={isExperienceSavePending}
+                >
+                  {editingExperienceId ? "Update" : "Save"}
+                </Button>
+              </DialogActions>
+            </Dialog>
 
             <Dialog
               open={isEditDialogOpen}
