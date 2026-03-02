@@ -2,8 +2,8 @@ import React from "react";
 import { useQuery } from "convex/react";
 import { Paper, Avatar, Divider } from "@material-ui/core";
 import { useTheme } from "@material-ui/core/styles";
-import LabelImportantIcon from "@material-ui/icons/LabelImportant";
-import BookmarkIcon from "@material-ui/icons/Bookmark";
+import LabelOutlinedIcon from "@material-ui/icons/LabelOutlined";
+import BookmarkBorderIcon from "@material-ui/icons/BookmarkBorder";
 import { Link } from "react-router-dom";
 import { api } from "../../../convex/_generated/api";
 import useConvexUser from "../../../hooks/useConvexUser";
@@ -39,12 +39,12 @@ const SidebarTop = () => {
         <Divider />
       </div>
       <div className={classes.myItems}>
-        <LabelImportantIcon style={{ transform: "rotate(-90deg)" }} />
+        <LabelOutlinedIcon style={{ transform: "rotate(-90deg)" }} />
         <h4>My Items</h4>
       </div>
       <Link to="/saved" className={classes.savedPostsLink}>
         <div className={classes.myItems}>
-          <BookmarkIcon />
+          <BookmarkBorderIcon />
           <h4>Saved posts</h4>
         </div>
       </Link>

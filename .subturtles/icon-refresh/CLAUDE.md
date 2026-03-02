@@ -1,5 +1,5 @@
 ## Current Task
-Update sidebar icons in `linkedin-demo/src/components/sidebar/sidebarTop/SidebarTop.js` to outlined variants where appropriate.
+Update widgets icons in `linkedin-demo/src/components/widgets/Widgets.js`, replacing the alert-style info icon with a neutral outlined info icon.
 
 ## End Goal with Specs
 Modern, professional icons that match LinkedIn's visual language. Replace generic icons with more appropriate MUI icon variants. Improve post action bar, header nav, and sidebar icons.
@@ -25,10 +25,10 @@ Modern, professional icons that match LinkedIn's visual language. Replace generi
   - `PhotoSizeSelectActualIcon` → `ImageOutlinedIcon` or `PhotoOutlinedIcon` (cleaner)
   - `CreateIcon` → `EditOutlinedIcon` or `CreateOutlinedIcon`
   - `InsertLinkIcon` → `LinkOutlinedIcon` (if available) or keep
-- [ ] **Sidebar icons** in `linkedin-demo/src/components/sidebar/sidebarTop/SidebarTop.js`: <- current
+- [x] **Sidebar icons** in `linkedin-demo/src/components/sidebar/sidebarTop/SidebarTop.js`:
   - `LabelImportantIcon` → `BookmarkBorderIcon` or `LabelOutlinedIcon`
   - `BookmarkIcon` — check if using outlined variant
-- [ ] **Widgets icons** in `linkedin-demo/src/components/widgets/Widgets.js`:
+- [ ] **Widgets icons** in `linkedin-demo/src/components/widgets/Widgets.js`: <- current
   - `FiberManualRecordIcon` (dot) — is fine for bullet points
   - `ErrorOutlineSharpIcon` → `InfoOutlinedIcon` (less alarming for info display)
   - `ExpandMoreIcon` is fine — keep
