@@ -1,13 +1,13 @@
 ## Current Task
-Create `src/components/company/CompanyAnalytics.js` admin-only stats view (followers, posts, total post likes).
+Add analytics tab to CompanyPage.js — only visible to admins. Show CompanyAnalytics component.
 
 ## End Goal with Specs
 Company pages are fully theme-aware (dark mode works). Company admins see basic analytics (follower count, post engagement). Jobs tab exists as a placeholder. Verified companies show a badge.
 
 ## Backlog
 - [x] Add `isVerified` boolean field (optional) to companies table in schema.ts.
-- [ ] Create `src/components/company/CompanyAnalytics.js` — admin-only view: total followers (number), total posts (number), total post likes (sum across company posts). Use MUI Card with simple stat display (number + label). No charts needed — just clean stat cards. <- current
-- [ ] Add analytics tab to CompanyPage.js — only visible to admins. Show CompanyAnalytics component.
+- [x] Create `src/components/company/CompanyAnalytics.js` — admin-only view: total followers (number), total posts (number), total post likes (sum across company posts). Use MUI Card with simple stat display (number + label). No charts needed — just clean stat cards.
+- [ ] Add analytics tab to CompanyPage.js — only visible to admins. Show CompanyAnalytics component. <- current
 - [ ] Create `src/components/company/CompanyJobsTab.js` — placeholder tab showing "No job postings yet. Check back soon!" with a WorkOutlineIcon. This will be populated in Phase 4.
 - [ ] Add Jobs tab to CompanyPage.js tabs (after Posts tab).
 - [ ] Add verified badge display: in CompanyPage.js header, if company.isVerified is true, show a VerifiedIcon (MUI) in blue next to the company name. Also show in search results and suggestion cards.

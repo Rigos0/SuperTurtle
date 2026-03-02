@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { query } from "./_generated/server";
 
 export const listCompanyNames = query({
@@ -49,5 +50,45 @@ export const searchCompanies = query({
         followerCount: followerCountByCompanyId.get(company._id) ?? 0,
         logoStorageId: company.logoStorageId ?? null,
       }));
+  },
+});
+
+export const getCompanyAnalytics = query({
+  args: {
+    companyId: v.id("companies"),
+  },
+  handler: async (ctx, args) => {
+    const viewerId = await getAuthUserId(ctx);
+    if (!viewerId) {
+      return null;
+    }
+
+    const company = await ctx.db.get(args.companyId);
+    if (!company) {
+      return null;
+    }
+
+    const isAdmin = company.admins.some((adminId) => adminId === viewerId);
+    if (!isAdmin) {
+      return null;
+    }
+
+    const [followers, posts] = await Promise.all([
+      ctx.db
+        .query("companyFollowers")
+        .withIndex("byCompany", (q) => q.eq("companyId", args.companyId))
+        .collect(),
+      ctx.db.query("posts").collect(),
+    ]);
+
+    const companyAdminIds = new Set(company.admins);
+    const companyPosts = posts.filter((post) => companyAdminIds.has(post.authorId));
+    const totalPostLikes = companyPosts.reduce((sum, post) => sum + post.likesCount, 0);
+
+    return {
+      totalFollowers: followers.length,
+      totalPosts: companyPosts.length,
+      totalPostLikes,
+    };
   },
 });
