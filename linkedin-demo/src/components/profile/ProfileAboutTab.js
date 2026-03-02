@@ -21,6 +21,7 @@ const ProfileAboutTab = ({
   onCloseExperienceDialog,
   onSaveExperience,
   onExperienceFieldChange,
+  onExperienceCompanyChange,
   educationEntries,
   isEducationSavePending,
   isEducationDialogOpen,
@@ -65,6 +66,7 @@ const ProfileAboutTab = ({
       onCloseDialog={onCloseExperienceDialog}
       onSaveExperience={onSaveExperience}
       onExperienceFieldChange={onExperienceFieldChange}
+      onExperienceCompanyChange={onExperienceCompanyChange}
     />
 
     <EducationSection

@@ -1,4 +1,5 @@
 import React from "react";
+import { useQuery } from "convex/react";
 import {
   Button,
   Dialog,
@@ -9,7 +10,9 @@ import {
   TextField,
   Typography,
 } from "@material-ui/core";
+import { Autocomplete } from "@material-ui/lab";
 import { fade, useTheme } from "@material-ui/core/styles";
+import { api } from "../../convex/_generated/api";
 
 const formatExperienceDateRange = (startDate, endDate) => {
   const hasStartDate = typeof startDate === "string" && startDate.trim().length > 0;
@@ -40,8 +43,15 @@ const ExperienceSection = ({
   onCloseDialog,
   onSaveExperience,
   onExperienceFieldChange,
+  onExperienceCompanyChange,
 }) => {
   const theme = useTheme();
+  const companies = useQuery(api.companies.listCompanyNames);
+  const companyOptions = Array.isArray(companies) ? companies : [];
+  const selectedCompanyOption =
+    experienceFormData.companyId && companyOptions.length > 0
+      ? companyOptions.find((company) => company._id === experienceFormData.companyId) ?? null
+      : null;
 
   return (
     <>
@@ -193,14 +203,45 @@ const ExperienceSection = ({
           fullWidth
           required
         />
-        <TextField
-          label="Company"
-          value={experienceFormData.company}
-          onChange={onExperienceFieldChange("company")}
-          variant="outlined"
-          margin="dense"
-          fullWidth
-          required
+        <Autocomplete
+          freeSolo
+          options={companyOptions}
+          value={selectedCompanyOption}
+          inputValue={experienceFormData.company}
+          getOptionLabel={(option) => {
+            if (typeof option === "string") {
+              return option;
+            }
+            return option?.name ?? "";
+          }}
+          onChange={(_, nextValue) => {
+            if (typeof nextValue === "string") {
+              onExperienceCompanyChange({ company: nextValue, companyId: null });
+              return;
+            }
+
+            if (nextValue?.name) {
+              onExperienceCompanyChange({ company: nextValue.name, companyId: nextValue._id });
+              return;
+            }
+
+            onExperienceCompanyChange({ company: "", companyId: null });
+          }}
+          onInputChange={(_, nextInputValue, reason) => {
+            if (reason === "input" || reason === "clear") {
+              onExperienceCompanyChange({ company: nextInputValue, companyId: null });
+            }
+          }}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Company"
+              variant="outlined"
+              margin="dense"
+              fullWidth
+              required
+            />
+          )}
         />
         <TextField
           label="Start date"

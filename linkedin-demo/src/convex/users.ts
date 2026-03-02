@@ -48,16 +48,32 @@ const normalizeRequiredField = (value: string, fieldName: string) => {
 const normalizeExperienceInput = (args: {
   title: string;
   company: string;
+  companyId?: Id<"companies">;
   startDate: string;
   endDate?: string;
   description?: string;
-}) => ({
-  title: normalizeRequiredField(args.title, "Title"),
-  company: normalizeRequiredField(args.company, "Company"),
-  startDate: normalizeRequiredField(args.startDate, "Start date"),
-  endDate: normalizeOptionalField(args.endDate),
-  description: normalizeOptionalField(args.description),
-});
+}) => {
+  const normalizedInput: {
+    title: string;
+    company: string;
+    companyId?: Id<"companies">;
+    startDate: string;
+    endDate?: string;
+    description?: string;
+  } = {
+    title: normalizeRequiredField(args.title, "Title"),
+    company: normalizeRequiredField(args.company, "Company"),
+    startDate: normalizeRequiredField(args.startDate, "Start date"),
+    endDate: normalizeOptionalField(args.endDate),
+    description: normalizeOptionalField(args.description),
+  };
+
+  if (args.companyId) {
+    normalizedInput.companyId = args.companyId;
+  }
+
+  return normalizedInput;
+};
 
 const normalizeEducationInput = (args: {
   school: string;
@@ -684,6 +700,7 @@ export const addExperience = mutation({
   args: {
     title: v.string(),
     company: v.string(),
+    companyId: v.optional(v.id("companies")),
     startDate: v.string(),
     endDate: v.optional(v.string()),
     description: v.optional(v.string()),
@@ -718,6 +735,7 @@ export const updateExperience = mutation({
     entryId: v.string(),
     title: v.string(),
     company: v.string(),
+    companyId: v.optional(v.id("companies")),
     startDate: v.string(),
     endDate: v.optional(v.string()),
     description: v.optional(v.string()),

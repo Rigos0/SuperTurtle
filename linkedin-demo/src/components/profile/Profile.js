@@ -90,6 +90,7 @@ const buildProfileFormData = (user) => ({
 const buildExperienceFormData = (entry = null) => ({
   title: resolveProfileText(entry?.title),
   company: resolveProfileText(entry?.company),
+  companyId: entry?.companyId ?? null,
   startDate: resolveProfileText(entry?.startDate),
   endDate: resolveProfileText(entry?.endDate),
   description: resolveProfileText(entry?.description),
@@ -705,6 +706,14 @@ const Profile = ({
     }));
   };
 
+  const handleExperienceCompanyChange = ({ company, companyId = null }) => {
+    setExperienceFormData((previousData) => ({
+      ...previousData,
+      company,
+      companyId,
+    }));
+  };
+
   const handleSaveExperience = async () => {
     if (!isOwnProfile || isExperienceSavePending) {
       return;
@@ -718,6 +727,7 @@ const Profile = ({
           entryId: editingExperienceId,
           title: experienceFormData.title,
           company: experienceFormData.company,
+          companyId: experienceFormData.companyId || undefined,
           startDate: experienceFormData.startDate,
           endDate: experienceFormData.endDate,
           description: experienceFormData.description,
@@ -726,6 +736,7 @@ const Profile = ({
         await addExperience({
           title: experienceFormData.title,
           company: experienceFormData.company,
+          companyId: experienceFormData.companyId || undefined,
           startDate: experienceFormData.startDate,
           endDate: experienceFormData.endDate,
           description: experienceFormData.description,
@@ -1669,6 +1680,7 @@ const Profile = ({
                 onCloseExperienceDialog={handleCloseExperienceDialog}
                 onSaveExperience={handleSaveExperience}
                 onExperienceFieldChange={handleExperienceFieldChange}
+                onExperienceCompanyChange={handleExperienceCompanyChange}
                 educationEntries={educationEntries}
                 isEducationSavePending={isEducationSavePending}
                 isEducationDialogOpen={isEducationDialogOpen}
