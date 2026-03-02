@@ -58,6 +58,14 @@ git commit -m "restore branch-specific CLAUDE.md"
 ## Current task
 Connections system + guest read-only mode. 3 SubTurtles: guest-readonly, connections-backend, connections-frontend (queued).
 
+## 🤖 FULL-AUTO MODE (overnight)
+The meta agent is running autonomously. Cron orchestrator (id `c0ffee`) fires every 20 min.
+- Monitor all running SubTurtles, stop finished ones, commit+push work
+- When all SubTurtles done → move to final QA: Convex deploy, build, e2e tests, write new tests for connections + guest read-only
+- When QA done → clean up all crons, send final summary to user
+- Only message the user on: completions, stuck states, errors
+- If a SubTurtle finishes and the next backlog item needs a new SubTurtle, spawn it automatically
+
 ## End goal with specs
 A **production-grade** LinkedIn-style demo app (Turtle In 🐢) — live at **https://linkedin-demo-iota.vercel.app**
 
@@ -80,10 +88,11 @@ A **production-grade** LinkedIn-style demo app (Turtle In 🐢) — live at **ht
 - ✅ Production polish: dead buttons wired, dead UI removed, navigation cleanup, LoadingGate universal spinner, email index for OAuth
 
 ## Backlog
-- [ ] Remove anonymous auth — guests browse read-only (no post/like/comment/message)
-- [ ] Connections backend — connections table, send/accept/reject/remove mutations, real counts, no self-connect
-- [ ] Connections frontend — wire Connect button, pending/connected states, view connections list on profiles, real counts
-- [ ] Final deploy + full manual QA
+- [x] Remove anonymous auth — guests browse read-only (no post/like/comment/message) ✅
+- [x] Connections backend — connections table, send/accept/reject/remove mutations, real counts, no self-connect ✅
+- [ ] Connections frontend — wire Connect button, pending/connected states, view connections list on profiles, real counts <- current (connections-frontend)
+- [ ] UI polish — dark mode fixes, empty states, dead code cleanup, loading UX, active tab, ErrorBoundary <- current (ui-polish)
+- [ ] Final deploy + full manual QA + E2E tests
 
 ## Notes
 - Convex schema: users (with email index), posts, likes, comments, conversations, messages, notifications + authTables
