@@ -1,5 +1,5 @@
 ## Current Task
-Update Network connections UX: self-filtered list, real status-aware action buttons, pending incoming requests, and real connection counts.
+Update Sidebar top connections count to use real Convex query data.
 
 ## End Goal with Specs
 - Connect button on Profile and Network calls `sendConnectionRequest` mutation
@@ -23,13 +23,13 @@ Update Network connections UX: self-filtered list, real status-aware action butt
   - Hide Connect button entirely when `authUser._id === profileUserId` (own profile)
   - Make "X connections" text clickable — onClick sets a `showConnections` state to true
   - When `showConnections` is true, render a connections list panel (query `api.connections.listConnections({ userId: profileUserId })`). Each item: Avatar + displayName + title, clickable to navigate to that user's profile via `onViewProfile(user._id)`.
-- [ ] Update `linkedin-demo/src/components/network/Network.js`: <- current
+- [x] Update `linkedin-demo/src/components/network/Network.js`:
   - Filter out current user from the users list: `filteredUsers = users.filter(u => u._id !== user?._id)`
   - For each user card, query `api.connections.getConnectionStatus` to show correct button state
   - Wire Connect button to `sendConnectionRequest` mutation
   - Add a "Pending Requests" section at top: query `api.connections.listPendingRequests({ userId: user._id })`. Show Accept/Reject buttons for each.
   - Show connection count on each user card
-- [ ] Update `linkedin-demo/src/components/sidebar/sidebarTop/SidebarTop.js`:
+- [ ] Update `linkedin-demo/src/components/sidebar/sidebarTop/SidebarTop.js`: <- current
   - Import `useQuery` and query `api.connections.getConnectionCount({ userId: user._id })` for real count
   - Replace `user?.connections ?? 0` with the real query result
 - [ ] Run `cd linkedin-demo && npm run build` to verify build passes

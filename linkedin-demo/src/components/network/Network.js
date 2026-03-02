@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "convex/react";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery } from "convex/react";
 import { Avatar, Button, Paper, TextField, Typography } from "@material-ui/core";
 import { api } from "../../convex/_generated/api";
 import { DEFAULT_PHOTO } from "../../constants";
@@ -15,12 +15,233 @@ const resolvePhoto = (photoURL) => {
   return photoURL;
 };
 
+const NetworkUserCard = ({
+  candidateUser,
+  authUserId,
+  canConnect,
+  classes,
+  onNavigateProfile,
+  sendConnectionRequest,
+  acceptConnection,
+  rejectConnection,
+  removeConnection,
+}) => {
+  const connectionStatus = useQuery(
+    api.connections.getConnectionStatus,
+    authUserId
+      ? { userId1: authUserId, userId2: candidateUser._id }
+      : "skip",
+  );
+  const connectionCount = useQuery(
+    api.connections.getConnectionCount,
+    candidateUser?._id ? { userId: candidateUser._id } : "skip",
+  );
+  const [isConnectionActionPending, setIsConnectionActionPending] = useState(false);
+  const [isConnectedActionHovered, setIsConnectedActionHovered] = useState(false);
+  const connectionState = connectionStatus?.status ?? "none";
+
+  useEffect(() => {
+    if (connectionState !== "accepted") {
+      setIsConnectedActionHovered(false);
+    }
+  }, [connectionState]);
+
+  const handleConnect = async (event) => {
+    event.stopPropagation();
+    if (!authUserId || !candidateUser?._id || isConnectionActionPending) {
+      return;
+    }
+
+    setIsConnectionActionPending(true);
+    try {
+      await sendConnectionRequest({
+        fromUserId: authUserId,
+        toUserId: candidateUser._id,
+      });
+    } catch (error) {
+      console.error("Failed to send connection request:", error);
+    } finally {
+      setIsConnectionActionPending(false);
+    }
+  };
+
+  const handleAccept = async (event) => {
+    event.stopPropagation();
+    if (!connectionStatus?.connectionId || isConnectionActionPending) {
+      return;
+    }
+
+    setIsConnectionActionPending(true);
+    try {
+      await acceptConnection({ connectionId: connectionStatus.connectionId });
+    } catch (error) {
+      console.error("Failed to accept connection request:", error);
+    } finally {
+      setIsConnectionActionPending(false);
+    }
+  };
+
+  const handleReject = async (event) => {
+    event.stopPropagation();
+    if (!connectionStatus?.connectionId || isConnectionActionPending) {
+      return;
+    }
+
+    setIsConnectionActionPending(true);
+    try {
+      await rejectConnection({ connectionId: connectionStatus.connectionId });
+    } catch (error) {
+      console.error("Failed to reject connection request:", error);
+    } finally {
+      setIsConnectionActionPending(false);
+    }
+  };
+
+  const handleRemove = async (event) => {
+    event.stopPropagation();
+    if (!connectionStatus?.connectionId || isConnectionActionPending) {
+      return;
+    }
+
+    setIsConnectionActionPending(true);
+    try {
+      await removeConnection({ connectionId: connectionStatus.connectionId });
+      setIsConnectedActionHovered(false);
+    } catch (error) {
+      console.error("Failed to remove connection:", error);
+    } finally {
+      setIsConnectionActionPending(false);
+    }
+  };
+
+  const renderConnectionAction = () => {
+    if (!canConnect) {
+      return null;
+    }
+
+    if (connectionState === "pending" && connectionStatus?.direction === "received") {
+      return (
+        <div className={classes.actionRow}>
+          <Button
+            variant="contained"
+            size="small"
+            className={classes.acceptButton}
+            onClick={handleAccept}
+            disabled={isConnectionActionPending}
+          >
+            Accept
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            className={classes.rejectButton}
+            onClick={handleReject}
+            disabled={isConnectionActionPending}
+          >
+            Reject
+          </Button>
+        </div>
+      );
+    }
+
+    if (connectionState === "accepted") {
+      return (
+        <Button
+          variant="outlined"
+          size="small"
+          className={classes.connectButton}
+          onClick={handleRemove}
+          onMouseEnter={() => setIsConnectedActionHovered(true)}
+          onMouseLeave={() => setIsConnectedActionHovered(false)}
+          onFocus={() => setIsConnectedActionHovered(true)}
+          onBlur={() => setIsConnectedActionHovered(false)}
+          disabled={isConnectionActionPending}
+          style={{
+            borderColor: isConnectedActionHovered ? "#c62828" : "#2e7d32",
+            color: isConnectedActionHovered ? "#c62828" : "#2e7d32",
+          }}
+        >
+          {isConnectedActionHovered ? "Remove" : "Connected ✓"}
+        </Button>
+      );
+    }
+
+    if (connectionState === "pending") {
+      return (
+        <Button
+          variant="outlined"
+          size="small"
+          disabled
+          className={`${classes.connectButton} ${classes.connectButtonPending}`}
+        >
+          Pending
+        </Button>
+      );
+    }
+
+    return (
+      <Button
+        variant="outlined"
+        size="small"
+        className={classes.connectButton}
+        onClick={handleConnect}
+        disabled={connectionStatus === undefined || isConnectionActionPending}
+      >
+        Connect
+      </Button>
+    );
+  };
+
+  return (
+    <Paper
+      elevation={1}
+      className={classes.card}
+      role="button"
+      tabIndex={0}
+      onClick={() => onNavigateProfile(candidateUser._id)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onNavigateProfile(candidateUser._id);
+        }
+      }}
+    >
+      <Avatar
+        src={resolvePhoto(candidateUser.photoURL)}
+        alt={candidateUser.displayName}
+        className={classes.avatar}
+      />
+      <div className={classes.info}>
+        <Typography className={classes.displayName}>{candidateUser.displayName}</Typography>
+        <Typography className={classes.title}>{candidateUser.title}</Typography>
+        <Typography className={classes.location}>
+          {candidateUser.location?.trim().length > 0
+            ? candidateUser.location
+            : "Location not listed"}
+        </Typography>
+        <Typography className={classes.connectionCount}>
+          {(connectionCount ?? 0)} connections
+        </Typography>
+      </div>
+      {renderConnectionAction()}
+    </Paper>
+  );
+};
+
 const Network = ({ onNavigateProfile }) => {
   const classes = Style();
   const authUser = useConvexUser();
+  const sendConnectionRequest = useMutation(api.connections.sendConnectionRequest);
+  const acceptConnection = useMutation(api.connections.acceptConnection);
+  const rejectConnection = useMutation(api.connections.rejectConnection);
+  const removeConnection = useMutation(api.connections.removeConnection);
   const users = useQuery(api.users.listAllUsers);
+  const pendingRequests = useQuery(
+    api.connections.listPendingRequests,
+    authUser?._id ? { userId: authUser._id } : "skip",
+  );
   const [searchTerm, setSearchTerm] = useState("");
-  const [pendingIds, setPendingIds] = useState(() => new Set());
+  const [pendingRequestActionIds, setPendingRequestActionIds] = useState(() => new Set());
   const canConnect = Boolean(authUser?._id);
   const normalizedTerm = searchTerm.trim().toLowerCase();
   const filteredUsers = useMemo(() => {
@@ -28,15 +249,18 @@ const Network = ({ onNavigateProfile }) => {
       return [];
     }
 
+    const usersWithoutSelf = users.filter((user) => user._id !== authUser?._id);
+
     if (!normalizedTerm) {
-      return users;
+      return usersWithoutSelf;
     }
 
-    return users.filter((user) => {
+    return usersWithoutSelf.filter((user) => {
       const fields = [user.displayName, user.title, user.location].filter(Boolean);
       return fields.some((field) => field.toLowerCase().includes(normalizedTerm));
     });
-  }, [users, normalizedTerm]);
+  }, [users, normalizedTerm, authUser?._id]);
+  const pendingRequestList = useMemo(() => pendingRequests ?? [], [pendingRequests]);
 
   if (users?.length === 0) {
     return (
@@ -62,72 +286,145 @@ const Network = ({ onNavigateProfile }) => {
           inputProps={{ "aria-label": "Search users in network" }}
         />
       </div>
+      {authUser?._id && (
+        <LoadingGate isLoading={pendingRequests === undefined}>
+          <Paper className={classes.pendingSection} elevation={1}>
+            <Typography className={classes.pendingSectionTitle}>Pending Requests</Typography>
+            {pendingRequestList.length === 0 ? (
+              <Typography variant="body2" color="textSecondary">
+                No pending requests.
+              </Typography>
+            ) : (
+              <div className={classes.pendingRequestsList}>
+                {pendingRequestList.map((request) => {
+                  const isRequestActionPending = pendingRequestActionIds.has(request.connectionId);
+
+                  return (
+                    <Paper
+                      key={request.connectionId}
+                      elevation={0}
+                      className={classes.pendingRequestCard}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onNavigateProfile(request.user._id)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onNavigateProfile(request.user._id);
+                        }
+                      }}
+                    >
+                      <Avatar
+                        src={resolvePhoto(request.user.photoURL)}
+                        alt={request.user.displayName}
+                        className={classes.avatar}
+                      />
+                      <div className={classes.info}>
+                        <Typography className={classes.displayName}>
+                          {request.user.displayName}
+                        </Typography>
+                        <Typography className={classes.title}>
+                          {request.user.title || "No title listed"}
+                        </Typography>
+                      </div>
+                      <div className={classes.actionRow}>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          className={classes.acceptButton}
+                          disabled={isRequestActionPending}
+                          onClick={async (event) => {
+                            event.stopPropagation();
+                            if (isRequestActionPending) {
+                              return;
+                            }
+
+                            setPendingRequestActionIds((prev) => {
+                              const next = new Set(prev);
+                              next.add(request.connectionId);
+                              return next;
+                            });
+
+                            try {
+                              await acceptConnection({ connectionId: request.connectionId });
+                            } catch (error) {
+                              console.error("Failed to accept request:", error);
+                            } finally {
+                              setPendingRequestActionIds((prev) => {
+                                const next = new Set(prev);
+                                next.delete(request.connectionId);
+                                return next;
+                              });
+                            }
+                          }}
+                        >
+                          Accept
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          className={classes.rejectButton}
+                          disabled={isRequestActionPending}
+                          onClick={async (event) => {
+                            event.stopPropagation();
+                            if (isRequestActionPending) {
+                              return;
+                            }
+
+                            setPendingRequestActionIds((prev) => {
+                              const next = new Set(prev);
+                              next.add(request.connectionId);
+                              return next;
+                            });
+
+                            try {
+                              await rejectConnection({ connectionId: request.connectionId });
+                            } catch (error) {
+                              console.error("Failed to reject request:", error);
+                            } finally {
+                              setPendingRequestActionIds((prev) => {
+                                const next = new Set(prev);
+                                next.delete(request.connectionId);
+                                return next;
+                              });
+                            }
+                          }}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    </Paper>
+                  );
+                })}
+              </div>
+            )}
+          </Paper>
+        </LoadingGate>
+      )}
       <LoadingGate isLoading={users === undefined}>
         <>
           <div className={classes.grid}>
-            {filteredUsers.map((user) => {
-              const isPending = pendingIds.has(user._id);
-
-              return (
-                <Paper
-                  key={user._id}
-                  elevation={1}
-                  className={classes.card}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onNavigateProfile(user._id)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      onNavigateProfile(user._id);
-                    }
-                  }}
-                >
-                  <Avatar
-                    src={resolvePhoto(user.photoURL)}
-                    alt={user.displayName}
-                    className={classes.avatar}
-                  />
-                  <div className={classes.info}>
-                    <Typography className={classes.displayName}>{user.displayName}</Typography>
-                    <Typography className={classes.title}>{user.title}</Typography>
-                    <Typography className={classes.location}>
-                      {user.location?.trim().length > 0 ? user.location : "Location not listed"}
-                    </Typography>
-                  </div>
-                  {canConnect && (
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      disabled={isPending}
-                      className={`${classes.connectButton} ${
-                        isPending ? classes.connectButtonPending : ""
-                      }`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-
-                        if (isPending) {
-                          return;
-                        }
-
-                        setPendingIds((prev) => {
-                          const next = new Set(prev);
-                          next.add(user._id);
-                          return next;
-                        });
-                      }}
-                    >
-                      {isPending ? "Pending" : "Connect"}
-                    </Button>
-                  )}
-                </Paper>
-              );
-            })}
+            {filteredUsers.map((candidateUser) => (
+              <NetworkUserCard
+                key={candidateUser._id}
+                candidateUser={candidateUser}
+                authUserId={authUser?._id ?? null}
+                canConnect={canConnect}
+                classes={classes}
+                onNavigateProfile={onNavigateProfile}
+                sendConnectionRequest={sendConnectionRequest}
+                acceptConnection={acceptConnection}
+                rejectConnection={rejectConnection}
+                removeConnection={removeConnection}
+              />
+            ))}
           </div>
           {filteredUsers.length === 0 && (
             <Paper className={classes.stateCard} elevation={1}>
               <Typography variant="body2" color="textSecondary">
-                No people match "{searchTerm.trim()}".
+                {normalizedTerm
+                  ? `No people match "${searchTerm.trim()}".`
+                  : "No people to show yet."}
               </Typography>
             </Paper>
           )}
