@@ -143,6 +143,101 @@ export default makeStyles((theme) => ({
     },
   },
 
+  pollComposer: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    margin: "8px 0 6px",
+    padding: "10px 12px",
+    borderRadius: 10,
+    border:
+      theme.palette.type === "dark"
+        ? "1px solid rgba(225,225,225,0.1)"
+        : "1px solid rgba(0,0,0,0.1)",
+    backgroundColor: theme.palette.type === "dark" ? darkSecondary : "rgba(46,125,50,0.04)",
+  },
+
+  pollLabel: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: theme.palette.type === "dark" ? "rgba(255,255,255,0.9)" : "#1b5e20",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+
+  pollInput: {
+    width: "100%",
+    border: 0,
+    outlineWidth: 0,
+    borderRadius: 8,
+    padding: "10px 12px",
+    fontSize: 14,
+    color: theme.palette.type === "dark" ? "lightgrey" : "#222",
+    backgroundColor: theme.palette.type === "dark" ? "rgba(0,0,0,0.25)" : "#fff",
+  },
+
+  pollOptions: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+  },
+
+  pollOptionRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  pollOptionInput: {
+    flex: 1,
+    border: 0,
+    outlineWidth: 0,
+    borderRadius: 8,
+    padding: "9px 12px",
+    fontSize: 13,
+    color: theme.palette.type === "dark" ? "lightgrey" : "#222",
+    backgroundColor: theme.palette.type === "dark" ? "rgba(0,0,0,0.25)" : "#fff",
+  },
+
+  pollRemoveOption: {
+    width: 32,
+    height: 32,
+    border: 0,
+    borderRadius: 999,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    color: theme.palette.type === "dark" ? "#f5b5b5" : "#c62828",
+    backgroundColor: theme.palette.type === "dark" ? "rgba(255,255,255,0.08)" : "rgba(198,40,40,0.08)",
+  },
+
+  pollAddOption: {
+    width: "fit-content",
+    border: 0,
+    outlineWidth: 0,
+    borderRadius: 999,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "6px 10px",
+    cursor: "pointer",
+    fontWeight: 700,
+    fontSize: 12,
+    color: theme.palette.type === "dark" ? "#a5d6a7" : "#1b5e20",
+    backgroundColor: theme.palette.type === "dark" ? "rgba(46,125,50,0.2)" : "rgba(46,125,50,0.15)",
+    "&:disabled": {
+      cursor: "not-allowed",
+      opacity: 0.6,
+    },
+  },
+
+  pollHint: {
+    margin: 0,
+    fontSize: 12,
+    color: theme.palette.type === "dark" ? "rgba(255,255,255,0.65)" : "rgba(0,0,0,0.6)",
+  },
+
   progress: {
     flex: 1,
     height: 8,

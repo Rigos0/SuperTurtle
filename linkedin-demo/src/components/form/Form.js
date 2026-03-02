@@ -5,6 +5,9 @@ import VideocamRoundedIcon from "@material-ui/icons/VideocamRounded";
 import YouTubeIcon from "@material-ui/icons/YouTube";
 import PhotoSizeSelectActualIcon from "@material-ui/icons/PhotoSizeSelectActual";
 import CreateIcon from "@material-ui/icons/Create";
+import PollIcon from "@material-ui/icons/Poll";
+import AddCircleOutlineIcon from "@material-ui/icons/AddCircleOutline";
+import HighlightOffRoundedIcon from "@material-ui/icons/HighlightOffRounded";
 // Colors import removed — using green branding directly
 import Styles from "./Style";
 import swal from "@sweetalert/with-react";
@@ -16,6 +19,8 @@ import useConvexUser from "../../hooks/useConvexUser";
 import MentionAutocomplete from "../mentions/MentionAutocomplete";
 
 const MAX_POST_IMAGES = 4;
+const MIN_POLL_OPTIONS = 2;
+const MAX_POLL_OPTIONS = 4;
 const MENTION_TRIGGER_REGEX = /(^|\s)@([a-z0-9-]*)$/i;
 
 const getActiveMention = (value, caretPosition) => {
@@ -56,6 +61,11 @@ const Form = () => {
   const [URL, setURL] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [postVisibility, setPostVisibility] = useState("public");
+  const [isPollComposerOpen, setIsPollComposerOpen] = useState(false);
+  const [pollDraft, setPollDraft] = useState({
+    question: "",
+    options: ["", ""],
+  });
   const [mentionState, setMentionState] = useState({
     open: false,
     query: "",
@@ -70,6 +80,13 @@ const Form = () => {
       query: "",
       start: -1,
       end: -1,
+    });
+  };
+
+  const resetPollDraft = () => {
+    setPollDraft({
+      question: "",
+      options: ["", ""],
     });
   };
 
@@ -250,6 +267,8 @@ const Form = () => {
     setOpenURL(false);
     setURL("");
     setPostVisibility("public");
+    setIsPollComposerOpen(false);
+    resetPollDraft();
     closeMentionAutocomplete();
   };
 
@@ -276,6 +295,59 @@ const Form = () => {
     } else {
       setOpenURL(true);
     }
+  };
+
+  const togglePollComposer = () => {
+    setIsPollComposerOpen((previousValue) => {
+      const nextValue = !previousValue;
+      if (!nextValue) {
+        resetPollDraft();
+      }
+      return nextValue;
+    });
+  };
+
+  const handlePollQuestionChange = (event) => {
+    const nextQuestion = event.target.value;
+    setPollDraft((previousValue) => ({
+      ...previousValue,
+      question: nextQuestion,
+    }));
+  };
+
+  const handlePollOptionChange = (optionIndex, nextValue) => {
+    setPollDraft((previousValue) => ({
+      ...previousValue,
+      options: previousValue.options.map((option, index) =>
+        index === optionIndex ? nextValue : option,
+      ),
+    }));
+  };
+
+  const addPollOption = () => {
+    setPollDraft((previousValue) => {
+      if (previousValue.options.length >= MAX_POLL_OPTIONS) {
+        return previousValue;
+      }
+
+      return {
+        ...previousValue,
+        options: [...previousValue.options, ""],
+      };
+    });
+  };
+
+  const removePollOption = (optionIndex) => {
+    setPollDraft((previousValue) => {
+      if (previousValue.options.length <= MIN_POLL_OPTIONS) {
+        return previousValue;
+      }
+
+      return {
+        ...previousValue,
+        options: previousValue.options.filter((_, index) => index !== optionIndex),
+      };
+    });
   };
 
   if (!isAuthenticated || !user?._id) {
@@ -372,6 +444,52 @@ const Form = () => {
           )}
         </div>
       )}
+      {isPollComposerOpen && (
+        <div className={classes.pollComposer}>
+          <label className={classes.pollLabel} htmlFor="poll-question">
+            Poll Question
+          </label>
+          <input
+            id="poll-question"
+            className={classes.pollInput}
+            placeholder="Ask a question..."
+            value={pollDraft.question}
+            onChange={handlePollQuestionChange}
+          />
+          <div className={classes.pollOptions}>
+            {pollDraft.options.map((option, optionIndex) => (
+              <div className={classes.pollOptionRow} key={`poll-option-${optionIndex}`}>
+                <input
+                  className={classes.pollOptionInput}
+                  placeholder={`Option ${optionIndex + 1}`}
+                  value={option}
+                  onChange={(event) => handlePollOptionChange(optionIndex, event.target.value)}
+                />
+                {pollDraft.options.length > MIN_POLL_OPTIONS && (
+                  <button
+                    type="button"
+                    className={classes.pollRemoveOption}
+                    aria-label={`Remove option ${optionIndex + 1}`}
+                    onClick={() => removePollOption(optionIndex)}
+                  >
+                    <HighlightOffRoundedIcon />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            className={classes.pollAddOption}
+            onClick={addPollOption}
+            disabled={pollDraft.options.length >= MAX_POLL_OPTIONS}
+          >
+            <AddCircleOutlineIcon />
+            Add option
+          </button>
+          <p className={classes.pollHint}>Add between 2 and 4 options.</p>
+        </div>
+      )}
 
       <div className={classes.upload__media}>
         <label
@@ -395,6 +513,10 @@ const Form = () => {
         <div className={classes.media__options} onClick={toggleURL_Tab}>
           <InsertLinkIcon style={{ color: "#e88ee4", fontSize: 30 }} />
           <h4>URL</h4>
+        </div>
+        <div className={classes.media__options} onClick={togglePollComposer}>
+          <PollIcon style={{ color: "#2e7d32" }} />
+          <h4>{isPollComposerOpen ? "Cancel Poll" : "Create Poll"}</h4>
         </div>
       </div>
     </Paper>
