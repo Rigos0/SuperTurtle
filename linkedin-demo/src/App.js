@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useSelector } from "react-redux";
 import { Grid, Hidden, Modal, Typography } from "@material-ui/core";
@@ -23,6 +23,8 @@ import Widgets from "./components/widgets/Widgets";
 import { api } from "./convex/_generated/api";
 import Styles from "./Style";
 import { LinkedInBgColor, LinkedInBlue, darkPrimary } from "./assets/Colors";
+
+const CompanyPage = lazy(() => import("./components/company/CompanyPage"));
 
 const normalizeHashtag = (value) =>
   value
@@ -50,16 +52,23 @@ const AppShell = () => {
   const writeArticleRouteMatch = useMatch("/write-article");
   const articleRouteMatch = useMatch("/article/:id");
   const savedRouteMatch = useMatch("/saved");
+  const companyRouteMatch = useMatch("/company/:slug");
   const usernameRouteMatch = useMatch("/:username");
   const profileIdRouteMatch = useMatch("/profile/:userId");
   const routeHashtagParam = hashtagRouteMatch?.params?.tag ?? null;
+  const routeCompanySlugParam = companyRouteMatch?.params?.slug ?? null;
   const routeHashtag = routeHashtagParam
     ? normalizeHashtag(decodeRouteParam(routeHashtagParam))
+    : null;
+  const routeCompanySlug = routeCompanySlugParam
+    ? decodeRouteParam(routeCompanySlugParam).trim().toLowerCase()
     : null;
   const isWriteArticleRouteActive = Boolean(writeArticleRouteMatch);
   const isArticleRouteActive = Boolean(articleRouteMatch?.params?.id);
   const isSavedRouteActive = Boolean(savedRouteMatch);
-  const routeUsername = isWriteArticleRouteActive || isArticleRouteActive || isSavedRouteActive
+  const isCompanyRouteActive = Boolean(routeCompanySlug);
+  const routeUsername =
+    isWriteArticleRouteActive || isArticleRouteActive || isSavedRouteActive || isCompanyRouteActive
     ? null
     : usernameRouteMatch?.params?.username?.trim().toLowerCase() ?? null;
   const routeUserId = profileIdRouteMatch?.params?.userId ?? null;
@@ -70,7 +79,8 @@ const AppShell = () => {
     isHashtagRouteActive ||
     isWriteArticleRouteActive ||
     isArticleRouteActive ||
-    isSavedRouteActive;
+    isSavedRouteActive ||
+    isCompanyRouteActive;
   const { isAuthenticated, isLoading } = useConvexAuth();
   const seedData = useMutation(api.seed.seedData);
   const currentUser = useQuery(api.users.getCurrentUser, isAuthenticated ? {} : "skip");
@@ -256,7 +266,9 @@ const AppShell = () => {
   const shouldShowWriteArticleView = isWriteArticleRouteActive;
   const shouldShowArticleView = isArticleRouteActive;
   const shouldShowSavedView = isSavedRouteActive;
+  const shouldShowCompanyView = isCompanyRouteActive;
   const shouldShowProfileView =
+    !shouldShowCompanyView &&
     !shouldShowSavedView &&
     !shouldShowHashtagView &&
     !shouldShowArticleView &&
@@ -321,6 +333,17 @@ const AppShell = () => {
               {shouldShowWriteArticleView && <ArticleEditor />}
               {shouldShowArticleView && <ArticleView />}
               {shouldShowSavedView && <SavedPosts onNavigateProfile={onNavigateProfile} />}
+              {shouldShowCompanyView && routeCompanySlug && (
+                <Suspense
+                  fallback={
+                    <Typography variant="body2" color="textSecondary">
+                      Loading company...
+                    </Typography>
+                  }
+                >
+                  <CompanyPage slug={routeCompanySlug} />
+                </Suspense>
+              )}
 
               {/* Keep-alive tabs — always mounted, shown/hidden via display.
                   This prevents Convex query re-fetching and skeleton flashes. */}
@@ -328,6 +351,7 @@ const AppShell = () => {
                 style={showWhen(
                   !shouldShowProfileView &&
                     !shouldShowSavedView &&
+                    !shouldShowCompanyView &&
                     !shouldShowHashtagView &&
                     !shouldShowArticleView &&
                     !shouldShowWriteArticleView &&
@@ -346,6 +370,7 @@ const AppShell = () => {
                 style={showWhen(
                   !shouldShowProfileView &&
                     !shouldShowSavedView &&
+                    !shouldShowCompanyView &&
                     !shouldShowHashtagView &&
                     !shouldShowArticleView &&
                     !shouldShowWriteArticleView &&
@@ -359,6 +384,7 @@ const AppShell = () => {
                 style={showWhen(
                   !shouldShowProfileView &&
                     !shouldShowSavedView &&
+                    !shouldShowCompanyView &&
                     !shouldShowHashtagView &&
                     !shouldShowArticleView &&
                     !shouldShowWriteArticleView &&
@@ -372,6 +398,7 @@ const AppShell = () => {
                 style={showWhen(
                   !shouldShowProfileView &&
                   !shouldShowSavedView &&
+                  !shouldShowCompanyView &&
                   !shouldShowHashtagView &&
                   !shouldShowArticleView &&
                   !shouldShowWriteArticleView &&

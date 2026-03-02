@@ -1,5 +1,5 @@
 ## Current Task
-Add `/company/:slug` route to App.js (import CompanyPage lazily).
+All backlog items complete.
 
 ## End Goal with Specs
 Full company entity: schema table, create/update mutations (admin-only updates), public page at /company/:slug with header (logo + cover), about section, and posts feed. Creator is auto-admin, can add other admins.
@@ -9,9 +9,9 @@ Full company entity: schema table, create/update mutations (admin-only updates),
 - [x] Add `companyFollowers` table to schema.ts: companyId (companies id), userId (users id), createdAt (number). Index on companyId and byCompanyAndUser.
 - [x] Create `src/convex/companies.ts` with mutations: createCompany (auth required, creator becomes admin), updateCompany (admin-only check — verify userId is in admins array), getCompanyBySlug query, addAdmin mutation (admin-only).
 - [x] Create `src/components/company/CompanyPage.js` — route `/company/:slug`, loads company by slug, displays: cover photo, logo, name, industry, size, follower count, admin actions dropdown. Use MUI Card, Avatar, Typography. Match the green theme (#2e7d32 / theme.palette.primary).
-- [ ] Add `/company/:slug` route to App.js (import CompanyPage lazily). <- current
-- [ ] Run `cd linkedin-demo && npx convex dev --once` to push schema + functions, then `cd linkedin-demo && npm run build` to verify no build errors.
-- [ ] Commit with descriptive message.
+- [x] Add `/company/:slug` route to App.js (import CompanyPage lazily).
+- [x] Run `cd linkedin-demo && npx convex dev --once` to push schema + functions, then `cd linkedin-demo && npm run build` to verify no build errors.
+- [x] Commit with descriptive message.
 
 ## Notes
 - Project root: /Users/Richard.Mladek/Documents/projects/agentic/linkedin-demo
@@ -22,3 +22,6 @@ Full company entity: schema table, create/update mutations (admin-only updates),
 - Use getAuthUserId(ctx) for auth checks in all mutations
 - MUI v4: @material-ui/core, @material-ui/icons
 - IMPORTANT: Only modify files in linkedin-demo/ directory
+
+## Loop Control
+STOP
