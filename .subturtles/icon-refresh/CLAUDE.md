@@ -1,5 +1,5 @@
 ## Current Task
-Update widgets icons in `linkedin-demo/src/components/widgets/Widgets.js`, replacing the alert-style info icon with a neutral outlined info icon.
+Review comment delete icon usage in `linkedin-demo/src/components/posts/post/PostComments.js` and keep `DeleteOutlineIcon` if already correct.
 
 ## End Goal with Specs
 Modern, professional icons that match LinkedIn's visual language. Replace generic icons with more appropriate MUI icon variants. Improve post action bar, header nav, and sidebar icons.
@@ -28,11 +28,11 @@ Modern, professional icons that match LinkedIn's visual language. Replace generi
 - [x] **Sidebar icons** in `linkedin-demo/src/components/sidebar/sidebarTop/SidebarTop.js`:
   - `LabelImportantIcon` → `BookmarkBorderIcon` or `LabelOutlinedIcon`
   - `BookmarkIcon` — check if using outlined variant
-- [ ] **Widgets icons** in `linkedin-demo/src/components/widgets/Widgets.js`: <- current
+- [x] **Widgets icons** in `linkedin-demo/src/components/widgets/Widgets.js`:
   - `FiberManualRecordIcon` (dot) — is fine for bullet points
   - `ErrorOutlineSharpIcon` → `InfoOutlinedIcon` (less alarming for info display)
   - `ExpandMoreIcon` is fine — keep
-- [ ] **Comment delete icon** in `linkedin-demo/src/components/posts/post/PostComments.js`:
+- [ ] **Comment delete icon** in `linkedin-demo/src/components/posts/post/PostComments.js`: <- current
   - `DeleteOutlineIcon` is fine — keep
 - [ ] **Bottom nav (mobile)** in Header.js `tabItems` array:
   - Same icon updates as header nav — apply outlined variants

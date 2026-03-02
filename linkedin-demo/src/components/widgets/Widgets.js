@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Paper } from "@material-ui/core";
 import FiberManualRecordIcon from "@material-ui/icons/FiberManualRecord";
-import ErrorOutlineSharpIcon from "@material-ui/icons/ErrorOutlineSharp";
+import InfoOutlinedIcon from "@material-ui/icons/InfoOutlined";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 import HeaderInfo from "../../components/util/HeadLine";
 import { LinkedInLightBlue } from "../../assets/Colors";
@@ -16,7 +16,7 @@ const Widgets = () => {
       <Paper className={classes.widgets__top}>
         <div className={classes.heading}>
           <h4>TurtleIn News</h4>
-          <ErrorOutlineSharpIcon />
+          <InfoOutlinedIcon />
         </div>
         {top_1.map((title, i) => (
           <HeaderInfo
