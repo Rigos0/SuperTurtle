@@ -14,11 +14,18 @@ const realDateNow = Date.now;
 mkdirSync(fixtureSrcDir, { recursive: true });
 writeFileSync(
   fixtureCronPath,
-  readFileSync(new URL("./cron.ts", import.meta.url), "utf-8").replace(`from "./logger";`, `from "./logger.ts";`)
+  readFileSync(new URL("./cron.ts", import.meta.url), "utf-8")
+    .replace(`from "./logger";`, `from "./logger.ts";`)
+    .replace(`from "./config";`, `from "./config.ts";`)
 );
 writeFileSync(
   fixtureLoggerPath,
   `export const cronLog = { warn: () => {}, error: () => {}, info: () => {}, debug: () => {} };\n`
+);
+const fixtureConfigPath = join(fixtureSrcDir, "config.ts");
+writeFileSync(
+  fixtureConfigPath,
+  `export const SUPERTURTLE_DATA_DIR = ${JSON.stringify(fixtureRoot)};\n`
 );
 
 const cronModuleUrl = `${pathToFileURL(fixtureCronPath).href}?ts=${Date.now()}`;

@@ -213,7 +213,7 @@ describe("handleText crash retry gating", () => {
         entry.includes("stalled after spawn orchestration")
       )
     ).toBe(true);
-    expect(result.payload?.messages[1]?.includes("./super_turtle/subturtle/ctl list")).toBe(true);
+    expect(result.payload?.messages[1]?.includes("/subturtle/ctl list")).toBe(true);
   });
 
   it("retries stalled runs when spawn orchestration tool status is HTML-encoded", async () => {
@@ -229,7 +229,7 @@ describe("handleText crash retry gating", () => {
         entry.includes("stalled after spawn orchestration")
       )
     ).toBe(true);
-    expect(result.payload?.messages[1]?.includes("./super_turtle/subturtle/ctl list")).toBe(true);
+    expect(result.payload?.messages[1]?.includes("/subturtle/ctl list")).toBe(true);
   });
 
   it("retries stalled runs without tool execution", async () => {

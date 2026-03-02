@@ -143,7 +143,7 @@ describe("/restart self-reexec", () => {
     expect(result.payload?.spawnOpts?.stdin).toBe("ignore");
     expect(result.payload?.spawnOpts?.stdout).toBe("ignore");
     expect(result.payload?.spawnOpts?.stderr).toBe("ignore");
-    expect(result.payload?.spawnOpts?.cwd?.endsWith("/super_turtle/claude-telegram-bot")).toBe(true);
+    expect(result.payload?.spawnOpts?.cwd?.endsWith("/claude-telegram-bot")).toBe(true);
     expect(result.payload?.unrefCalled).toBe(true);
     expect(result.payload?.exitCode).toBe(0);
   });

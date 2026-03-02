@@ -49,7 +49,7 @@ describe("/subturtle", () => {
     const originalSpawnSync = Bun.spawnSync;
 
     Bun.spawnSync = ((cmd: unknown, opts?: unknown) => {
-      if (Array.isArray(cmd) && String(cmd[0]).endsWith("/super_turtle/subturtle/ctl") && cmd[1] === "list") {
+      if (Array.isArray(cmd) && String(cmd[0]).endsWith("/subturtle/ctl") && cmd[1] === "list") {
         const output = [
           `  ${turtleName}      running  yolo-codex   (PID 12345)   9m left       Tail raw logs here [skills: ["frontend"]]`,
           "                 → https://example.trycloudflare.com",

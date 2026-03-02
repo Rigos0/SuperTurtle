@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { existsSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import { codexSession } from "../codex-session";
 import { getAvailableModels, session } from "../session";
@@ -83,7 +83,9 @@ function mockClaudeCredentialLookupFailure(): () => void {
   };
 }
 
-const cronJobsPath = resolve(import.meta.dir, "../../cron-jobs.json");
+const superturtleDataDir = resolve(process.env.CLAUDE_WORKING_DIR || process.cwd(), ".superturtle");
+mkdirSync(superturtleDataDir, { recursive: true });
+const cronJobsPath = resolve(superturtleDataDir, "cron-jobs.json");
 const originalCronJobsText = existsSync(cronJobsPath) ? readFileSync(cronJobsPath, "utf-8") : null;
 const originalSessionStopTyping = session.stopTyping;
 const originalSessionKill = session.kill;

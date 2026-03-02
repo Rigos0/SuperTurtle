@@ -35,6 +35,9 @@ debug_redirect.txt
 # SubTurtle workspaces (runtime state, not committed)
 .subturtles/
 
+# Super Turtle runtime data (user-specific config + state)
+.superturtle/
+
 # Runtime state ledgers / schedulers (generated locally)
 super_turtle/claude-telegram-bot/cron-jobs.json
 super_turtle/state/runs.jsonl

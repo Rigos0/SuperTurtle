@@ -95,7 +95,7 @@ describe("driver routing retry parity", () => {
       const result = await runMessageWithDriver("claude", baseInput("spawn subturtle"));
       expect(result).toBe("ok");
       expect(attempts).toBe(2);
-      expect(seenMessages[1]?.includes("./super_turtle/subturtle/ctl list")).toBe(true);
+      expect(seenMessages[1]?.includes("/subturtle/ctl list")).toBe(true);
     } finally {
       driver.runMessage = original.runMessage;
       driver.isStallError = original.isStallError;
