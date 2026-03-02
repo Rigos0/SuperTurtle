@@ -28,9 +28,7 @@ import useErrorToast from "../../hooks/useErrorToast";
 import ConfirmDialog from "../common/ConfirmDialog";
 import LoadingGate from "../LoadingGate";
 import Post from "../posts/post/Post";
-import EducationSection from "./EducationSection";
-import ExperienceSection from "./ExperienceSection";
-import SkillsSection from "./SkillsSection";
+import ProfileAboutTab from "./ProfileAboutTab";
 import Style from "./Style";
 
 const DEFAULT_PROFILE = {
@@ -1604,65 +1602,43 @@ const Profile = ({
             )}
 
             {activeTab === 2 && (
-              <div className={classes.section}>
-                <Typography variant="subtitle2" style={{ fontWeight: 700, marginBottom: 6 }}>
-                  About
-                </Typography>
-                <Typography
-                  variant="body2"
-                  color="textSecondary"
-                  component="div"
-                  style={{ lineHeight: 1.65 }}
-                >
-                  {renderBasicRichText(about, "No about information yet.")}
-                </Typography>
-
-                <Divider style={{ margin: "16px 0 12px" }} />
-
-                <ExperienceSection
-                  isOwnProfile={isOwnProfile}
-                  experienceEntries={experienceEntries}
-                  legacyExperience={legacyExperience}
-                  isExperienceSavePending={isExperienceSavePending}
-                  isExperienceDialogOpen={isExperienceDialogOpen}
-                  editingExperienceId={editingExperienceId}
-                  experienceFormData={experienceFormData}
-                  onOpenCreateDialog={handleOpenCreateExperienceDialog}
-                  onOpenEditDialog={handleOpenEditExperienceDialog}
-                  onRemoveExperience={handleRemoveExperience}
-                  onCloseDialog={handleCloseExperienceDialog}
-                  onSaveExperience={handleSaveExperience}
-                  onExperienceFieldChange={handleExperienceFieldChange}
-                />
-
-                <EducationSection
-                  isOwnProfile={isOwnProfile}
-                  educationEntries={educationEntries}
-                  isEducationSavePending={isEducationSavePending}
-                  isEducationDialogOpen={isEducationDialogOpen}
-                  editingEducationId={editingEducationId}
-                  educationFormData={educationFormData}
-                  primaryColor={theme.palette.primary.main}
-                  onOpenCreateDialog={handleOpenCreateEducationDialog}
-                  onOpenEditDialog={handleOpenEditEducationDialog}
-                  onRemoveEducation={handleRemoveEducation}
-                  onCloseDialog={handleCloseEducationDialog}
-                  onSaveEducation={handleSaveEducation}
-                  onEducationFieldChange={handleEducationFieldChange}
-                />
-
-                <SkillsSection
-                  isOwnProfile={isOwnProfile}
-                  skills={skills}
-                  skillInputValue={skillInputValue}
-                  skillError={skillError}
-                  isSkillMutationPending={isSkillMutationPending}
-                  primaryColor={theme.palette.primary.main}
-                  onSkillInputChange={handleSkillInputChange}
-                  onAddSkill={handleAddSkill}
-                  onRemoveSkill={handleRemoveSkill}
-                />
-              </div>
+              <ProfileAboutTab
+                sectionClassName={classes.section}
+                about={about}
+                renderBasicRichText={renderBasicRichText}
+                isOwnProfile={isOwnProfile}
+                experienceEntries={experienceEntries}
+                legacyExperience={legacyExperience}
+                isExperienceSavePending={isExperienceSavePending}
+                isExperienceDialogOpen={isExperienceDialogOpen}
+                editingExperienceId={editingExperienceId}
+                experienceFormData={experienceFormData}
+                onOpenCreateExperienceDialog={handleOpenCreateExperienceDialog}
+                onOpenEditExperienceDialog={handleOpenEditExperienceDialog}
+                onRemoveExperience={handleRemoveExperience}
+                onCloseExperienceDialog={handleCloseExperienceDialog}
+                onSaveExperience={handleSaveExperience}
+                onExperienceFieldChange={handleExperienceFieldChange}
+                educationEntries={educationEntries}
+                isEducationSavePending={isEducationSavePending}
+                isEducationDialogOpen={isEducationDialogOpen}
+                editingEducationId={editingEducationId}
+                educationFormData={educationFormData}
+                onOpenCreateEducationDialog={handleOpenCreateEducationDialog}
+                onOpenEditEducationDialog={handleOpenEditEducationDialog}
+                onRemoveEducation={handleRemoveEducation}
+                onCloseEducationDialog={handleCloseEducationDialog}
+                onSaveEducation={handleSaveEducation}
+                onEducationFieldChange={handleEducationFieldChange}
+                skills={skills}
+                skillInputValue={skillInputValue}
+                skillError={skillError}
+                isSkillMutationPending={isSkillMutationPending}
+                primaryColor={theme.palette.primary.main}
+                onSkillInputChange={handleSkillInputChange}
+                onAddSkill={handleAddSkill}
+                onRemoveSkill={handleRemoveSkill}
+              />
             )}
 
             <ConfirmDialog
