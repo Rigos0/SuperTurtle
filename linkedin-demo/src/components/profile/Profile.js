@@ -24,6 +24,7 @@ import ReactTimeago from "react-timeago";
 import { api } from "../../convex/_generated/api";
 import { DEFAULT_PHOTO } from "../../constants";
 import useConvexUser from "../../hooks/useConvexUser";
+import useErrorToast from "../../hooks/useErrorToast";
 import LoadingGate from "../LoadingGate";
 import Post from "../posts/post/Post";
 import Style from "./Style";
@@ -219,6 +220,7 @@ const Profile = ({
   username = null,
 }) => {
   const classes = Style();
+  const { showError, ErrorToast } = useErrorToast();
   const authUser = useConvexUser();
   const getOrCreateConversation = useMutation(api.messaging.getOrCreateConversation);
   const sendConnectionRequest = useMutation(api.connections.sendConnectionRequest);
@@ -465,6 +467,7 @@ const Profile = ({
       });
     } catch (error) {
       console.error("Failed to send connection request:", error);
+      showError("Failed to send connection request. Please try again.");
     } finally {
       setIsConnectionActionPending(false);
     }
@@ -481,6 +484,7 @@ const Profile = ({
       await acceptConnection({ connectionId: connectionStatus.connectionId });
     } catch (error) {
       console.error("Failed to accept connection request:", error);
+      showError("Failed to accept connection request. Please try again.");
     } finally {
       setIsConnectionActionPending(false);
     }
@@ -497,6 +501,7 @@ const Profile = ({
       await rejectConnection({ connectionId: connectionStatus.connectionId });
     } catch (error) {
       console.error("Failed to reject connection request:", error);
+      showError("Failed to reject connection request. Please try again.");
     } finally {
       setIsConnectionActionPending(false);
     }
@@ -519,6 +524,7 @@ const Profile = ({
       setIsConnectedActionHovered(false);
     } catch (error) {
       console.error("Failed to remove connection:", error);
+      showError("Failed to remove connection. Please try again.");
     } finally {
       setIsConnectionActionPending(false);
     }
@@ -551,6 +557,7 @@ const Profile = ({
       }
     } catch (error) {
       console.error("Failed to update follow state:", error);
+      showError("Failed to update follow state. Please try again.");
     } finally {
       setIsFollowActionPending(false);
     }
@@ -619,6 +626,7 @@ const Profile = ({
       setIsEditDialogOpen(false);
     } catch (error) {
       console.error("Failed to update profile:", error);
+      showError("Failed to save profile changes. Please try again.");
     } finally {
       setIsProfileSavePending(false);
     }
@@ -692,6 +700,7 @@ const Profile = ({
       handleCloseExperienceDialog(true);
     } catch (error) {
       console.error("Failed to save experience:", error);
+      showError("Failed to save experience. Please try again.");
     } finally {
       setIsExperienceSavePending(false);
     }
@@ -715,6 +724,7 @@ const Profile = ({
       }
     } catch (error) {
       console.error("Failed to remove experience:", error);
+      showError("Failed to remove experience. Please try again.");
     } finally {
       setIsExperienceSavePending(false);
     }
@@ -788,6 +798,7 @@ const Profile = ({
       handleCloseEducationDialog(true);
     } catch (error) {
       console.error("Failed to save education:", error);
+      showError("Failed to save education. Please try again.");
     } finally {
       setIsEducationSavePending(false);
     }
@@ -811,6 +822,7 @@ const Profile = ({
       }
     } catch (error) {
       console.error("Failed to remove education:", error);
+      showError("Failed to remove education. Please try again.");
     } finally {
       setIsEducationSavePending(false);
     }
@@ -847,6 +859,7 @@ const Profile = ({
       setSkillInputValue("");
     } catch (error) {
       console.error("Failed to add skill:", error);
+      showError("Failed to add skill. Please try again.");
       setSkillError("Could not add skill. Please try again.");
     } finally {
       setIsSkillMutationPending(false);
@@ -865,6 +878,7 @@ const Profile = ({
       await removeSkill({ skill });
     } catch (error) {
       console.error("Failed to remove skill:", error);
+      showError("Failed to remove skill. Please try again.");
       setSkillError("Could not remove skill. Please try again.");
     } finally {
       setIsSkillMutationPending(false);
@@ -892,6 +906,7 @@ const Profile = ({
       }
     } catch (error) {
       console.error("Failed to update featured posts:", error);
+      showError("Failed to update featured posts. Please try again.");
       setFeaturedPostError("Could not update featured posts. Please try again.");
     } finally {
       setFeaturedMutationPostId(null);
@@ -955,6 +970,7 @@ const Profile = ({
       await saveProfilePhoto({ storageId });
     } catch (error) {
       console.error("Failed to upload profile photo:", error);
+      showError("Failed to upload profile photo. Please try again.");
       setPhotoUploadError("Profile photo upload failed. Please try again.");
     } finally {
       setIsPhotoUploadPending(false);
@@ -1004,6 +1020,7 @@ const Profile = ({
       await saveCoverPhoto({ storageId });
     } catch (error) {
       console.error("Failed to upload cover photo:", error);
+      showError("Failed to upload cover photo. Please try again.");
       setCoverUploadError("Cover photo upload failed. Please try again.");
     } finally {
       setIsCoverUploadPending(false);
@@ -2154,6 +2171,7 @@ const Profile = ({
           </LoadingGate>
         )}
       </Paper>
+      <ErrorToast />
     </div>
   );
 };
