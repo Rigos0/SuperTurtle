@@ -16,9 +16,6 @@ const LoginCard = () => {
       </header>
 
       <div className={classes.authButtons}>
-        <button className={classes.guestBtn} onClick={() => signIn("anonymous")} type="button">
-          🐢 Continue as Turtle
-        </button>
         <button className={classes.githubBtn} onClick={() => signIn("github")} type="button">
           Sign in with GitHub
         </button>
