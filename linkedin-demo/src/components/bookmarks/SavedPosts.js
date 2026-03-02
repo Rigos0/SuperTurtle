@@ -4,17 +4,9 @@ import { makeStyles } from "@material-ui/core/styles";
 import Typography from "@material-ui/core/Typography";
 import LoadingGate from "../LoadingGate";
 import Post from "../posts/post/Post";
-import { DEFAULT_PHOTO } from "../../constants";
 import { api } from "../../convex/_generated/api";
 import useConvexUser from "../../hooks/useConvexUser";
-
-const resolvePhoto = (photoURL) => {
-  if (!photoURL || (typeof photoURL === "string" && photoURL.startsWith("/"))) {
-    return DEFAULT_PHOTO;
-  }
-
-  return photoURL;
-};
+import { resolvePhoto } from "../../utils/photo";
 
 const SavedPosts = ({ onNavigateProfile }) => {
   const classes = useStyles();

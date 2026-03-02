@@ -1,5 +1,5 @@
 ## Current Task
-Run `cd linkedin-demo && npx convex dev --once` to push fixes
+All backlog items complete; finalize and stop loop
 
 ## End Goal with Specs
 All Convex mutations properly authenticate the calling user and reject unauthorized operations. No mutation should trust client-supplied userId.
@@ -13,9 +13,9 @@ All Convex mutations properly authenticate the calling user and reject unauthori
 - [x] Fix `linkedin-demo/src/convex/articles.ts` getArticle: add visibility check for connections-only articles
 - [x] Fix `linkedin-demo/src/convex/postEdits.ts` getEditHistory: consider access control (at minimum, don't expose edits of connections-only posts to non-connections)
 - [x] Wire poll creation: `linkedin-demo/src/components/form/Form.js` line ~196-262 — pollDraft data is never sent to backend. After createPost, call `polls:createPoll` with postId + poll data
-- [ ] Run `cd linkedin-demo && npx convex dev --once` to push fixes <- current
-- [ ] Test build passes: `cd linkedin-demo && npm run build`
-- [ ] Commit
+- [x] Run `cd linkedin-demo && npx convex dev --once` to push fixes
+- [x] Test build passes: `cd linkedin-demo && npm run build`
+- [x] Commit
 
 ## Notes
 - Auth helper: `getAuthUserId(ctx)` from `@convex-dev/auth/server`

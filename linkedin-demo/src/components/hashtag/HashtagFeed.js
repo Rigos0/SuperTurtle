@@ -3,23 +3,15 @@ import { useQuery } from "convex/react";
 import { Typography } from "@material-ui/core";
 import LoadingGate from "../LoadingGate";
 import Post from "../posts/post/Post";
-import { DEFAULT_PHOTO } from "../../constants";
 import { api } from "../../convex/_generated/api";
 import useConvexUser from "../../hooks/useConvexUser";
+import { resolvePhoto } from "../../utils/photo";
 
 const normalizeHashtag = (value) =>
   value
     .trim()
     .replace(/^#+/, "")
     .toLowerCase();
-
-const resolvePhoto = (photoURL) => {
-  if (!photoURL || (typeof photoURL === "string" && photoURL.startsWith("/"))) {
-    return DEFAULT_PHOTO;
-  }
-
-  return photoURL;
-};
 
 const HashtagFeed = ({ tag, onNavigateProfile }) => {
   const normalizedTag = useMemo(() => normalizeHashtag(tag ?? ""), [tag]);

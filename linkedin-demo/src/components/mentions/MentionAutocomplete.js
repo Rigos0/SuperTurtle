@@ -3,7 +3,7 @@ import { useQuery } from "convex/react";
 import { Avatar, ClickAwayListener, Paper, Popper, Typography } from "@material-ui/core";
 import { makeStyles } from "@material-ui/core/styles";
 import { api } from "../../convex/_generated/api";
-import { DEFAULT_PHOTO } from "../../constants";
+import { resolvePhoto } from "../../utils/photo";
 
 const useStyles = makeStyles((theme) => ({
   popper: {
@@ -60,14 +60,6 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 const normalizeMentionPrefix = (value = "") => value.trim().replace(/^@+/, "").toLowerCase();
-
-const resolvePhoto = (photoURL) => {
-  if (!photoURL || (typeof photoURL === "string" && photoURL.startsWith("/"))) {
-    return DEFAULT_PHOTO;
-  }
-
-  return photoURL;
-};
 
 const MentionAutocomplete = ({
   anchorEl,

@@ -12,7 +12,7 @@ import {
 import ArrowBackIcon from "@material-ui/icons/ArrowBack";
 import SendIcon from "@material-ui/icons/Send";
 import { api } from "../../convex/_generated/api";
-import { DEFAULT_PHOTO } from "../../constants";
+import { resolvePhoto } from "../../utils/photo";
 import useConvexUser from "../../hooks/useConvexUser";
 import LoadingGate from "../LoadingGate";
 import useStyles from "./Style";
@@ -54,13 +54,6 @@ const formatTimeAgo = (timestamp) => {
   return new Date(timestamp).toLocaleDateString();
 };
 
-const resolvePhoto = (photoURL) => {
-  if (!photoURL || (typeof photoURL === "string" && photoURL.startsWith("/"))) {
-    return DEFAULT_PHOTO;
-  }
-  return photoURL;
-};
-
 const Messaging = () => {
   const classes = useStyles();
   const user = useConvexUser();
@@ -68,6 +61,7 @@ const Messaging = () => {
   const [selectedConversationId, setSelectedConversationId] = useState(null);
   const [body, setBody] = useState("");
   const messageEndRef = useRef(null);
+  const { showError, ErrorToast } = useErrorToast();
 
   const conversations = useQuery(
     api.messaging.listConversations,
@@ -121,139 +115,149 @@ const Messaging = () => {
       setBody("");
     } catch (error) {
       console.error("Failed to send message:", error);
+      showError("Failed to send message. Please try again.");
     }
   };
 
   if (!user?._id) {
     return (
-      <Paper className={classes.root} elevation={1}>
-        <div className={classes.emptyState}>
-          <Typography variant="body2">Sign in to use messaging.</Typography>
-        </div>
-      </Paper>
+      <>
+        <Paper className={classes.root} elevation={1}>
+          <div className={classes.emptyState}>
+            <Typography variant="body2">Sign in to use messaging.</Typography>
+          </div>
+        </Paper>
+        <ErrorToast />
+      </>
     );
   }
 
   if (!selectedConversationId) {
     return (
-      <Paper className={classes.root} elevation={1}>
-        <LoadingGate isLoading={conversations === undefined}>
-          <div className={classes.listView}>
-            <div className={classes.listHeader}>
-              <Typography variant="h6" style={{ fontSize: 18, fontWeight: 700 }}>
-                Messaging
-              </Typography>
-            </div>
-            {conversations?.length === 0 ? (
-              <div className={classes.emptyState}>
-                <Typography variant="body2">No conversations yet.</Typography>
+      <>
+        <Paper className={classes.root} elevation={1}>
+          <LoadingGate isLoading={conversations === undefined}>
+            <div className={classes.listView}>
+              <div className={classes.listHeader}>
+                <Typography variant="h6" style={{ fontSize: 18, fontWeight: 700 }}>
+                  Messaging
+                </Typography>
               </div>
-            ) : (
-              conversations?.map((conversation) => {
-                const preview = conversation.latestMessage?.body ?? "No messages yet";
-                const displayName = conversation.otherParticipant?.displayName ?? "Unknown user";
-                const photoURL = resolvePhoto(conversation.otherParticipant?.photoURL);
-                const timestamp = conversation.latestMessage?.createdAt ?? conversation.createdAt;
+              {conversations?.length === 0 ? (
+                <div className={classes.emptyState}>
+                  <Typography variant="body2">No conversations yet.</Typography>
+                </div>
+              ) : (
+                conversations?.map((conversation) => {
+                  const preview = conversation.latestMessage?.body ?? "No messages yet";
+                  const displayName = conversation.otherParticipant?.displayName ?? "Unknown user";
+                  const photoURL = resolvePhoto(conversation.otherParticipant?.photoURL);
+                  const timestamp = conversation.latestMessage?.createdAt ?? conversation.createdAt;
 
-                return (
-                  <Button
-                    type="button"
-                    key={conversation._id}
-                    className={classes.conversationItem}
-                    onClick={() => setSelectedConversationId(conversation._id)}
-                    disableRipple
-                  >
-                    <Avatar src={photoURL} alt={displayName} />
-                    <div className={classes.conversationMain}>
-                      <div className={classes.conversationTopRow}>
-                        <p className={classes.conversationName}>{displayName}</p>
-                        <span className={classes.conversationTime}>{formatTimeAgo(timestamp)}</span>
+                  return (
+                    <Button
+                      type="button"
+                      key={conversation._id}
+                      className={classes.conversationItem}
+                      onClick={() => setSelectedConversationId(conversation._id)}
+                      disableRipple
+                    >
+                      <Avatar src={photoURL} alt={displayName} />
+                      <div className={classes.conversationMain}>
+                        <div className={classes.conversationTopRow}>
+                          <p className={classes.conversationName}>{displayName}</p>
+                          <span className={classes.conversationTime}>{formatTimeAgo(timestamp)}</span>
+                        </div>
+                        <p className={classes.conversationPreview}>{truncatePreview(preview, 50)}</p>
                       </div>
-                      <p className={classes.conversationPreview}>{truncatePreview(preview, 50)}</p>
-                    </div>
-                  </Button>
-                );
-              })
-            )}
-          </div>
-        </LoadingGate>
-      </Paper>
+                    </Button>
+                  );
+                })
+              )}
+            </div>
+          </LoadingGate>
+        </Paper>
+        <ErrorToast />
+      </>
     );
   }
 
   const threadTitle = selectedConversation?.otherParticipant?.displayName ?? "Conversation";
 
   return (
-    <Paper className={classes.root} elevation={1}>
-      <div className={classes.threadHeader}>
-        <IconButton
-          className={classes.backButton}
-          onClick={() => {
-            setSelectedConversationId(null);
-            setBody("");
-          }}
-          aria-label="Back to conversations"
-        >
-          <ArrowBackIcon />
-        </IconButton>
-        <Typography className={classes.threadTitle}>{threadTitle}</Typography>
-      </div>
+    <>
+      <Paper className={classes.root} elevation={1}>
+        <div className={classes.threadHeader}>
+          <IconButton
+            className={classes.backButton}
+            onClick={() => {
+              setSelectedConversationId(null);
+              setBody("");
+            }}
+            aria-label="Back to conversations"
+          >
+            <ArrowBackIcon />
+          </IconButton>
+          <Typography className={classes.threadTitle}>{threadTitle}</Typography>
+        </div>
 
-      <div className={classes.messageList}>
-        {messages === undefined ? (
-          <div className={classes.loadingState}>
-            <CircularProgress size={22} style={{ color: "#2e7d32" }} />
-          </div>
-        ) : messages.length === 0 ? (
-          <div className={classes.emptyState}>
-            <Typography variant="body2">No messages yet. Start the conversation.</Typography>
-          </div>
-        ) : (
-          messages.map((message) => {
-            const isOwnMessage = message.senderId === user._id;
+        <div className={classes.messageList}>
+          {messages === undefined ? (
+            <div className={classes.loadingState}>
+              <CircularProgress size={22} style={{ color: "#2e7d32" }} />
+            </div>
+          ) : messages.length === 0 ? (
+            <div className={classes.emptyState}>
+              <Typography variant="body2">No messages yet. Start the conversation.</Typography>
+            </div>
+          ) : (
+            messages.map((message) => {
+              const isOwnMessage = message.senderId === user._id;
 
-            return (
-              <div
-                key={message._id}
-                className={`${classes.messageRow} ${isOwnMessage ? classes.ownRow : classes.otherRow}`}
-              >
+              return (
                 <div
-                  className={`${classes.bubble} ${
-                    isOwnMessage ? classes.ownBubble : classes.otherBubble
-                  }`}
+                  key={message._id}
+                  className={`${classes.messageRow} ${isOwnMessage ? classes.ownRow : classes.otherRow}`}
                 >
-                  <Typography className={classes.messageText}>{message.body}</Typography>
-                  <Typography className={classes.messageMeta}>
-                    {formatTimeAgo(message.createdAt)}
-                  </Typography>
+                  <div
+                    className={`${classes.bubble} ${
+                      isOwnMessage ? classes.ownBubble : classes.otherBubble
+                    }`}
+                  >
+                    <Typography className={classes.messageText}>{message.body}</Typography>
+                    <Typography className={classes.messageMeta}>
+                      {formatTimeAgo(message.createdAt)}
+                    </Typography>
+                  </div>
                 </div>
-              </div>
-            );
-          })
-        )}
-        <div ref={messageEndRef} />
-      </div>
+              );
+            })
+          )}
+          <div ref={messageEndRef} />
+        </div>
 
-      <form className={classes.inputBar} onSubmit={handleSendMessage}>
-        <TextField
-          className={classes.inputField}
-          variant="outlined"
-          size="small"
-          value={body}
-          onChange={(event) => setBody(event.target.value)}
-          placeholder="Type a message"
-        />
-        <Button
-          className={classes.sendButton}
-          type="submit"
-          variant="contained"
-          endIcon={<SendIcon />}
-          disabled={!body.trim()}
-        >
-          Send
-        </Button>
-      </form>
-    </Paper>
+        <form className={classes.inputBar} onSubmit={handleSendMessage}>
+          <TextField
+            className={classes.inputField}
+            variant="outlined"
+            size="small"
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
+            placeholder="Type a message"
+          />
+          <Button
+            className={classes.sendButton}
+            type="submit"
+            variant="contained"
+            endIcon={<SendIcon />}
+            disabled={!body.trim()}
+          >
+            Send
+          </Button>
+        </form>
+      </Paper>
+      <ErrorToast />
+    </>
   );
 };
 
