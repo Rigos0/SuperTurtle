@@ -1,5 +1,5 @@
 ## Current Task
-Run `cd linkedin-demo && npx convex dev --once` to push schema
+All backlog items complete.
 
 ## End Goal with Specs
 Items 26-30 from Phase 2: Post visibility (public/connections only), feed algorithm (Recent/Top/Following), follow system, infinite scroll pagination.
@@ -14,10 +14,13 @@ Items 26-30 from Phase 2: Post visibility (public/connections only), feed algori
 - [x] Feed sort tabs — Recent (default, by createdAt), Top (most reactions+comments), Following (only from connections+followed users)
 - [x] Add feed sort UI — tabs or dropdown above feed in `linkedin-demo/src/App.js` or feed component
 - [x] Pagination — load 10 posts at a time in listPosts, add "Load more" button or infinite scroll with intersection observer
-- [ ] Run `cd linkedin-demo && npx convex dev --once` to push schema <- current
-- [ ] Test and commit
+- [x] Run `cd linkedin-demo && npx convex dev --once` to push schema
+- [x] Test and commit
 
 ## Notes
 - Posts query: `linkedin-demo/src/convex/posts.ts` listPosts
 - Connections system already exists in `linkedin-demo/src/convex/connections.ts`
 - Feed rendering in App.js around the posts map area
+
+## Loop Control
+STOP
