@@ -225,6 +225,8 @@ const Profile = ({
   const acceptConnection = useMutation(api.connections.acceptConnection);
   const rejectConnection = useMutation(api.connections.rejectConnection);
   const removeConnection = useMutation(api.connections.removeConnection);
+  const followUser = useMutation(api.follows.followUser);
+  const unfollowUser = useMutation(api.follows.unfollowUser);
   const updateCurrentUserProfile = useMutation(api.users.updateCurrentUserProfile);
   const updateCurrentUserAbout = useMutation(api.users.updateCurrentUserAbout);
   const addExperience = useMutation(api.users.addExperience);
@@ -267,6 +269,12 @@ const Profile = ({
     api.connections.getMutualConnectionsCount,
     authUser?._id && resolvedUserId && authUser._id !== resolvedUserId
       ? { viewerUserId: authUser._id, targetUserId: resolvedUserId }
+      : "skip",
+  );
+  const isFollowing = useQuery(
+    api.follows.isFollowing,
+    authUser?._id && resolvedUserId && authUser._id !== resolvedUserId
+      ? { followerId: authUser._id, followedId: resolvedUserId }
       : "skip",
   );
   const profileConnections = useQuery(
@@ -318,6 +326,7 @@ const Profile = ({
   const [activeTab, setActiveTab] = useState(0);
   const [isStartingConversation, setIsStartingConversation] = useState(false);
   const [isConnectionActionPending, setIsConnectionActionPending] = useState(false);
+  const [isFollowActionPending, setIsFollowActionPending] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isProfileSavePending, setIsProfileSavePending] = useState(false);
   const [profileFormData, setProfileFormData] = useState(() => buildProfileFormData(null));
@@ -412,6 +421,7 @@ const Profile = ({
     setCoverUploadError("");
     setSkillInputValue("");
     setSkillError("");
+    setIsFollowActionPending(false);
     setIsSkillMutationPending(false);
     setFeaturedMutationPostId(null);
     setFeaturedPostError("");
@@ -507,6 +517,38 @@ const Profile = ({
       console.error("Failed to remove connection:", error);
     } finally {
       setIsConnectionActionPending(false);
+    }
+  };
+
+  const handleToggleFollow = async () => {
+    if (
+      !authUser?._id ||
+      !resolvedUserId ||
+      isOwnProfile ||
+      isFollowActionPending ||
+      isFollowing === undefined
+    ) {
+      return;
+    }
+
+    setIsFollowActionPending(true);
+
+    try {
+      if (isFollowing) {
+        await unfollowUser({
+          followerId: authUser._id,
+          followedId: resolvedUserId,
+        });
+      } else {
+        await followUser({
+          followerId: authUser._id,
+          followedId: resolvedUserId,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to update follow state:", error);
+    } finally {
+      setIsFollowActionPending(false);
     }
   };
 
@@ -1230,6 +1272,25 @@ const Profile = ({
                     {isConnectedActionHovered ? "Remove" : "Connected ✓"}
                   </Button>
                 )}
+                <Button
+                  variant={isFollowing ? "contained" : "outlined"}
+                  size="small"
+                  onClick={handleToggleFollow}
+                  disabled={
+                    isFollowActionPending || isFollowing === undefined || !authUser?._id || !resolvedUserId
+                  }
+                  style={{
+                    backgroundColor: isFollowing ? "#2e7d32" : "transparent",
+                    color: isFollowing ? "#fff" : "#2e7d32",
+                    textTransform: "none",
+                    borderRadius: 16,
+                    borderColor: "#2e7d32",
+                    fontWeight: 600,
+                    padding: "4px 16px",
+                  }}
+                >
+                  {isFollowing ? "Following" : "Follow"}
+                </Button>
                 <Button
                   variant="outlined"
                   size="small"

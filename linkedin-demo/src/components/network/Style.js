@@ -158,4 +158,23 @@ export default makeStyles((theme) => ({
     borderColor: "#9e9e9e",
     color: "#757575",
   },
+  followButton: {
+    borderRadius: 16,
+    textTransform: "none",
+    fontWeight: 600,
+    minWidth: 92,
+    borderColor: "#2e7d32",
+    color: "#2e7d32",
+    "&:hover": {
+      borderColor: "#2e7d32",
+      backgroundColor: "rgba(46, 125, 50, 0.08)",
+    },
+  },
+  followButtonFollowing: {
+    backgroundColor: "#2e7d32",
+    color: "#fff",
+    "&:hover": {
+      backgroundColor: "#1b5e20",
+    },
+  },
 }));

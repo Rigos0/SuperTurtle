@@ -25,6 +25,8 @@ const NetworkUserCard = ({
   acceptConnection,
   rejectConnection,
   removeConnection,
+  followUser,
+  unfollowUser,
 }) => {
   const connectionStatus = useQuery(
     api.connections.getConnectionStatus,
@@ -46,7 +48,14 @@ const NetworkUserCard = ({
       ? { viewerUserId: authUserId, targetUserId: candidateUser._id }
       : "skip",
   );
+  const isFollowing = useQuery(
+    api.follows.isFollowing,
+    authUserId
+      ? { followerId: authUserId, followedId: candidateUser._id }
+      : "skip",
+  );
   const [isConnectionActionPending, setIsConnectionActionPending] = useState(false);
+  const [isFollowActionPending, setIsFollowActionPending] = useState(false);
   const [isConnectedActionHovered, setIsConnectedActionHovered] = useState(false);
   const connectionState = connectionStatus?.status ?? "none";
   const candidateUsername = candidateProfile?.username ?? candidateUser?.username ?? null;
@@ -125,14 +134,36 @@ const NetworkUserCard = ({
     }
   };
 
-  const renderConnectionAction = () => {
-    if (!canConnect) {
-      return null;
+  const handleToggleFollow = async (event) => {
+    event.stopPropagation();
+    if (!authUserId || !candidateUser?._id || isFollowActionPending || isFollowing === undefined) {
+      return;
     }
 
+    setIsFollowActionPending(true);
+    try {
+      if (isFollowing) {
+        await unfollowUser({
+          followerId: authUserId,
+          followedId: candidateUser._id,
+        });
+      } else {
+        await followUser({
+          followerId: authUserId,
+          followedId: candidateUser._id,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to update follow state:", error);
+    } finally {
+      setIsFollowActionPending(false);
+    }
+  };
+
+  const renderConnectionAction = () => {
     if (connectionState === "pending" && connectionStatus?.direction === "received") {
       return (
-        <div className={classes.actionRow}>
+        <>
           <Button
             variant="contained"
             size="small"
@@ -151,7 +182,7 @@ const NetworkUserCard = ({
           >
             Reject
           </Button>
-        </div>
+        </>
       );
     }
 
@@ -248,7 +279,22 @@ const NetworkUserCard = ({
           </Typography>
         )}
       </div>
-      {renderConnectionAction()}
+      {canConnect && (
+        <div className={classes.actionRow}>
+          {renderConnectionAction()}
+          <Button
+            variant={isFollowing ? "contained" : "outlined"}
+            size="small"
+            className={`${classes.followButton} ${
+              isFollowing ? classes.followButtonFollowing : ""
+            }`}
+            onClick={handleToggleFollow}
+            disabled={isFollowActionPending || isFollowing === undefined}
+          >
+            {isFollowing ? "Following" : "Follow"}
+          </Button>
+        </div>
+      )}
     </Paper>
   );
 };
@@ -260,6 +306,8 @@ const Network = ({ onNavigateProfile }) => {
   const acceptConnection = useMutation(api.connections.acceptConnection);
   const rejectConnection = useMutation(api.connections.rejectConnection);
   const removeConnection = useMutation(api.connections.removeConnection);
+  const followUser = useMutation(api.follows.followUser);
+  const unfollowUser = useMutation(api.follows.unfollowUser);
   const users = useQuery(api.users.listAllUsers);
   const pendingRequests = useQuery(
     api.connections.listPendingRequests,
@@ -449,6 +497,8 @@ const Network = ({ onNavigateProfile }) => {
                 acceptConnection={acceptConnection}
                 rejectConnection={rejectConnection}
                 removeConnection={removeConnection}
+                followUser={followUser}
+                unfollowUser={unfollowUser}
               />
             ))}
           </div>
