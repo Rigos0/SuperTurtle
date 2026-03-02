@@ -90,7 +90,7 @@ A **production-grade** LinkedIn-style demo app (Turtle In 🐢) — live at **ht
 ## Backlog
 - [x] Remove anonymous auth — guests browse read-only (no post/like/comment/message) ✅
 - [x] Connections backend — connections table, send/accept/reject/remove mutations, real counts, no self-connect ✅
-- [ ] Connections frontend — wire Connect button, pending/connected states, view connections list on profiles, real counts <- current (connections-frontend)
+- [x] Connections frontend — wire Connect button, pending/connected states, view connections list on profiles, real counts ✅
 - [ ] UI polish — dark mode fixes, empty states, dead code cleanup, loading UX, active tab, ErrorBoundary <- current (ui-polish)
 - [ ] Final deploy + full manual QA + E2E tests
 
