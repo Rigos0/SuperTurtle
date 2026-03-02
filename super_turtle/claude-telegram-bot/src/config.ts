@@ -242,7 +242,11 @@ export const ALLOWED_PATHS: string[] = allowedPathsStr
 let META_PROMPT = "";
 try {
   const metaPath = resolve(SUPER_TURTLE_DIR, "meta/META_SHARED.md");
-  META_PROMPT = readFileSync(metaPath, "utf-8").trim();
+  META_PROMPT = readFileSync(metaPath, "utf-8")
+    .replace(/\{\{SUPER_TURTLE_DIR\}\}/g, SUPER_TURTLE_DIR)
+    .replace(/\{\{CTL_PATH\}\}/g, CTL_PATH)
+    .replace(/\{\{DATA_DIR\}\}/g, SUPERTURTLE_DATA_DIR)
+    .trim();
   configLog.info({ metaPath }, `Loaded meta prompt from ${metaPath}`);
 } catch {
   configLog.warn("Failed to load META_SHARED.md - running without meta prompt");
