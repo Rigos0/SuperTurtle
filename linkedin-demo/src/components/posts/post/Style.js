@@ -68,6 +68,33 @@ export default makeStyles((theme) => ({
       wordBreak: "break-word",
     },
   },
+  hashtag: {
+    color: theme.palette.type === "dark" ? "#81c784" : "#2e7d32",
+    cursor: "pointer",
+    fontWeight: 600,
+    "&:hover": {
+      textDecoration: "underline",
+    },
+    "&:focus": {
+      outline: `2px solid ${theme.palette.type === "dark" ? "#81c784" : "#2e7d32"}`,
+      outlineOffset: 1,
+      borderRadius: 2,
+    },
+  },
+  mention: {
+    color: theme.palette.type === "dark" ? "#90caf9" : "#0a66c2",
+    cursor: "pointer",
+    fontWeight: 600,
+    textDecoration: "none",
+    "&:hover": {
+      textDecoration: "underline",
+    },
+    "&:focus": {
+      outline: `2px solid ${theme.palette.type === "dark" ? "#90caf9" : "#0a66c2"}`,
+      outlineOffset: 1,
+      borderRadius: 2,
+    },
+  },
   body__linkPreview: {
     width: "100%",
     padding: "0 10px 10px",

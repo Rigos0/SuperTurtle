@@ -21,6 +21,7 @@ import RepeatIcon from "@material-ui/icons/Repeat";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import ReactPlayer from "react-player";
 import ReactTimeago from "react-timeago";
+import { useNavigate } from "react-router-dom";
 import { api } from "../../../convex/_generated/api";
 import { DEFAULT_PHOTO } from "../../../constants";
 import useConvexUser from "../../../hooks/useConvexUser";
@@ -71,6 +72,8 @@ const REACTION_ITEM_BY_KEY = REACTION_ITEMS.reduce((accumulator, item) => {
   accumulator[item.key] = item;
   return accumulator;
 }, {});
+const HASHTAG_REGEX = /(^|[^a-zA-Z0-9_])(#([a-zA-Z0-9_]+))/g;
+const MENTION_REGEX = /(^|[^a-z0-9-])(@([a-z0-9]+(?:-[a-z0-9]+)*))/gi;
 
 const Post = forwardRef(
   (
@@ -95,6 +98,7 @@ const Post = forwardRef(
     ref
   ) => {
     const classes = Style();
+    const navigate = useNavigate();
     const user = useConvexUser();
     const { isAuthenticated } = useConvexAuth();
     const setReaction = useMutation(api.likes.setReaction);
@@ -123,6 +127,52 @@ const Post = forwardRef(
       () => getLinkPreviewFromText(description),
       [description]
     );
+    const descriptionSegments = React.useMemo(() => {
+      const text = typeof description === "string" ? description : "";
+      if (!text) {
+        return [];
+      }
+
+      const segments = [];
+      let lastIndex = 0;
+
+      for (const match of text.matchAll(HASHTAG_REGEX)) {
+        const matchIndex = match.index ?? -1;
+        const fullMatch = match[0] ?? "";
+        const prefix = match[1] ?? "";
+        const hashtagText = match[2] ?? "";
+        const rawTag = match[3] ?? "";
+
+        if (matchIndex < 0 || !fullMatch || !hashtagText || !rawTag) {
+          continue;
+        }
+
+        if (matchIndex > lastIndex) {
+          segments.push({
+            type: "text",
+            value: text.slice(lastIndex, matchIndex),
+          });
+        }
+
+        if (prefix) {
+          segments.push({ type: "text", value: prefix });
+        }
+
+        segments.push({
+          type: "hashtag",
+          value: hashtagText,
+          tag: rawTag.toLowerCase(),
+        });
+
+        lastIndex = matchIndex + fullMatch.length;
+      }
+
+      if (lastIndex < text.length) {
+        segments.push({ type: "text", value: text.slice(lastIndex) });
+      }
+
+      return segments;
+    }, [description]);
 
     const comments = useQuery(
       api.comments.listComments,
@@ -427,6 +477,77 @@ const Post = forwardRef(
         });
       }
     };
+    const handleHashtagClick = (tag) => {
+      if (!tag) {
+        return;
+      }
+
+      navigate(`/hashtag/${encodeURIComponent(tag)}`);
+    };
+    const handleMentionClick = (event, mentionUsername) => {
+      if (!mentionUsername) {
+        return;
+      }
+
+      if (typeof onNavigateProfile === "function") {
+        event.preventDefault();
+        onNavigateProfile({ username: mentionUsername.toLowerCase(), userId: null });
+      }
+    };
+    const renderTextWithMentions = (value, segmentIndex) => {
+      if (typeof value !== "string" || value.length === 0) {
+        return value;
+      }
+
+      const renderedNodes = [];
+      let lastIndex = 0;
+
+      for (const match of value.matchAll(new RegExp(MENTION_REGEX))) {
+        const matchIndex = match.index ?? -1;
+        const fullMatch = match[0] ?? "";
+        const prefix = match[1] ?? "";
+        const mentionText = match[2] ?? "";
+        const mentionUsername = match[3] ?? "";
+
+        if (matchIndex < 0 || !fullMatch || !mentionText || !mentionUsername) {
+          continue;
+        }
+
+        if (matchIndex > lastIndex) {
+          renderedNodes.push(value.slice(lastIndex, matchIndex));
+        }
+
+        if (prefix) {
+          renderedNodes.push(prefix);
+        }
+
+        const normalizedMentionUsername = mentionUsername.toLowerCase();
+        renderedNodes.push(
+          <a
+            key={`mention-${segmentIndex}-${matchIndex}`}
+            className={classes.mention}
+            href={`/${encodeURIComponent(normalizedMentionUsername)}`}
+            onClick={(event) => handleMentionClick(event, normalizedMentionUsername)}
+          >
+            {mentionText}
+          </a>,
+        );
+
+        lastIndex = matchIndex + fullMatch.length;
+      }
+
+      if (lastIndex < value.length) {
+        renderedNodes.push(value.slice(lastIndex));
+      }
+
+      if (renderedNodes.length === 0) {
+        return value;
+      }
+
+      return renderedNodes.map((node, index) => (
+        <React.Fragment key={`text-${segmentIndex}-${index}`}>{node}</React.Fragment>
+      ));
+    };
 
     const resolvedReactionCounts = {
       like: reactionCounts?.like ?? likesCount,
@@ -592,7 +713,33 @@ const Post = forwardRef(
                 </div>
               </div>
             ) : (
-              <p>{description}</p>
+              <p>
+                {descriptionSegments.length === 0
+                  ? description
+                  : descriptionSegments.map((segment, index) => {
+                    if (segment.type !== "hashtag") {
+                      return <React.Fragment key={`text-${index}`}>{renderTextWithMentions(segment.value, index)}</React.Fragment>;
+                    }
+
+                    return (
+                      <span
+                        key={`hashtag-${index}`}
+                        role="link"
+                        tabIndex={0}
+                        className={classes.hashtag}
+                        onClick={() => handleHashtagClick(segment.tag)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            handleHashtagClick(segment.tag);
+                          }
+                        }}
+                      >
+                        {segment.value}
+                      </span>
+                    );
+                  })}
+              </p>
             )}
           </div>
           {!isEditing && linkPreview && (
