@@ -1,5 +1,5 @@
 ## Current Task
-Create `linkedin-demo/src/components/posts/report/ReportDialog.js` — dialog with reason dropdown + details textarea + submit button.
+Wire report submission — call mutation, show success Snackbar, disable re-report.
 
 ## End Goal with Specs
 Item 34 from Phase 2: Users can report posts with a reason. Reports stored in database for admin review.
@@ -13,8 +13,8 @@ Item 34 from Phase 2: Users can report posts with a reason. Reports stored in da
 - [x] Add `reports` table to schema (`linkedin-demo/src/convex/schema.ts`) — userId, postId, reason (string), details (optional string), createdAt. Index by postId, userId.
 - [x] Create `linkedin-demo/src/convex/reports.ts` — mutations: reportPost(postId, reason, details?); queries: hasReported(postId)
 - [x] Add three-dot overflow menu to post header in `linkedin-demo/src/components/posts/post/Post.js` with "Report" option
-- [ ] Create `linkedin-demo/src/components/posts/report/ReportDialog.js` — dialog with reason dropdown + details textarea + submit button <- current
-- [ ] Wire report submission — call mutation, show success Snackbar, disable re-report
+- [x] Create `linkedin-demo/src/components/posts/report/ReportDialog.js` — dialog with reason dropdown + details textarea + submit button
+- [ ] Wire report submission — call mutation, show success Snackbar, disable re-report <- current
 - [ ] Run `cd linkedin-demo && npx convex dev --once` to push schema
 - [ ] Test and commit
 
