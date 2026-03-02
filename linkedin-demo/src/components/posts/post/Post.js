@@ -18,6 +18,8 @@ import SentimentVerySatisfiedIcon from "@material-ui/icons/SentimentVerySatisfie
 import FiberManualRecordRoundedIcon from "@material-ui/icons/FiberManualRecordRounded";
 import CommentOutlinedIcon from "@material-ui/icons/CommentOutlined";
 import RepeatIcon from "@material-ui/icons/Repeat";
+import BookmarkBorderOutlinedIcon from "@material-ui/icons/BookmarkBorderOutlined";
+import BookmarkIcon from "@material-ui/icons/Bookmark";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import ReactPlayer from "react-player";
 import ReactTimeago from "react-timeago";
@@ -137,6 +139,7 @@ const Post = forwardRef(
     const deleteComment = useMutation(api.comments.deleteComment);
     const updatePost = useMutation(api.posts.updatePost);
     const repostPost = useMutation(api.reposts.repostPost);
+    const toggleBookmark = useMutation(api.bookmarks.toggleBookmark);
 
     const [showComments, setShowComments] = React.useState(false);
     const [commentText, setCommentText] = React.useState("");
@@ -146,6 +149,8 @@ const Post = forwardRef(
     const [isRepostDialogOpen, setIsRepostDialogOpen] = React.useState(false);
     const [repostCommentary, setRepostCommentary] = React.useState("");
     const [isRepostPending, setIsRepostPending] = React.useState(false);
+    const [optimisticBookmarked, setOptimisticBookmarked] = React.useState(undefined);
+    const [isBookmarkMutationPending, setIsBookmarkMutationPending] = React.useState(false);
     const [optimisticReaction, setOptimisticReaction] = React.useState(undefined);
     const [isReactionMutationPending, setIsReactionMutationPending] = React.useState(false);
     const [isReactionPickerOpen, setIsReactionPickerOpen] = React.useState(false);
@@ -207,6 +212,7 @@ const Post = forwardRef(
       api.comments.listComments,
       showComments ? { postId } : "skip"
     );
+    const bookmarked = useQuery(api.bookmarks.isBookmarked, { postId });
     const queriedRepostCount = useQuery(api.reposts.getRepostCount, { postId });
     const resolvedRepostCount =
       typeof repostCount === "number" ? repostCount : (queriedRepostCount ?? 0);
@@ -224,10 +230,20 @@ const Post = forwardRef(
         setOptimisticReaction(undefined);
       }
     }, [currentReaction]);
+    React.useEffect(() => {
+      if (bookmarked !== undefined) {
+        setOptimisticBookmarked(undefined);
+      }
+    }, [bookmarked]);
     const commentsList = comments ?? [];
     const canInteract = Boolean(isAuthenticated && user?._id);
+    const canBookmark = canInteract && !isBookmarkMutationPending;
     const canReact = canInteract && !isReactionMutationPending;
+    const isBookmarked =
+      optimisticBookmarked !== undefined ? optimisticBookmarked : (bookmarked ?? false);
     const isOwnPost = Boolean(!isRepost && canInteract && authorId && authorId === user._id);
+    const canShowPostMenu = canInteract;
+    const canReportPost = canShowPostMenu && !isOwnPost;
     const isMenuOpen = Boolean(menuAnchorEl);
     const canNavigateProfile =
       typeof onNavigateProfile === "function" && Boolean(authorId || authorUsername);
@@ -409,6 +425,25 @@ const Post = forwardRef(
       setIsRepostDialogOpen(true);
     };
 
+    const handleBookmarkClick = async () => {
+      if (!canBookmark) {
+        return;
+      }
+
+      const nextBookmarked = !isBookmarked;
+      setOptimisticBookmarked(nextBookmarked);
+      setIsBookmarkMutationPending(true);
+
+      try {
+        await toggleBookmark({ postId });
+      } catch (error) {
+        setOptimisticBookmarked(undefined);
+        console.error("Failed to update bookmark:", error);
+      } finally {
+        setIsBookmarkMutationPending(false);
+      }
+    };
+
     const handleRepostDialogClose = () => {
       if (isRepostPending) {
         return;
@@ -442,7 +477,7 @@ const Post = forwardRef(
     };
 
     const handleMenuOpen = (event) => {
-      if (!isOwnPost) {
+      if (!canShowPostMenu) {
         return;
       }
       setMenuAnchorEl(event.currentTarget);
@@ -472,6 +507,14 @@ const Post = forwardRef(
 
       setEditText(description ?? "");
       setIsEditing(true);
+      handleMenuClose();
+    };
+
+    const handleReportClick = () => {
+      if (!canReportPost) {
+        return;
+      }
+
       handleMenuClose();
     };
 
@@ -775,7 +818,7 @@ const Post = forwardRef(
                 <ReactTimeago date={new Date(timestamp).toUTCString()} units="minute" />
               </p>
             </div>
-            {isOwnPost && (
+            {canShowPostMenu && (
               <>
                 <MoreHorizOutlinedIcon onClick={handleMenuOpen} />
                 <Menu
@@ -784,8 +827,14 @@ const Post = forwardRef(
                   open={isMenuOpen}
                   onClose={handleMenuClose}
                 >
-                  <MenuItem onClick={handleEditClick}>Edit</MenuItem>
-                  <MenuItem onClick={handleDeleteClick}>Delete</MenuItem>
+                  {isOwnPost ? (
+                    <>
+                      <MenuItem onClick={handleEditClick}>Edit</MenuItem>
+                      <MenuItem onClick={handleDeleteClick}>Delete</MenuItem>
+                    </>
+                  ) : (
+                    <MenuItem onClick={handleReportClick}>Report</MenuItem>
+                  )}
                 </Menu>
               </>
             )}
@@ -993,6 +1042,20 @@ const Post = forwardRef(
             >
               <RepeatIcon />
               <h4>Repost</h4>
+            </div>
+            <div
+              className={classes.action__icons}
+              onClick={canBookmark ? handleBookmarkClick : undefined}
+              style={!canInteract ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
+            >
+              {isBookmarked ? (
+                <BookmarkIcon style={{ color: "#2e7d32" }} />
+              ) : (
+                <BookmarkBorderOutlinedIcon />
+              )}
+              <h4 style={isBookmarked ? { color: "#2e7d32" } : undefined}>
+                {isBookmarked ? "Saved" : "Save"}
+              </h4>
             </div>
           </div>
 

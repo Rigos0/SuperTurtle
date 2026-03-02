@@ -1,5 +1,5 @@
 ## Current Task
-Create `linkedin-demo/src/convex/bookmarks.ts` with toggle/query logic for bookmarks.
+Create `linkedin-demo/src/components/bookmarks/SavedPosts.js` page listing all bookmarked posts.
 
 ## End Goal with Specs
 Item 33 from Phase 2: Users can bookmark posts and access them from a "Saved" section.
@@ -10,9 +10,9 @@ Item 33 from Phase 2: Users can bookmark posts and access them from a "Saved" se
 
 ## Backlog
 - [x] Add `bookmarks` table to schema (`linkedin-demo/src/convex/schema.ts`) — userId, postId, createdAt. Index by userId.
-- [ ] Create `linkedin-demo/src/convex/bookmarks.ts` — mutations: toggleBookmark(postId); queries: isBookmarked(postId), getUserBookmarks() <- current
-- [ ] Add bookmark button to post footer in `linkedin-demo/src/components/posts/post/Post.js` — filled/outline icon toggle
-- [ ] Create `linkedin-demo/src/components/bookmarks/SavedPosts.js` — page listing all bookmarked posts
+- [x] Create `linkedin-demo/src/convex/bookmarks.ts` — mutations: toggleBookmark(postId); queries: isBookmarked(postId), getUserBookmarks()
+- [x] Add bookmark button to post footer in `linkedin-demo/src/components/posts/post/Post.js` — filled/outline icon toggle
+- [ ] Create `linkedin-demo/src/components/bookmarks/SavedPosts.js` — page listing all bookmarked posts <- current
 - [ ] Add `/saved` route in App.js and link from profile or sidebar
 - [ ] Run `cd linkedin-demo && npx convex dev --once` to push schema
 - [ ] Test and commit
