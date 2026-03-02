@@ -1,0 +1,28 @@
+{
+  "name": "superturtle",
+  "version": "0.1.0",
+  "description": "Code from anywhere. Autonomous coding system controlled from Telegram.",
+  "bin": {
+    "superturtle": "./bin/superturtle.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "keywords": [
+    "claude",
+    "telegram",
+    "ai",
+    "coding",
+    "agent",
+    "autonomous"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Rigos0/superturtle.git"
+  }
+}

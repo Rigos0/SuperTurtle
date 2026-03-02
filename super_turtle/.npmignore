@@ -1,0 +1,37 @@
+# Demo assets (20MB of GIFs)
+*.gif
+
+# Documentation that doesn't need to ship
+claude-telegram-bot/docs
+claude-telegram-bot/launchagent
+claude-telegram-bot/SECURITY.md
+claude-telegram-bot/README.md
+claude-telegram-bot/CLAUDE.md
+claude-telegram-bot/bun.lock
+claude-telegram-bot/.env.example
+docs/
+
+# Test files
+*.test.ts
+*.test.js
+**/tests/
+
+# Python bytecode
+__pycache__
+*.pyc
+
+# Runtime state (not package code)
+state/runs.jsonl
+subturtle/.venv
+
+# Dev files
+.pytest_cache
+.tmp
+.env
+.env.*
+!templates/.env.example
+__init__.py
+
+# Git
+.git
+.github
