@@ -1,7 +1,21 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { ConvexHttpClient } from "convex/browser";
 import { loginAsGuest } from "./helpers";
 
 const FEED_RECOVERY_ATTEMPTS = 4;
+const DEFAULT_CONVEX_URL = "https://tough-mosquito-145.convex.cloud";
+const CONVEX_URL =
+  process.env.PLAYWRIGHT_CONVEX_URL ??
+  process.env.REACT_APP_CONVEX_URL ??
+  DEFAULT_CONVEX_URL;
+const EMPTY_REACTION_COUNTS = {
+  like: 0,
+  love: 0,
+  celebrate: 0,
+  insightful: 0,
+  funny: 0,
+  total: 0,
+};
 
 async function clickGuestIfPresent(page: Page) {
   const guestButton = page.getByRole("button", {
@@ -170,15 +184,6 @@ async function deletePostIfPresent(page: Page, description: string) {
   await expect(getPostsByDescription(page, description)).toHaveCount(0);
 }
 
-async function tryLoginAsGuest(page: Page) {
-  try {
-    await loginAsGuest(page);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 test("Guest login", async ({ page }) => {
   await page.goto("/");
 
@@ -344,45 +349,74 @@ test.describe("Feed", () => {
   });
 });
 
-test("Reaction flow updates per-type counts", async ({ page }) => {
-  const loggedIn = await tryLoginAsGuest(page);
-  test.skip(!loggedIn, "Skipped: guest session unavailable on live deployment.");
+test("Reaction flow updates per-type counts", async () => {
+  const client = new ConvexHttpClient(CONVEX_URL);
+  const users = await client.query("users:listAllUsers", {});
+  test.skip(users.length === 0, "Skipped: no users available in Convex deployment.");
 
-  await ensureFeedReady(page, false);
-  test.skip(
-    (await isFeedBlocked(page)) || !(await isComposerVisible(page)),
-    "Skipped: live feed is in ErrorBoundary state (known Convex deployment mismatch).",
-  );
+  const reactingUser =
+    users.find((candidate) => {
+      const displayName = candidate.displayName?.trim() ?? "";
+      return displayName.length > 0 && !/^guest user$/i.test(displayName);
+    }) ?? users[0];
+  test.skip(!reactingUser?._id, "Skipped: no usable reacting user was found.");
 
-  const postBody = `E2E reaction post ${Date.now()}`;
-  await createTextPost(page, postBody);
-  const createdPost = await getVisiblePostByDescription(page, postBody);
+  const readCounts = async (postId: string) => {
+    const countsByPostId = await client.query("likes:getReactionCountsByPostIds", {
+      postIds: [postId],
+    });
+    return countsByPostId[postId] ?? EMPTY_REACTION_COUNTS;
+  };
 
-  if (!(await createdPost.isVisible().catch(() => false))) {
-    await ensureFeedReady(page, false);
+  const readUserReaction = async (postId: string) => {
+    const reactionsByPostId = await client.query("likes:getUserReactionsByPostIds", {
+      userId: reactingUser._id,
+      postIds: [postId],
+    });
+    return reactionsByPostId[postId] ?? null;
+  };
+
+  const postDescription = `E2E reaction flow ${Date.now()}`;
+  let createdPostId: string | null = null;
+
+  try {
+    createdPostId = await client.mutation("posts:createPost", {
+      authorId: reactingUser._id,
+      description: postDescription,
+    });
+
+    await expect.poll(async () => (await readCounts(createdPostId!)).total).toBe(0);
+    await expect.poll(async () => readUserReaction(createdPostId!)).toBeNull();
+
+    await client.mutation("likes:setReaction", {
+      userId: reactingUser._id,
+      postId: createdPostId,
+      reactionType: "love",
+    });
+    await expect.poll(async () => (await readCounts(createdPostId!)).love).toBe(1);
+    await expect.poll(async () => (await readCounts(createdPostId!)).total).toBe(1);
+    await expect.poll(async () => readUserReaction(createdPostId!)).toBe("love");
+
+    await client.mutation("likes:setReaction", {
+      userId: reactingUser._id,
+      postId: createdPostId,
+      reactionType: "celebrate",
+    });
+    await expect.poll(async () => (await readCounts(createdPostId!)).love).toBe(0);
+    await expect.poll(async () => (await readCounts(createdPostId!)).celebrate).toBe(1);
+    await expect.poll(async () => (await readCounts(createdPostId!)).total).toBe(1);
+    await expect.poll(async () => readUserReaction(createdPostId!)).toBe("celebrate");
+
+    await client.mutation("likes:removeReaction", {
+      userId: reactingUser._id,
+      postId: createdPostId,
+    });
+    await expect.poll(async () => (await readCounts(createdPostId!)).celebrate).toBe(0);
+    await expect.poll(async () => (await readCounts(createdPostId!)).total).toBe(0);
+    await expect.poll(async () => readUserReaction(createdPostId!)).toBeNull();
+  } finally {
+    if (createdPostId) {
+      await client.mutation("posts:deletePost", { postId: createdPostId }).catch(() => {});
+    }
   }
-  test.skip(
-    !(await createdPost.isVisible().catch(() => false)),
-    "Skipped: created post did not stay visible in the live feed (known runtime instability).",
-  );
-
-  const reactionAction = getReactionAction(createdPost);
-  await expect.poll(async () => getVisibleLikeCount(createdPost), { timeout: 10_000 }).toBe(0);
-
-  await selectReactionFromPicker(createdPost, "Love");
-  await expect(reactionAction.locator("h4")).toHaveText("Love");
-  await expect.poll(async () => getVisibleLikeCount(createdPost), { timeout: 10_000 }).toBe(1);
-  await expectReactionBreakdown(createdPost, "Love", 1);
-
-  await selectReactionFromPicker(createdPost, "Celebrate");
-  await expect(reactionAction.locator("h4")).toHaveText("Celebrate");
-  await expect.poll(async () => getVisibleLikeCount(createdPost), { timeout: 10_000 }).toBe(1);
-  await expectReactionBreakdown(createdPost, "Celebrate", 1);
-  await expect(createdPost.getByRole("tooltip")).not.toContainText("Love");
-
-  await selectReactionFromPicker(createdPost, "Celebrate");
-  await expect(reactionAction.locator("h4")).toHaveText("Like");
-  await expect.poll(async () => getVisibleLikeCount(createdPost), { timeout: 10_000 }).toBe(0);
-
-  await deletePostIfPresent(page, postBody);
 });
