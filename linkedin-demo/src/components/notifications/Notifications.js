@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { Avatar, Button, Paper, Typography } from "@material-ui/core";
+import { Skeleton } from "@material-ui/lab";
 import { useTheme } from "@material-ui/core/styles";
 import useMediaQuery from "@material-ui/core/useMediaQuery";
 import ReactTimeago from "react-timeago";
@@ -50,6 +51,19 @@ const Notifications = ({ onViewPost, onNavigateProfile, onNavigateMessaging }) =
 
     return notifications.filter((notification) => !notification.read).length;
   }, [notifications]);
+  const notificationsLoadingContent = (
+    <div className={classes.list}>
+      {Array.from({ length: 5 }).map((_, index) => (
+        <div key={`notification-skeleton-${index}`} className={`${classes.item} ${classes.readItem}`}>
+          <Skeleton variant="circle" width={44} height={44} />
+          <div className={classes.content}>
+            <Skeleton variant="text" width="76%" height={22} />
+            <Skeleton variant="text" width="36%" height={18} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   const handleItemClick = async (notification) => {
     if (!notification) {
@@ -135,7 +149,10 @@ const Notifications = ({ onViewPost, onNavigateProfile, onNavigateMessaging }) =
           </Button>
         </div>
 
-        <LoadingGate isLoading={notifications === undefined}>
+        <LoadingGate
+          isLoading={notifications === undefined}
+          loadingContent={notificationsLoadingContent}
+        >
           {notifications?.length === 0 ? (
             <div className={classes.emptyState}>
               <Typography variant="body2" color="textSecondary">

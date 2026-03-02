@@ -17,6 +17,7 @@ import {
   IconButton,
   LinearProgress,
 } from "@material-ui/core";
+import { Skeleton } from "@material-ui/lab";
 import ArrowBackIcon from "@material-ui/icons/ArrowBack";
 import CameraAltIcon from "@material-ui/icons/CameraAlt";
 import LocationOnIcon from "@material-ui/icons/LocationOn";
@@ -383,6 +384,49 @@ const Profile = ({
   const isConnectionsListLoading = showConnections && profileConnections === undefined;
   const canAddMoreFeaturedPosts = featuredPosts.length < MAX_FEATURED_POSTS;
   const isFeaturedMutationPending = featuredMutationPostId !== null;
+  const profileLoadingContent = (
+    <div className={classes.section}>
+      <Skeleton variant="rect" width="100%" height={140} />
+      <Skeleton variant="text" width="48%" height={38} style={{ marginTop: 14 }} />
+      <Skeleton variant="text" width="34%" height={24} />
+      <Skeleton variant="text" width="68%" height={22} />
+      <Skeleton variant="rect" width="100%" height={44} style={{ borderRadius: 8, marginTop: 18 }} />
+      <Skeleton variant="rect" width="100%" height={210} style={{ borderRadius: 10, marginTop: 16 }} />
+      <Skeleton variant="rect" width="100%" height={170} style={{ borderRadius: 10, marginTop: 12 }} />
+    </div>
+  );
+  const connectionsLoadingContent = (
+    <div className={classes.connectionsList}>
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={`profile-connection-skeleton-${index}`} className={classes.connectionCard}>
+          <Skeleton variant="circle" width={40} height={40} />
+          <div className={classes.connectionCardInfo} style={{ width: "100%" }}>
+            <Skeleton variant="text" width="44%" height={22} />
+            <Skeleton variant="text" width="52%" height={18} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+  const postsLoadingContent = (
+    <div className={classes.postsList}>
+      <Skeleton variant="rect" width="100%" height={130} style={{ borderRadius: 10 }} />
+      <Skeleton variant="rect" width="100%" height={220} style={{ borderRadius: 10 }} />
+      <Skeleton variant="rect" width="100%" height={220} style={{ borderRadius: 10 }} />
+    </div>
+  );
+  const activityLoadingContent = (
+    <div className={classes.activityList}>
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={`activity-skeleton-${index}`} className={classes.activityCard}>
+          <Skeleton variant="text" width="26%" height={22} />
+          <Skeleton variant="text" width="22%" height={18} />
+          <Skeleton variant="text" width="94%" height={22} />
+          <Skeleton variant="text" width="74%" height={22} />
+        </div>
+      ))}
+    </div>
+  );
 
   React.useEffect(() => {
     if (connectionState !== "accepted") {
@@ -1068,7 +1112,7 @@ const Profile = ({
             </Typography>
           </div>
         ) : (
-          <LoadingGate isLoading={isUserLoading}>
+          <LoadingGate isLoading={isUserLoading} loadingContent={profileLoadingContent}>
             <>
             <div
               className={`${classes.coverArea} ${coverPhotoURL ? classes.coverAreaWithImage : ""}`}
@@ -1363,7 +1407,10 @@ const Profile = ({
                     Close
                   </Button>
                 </div>
-                <LoadingGate isLoading={isConnectionsListLoading}>
+                <LoadingGate
+                  isLoading={isConnectionsListLoading}
+                  loadingContent={connectionsLoadingContent}
+                >
                   {connectionsList.length === 0 ? (
                     <Typography variant="body2" color="textSecondary">
                       No connections to show yet.
@@ -1421,7 +1468,7 @@ const Profile = ({
 
             {activeTab === 0 && (
               <div className={`${classes.section} ${classes.postsSection}`}>
-                <LoadingGate isLoading={posts === undefined}>
+                <LoadingGate isLoading={posts === undefined} loadingContent={postsLoadingContent}>
                   <div className={classes.postsList}>
                     <div className={classes.featuredSection}>
                       <div className={classes.featuredHeader}>
@@ -1556,7 +1603,10 @@ const Profile = ({
 
             {activeTab === 1 && (
               <div className={classes.section}>
-                <LoadingGate isLoading={activity === undefined}>
+                <LoadingGate
+                  isLoading={activity === undefined}
+                  loadingContent={activityLoadingContent}
+                >
                   {activityItems.length === 0 ? (
                     <Typography variant="body2" color="textSecondary">
                       No recent activity yet.

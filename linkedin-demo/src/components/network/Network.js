@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { Avatar, Button, Paper, TextField, Typography } from "@material-ui/core";
+import { Skeleton } from "@material-ui/lab";
 import { api } from "../../convex/_generated/api";
 import useConvexUser from "../../hooks/useConvexUser";
 import useErrorToast from "../../hooks/useErrorToast";
@@ -364,6 +365,54 @@ const Network = ({ onNavigateProfile }) => {
     });
   }, [users, normalizedTerm, authUser?._id]);
   const pendingRequestList = useMemo(() => pendingRequests ?? [], [pendingRequests]);
+  const pendingRequestsLoadingContent = (
+    <Paper className={classes.pendingSection} elevation={1}>
+      <Skeleton variant="text" width={160} height={30} />
+      <div className={classes.pendingRequestsList}>
+        {Array.from({ length: 2 }).map((_, index) => (
+          <div key={`pending-skeleton-${index}`} className={classes.pendingRequestCard}>
+            <Skeleton variant="circle" width={52} height={52} />
+            <div className={classes.info}>
+              <Skeleton variant="text" width={140} height={24} />
+              <Skeleton variant="text" width={110} height={20} />
+            </div>
+            <div className={classes.actionRow}>
+              <Skeleton
+                variant="rect"
+                width={78}
+                height={32}
+                style={{ borderRadius: 16 }}
+              />
+              <Skeleton
+                variant="rect"
+                width={78}
+                height={32}
+                style={{ borderRadius: 16 }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </Paper>
+  );
+  const usersLoadingContent = (
+    <div className={classes.grid}>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <Paper key={`network-skeleton-${index}`} elevation={1} className={classes.card}>
+          <Skeleton variant="circle" width={52} height={52} />
+          <div className={classes.info}>
+            <Skeleton variant="text" width="56%" height={24} />
+            <Skeleton variant="text" width="48%" height={20} />
+            <Skeleton variant="text" width="38%" height={18} />
+          </div>
+          <div className={classes.actionRow}>
+            <Skeleton variant="rect" width={92} height={32} style={{ borderRadius: 16 }} />
+            <Skeleton variant="rect" width={92} height={32} style={{ borderRadius: 16 }} />
+          </div>
+        </Paper>
+      ))}
+    </div>
+  );
 
   if (users?.length === 0) {
     return (
@@ -390,7 +439,10 @@ const Network = ({ onNavigateProfile }) => {
         />
       </div>
       {authUser?._id && (
-        <LoadingGate isLoading={pendingRequests === undefined}>
+        <LoadingGate
+          isLoading={pendingRequests === undefined}
+          loadingContent={pendingRequestsLoadingContent}
+        >
           <Paper className={classes.pendingSection} elevation={1}>
             <Typography className={classes.pendingSectionTitle}>Pending Requests</Typography>
             {pendingRequestList.length === 0 ? (
@@ -514,7 +566,7 @@ const Network = ({ onNavigateProfile }) => {
           </Paper>
         </LoadingGate>
       )}
-      <LoadingGate isLoading={users === undefined}>
+      <LoadingGate isLoading={users === undefined} loadingContent={usersLoadingContent}>
         <>
           <div className={classes.grid}>
             {filteredUsers.map((candidateUser) => (
