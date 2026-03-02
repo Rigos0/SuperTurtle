@@ -1,5 +1,5 @@
 ## Current Task
-Create `src/components/company/CompanyAboutTab.js` — displays: description, industry, size, website (clickable link), founded year, locations list, specialties.
+Create `src/components/company/CompanyPeopleTab.js` — query users whose experienceEntries contain an entry matching the company name (case-insensitive). Display user cards with avatar, name, title. Click navigates to /:username.
 
 ## End Goal with Specs
 Users can follow companies. Company admins post as the company (shows company logo/name). Company page has 3 tabs: About (full details), People (employees from experience), Posts (company posts feed).
@@ -7,8 +7,8 @@ Users can follow companies. Company admins post as the company (shows company lo
 ## Backlog
 - [x] Create `src/convex/companyFollowers.ts` with mutations: followCompany (auth required, no duplicate), unfollowCompany, getFollowerCount query, isFollowing query. Use the `companyFollowers` table from schema (company-core SubTurtle adds it — if not present yet, add it yourself).
 - [x] Add `companyPosts` concept: In `src/convex/posts.ts`, add optional `companyId` field to posts schema (v.optional(v.id("companies"))). Add `createCompanyPost` mutation — verify user is in company admins array, set companyId on the post. Add `getCompanyPosts` query filtered by companyId.
-- [ ] Create `src/components/company/CompanyAboutTab.js` — displays: description, industry, size, website (clickable link), founded year, locations list, specialties. Use MUI Typography, List, ListItem, Link. <- current
-- [ ] Create `src/components/company/CompanyPeopleTab.js` — query users whose experienceEntries contain an entry matching the company name (case-insensitive). Display user cards with avatar, name, title. Click navigates to /:username.
+- [x] Create `src/components/company/CompanyAboutTab.js` — displays: description, industry, size, website (clickable link), founded year, locations list, specialties. Use MUI Typography, List, ListItem, Link.
+- [ ] Create `src/components/company/CompanyPeopleTab.js` — query users whose experienceEntries contain an entry matching the company name (case-insensitive). Display user cards with avatar, name, title. Click navigates to /:username. <- current
 - [ ] Create `src/components/company/CompanyPostsTab.js` — list posts where companyId matches. Reuse existing Post component. Show "No posts yet" empty state.
 - [ ] Wire tabs into CompanyPage.js using MUI Tabs component. Three tabs: About, People, Posts. Default to About tab.
 - [ ] Run `cd linkedin-demo && npx convex dev --once && npm run build` to verify.
