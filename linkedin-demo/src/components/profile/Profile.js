@@ -30,8 +30,6 @@ const DEFAULT_PROFILE = {
     "Product Engineer - ScaleUp Inc",
     "CS Graduate - State University",
   ],
-  connections: 500,
-  followers: 750,
 };
 
 const resolveProfilePhoto = (photoURL) => {
@@ -46,13 +44,31 @@ const resolveProfilePhoto = (photoURL) => {
   return photoURL;
 };
 
-const Profile = ({ onBack, onNavigateMessaging = () => {}, userId = null }) => {
+const Profile = ({
+  onBack,
+  onNavigateMessaging = () => {},
+  onViewConnections = () => {},
+  userId = null,
+}) => {
   const classes = Style();
   const authUser = useConvexUser();
   const getOrCreateConversation = useMutation(api.messaging.getOrCreateConversation);
+  const sendConnectionRequest = useMutation(api.connections.sendConnectionRequest);
+  const acceptConnection = useMutation(api.connections.acceptConnection);
+  const rejectConnection = useMutation(api.connections.rejectConnection);
   const profileUser = useQuery(api.users.getUser, userId ? { id: userId } : "skip");
   const resolvedUser = profileUser ?? (!userId ? authUser : null);
   const resolvedUserId = userId ?? authUser?._id ?? null;
+  const connectionStatus = useQuery(
+    api.connections.getConnectionStatus,
+    authUser?._id && resolvedUserId
+      ? { userId1: authUser._id, userId2: resolvedUserId }
+      : "skip",
+  );
+  const connectionCount = useQuery(
+    api.connections.getConnectionCount,
+    resolvedUserId ? { userId: resolvedUserId } : "skip",
+  );
   const posts = useQuery(
     api.posts.listPostsByUser,
     resolvedUserId ? { authorId: resolvedUserId } : "skip",
@@ -74,7 +90,7 @@ const Profile = ({ onBack, onNavigateMessaging = () => {}, userId = null }) => {
 
   const [activeTab, setActiveTab] = useState(0);
   const [isStartingConversation, setIsStartingConversation] = useState(false);
-  const [connectPending, setConnectPending] = useState(false);
+  const [isConnectionActionPending, setIsConnectionActionPending] = useState(false);
 
   const userAvatar = resolveProfilePhoto(
     resolvedUser?.photoURL ?? resolvedUser?.image ?? DEFAULT_PROFILE.photoURL,
@@ -85,8 +101,7 @@ const Profile = ({ onBack, onNavigateMessaging = () => {}, userId = null }) => {
     DEFAULT_PROFILE.displayName;
   const userTitle = resolvedUser?.title ?? DEFAULT_PROFILE.title;
   const location = resolvedUser?.location ?? DEFAULT_PROFILE.location;
-  const connections = resolvedUser?.connections ?? DEFAULT_PROFILE.connections;
-  const followers = resolvedUser?.followers ?? DEFAULT_PROFILE.followers;
+  const connections = connectionCount ?? 0;
   const about =
     typeof resolvedUser?.about === "string" && resolvedUser.about.trim().length > 0
       ? resolvedUser.about
@@ -95,6 +110,15 @@ const Profile = ({ onBack, onNavigateMessaging = () => {}, userId = null }) => {
     Array.isArray(resolvedUser?.experience) && resolvedUser.experience.length > 0
       ? resolvedUser.experience
       : ["No experience added yet."];
+  const isOwnProfile =
+    Boolean(authUser?._id) &&
+    Boolean(resolvedUserId) &&
+    authUser?._id === resolvedUserId;
+  const connectionState = connectionStatus?.status ?? "none";
+  const isConnectionStatusLoading =
+    Boolean(authUser?._id) &&
+    Boolean(resolvedUserId) &&
+    connectionStatus === undefined;
 
   const handleMessageClick = async () => {
     if (!authUser?._id || !resolvedUserId || isStartingConversation) {
@@ -114,6 +138,65 @@ const Profile = ({ onBack, onNavigateMessaging = () => {}, userId = null }) => {
     } finally {
       setIsStartingConversation(false);
     }
+  };
+
+  const handleConnect = async () => {
+    if (!authUser?._id || !resolvedUserId || isConnectionActionPending) {
+      return;
+    }
+
+    setIsConnectionActionPending(true);
+
+    try {
+      await sendConnectionRequest({
+        fromUserId: authUser._id,
+        toUserId: resolvedUserId,
+      });
+    } catch (error) {
+      console.error("Failed to send connection request:", error);
+    } finally {
+      setIsConnectionActionPending(false);
+    }
+  };
+
+  const handleAcceptConnection = async () => {
+    if (!connectionStatus?.connectionId || isConnectionActionPending) {
+      return;
+    }
+
+    setIsConnectionActionPending(true);
+
+    try {
+      await acceptConnection({ connectionId: connectionStatus.connectionId });
+    } catch (error) {
+      console.error("Failed to accept connection request:", error);
+    } finally {
+      setIsConnectionActionPending(false);
+    }
+  };
+
+  const handleRejectConnection = async () => {
+    if (!connectionStatus?.connectionId || isConnectionActionPending) {
+      return;
+    }
+
+    setIsConnectionActionPending(true);
+
+    try {
+      await rejectConnection({ connectionId: connectionStatus.connectionId });
+    } catch (error) {
+      console.error("Failed to reject connection request:", error);
+    } finally {
+      setIsConnectionActionPending(false);
+    }
+  };
+
+  const handleViewConnections = () => {
+    if (!resolvedUserId) {
+      return;
+    }
+
+    onViewConnections(resolvedUserId);
   };
 
   return (
@@ -150,48 +233,137 @@ const Profile = ({ onBack, onNavigateMessaging = () => {}, userId = null }) => {
                   <span>{location}</span>
                 </Typography>
               )}
-              <Typography variant="body2" className={classes.networkMeta}>
-                {connections} connections · {followers} followers
+              <Typography
+                variant="body2"
+                className={classes.networkMeta}
+                role={resolvedUserId ? "button" : undefined}
+                tabIndex={resolvedUserId ? 0 : undefined}
+                onClick={handleViewConnections}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    handleViewConnections();
+                  }
+                }}
+                style={{ cursor: resolvedUserId ? "pointer" : "default" }}
+              >
+                {connections} connections
               </Typography>
             </div>
 
-            <div className={classes.actionRow}>
-              <Button
-                variant={connectPending ? "outlined" : "contained"}
-                size="small"
-                onClick={() => setConnectPending(true)}
-                disabled={connectPending}
-                style={{
-                  backgroundColor: connectPending ? "transparent" : "#2e7d32",
-                  borderColor: connectPending ? "#9e9e9e" : "transparent",
-                  color: connectPending ? "#757575" : "#fff",
-                  textTransform: "none",
-                  borderRadius: 16,
-                  fontWeight: 600,
-                  padding: "4px 16px",
-                  opacity: connectPending ? 0.6 : 1,
-                  cursor: connectPending ? "default" : "pointer",
-                }}
-              >
-                {connectPending ? "Pending" : "Connect"}
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={handleMessageClick}
-                disabled={isStartingConversation || !authUser?._id || !resolvedUserId}
-                style={{
-                  textTransform: "none",
-                  borderRadius: 16,
-                  borderColor: "#2e7d32",
-                  color: "#2e7d32",
-                  fontWeight: 600,
-                  padding: "4px 16px",
-                }}
-              >
-                Message
-              </Button>
-            </div>
+            {!isOwnProfile && (
+              <div className={classes.actionRow}>
+                {connectionState === "none" && (
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={handleConnect}
+                    disabled={
+                      isConnectionStatusLoading ||
+                      isConnectionActionPending ||
+                      !authUser?._id ||
+                      !resolvedUserId
+                    }
+                    style={{
+                      backgroundColor: "#2e7d32",
+                      color: "#fff",
+                      textTransform: "none",
+                      borderRadius: 16,
+                      fontWeight: 600,
+                      padding: "4px 16px",
+                    }}
+                  >
+                    Connect
+                  </Button>
+                )}
+                {connectionState === "pending" && connectionStatus?.direction === "sent" && (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled
+                    style={{
+                      textTransform: "none",
+                      borderRadius: 16,
+                      borderColor: "#9e9e9e",
+                      color: "#757575",
+                      fontWeight: 600,
+                      padding: "4px 16px",
+                    }}
+                  >
+                    Pending
+                  </Button>
+                )}
+                {connectionState === "pending" && connectionStatus?.direction === "received" && (
+                  <>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={handleAcceptConnection}
+                      disabled={isConnectionActionPending}
+                      style={{
+                        backgroundColor: "#2e7d32",
+                        color: "#fff",
+                        textTransform: "none",
+                        borderRadius: 16,
+                        fontWeight: 600,
+                        padding: "4px 16px",
+                      }}
+                    >
+                      Accept
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={handleRejectConnection}
+                      disabled={isConnectionActionPending}
+                      style={{
+                        textTransform: "none",
+                        borderRadius: 16,
+                        borderColor: "#9e9e9e",
+                        color: "#757575",
+                        fontWeight: 600,
+                        padding: "4px 16px",
+                      }}
+                    >
+                      Reject
+                    </Button>
+                  </>
+                )}
+                {connectionState === "accepted" && (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled
+                    style={{
+                      textTransform: "none",
+                      borderRadius: 16,
+                      borderColor: "#2e7d32",
+                      color: "#2e7d32",
+                      fontWeight: 600,
+                      padding: "4px 16px",
+                    }}
+                  >
+                    Connected ✓
+                  </Button>
+                )}
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleMessageClick}
+                  disabled={isStartingConversation || !authUser?._id || !resolvedUserId}
+                  style={{
+                    textTransform: "none",
+                    borderRadius: 16,
+                    borderColor: "#2e7d32",
+                    color: "#2e7d32",
+                    fontWeight: 600,
+                    padding: "4px 16px",
+                  }}
+                >
+                  Message
+                </Button>
+              </div>
+            )}
             <Divider style={{ margin: "16px 0 0" }} />
 
             <Tabs
