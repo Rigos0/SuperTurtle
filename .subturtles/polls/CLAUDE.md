@@ -1,5 +1,5 @@
 ## Current Task
-Create `linkedin-demo/src/components/posts/poll/PollDisplay.js` — renders poll in feed: question, options as clickable bars, vote counts/percentages after voting.
+Wire PollDisplay into Post.js — if post has associated poll, render PollDisplay below post text.
 
 ## End Goal with Specs
 Item 31 from Phase 2: Poll posts with 2-4 options, voting, and percentage results display.
@@ -13,8 +13,8 @@ Item 31 from Phase 2: Poll posts with 2-4 options, voting, and percentage result
 - [x] Add `polls` and `pollVotes` tables to schema (`linkedin-demo/src/convex/schema.ts`) — polls: postId, question, options (array of strings); pollVotes: pollId, userId, optionIndex
 - [x] Create `linkedin-demo/src/convex/polls.ts` — mutations: createPoll(postId, question, options), vote(pollId, optionIndex), changeVote(pollId, optionIndex); queries: getPoll(postId), getResults(pollId), getUserVote(pollId)
 - [x] Add "Create Poll" toggle to post composer (`linkedin-demo/src/components/posts/postMaker/PostMaker.js`) — shows poll form fields when toggled
-- [ ] Create `linkedin-demo/src/components/posts/poll/PollDisplay.js` — renders poll in feed: question, options as clickable bars, vote counts/percentages after voting <- current
-- [ ] Wire PollDisplay into Post.js — if post has associated poll, render PollDisplay below post text
+- [x] Create `linkedin-demo/src/components/posts/poll/PollDisplay.js` — renders poll in feed: question, options as clickable bars, vote counts/percentages after voting
+- [ ] Wire PollDisplay into Post.js — if post has associated poll, render PollDisplay below post text <- current
 - [ ] Run `cd linkedin-demo && npx convex dev --once` to push schema
 - [ ] Test and commit
 
