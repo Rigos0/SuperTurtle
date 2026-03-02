@@ -83,7 +83,8 @@ Full LinkedIn feature parity sprint — overnight autonomous build.
 
 ## 🤖 FULL-AUTO MODE (overnight)
 The meta agent is running autonomously. Cron orchestrator (id `c0ffee`) fires every 20 min.
-- Pick next unchecked backlog items, group into parallel SubTurtles (2-3 at a time)
+- Pick next unchecked backlog items, group into parallel SubTurtles (aim for 5 at a time)
+- Use `yolo-codex` for all SubTurtles when Codex is available
 - Stop finished SubTurtles, commit+push, deploy (Convex + Vercel), spawn next batch
 - Only message the user on: completions, stuck states, errors
 - Work through the backlog top-to-bottom, respecting phase order
@@ -114,21 +115,21 @@ Feature parity with core LinkedIn: profiles with `/:username` URLs, company page
 - ✅ Mobile responsive with bottom nav, dark mode, production polish
 
 ## Backlog — Phase 1: Profile System (items 1–15)
-- [ ] 1. Add `username` (slug) field to users schema — unique, URL-safe, auto-generated from displayName on first login
-- [ ] 2. First-login onboarding page — after OAuth, if user has no username, show a one-page setup: pick username (validate uniqueness in real-time), set displayName, title, location. Save all fields in one mutation. Only shown once.
-- [ ] 3. Create `/:username` route — React Router, profile page loads by username lookup instead of userId
-- [ ] 4. Profile vanity URL — clicking any user link navigates to `/:username` everywhere (feed, network, search, notifications)
-- [ ] 5. Profile edit modal — edit displayName, title, headline, location, about, with save mutation
-- [ ] 6. Profile photo upload — file picker, store in Convex storage, display as avatar everywhere
-- [ ] 7. Cover photo upload — file picker, store in Convex storage, display on profile header
-- [ ] 8. Experience section — structured entries: title, company, startDate, endDate, description (CRUD)
-- [ ] 9. Education section — structured entries: school, degree, field, startYear, endYear (CRUD)
-- [ ] 10. Skills section — add/remove skills, display as tags on profile
-- [ ] 11. Profile "About" rich text — multiline with basic formatting, save/edit
-- [ ] 12. Profile activity feed — show user's recent posts, comments, and likes on their profile
-- [ ] 13. Profile "Featured" section — pin up to 3 posts to top of profile
-- [ ] 14. Mutual connections display — "X mutual connections" on profile and network cards
-- [ ] 15. Profile completeness indicator — progress bar showing % of fields filled
+- [x] 1. Add `username` (slug) field to users schema — unique, URL-safe, auto-generated from displayName on first login
+- [x] 2. First-login onboarding page — after OAuth, if user has no username, show a one-page setup: pick username (validate uniqueness in real-time), set displayName, title, location. Save all fields in one mutation. Only shown once.
+-- [x] 3. Create `/:username` route — React Router, profile page loads by username lookup instead of userId
+-- [x] 4. Profile vanity URL — clicking any user link navigates to `/:username` everywhere (feed, network, search, notifications)
+- [x] 5. Profile edit modal — edit displayName, title, headline, location, about, with save mutation
+- [x] 6. Profile photo upload — file picker, store in Convex storage, display as avatar everywhere
+- [x] 7. Cover photo upload — file picker, store in Convex storage, display on profile header
+- [x] 8. Experience section — structured entries: title, company, startDate, endDate, description (CRUD)
+- [x] 9. Education section — structured entries: school, degree, field, startYear, endYear (CRUD)
+- [x] 10. Skills section — add/remove skills, display as tags on profile
+- [x] 11. Profile "About" rich text — multiline with basic formatting, save/edit
+- [x] 12. Profile activity feed — show user's recent posts, comments, and likes on their profile
+-- [x] 13. Profile "Featured" section — pin up to 3 posts to top of profile
+-- [x] 14. Mutual connections display — "X mutual connections" on profile and network cards
+-- [x] 15. Profile completeness indicator — progress bar showing % of fields filled
 - SKIPPED: Profile SEO/share meta (og:tags need server-side rendering; CRA is client-only)
 
 ## Backlog — Phase 2: Rich Posts & Feed (items 16–35)

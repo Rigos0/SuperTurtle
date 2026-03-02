@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { Avatar, Button, Paper, TextField, Typography } from "@material-ui/core";
 import { Skeleton } from "@material-ui/lab";
@@ -10,7 +10,10 @@ import ConfirmDialog from "../common/ConfirmDialog";
 import LoadingGate from "../LoadingGate";
 import Style from "./Style";
 
-const NetworkUserCard = ({
+const PAGE_SIZE = 10;
+const SEARCH_DEBOUNCE_MS = 250;
+
+const NetworkUserCard = React.memo(({
   candidateUser,
   authUserId,
   canConnect,
@@ -24,38 +27,16 @@ const NetworkUserCard = ({
   unfollowUser,
   showError,
 }) => {
-  const connectionStatus = useQuery(
-    api.connections.getConnectionStatus,
-    authUserId
-      ? { userId1: authUserId, userId2: candidateUser._id }
-      : "skip",
-  );
-  const connectionCount = useQuery(
-    api.connections.getConnectionCount,
-    candidateUser?._id ? { userId: candidateUser._id } : "skip",
-  );
-  const candidateProfile = useQuery(
-    api.users.getUser,
-    candidateUser?._id ? { id: candidateUser._id } : "skip",
-  );
-  const mutualConnectionsCount = useQuery(
-    api.connections.getMutualConnectionsCount,
-    authUserId
-      ? { viewerUserId: authUserId, targetUserId: candidateUser._id }
-      : "skip",
-  );
-  const isFollowing = useQuery(
-    api.follows.isFollowing,
-    authUserId
-      ? { followerId: authUserId, followedId: candidateUser._id }
-      : "skip",
-  );
+  const connectionStatus = candidateUser.connectionStatus ?? { status: "none" };
+  const connectionState = connectionStatus.status ?? "none";
+  const connectionCount = candidateUser.connectionCount ?? 0;
+  const mutualConnectionsCount = candidateUser.mutualConnectionsCount ?? 0;
+  const isFollowing = Boolean(candidateUser.isFollowing);
+  const candidateUsername = candidateUser?.username ?? null;
   const [isConnectionActionPending, setIsConnectionActionPending] = useState(false);
   const [isFollowActionPending, setIsFollowActionPending] = useState(false);
   const [isConnectedActionHovered, setIsConnectedActionHovered] = useState(false);
   const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
-  const connectionState = connectionStatus?.status ?? "none";
-  const candidateUsername = candidateProfile?.username ?? candidateUser?.username ?? null;
 
   useEffect(() => {
     if (connectionState !== "accepted") {
@@ -154,7 +135,7 @@ const NetworkUserCard = ({
 
   const handleToggleFollow = async (event) => {
     event.stopPropagation();
-    if (!authUserId || !candidateUser?._id || isFollowActionPending || isFollowing === undefined) {
+    if (!authUserId || !candidateUser?._id || isFollowActionPending) {
       return;
     }
 
@@ -246,7 +227,7 @@ const NetworkUserCard = ({
         size="small"
         className={classes.connectButton}
         onClick={handleConnect}
-        disabled={connectionStatus === undefined || isConnectionActionPending}
+        disabled={isConnectionActionPending}
       >
         Connect
       </Button>
@@ -289,10 +270,8 @@ const NetworkUserCard = ({
               ? candidateUser.location
               : "Location not listed"}
           </Typography>
-          <Typography className={classes.connectionCount}>
-            {(connectionCount ?? 0)} connections
-          </Typography>
-          {authUserId && mutualConnectionsCount !== undefined && (
+          <Typography className={classes.connectionCount}>{connectionCount} connections</Typography>
+          {authUserId && (
             <Typography className={classes.mutualConnectionCount}>
               {mutualConnectionsCount} mutual connection
               {mutualConnectionsCount === 1 ? "" : "s"}
@@ -309,7 +288,7 @@ const NetworkUserCard = ({
                 isFollowing ? classes.followButtonFollowing : ""
               }`}
               onClick={handleToggleFollow}
-              disabled={isFollowActionPending || isFollowing === undefined}
+              disabled={isFollowActionPending}
             >
               {isFollowing ? "Following" : "Follow"}
             </Button>
@@ -327,7 +306,7 @@ const NetworkUserCard = ({
       />
     </>
   );
-};
+});
 
 const Network = ({ onNavigateProfile }) => {
   const classes = Style();
@@ -338,33 +317,48 @@ const Network = ({ onNavigateProfile }) => {
   const removeConnection = useMutation(api.connections.removeConnection);
   const followUser = useMutation(api.follows.followUser);
   const unfollowUser = useMutation(api.follows.unfollowUser);
-  const users = useQuery(api.users.listAllUsers);
   const pendingRequests = useQuery(
     api.connections.listPendingRequests,
     authUser?._id ? { userId: authUser._id } : "skip",
   );
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [page, setPage] = useState(0);
+  const [displayedUsers, setDisplayedUsers] = useState([]);
   const [pendingRequestActionIds, setPendingRequestActionIds] = useState(() => new Set());
   const { showError, ErrorToast } = useErrorToast();
   const canConnect = Boolean(authUser?._id);
-  const normalizedTerm = searchTerm.trim().toLowerCase();
-  const filteredUsers = useMemo(() => {
-    if (!users) {
-      return [];
+  const limit = (page + 1) * PAGE_SIZE;
+
+  const networkPage = useQuery(api.users.listNetworkUsers, {
+    searchTerm: debouncedSearchTerm || undefined,
+    offset: 0,
+    limit,
+  });
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm.trim().toLowerCase());
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (Array.isArray(networkPage?.users)) {
+      setDisplayedUsers(networkPage.users);
     }
+  }, [networkPage]);
 
-    const usersWithoutSelf = users.filter((user) => user._id !== authUser?._id);
+  const users = displayedUsers;
 
-    if (!normalizedTerm) {
-      return usersWithoutSelf;
-    }
-
-    return usersWithoutSelf.filter((user) => {
-      const fields = [user.displayName, user.title, user.location].filter(Boolean);
-      return fields.some((field) => field.toLowerCase().includes(normalizedTerm));
-    });
-  }, [users, normalizedTerm, authUser?._id]);
   const pendingRequestList = useMemo(() => pendingRequests ?? [], [pendingRequests]);
+  const usersLoading = networkPage === undefined && displayedUsers.length === 0;
+  const usersLoadingMore = page > 0 && networkPage === undefined;
+  const hasMore = networkPage?.hasMore ?? true;
+
   const pendingRequestsLoadingContent = (
     <Paper className={classes.pendingSection} elevation={1}>
       <Skeleton variant="text" width={160} height={30} />
@@ -395,6 +389,7 @@ const Network = ({ onNavigateProfile }) => {
       </div>
     </Paper>
   );
+
   const usersLoadingContent = (
     <div className={classes.grid}>
       {Array.from({ length: 4 }).map((_, index) => (
@@ -414,22 +409,16 @@ const Network = ({ onNavigateProfile }) => {
     </div>
   );
 
-  if (users?.length === 0) {
-    return (
-      <Paper className={classes.stateCard} elevation={1}>
-        <Typography variant="body2" color="textSecondary">
-          No users found yet.
-        </Typography>
-      </Paper>
-    );
-  }
-
   return (
     <div className={classes.network}>
       <div className={classes.controls}>
         <TextField
           value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
+          onChange={(event) => {
+            setSearchTerm(event.target.value);
+            setPage(0);
+            setDisplayedUsers([]);
+          }}
           placeholder="Search your network"
           variant="outlined"
           size="small"
@@ -566,10 +555,10 @@ const Network = ({ onNavigateProfile }) => {
           </Paper>
         </LoadingGate>
       )}
-      <LoadingGate isLoading={users === undefined} loadingContent={usersLoadingContent}>
+      <LoadingGate isLoading={usersLoading} loadingContent={usersLoadingContent}>
         <>
           <div className={classes.grid}>
-            {filteredUsers.map((candidateUser) => (
+            {users.map((candidateUser) => (
               <NetworkUserCard
                 key={candidateUser._id}
                 candidateUser={candidateUser}
@@ -587,14 +576,27 @@ const Network = ({ onNavigateProfile }) => {
               />
             ))}
           </div>
-          {filteredUsers.length === 0 && (
+          {users.length === 0 && (
             <Paper className={classes.stateCard} elevation={1}>
               <Typography variant="body2" color="textSecondary">
-                {normalizedTerm
+                {debouncedSearchTerm
                   ? `No people match "${searchTerm.trim()}".`
                   : "No people to show yet."}
               </Typography>
             </Paper>
+          )}
+          {users.length > 0 && hasMore && (
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+              <Button
+                variant="outlined"
+                color="primary"
+                size="small"
+                onClick={() => setPage((previousPage) => previousPage + 1)}
+                disabled={usersLoadingMore}
+              >
+                {usersLoadingMore ? "Loading..." : "Load more"}
+              </Button>
+            </div>
           )}
         </>
       </LoadingGate>

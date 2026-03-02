@@ -21,17 +21,9 @@ const resolvePostImageUrls = async (ctx: QueryCtx, post: Doc<"posts">) => {
 };
 
 const buildBookmarkedPostPayload = async (ctx: QueryCtx, post: Doc<"posts">) => {
-  const [author, imageUrls, likes, comments, reposts] = await Promise.all([
+  const [author, imageUrls, reposts] = await Promise.all([
     buildAuthorSummaryById(ctx, post.authorId),
     resolvePostImageUrls(ctx, post),
-    ctx.db
-      .query("likes")
-      .filter((q) => q.eq(q.field("postId"), post._id))
-      .collect(),
-    ctx.db
-      .query("comments")
-      .filter((q) => q.eq(q.field("postId"), post._id))
-      .collect(),
     ctx.db
       .query("reposts")
       .withIndex("byOriginalPost", (q) => q.eq("originalPostId", post._id))
@@ -41,8 +33,8 @@ const buildBookmarkedPostPayload = async (ctx: QueryCtx, post: Doc<"posts">) => 
   return {
     ...post,
     fileData: post.fileType === "image" && imageUrls.length > 0 ? imageUrls[0] : post.fileData,
-    likesCount: likes.length,
-    commentsCount: comments.length,
+    likesCount: post.likesCount,
+    commentsCount: post.commentsCount,
     repostCount: reposts.length,
     imageUrls,
     author,
@@ -66,8 +58,9 @@ export const toggleBookmark = mutation({
 
     const existingBookmark = await ctx.db
       .query("bookmarks")
-      .withIndex("byUserId", (q) => q.eq("userId", userId))
-      .filter((q) => q.eq(q.field("postId"), args.postId))
+      .withIndex("byUserAndPost", (q) =>
+        q.eq("userId", userId).eq("postId", args.postId),
+      )
       .first();
 
     if (existingBookmark) {
@@ -97,8 +90,9 @@ export const isBookmarked = query({
 
     const bookmark = await ctx.db
       .query("bookmarks")
-      .withIndex("byUserId", (q) => q.eq("userId", userId))
-      .filter((q) => q.eq(q.field("postId"), args.postId))
+      .withIndex("byUserAndPost", (q) =>
+        q.eq("userId", userId).eq("postId", args.postId),
+      )
       .first();
 
     return Boolean(bookmark);

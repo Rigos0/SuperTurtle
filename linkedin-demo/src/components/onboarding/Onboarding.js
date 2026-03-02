@@ -81,6 +81,8 @@ const Onboarding = ({ currentUser }) => {
     setUsername(event.target.value);
   };
 
+  const [isSkipping, setIsSkipping] = useState(false);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!canSubmit) {
@@ -101,6 +103,37 @@ const Onboarding = ({ currentUser }) => {
       setSaveError(error instanceof Error ? error.message : "Unable to save profile");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSkip = async () => {
+    setIsSkipping(true);
+    setSaveError("");
+
+    const fallbackName = (currentUser?.displayName ?? currentUser?.name ?? currentUser?.email ?? "user").trim();
+    const autoUsername = slugifyUsername(fallbackName) || `user-${Date.now().toString(36)}`;
+
+    try {
+      await completeOnboarding({
+        username: autoUsername,
+        displayName: fallbackName || "TurtleIn User",
+        title: "",
+        location: "",
+      });
+    } catch (error) {
+      // If auto-generated username is taken, append random suffix and retry
+      try {
+        await completeOnboarding({
+          username: `${autoUsername}-${Date.now().toString(36)}`,
+          displayName: fallbackName || "TurtleIn User",
+          title: "",
+          location: "",
+        });
+      } catch (retryError) {
+        setSaveError(retryError instanceof Error ? retryError.message : "Unable to skip setup");
+      }
+    } finally {
+      setIsSkipping(false);
     }
   };
 
@@ -159,6 +192,20 @@ const Onboarding = ({ currentUser }) => {
           />
 
           <div className={classes.actions}>
+            <Button
+              onClick={handleSkip}
+              disabled={isSaving || isSkipping}
+              className={classes.skipButton}
+            >
+              {isSkipping ? (
+                <span className={classes.submitLabel}>
+                  <CircularProgress size={16} color="inherit" thickness={5} />
+                  Skipping...
+                </span>
+              ) : (
+                "Skip for now"
+              )}
+            </Button>
             <Button type="submit" disabled={!canSubmit} className={classes.submitButton}>
               {isSaving ? (
                 <span className={classes.submitLabel}>

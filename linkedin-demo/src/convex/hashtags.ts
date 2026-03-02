@@ -59,20 +59,12 @@ export const getPostsByHashtag = query({
         const imageUrls = await resolvePostImageUrls(ctx, post);
         const resolvedFileData =
           post.fileType === "image" && imageUrls.length > 0 ? imageUrls[0] : post.fileData;
-        const likes = await ctx.db
-          .query("likes")
-          .filter((q) => q.eq(q.field("postId"), post._id))
-          .collect();
-        const comments = await ctx.db
-          .query("comments")
-          .filter((q) => q.eq(q.field("postId"), post._id))
-          .collect();
 
         return {
           ...post,
           fileData: resolvedFileData,
-          likesCount: likes.length,
-          commentsCount: comments.length,
+          likesCount: post.likesCount,
+          commentsCount: post.commentsCount,
           imageUrls,
           author: await buildAuthorSummary(ctx, author),
         };

@@ -272,22 +272,24 @@ export const searchCompanies = query({
       return [];
     }
 
-    const [companies, companyFollowers] = await Promise.all([
-      ctx.db.query("companies").collect(),
-      ctx.db.query("companyFollowers").collect(),
-    ]);
-
-    const followerCountByCompanyId = new Map<string, number>();
-    for (const follow of companyFollowers) {
-      const companyId = follow.companyId;
-      followerCountByCompanyId.set(companyId, (followerCountByCompanyId.get(companyId) ?? 0) + 1);
-    }
-
-    return companies
+    const companies = await ctx.db.query("companies").order("desc").take(300);
+    const matchedCompanies = companies
       .filter((company) => company.name.toLowerCase().includes(normalizedQuery))
       .sort((a, b) => a.name.localeCompare(b.name))
-      .slice(0, 10)
-      .map((company) => ({
+      .slice(0, 10);
+
+    const followerCounts = await Promise.all(
+      matchedCompanies.map(async (company) => {
+        const followers = await ctx.db
+          .query("companyFollowers")
+          .withIndex("byCompany", (q) => q.eq("companyId", company._id))
+          .collect();
+        return [`${company._id}`, followers.length] as const;
+      }),
+    );
+    const followerCountByCompanyId = new Map<string, number>(followerCounts);
+
+    return matchedCompanies.map((company) => ({
         name: company.name,
         slug: company.slug,
         industry: company.industry,
@@ -302,34 +304,39 @@ export const getCompanySuggestions = query({
   args: {},
   handler: async (ctx) => {
     const viewerId = await getAuthUserId(ctx);
-    const [companies, companyFollowers] = await Promise.all([
-      ctx.db.query("companies").collect(),
-      ctx.db.query("companyFollowers").collect(),
+    const [companies, viewerCompanyFollows] = await Promise.all([
+      ctx.db.query("companies").order("desc").take(200),
+      viewerId
+        ? ctx.db
+            .query("companyFollowers")
+            .withIndex("byUser", (q) => q.eq("userId", viewerId))
+            .collect()
+        : Promise.resolve([]),
     ]);
 
-    const followerCountByCompanyId = new Map<string, number>();
-    const followedCompanyIds = new Set<string>();
-
-    for (const follow of companyFollowers) {
-      followerCountByCompanyId.set(
-        follow.companyId,
-        (followerCountByCompanyId.get(follow.companyId) ?? 0) + 1,
-      );
-
-      if (viewerId && follow.userId === viewerId) {
-        followedCompanyIds.add(follow.companyId);
-      }
-    }
-
-    const suggestions = companies
+    const followedCompanyIds = new Set(viewerCompanyFollows.map((follow) => `${follow.companyId}`));
+    const candidateCompanies = companies
       .filter((company) => !followedCompanyIds.has(company._id))
+      .slice(0, 20);
+
+    const candidateCounts = await Promise.all(
+      candidateCompanies.map(async (company) => {
+        const followers = await ctx.db
+          .query("companyFollowers")
+          .withIndex("byCompany", (q) => q.eq("companyId", company._id))
+          .collect();
+        return [`${company._id}`, followers.length] as const;
+      }),
+    );
+    const followerCountByCompanyId = new Map<string, number>(candidateCounts);
+
+    const suggestions = candidateCompanies
       .sort((a, b) => {
         const followerDelta =
           (followerCountByCompanyId.get(b._id) ?? 0) - (followerCountByCompanyId.get(a._id) ?? 0);
         if (followerDelta !== 0) {
           return followerDelta;
         }
-
         return a.name.localeCompare(b.name);
       })
       .slice(0, 5);

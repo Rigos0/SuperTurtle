@@ -265,11 +265,6 @@ const AppShell = () => {
     );
   }
 
-  // Helper: style for show/hide tabs without unmounting (keeps Convex subscriptions alive)
-  const showWhen = (condition) => ({
-    display: condition ? undefined : "none",
-    width: "100%",
-  });
   const shouldShowHashtagView = isHashtagRouteActive;
   const shouldShowWriteArticleView = isWriteArticleRouteActive;
   const shouldShowArticleView = isArticleRouteActive;
@@ -286,6 +281,14 @@ const AppShell = () => {
     (isProfileRouteActive || view === "profile");
   const routedProfileUserId = routeUserId || null;
   const routedProfileUsername = routeUsername || null;
+  const shouldShowMainTabs =
+    !shouldShowProfileView &&
+    !shouldShowCreateCompanyView &&
+    !shouldShowSavedView &&
+    !shouldShowCompanyView &&
+    !shouldShowHashtagView &&
+    !shouldShowArticleView &&
+    !shouldShowWriteArticleView;
 
   return (
     <ThemeProvider theme={muiTheme}>
@@ -366,76 +369,32 @@ const AppShell = () => {
                 </Suspense>
               )}
 
-              {/* Keep-alive tabs — always mounted, shown/hidden via display.
-                  This prevents Convex query re-fetching and skeleton flashes. */}
-              <div
-                style={showWhen(
-                    !shouldShowProfileView &&
-                    !shouldShowCreateCompanyView &&
-                    !shouldShowSavedView &&
-                    !shouldShowCompanyView &&
-                    !shouldShowHashtagView &&
-                    !shouldShowArticleView &&
-                    !shouldShowWriteArticleView &&
-                    activeTab === "home",
-                )}
-              >
-                <Grid item className={classes.feed__form}>
-                  <Form />
-                </Grid>
-                <Grid item className={classes.feed__posts}>
-                  <Posts onNavigateProfile={onNavigateProfile} />
-                </Grid>
-              </div>
+              {shouldShowMainTabs && activeTab === "home" && (
+                <>
+                  <Grid item className={classes.feed__form}>
+                    <Form />
+                  </Grid>
+                  <Grid item className={classes.feed__posts}>
+                    <Posts onNavigateProfile={onNavigateProfile} />
+                  </Grid>
+                </>
+              )}
 
-              <div
-                style={showWhen(
-                    !shouldShowProfileView &&
-                    !shouldShowCreateCompanyView &&
-                    !shouldShowSavedView &&
-                    !shouldShowCompanyView &&
-                    !shouldShowHashtagView &&
-                    !shouldShowArticleView &&
-                    !shouldShowWriteArticleView &&
-                    activeTab === "network",
-                )}
-              >
+              {shouldShowMainTabs && activeTab === "network" && (
                 <Network onNavigateProfile={onNavigateProfile} />
-              </div>
+              )}
 
-              <div
-                style={showWhen(
-                    !shouldShowProfileView &&
-                    !shouldShowCreateCompanyView &&
-                    !shouldShowSavedView &&
-                    !shouldShowCompanyView &&
-                    !shouldShowHashtagView &&
-                    !shouldShowArticleView &&
-                    !shouldShowWriteArticleView &&
-                    activeTab === "messaging",
-                )}
-              >
+              {shouldShowMainTabs && activeTab === "messaging" && (
                 <Messaging />
-              </div>
+              )}
 
-              <div
-                style={showWhen(
-                  !shouldShowProfileView &&
-                  !shouldShowCreateCompanyView &&
-                  !shouldShowSavedView &&
-                  !shouldShowCompanyView &&
-                  !shouldShowHashtagView &&
-                  !shouldShowArticleView &&
-                  !shouldShowWriteArticleView &&
-                  activeTab === "notifications",
-                )}
-              >
+              {shouldShowMainTabs && activeTab === "notifications" && (
                 <Notifications
                   onViewPost={onViewPost}
                   onNavigateProfile={onNavigateProfile}
                   onNavigateMessaging={onNavigateMessaging}
                 />
-              </div>
+              )}
             </ErrorBoundary>
           </Grid>
           <Hidden smDown>

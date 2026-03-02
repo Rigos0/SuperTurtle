@@ -1,6 +1,24 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { buildAuthorSummary } from "./helpers";
+
+const updateUserConnectionCount = async (
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  delta: number,
+) => {
+  const user = await ctx.db.get(userId);
+  if (!user) {
+    return;
+  }
+
+  const currentCount = typeof user.connections === "number" ? user.connections : 0;
+  await ctx.db.patch(userId, {
+    connections: Math.max(0, currentCount + delta),
+  });
+};
 
 export const sendConnectionRequest = mutation({
   args: {
@@ -66,6 +84,11 @@ export const acceptConnection = mutation({
         status: "accepted",
       });
 
+      await Promise.all([
+        updateUserConnectionCount(ctx, connection.userId1, 1),
+        updateUserConnectionCount(ctx, connection.userId2, 1),
+      ]);
+
       const acceptedBy =
         connection.requestedBy === connection.userId1
           ? connection.userId2
@@ -93,6 +116,13 @@ export const rejectConnection = mutation({
     }
 
     await ctx.db.delete(args.connectionId);
+
+    if (connection.status === "accepted") {
+      await Promise.all([
+        updateUserConnectionCount(ctx, connection.userId1, -1),
+        updateUserConnectionCount(ctx, connection.userId2, -1),
+      ]);
+    }
   },
 });
 
@@ -107,6 +137,13 @@ export const removeConnection = mutation({
     }
 
     await ctx.db.delete(args.connectionId);
+
+    if (connection.status === "accepted") {
+      await Promise.all([
+        updateUserConnectionCount(ctx, connection.userId1, -1),
+        updateUserConnectionCount(ctx, connection.userId2, -1),
+      ]);
+    }
   },
 });
 
@@ -267,6 +304,15 @@ export const getConnectionCount = query({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) {
+      return 0;
+    }
+
+    if (typeof user.connections === "number") {
+      return user.connections;
+    }
+
     const [requestedConnections, receivedConnections] = await Promise.all([
       ctx.db
         .query("connections")
@@ -293,6 +339,17 @@ export const getMutualConnectionsCount = query({
   },
   handler: async (ctx, args) => {
     if (args.viewerUserId === args.targetUserId) {
+      return 0;
+    }
+
+    const [viewerUser, targetUser] = await Promise.all([
+      ctx.db.get(args.viewerUserId),
+      ctx.db.get(args.targetUserId),
+    ]);
+    if (!viewerUser || !targetUser) {
+      return 0;
+    }
+    if (viewerUser.connections === 0 || targetUser.connections === 0) {
       return 0;
     }
 

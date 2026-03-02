@@ -1,9 +1,11 @@
 # SubTurtle Long-Run Handoff
 
-Last updated: 2026-03-01T13:50:01Z
+Last updated: 2026-03-02T11:22:02Z
 
 ## Active Runs
-- convex-frontend (last event: spawn at 2026-03-01T13:39:53Z)
+- company-links (last event: spawn at 2026-03-02T11:02:02Z)
+- company-polish (last event: spawn at 2026-03-02T11:01:32Z)
+- company-social (last event: spawn at 2026-03-02T11:00:31Z)
 
 ## Recent Milestones
 - None yet.

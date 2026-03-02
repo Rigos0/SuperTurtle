@@ -50,11 +50,8 @@ export const toggleLike = mutation({
 
     const existingLike = await ctx.db
       .query("likes")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("userId"), userId),
-          q.eq(q.field("postId"), args.postId),
-        ),
+      .withIndex("byUserAndPost", (q) =>
+        q.eq("userId", userId).eq("postId", args.postId),
       )
       .first();
 
@@ -166,7 +163,7 @@ export const removeReaction = mutation({
     const existingReaction = await ctx.db
       .query("reactions")
       .withIndex("byUserAndPost", (q) =>
-        q.eq("userId", args.userId).eq("postId", args.postId),
+        q.eq("userId", userId).eq("postId", args.postId),
       )
       .first();
 
@@ -191,11 +188,8 @@ export const getLikeStatus = query({
   handler: async (ctx, args) => {
     const existingLike = await ctx.db
       .query("likes")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("userId"), args.userId),
-          q.eq(q.field("postId"), args.postId),
-        ),
+      .withIndex("byUserAndPost", (q) =>
+        q.eq("userId", args.userId).eq("postId", args.postId),
       )
       .first();
 
@@ -211,7 +205,7 @@ export const getLikeStatuses = query({
   handler: async (ctx, args) => {
     const allLikes = await ctx.db
       .query("likes")
-      .filter((q) => q.eq(q.field("userId"), args.userId))
+      .withIndex("byUserId", (q) => q.eq("userId", args.userId))
       .collect();
 
     const likedPostIds = new Set(allLikes.map((like) => like.postId));
@@ -223,13 +217,66 @@ export const getLikeStatuses = query({
   },
 });
 
+export const getUserReactionsByPostIds = query({
+  args: {
+    userId: v.id("users"),
+    postIds: v.array(v.id("posts")),
+  },
+  handler: async (ctx, args) => {
+    const postIds = args.postIds.map((postId) => `${postId}`);
+    const postIdSet = new Set(postIds);
+    const reactionsByPostId: Record<string, ReactionType | null> = {};
+
+    for (const postId of postIds) {
+      reactionsByPostId[postId] = null;
+    }
+
+    if (postIds.length === 0) {
+      return reactionsByPostId;
+    }
+
+    const userReactions = await ctx.db
+      .query("reactions")
+      .withIndex("byUserAndPost", (q) => q.eq("userId", args.userId))
+      .collect();
+    const postsWithReaction = new Set<string>();
+
+    for (const reaction of userReactions) {
+      const postId = `${reaction.postId}`;
+      if (!postIdSet.has(postId)) {
+        continue;
+      }
+
+      reactionsByPostId[postId] = reaction.reactionType;
+      postsWithReaction.add(postId);
+    }
+
+    if (postsWithReaction.size !== postIdSet.size) {
+      const likes = await ctx.db
+        .query("likes")
+        .withIndex("byUserId", (q) => q.eq("userId", args.userId))
+        .collect();
+
+      for (const like of likes) {
+        const postId = `${like.postId}`;
+        if (!postIdSet.has(postId) || postsWithReaction.has(postId)) {
+          continue;
+        }
+
+        reactionsByPostId[postId] = "like";
+      }
+    }
+
+    return reactionsByPostId;
+  },
+});
+
 export const getReactionCountsByPostIds = query({
   args: {
     postIds: v.array(v.id("posts")),
   },
   handler: async (ctx, args) => {
     const postIds = args.postIds.map((postId) => `${postId}`);
-    const postIdSet = new Set(postIds);
     const reactionCountsByPostId: Record<string, ReactionCounts> = {};
 
     for (const postId of postIds) {
@@ -240,31 +287,34 @@ export const getReactionCountsByPostIds = query({
       return reactionCountsByPostId;
     }
 
-    const reactions = await ctx.db.query("reactions").collect();
-    const postsWithReactionDocs = new Set<string>();
+    const countsByPost = await Promise.all(
+      args.postIds.map(async (postId) => {
+        const [reactions, likes] = await Promise.all([
+          ctx.db
+            .query("reactions")
+            .withIndex("byPost", (q) => q.eq("postId", postId))
+            .collect(),
+          ctx.db
+            .query("likes")
+            .withIndex("byPostId", (q) => q.eq("postId", postId))
+            .collect(),
+        ]);
 
-    for (const reaction of reactions) {
-      const postId = `${reaction.postId}`;
-      if (!postIdSet.has(postId)) {
-        continue;
-      }
-
-      reactionCountsByPostId[postId][reaction.reactionType] += 1;
-      postsWithReactionDocs.add(postId);
-    }
-
-    // Until every post uses the `reactions` table, fall back to legacy likes.
-    if (postsWithReactionDocs.size !== postIdSet.size) {
-      const likes = await ctx.db.query("likes").collect();
-
-      for (const like of likes) {
-        const postId = `${like.postId}`;
-        if (!postIdSet.has(postId) || postsWithReactionDocs.has(postId)) {
-          continue;
+        const counts = buildEmptyReactionCounts();
+        if (reactions.length > 0) {
+          for (const reaction of reactions) {
+            counts[reaction.reactionType] += 1;
+          }
+        } else {
+          counts.like = likes.length;
         }
 
-        reactionCountsByPostId[postId].like += 1;
-      }
+        return [`${postId}`, counts] as const;
+      }),
+    );
+
+    for (const [postId, counts] of countsByPost) {
+      reactionCountsByPostId[postId] = counts;
     }
 
     for (const postId of postIds) {

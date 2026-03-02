@@ -154,6 +154,8 @@ You have authority to decompose a user request into multiple SubTurtles when it 
 
 When handling "build X" style requests, use `super_turtle/meta/DECOMPOSITION_PROMPT.md` as the canonical decomposition protocol (when to split, when not to split, limits, naming, and worked patterns).
 
+**Parallelism target:** Aim for **5 parallel SubTurtles** whenever the work can be safely split. Use **`yolo-codex`** for all of them when `codex_available=true`. If Codex is unavailable, fall back to `yolo`.
+
 **User-facing flow (default):**
 1. User says: "build X".
 2. You decompose into parallel-safe workstreams.

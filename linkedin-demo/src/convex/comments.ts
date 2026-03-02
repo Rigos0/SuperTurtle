@@ -67,7 +67,7 @@ export const listComments = query({
   handler: async (ctx, args) => {
     const comments = await ctx.db
       .query("comments")
-      .filter((q) => q.eq(q.field("postId"), args.postId))
+      .withIndex("byPostId", (q) => q.eq("postId", args.postId))
       .collect();
 
     const sortedComments = [...comments].sort((a, b) => a.createdAt - b.createdAt);

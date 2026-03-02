@@ -29,6 +29,7 @@ export default defineSchema({
           id: v.string(),
           title: v.string(),
           company: v.string(),
+          companyId: v.optional(v.id("companies")),
           startDate: v.string(),
           endDate: v.optional(v.string()),
           description: v.optional(v.string()),
@@ -65,6 +66,7 @@ export default defineSchema({
     size: v.string(),
     founded: v.optional(v.string()),
     locations: v.optional(v.array(v.string())),
+    isVerified: v.optional(v.boolean()),
     createdBy: v.id("users"),
     admins: v.array(v.id("users")),
     createdAt: v.number(),
@@ -86,7 +88,9 @@ export default defineSchema({
     createdAt: v.number(),
     likesCount: v.number(),
     commentsCount: v.number(),
-  }).index("byCompanyId", ["companyId"]),
+  })
+    .index("byCompanyId", ["companyId"])
+    .index("byAuthorId", ["authorId"]),
   postEdits: defineTable({
     postId: v.id("posts"),
     previousDescription: v.string(),
@@ -107,12 +111,17 @@ export default defineSchema({
   likes: defineTable({
     userId: v.id("users"),
     postId: v.id("posts"),
-  }),
+  })
+    .index("byUserId", ["userId"])
+    .index("byPostId", ["postId"])
+    .index("byUserAndPost", ["userId", "postId"]),
   bookmarks: defineTable({
     userId: v.id("users"),
     postId: v.id("posts"),
     createdAt: v.number(),
-  }).index("byUserId", ["userId"]),
+  })
+    .index("byUserId", ["userId"])
+    .index("byUserAndPost", ["userId", "postId"]),
   hashtags: defineTable({
     tag: v.string(),
     postId: v.id("posts"),
@@ -149,7 +158,9 @@ export default defineSchema({
     authorId: v.id("users"),
     body: v.string(),
     createdAt: v.number(),
-  }),
+  })
+    .index("byPostId", ["postId"])
+    .index("byAuthorId", ["authorId"]),
   reports: defineTable({
     userId: v.id("users"),
     postId: v.id("posts"),
@@ -193,6 +204,7 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("byCompany", ["companyId"])
+    .index("byUser", ["userId"])
     .index("byCompanyAndUser", ["companyId", "userId"]),
   notifications: defineTable({
     userId: v.id("users"),

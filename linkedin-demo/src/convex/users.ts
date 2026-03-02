@@ -16,6 +16,7 @@ const slugifyUsername = (value: string) => {
 };
 
 const normalizeUsername = (value: string) => value.trim().toLowerCase();
+const buildPrefixUpperBound = (value: string) => `${value}\uffff`;
 
 const resolveUserCoverURL = async (
   ctx: { storage: { getUrl: (storageId: Id<"_storage">) => Promise<string | null> } },
@@ -312,6 +313,35 @@ export const isUsernameAvailable = query({
       .unique();
 
     return !existingUser;
+  },
+});
+
+export const searchUsersByPrefix = query({
+  args: {
+    prefix: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const normalizedPrefix = normalizeUsername(args.prefix);
+    if (!normalizedPrefix) {
+      return [];
+    }
+
+    const users = await ctx.db
+      .query("users")
+      .withIndex("username", (q) =>
+        q.gte("username", normalizedPrefix).lt("username", buildPrefixUpperBound(normalizedPrefix)),
+      )
+      .take(10);
+
+    return await Promise.all(
+      users
+        .filter((user) => typeof user.username === "string" && user.username.length > 0)
+        .map(async (user) => ({
+          username: user.username as string,
+          displayName: user.displayName ?? user.name ?? "Guest User",
+          photoURL: await resolveUserPhotoURL(ctx, user),
+        })),
+    );
   },
 });
 
@@ -676,6 +706,213 @@ export const saveCoverPhoto = mutation({
   },
 });
 
+export const listNetworkUsers = query({
+  args: {
+    searchTerm: v.optional(v.string()),
+    offset: v.optional(v.number()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const viewerUserId = await getAuthUserId(ctx);
+    const normalizedSearchTerm = (args.searchTerm ?? "").trim().toLowerCase();
+    const rawOffset = Math.floor(args.offset ?? 0);
+    const rawLimit = Math.floor(args.limit ?? 10);
+    const offset = rawOffset < 0 ? 0 : rawOffset;
+    const limit = Math.min(Math.max(rawLimit, 1), 200);
+
+    const fetchedUsers = normalizedSearchTerm
+      ? await ctx.db.query("users").collect()
+      : await ctx.db.query("users").order("desc").take(offset + limit + 10);
+
+    const filteredUsers = fetchedUsers.filter((user) => {
+      if (viewerUserId && user._id === viewerUserId) {
+        return false;
+      }
+
+      if (!normalizedSearchTerm) {
+        return true;
+      }
+
+      const fields = [
+        user.displayName ?? user.name ?? "",
+        user.title ?? "",
+        user.location ?? "",
+        user.username ?? "",
+      ];
+
+      return fields.some((field) => field.toLowerCase().includes(normalizedSearchTerm));
+    });
+
+    const sortedUsers = normalizedSearchTerm
+      ? [...filteredUsers].sort((a, b) =>
+          (a.displayName ?? a.name ?? "").localeCompare(b.displayName ?? b.name ?? ""),
+        )
+      : filteredUsers;
+
+    const pageUsers = sortedUsers.slice(offset, offset + limit);
+    const hasMore = sortedUsers.length > offset + limit;
+
+    const relationshipByOtherUserId = new Map<
+      string,
+      | { status: "none" }
+      | { status: "accepted"; connectionId: Id<"connections"> }
+      | { status: "pending"; connectionId: Id<"connections">; direction: "sent" | "received" }
+    >();
+    const viewerConnectionUserIds = new Set<Id<"users">>();
+    const followingUserIds = new Set<Id<"users">>();
+
+    if (viewerUserId) {
+      const [
+        acceptedOutgoingConnections,
+        acceptedIncomingConnections,
+        pendingOutgoingConnections,
+        pendingIncomingConnections,
+        follows,
+      ] = await Promise.all([
+        ctx.db
+          .query("connections")
+          .withIndex("byUser1", (q) => q.eq("userId1", viewerUserId).eq("status", "accepted"))
+          .collect(),
+        ctx.db
+          .query("connections")
+          .withIndex("byUser2", (q) => q.eq("userId2", viewerUserId).eq("status", "accepted"))
+          .collect(),
+        ctx.db
+          .query("connections")
+          .withIndex("byUser1", (q) => q.eq("userId1", viewerUserId).eq("status", "pending"))
+          .collect(),
+        ctx.db
+          .query("connections")
+          .withIndex("byUser2", (q) => q.eq("userId2", viewerUserId).eq("status", "pending"))
+          .collect(),
+        ctx.db
+          .query("follows")
+          .withIndex("byFollower", (q) => q.eq("followerId", viewerUserId))
+          .collect(),
+      ]);
+
+      for (const connection of acceptedOutgoingConnections) {
+        viewerConnectionUserIds.add(connection.userId2);
+        relationshipByOtherUserId.set(`${connection.userId2}`, {
+          status: "accepted",
+          connectionId: connection._id,
+        });
+      }
+
+      for (const connection of acceptedIncomingConnections) {
+        viewerConnectionUserIds.add(connection.userId1);
+        relationshipByOtherUserId.set(`${connection.userId1}`, {
+          status: "accepted",
+          connectionId: connection._id,
+        });
+      }
+
+      for (const connection of pendingOutgoingConnections) {
+        const key = `${connection.userId2}`;
+        if (!relationshipByOtherUserId.has(key)) {
+          relationshipByOtherUserId.set(key, {
+            status: "pending",
+            connectionId: connection._id,
+            direction: "sent",
+          });
+        }
+      }
+
+      for (const connection of pendingIncomingConnections) {
+        const key = `${connection.userId1}`;
+        if (!relationshipByOtherUserId.has(key)) {
+          relationshipByOtherUserId.set(key, {
+            status: "pending",
+            connectionId: connection._id,
+            direction: "received",
+          });
+        }
+      }
+
+      for (const follow of follows) {
+        followingUserIds.add(follow.followedId);
+      }
+    }
+
+    const candidateConnectionIds = new Map<string, Set<Id<"users">>>();
+    if (viewerUserId && pageUsers.length > 0) {
+      const connectionSets = await Promise.all(
+        pageUsers.map(async (candidateUser) => {
+          const [requestedConnections, receivedConnections] = await Promise.all([
+            ctx.db
+              .query("connections")
+              .withIndex("byUser1", (q) =>
+                q.eq("userId1", candidateUser._id).eq("status", "accepted"),
+              )
+              .collect(),
+            ctx.db
+              .query("connections")
+              .withIndex("byUser2", (q) =>
+                q.eq("userId2", candidateUser._id).eq("status", "accepted"),
+              )
+              .collect(),
+          ]);
+
+          const connectionUserIds = new Set<Id<"users">>([
+            ...requestedConnections.map((connection) => connection.userId2),
+            ...receivedConnections.map((connection) => connection.userId1),
+          ]);
+
+          return [`${candidateUser._id}`, connectionUserIds] as const;
+        }),
+      );
+
+      for (const [candidateId, connectionIds] of connectionSets) {
+        candidateConnectionIds.set(candidateId, connectionIds);
+      }
+    }
+
+    const users = await Promise.all(
+      pageUsers.map(async (user) => {
+        const candidateId = `${user._id}`;
+        const connectionSet = candidateConnectionIds.get(candidateId);
+        const fallbackConnectionCount =
+          typeof user.connections === "number" ? user.connections : connectionSet?.size ?? 0;
+        const relationship = relationshipByOtherUserId.get(candidateId) ?? { status: "none" as const };
+
+        let mutualConnectionsCount = 0;
+        if (viewerConnectionUserIds.size > 0 && connectionSet && connectionSet.size > 0) {
+          const smallerSet =
+            viewerConnectionUserIds.size <= connectionSet.size
+              ? viewerConnectionUserIds
+              : connectionSet;
+          const largerSet = smallerSet === viewerConnectionUserIds ? connectionSet : viewerConnectionUserIds;
+
+          for (const connectionId of smallerSet) {
+            if (largerSet.has(connectionId)) {
+              mutualConnectionsCount += 1;
+            }
+          }
+        }
+
+        return {
+          _id: user._id,
+          displayName: user.displayName ?? user.name ?? "Guest User",
+          photoURL: await resolveUserPhotoURL(ctx, user),
+          username: user.username ?? null,
+          title: user.title ?? "",
+          location: user.location ?? "",
+          connectionCount: fallbackConnectionCount,
+          mutualConnectionsCount,
+          connectionStatus: relationship,
+          isFollowing: viewerUserId ? followingUserIds.has(user._id) : false,
+        };
+      }),
+    );
+
+    return {
+      users,
+      hasMore,
+      nextOffset: offset + users.length,
+    };
+  },
+});
+
 export const listAllUsers = query({
   args: {},
   handler: async (ctx) => {
@@ -908,21 +1145,45 @@ export const searchUsers = query({
       return [];
     }
 
-    const users = await ctx.db.query("users").collect();
+    const [recentUsers, usernamePrefixUsers] = await Promise.all([
+      ctx.db.query("users").order("desc").take(300),
+      ctx.db
+        .query("users")
+        .withIndex("username", (q) =>
+          q.gte("username", normalizedQuery).lt("username", buildPrefixUpperBound(normalizedQuery)),
+        )
+        .take(10),
+    ]);
+
+    const seenUserIds = new Set<Id<"users">>();
+    const combinedUsers = [...usernamePrefixUsers, ...recentUsers].filter((user) => {
+      if (seenUserIds.has(user._id)) {
+        return false;
+      }
+      seenUserIds.add(user._id);
+      return true;
+    });
+
+    const matchedUsers = combinedUsers
+      .filter((user) =>
+        [
+          user.displayName ?? user.name ?? "",
+          user.title ?? "",
+          user.location ?? "",
+          user.username ?? "",
+        ].some((field) => field.toLowerCase().includes(normalizedQuery)),
+      )
+      .sort((a, b) => (a.displayName ?? a.name ?? "").localeCompare(b.displayName ?? b.name ?? ""))
+      .slice(0, 10);
 
     return await Promise.all(
-      [...users]
-        .filter((user) =>
-          (user.displayName ?? user.name ?? "").toLowerCase().includes(normalizedQuery),
-        )
-        .sort((a, b) => (a.displayName ?? a.name ?? "").localeCompare(b.displayName ?? b.name ?? ""))
-        .slice(0, 10)
-        .map(async (user) => ({
-          _id: user._id,
-          displayName: user.displayName ?? user.name ?? "Guest User",
-          photoURL: await resolveUserPhotoURL(ctx, user),
-          title: user.title ?? "",
-        })),
+      matchedUsers.map(async (user) => ({
+        _id: user._id,
+        displayName: user.displayName ?? user.name ?? "Guest User",
+        photoURL: await resolveUserPhotoURL(ctx, user),
+        title: user.title ?? "",
+        username: user.username ?? null,
+      })),
     );
   },
 });
