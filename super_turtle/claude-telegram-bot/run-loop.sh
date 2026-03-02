@@ -7,8 +7,12 @@ set -uo pipefail
 
 cd "$(dirname "$0")"
 
-# Source environment variables
-if [ -f .env ]; then
+# Source environment variables — check project data dir first, then local .env
+if [ -n "${CLAUDE_WORKING_DIR:-}" ] && [ -f "${CLAUDE_WORKING_DIR}/.superturtle/.env" ]; then
+    set -a
+    source "${CLAUDE_WORKING_DIR}/.superturtle/.env"
+    set +a
+elif [ -f .env ]; then
     set -a
     source .env
     set +a

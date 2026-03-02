@@ -29,6 +29,12 @@ from pathlib import Path
 
 from .subturtle_loop import Claude, Codex
 
+# Package root (super_turtle/), used for resolving skills directory
+_SUPER_TURTLE_DIR = os.environ.get(
+    "SUPER_TURTLE_DIR", str(Path(__file__).resolve().parent.parent)
+)
+_SKILLS_DIR = os.path.join(_SUPER_TURTLE_DIR, "skills")
+
 STATS_SCRIPT = Path(__file__).resolve().parent / "claude-md-guard" / "stats.sh"
 
 # ---------------------------------------------------------------------------
@@ -202,7 +208,7 @@ def _resolve_state_ref(state_dir: Path, name: str) -> tuple[Path, str]:
 def _write_completion_notification(state_dir: Path, name: str, project_dir: Path) -> None:
     """Queue completion handoff: immediate UX ping + meta-agent follow-up check."""
     state_file = state_dir / "CLAUDE.md"
-    cron_jobs_path = project_dir / "super_turtle/claude-telegram-bot/cron-jobs.json"
+    cron_jobs_path = project_dir / ".superturtle/cron-jobs.json"
 
     try:
         state_text = state_file.read_text(encoding="utf-8")
@@ -244,8 +250,8 @@ def _write_completion_notification(state_dir: Path, name: str, project_dir: Path
         f"[AUTO-COMPLETION HANDOFF] SubTurtle {name} reported completion.\n"
         f"Summary from SubTurtle:\n{summary_text}\n\n"
         f"Now perform meta-agent completion handling for {name}:\n"
-        f"1. Run `./super_turtle/subturtle/ctl status {name}`.\n"
-        f"2. Run `./super_turtle/subturtle/ctl stop {name}` to ensure recurring cron/meta cleanup and archiving are complete.\n"
+        f"1. Run `{Path(__file__).resolve().with_name('ctl')} status {name}`.\n"
+        f"2. Run `{Path(__file__).resolve().with_name('ctl')} stop {name}` to ensure recurring cron/meta cleanup and archiving are complete.\n"
         f"3. Confirm whether any cron for {name} remains (if yes, remove it).\n"
         f"4. Send the user one concise completion update with what shipped and what starts next (or that roadmap is complete).\n"
         "If everything is already clean, still send the completion update."
@@ -416,7 +422,7 @@ def run_slow_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
     if skills:
         print(f"[subturtle:{name}] skills: {', '.join(skills)}")
 
-    add_dirs = ["super_turtle/skills"] if skills else []
+    add_dirs = [_SKILLS_DIR] if skills else []
     claude = Claude(add_dirs=add_dirs)
     codex = Codex(add_dirs=add_dirs)
     iteration = 0
@@ -466,7 +472,7 @@ def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
     if skills:
         print(f"[subturtle:{name}] skills: {', '.join(skills)}")
 
-    add_dirs = ["super_turtle/skills"] if skills else []
+    add_dirs = [_SKILLS_DIR] if skills else []
     claude = Claude(add_dirs=add_dirs)
     iteration = 0
     stopped_by_directive = False
@@ -506,7 +512,7 @@ def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = N
     if skills:
         print(f"[subturtle:{name}] skills: {', '.join(skills)}")
 
-    add_dirs = ["super_turtle/skills"] if skills else []
+    add_dirs = [_SKILLS_DIR] if skills else []
     codex = Codex(add_dirs=add_dirs)
     iteration = 0
     stopped_by_directive = False
@@ -548,7 +554,7 @@ def run_yolo_codex_spark_loop(
     if skills:
         print(f"[subturtle:{name}] skills: {', '.join(skills)}")
 
-    add_dirs = ["super_turtle/skills"] if skills else []
+    add_dirs = [_SKILLS_DIR] if skills else []
     codex = Codex(add_dirs=add_dirs, model="gpt-5.3-codex-spark")
     iteration = 0
     stopped_by_directive = False
