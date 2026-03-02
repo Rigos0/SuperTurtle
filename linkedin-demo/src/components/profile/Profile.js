@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { useTheme } from "@material-ui/core/styles";
 import {
   Avatar,
   Button,
@@ -27,6 +28,7 @@ import useConvexUser from "../../hooks/useConvexUser";
 import useErrorToast from "../../hooks/useErrorToast";
 import LoadingGate from "../LoadingGate";
 import Post from "../posts/post/Post";
+import ExperienceSection from "./ExperienceSection";
 import Style from "./Style";
 
 const DEFAULT_PROFILE = {
@@ -99,21 +101,6 @@ const buildEducationFormData = (entry = null) => ({
   startYear: resolveProfileText(entry?.startYear),
   endYear: resolveProfileText(entry?.endYear),
 });
-
-const formatExperienceDateRange = (startDate, endDate) => {
-  const hasStartDate = typeof startDate === "string" && startDate.trim().length > 0;
-  const hasEndDate = typeof endDate === "string" && endDate.trim().length > 0;
-
-  if (hasStartDate && hasEndDate) {
-    return `${startDate} - ${endDate}`;
-  }
-
-  if (hasStartDate) {
-    return `${startDate} - Present`;
-  }
-
-  return "";
-};
 
 const truncateText = (value, maxLength = 180) => {
   if (typeof value !== "string") {
@@ -220,6 +207,7 @@ const Profile = ({
   username = null,
 }) => {
   const classes = Style();
+  const theme = useTheme();
   const { showError, ErrorToast } = useErrorToast();
   const authUser = useConvexUser();
   const getOrCreateConversation = useMutation(api.messaging.getOrCreateConversation);
@@ -1182,8 +1170,8 @@ const Profile = ({
                   style={{
                     textTransform: "none",
                     borderRadius: 16,
-                    borderColor: "#2e7d32",
-                    color: "#2e7d32",
+                    borderColor: theme.palette.primary.main,
+                    color: theme.palette.primary.main,
                     fontWeight: 600,
                     padding: "4px 16px",
                   }}
@@ -1207,7 +1195,7 @@ const Profile = ({
                       !resolvedUserId
                     }
                     style={{
-                      backgroundColor: "#2e7d32",
+                      backgroundColor: theme.palette.primary.main,
                       color: "#fff",
                       textTransform: "none",
                       borderRadius: 16,
@@ -1243,7 +1231,7 @@ const Profile = ({
                       onClick={handleAcceptConnection}
                       disabled={isConnectionActionPending}
                       style={{
-                        backgroundColor: "#2e7d32",
+                        backgroundColor: theme.palette.primary.main,
                         color: "#fff",
                         textTransform: "none",
                         borderRadius: 16,
@@ -1284,8 +1272,8 @@ const Profile = ({
                     style={{
                       textTransform: "none",
                       borderRadius: 16,
-                      borderColor: isConnectedActionHovered ? "#c62828" : "#2e7d32",
-                      color: isConnectedActionHovered ? "#c62828" : "#2e7d32",
+                      borderColor: isConnectedActionHovered ? "#c62828" : theme.palette.primary.main,
+                      color: isConnectedActionHovered ? "#c62828" : theme.palette.primary.main,
                       fontWeight: 600,
                       padding: "4px 16px",
                     }}
@@ -1301,11 +1289,11 @@ const Profile = ({
                     isFollowActionPending || isFollowing === undefined || !authUser?._id || !resolvedUserId
                   }
                   style={{
-                    backgroundColor: isFollowing ? "#2e7d32" : "transparent",
-                    color: isFollowing ? "#fff" : "#2e7d32",
+                    backgroundColor: isFollowing ? theme.palette.primary.main : "transparent",
+                    color: isFollowing ? "#fff" : theme.palette.primary.main,
                     textTransform: "none",
                     borderRadius: 16,
-                    borderColor: "#2e7d32",
+                    borderColor: theme.palette.primary.main,
                     fontWeight: 600,
                     padding: "4px 16px",
                   }}
@@ -1320,8 +1308,8 @@ const Profile = ({
                   style={{
                     textTransform: "none",
                     borderRadius: 16,
-                    borderColor: "#2e7d32",
-                    color: "#2e7d32",
+                    borderColor: theme.palette.primary.main,
+                    color: theme.palette.primary.main,
                     fontWeight: 600,
                     padding: "4px 16px",
                   }}
@@ -1600,133 +1588,21 @@ const Profile = ({
 
                 <Divider style={{ margin: "16px 0 12px" }} />
 
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 8,
-                    marginBottom: 6,
-                  }}
-                >
-                  <Typography variant="subtitle2" style={{ fontWeight: 700 }}>
-                    Experience
-                  </Typography>
-                  {isOwnProfile && (
-                    <Button
-                      size="small"
-                      variant="text"
-                      onClick={handleOpenCreateExperienceDialog}
-                      style={{
-                        textTransform: "none",
-                        color: "#2e7d32",
-                        fontWeight: 600,
-                        minHeight: 32,
-                      }}
-                    >
-                      Add experience
-                    </Button>
-                  )}
-                </div>
-
-                {experienceEntries.length === 0 && legacyExperience.length === 0 && (
-                  <Typography variant="body2" color="textSecondary">
-                    No experience added yet.
-                  </Typography>
-                )}
-
-                {experienceEntries.map((entry) => {
-                  const dateRange = formatExperienceDateRange(entry.startDate, entry.endDate);
-                  return (
-                    <div
-                      key={entry.id}
-                      style={{
-                        border: "1px solid rgba(46, 125, 50, 0.2)",
-                        borderRadius: 10,
-                        padding: "10px 12px",
-                        marginBottom: 10,
-                      }}
-                    >
-                      <Typography variant="subtitle2" style={{ fontWeight: 700, marginBottom: 2 }}>
-                        {entry.title}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        color="textSecondary"
-                        style={{ fontWeight: 600, marginBottom: dateRange ? 2 : 6 }}
-                      >
-                        {entry.company}
-                      </Typography>
-                      {dateRange && (
-                        <Typography
-                          variant="body2"
-                          color="textSecondary"
-                          style={{ fontSize: "0.8rem", marginBottom: entry.description ? 6 : 2 }}
-                        >
-                          {dateRange}
-                        </Typography>
-                      )}
-                      {entry.description && (
-                        <Typography
-                          variant="body2"
-                          color="textSecondary"
-                          style={{ whiteSpace: "pre-line", lineHeight: 1.55, marginBottom: 6 }}
-                        >
-                          {entry.description}
-                        </Typography>
-                      )}
-                      {isOwnProfile && (
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => handleOpenEditExperienceDialog(entry)}
-                            disabled={isExperienceSavePending}
-                            style={{
-                              textTransform: "none",
-                              borderRadius: 16,
-                              borderColor: "#2e7d32",
-                              color: "#2e7d32",
-                              fontWeight: 600,
-                              padding: "2px 10px",
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => handleRemoveExperience(entry.id)}
-                            disabled={isExperienceSavePending}
-                            style={{
-                              textTransform: "none",
-                              borderRadius: 16,
-                              borderColor: "#c62828",
-                              color: "#c62828",
-                              fontWeight: 600,
-                              padding: "2px 10px",
-                            }}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {legacyExperience.map((exp, index) => (
-                  <Typography
-                    key={`${exp}-${index}`}
-                    variant="body2"
-                    color="textSecondary"
-                    style={{ marginBottom: 4, lineHeight: 1.55 }}
-                  >
-                    {exp}
-                  </Typography>
-                ))}
-
-                <Divider style={{ margin: "16px 0 12px" }} />
+                <ExperienceSection
+                  isOwnProfile={isOwnProfile}
+                  experienceEntries={experienceEntries}
+                  legacyExperience={legacyExperience}
+                  isExperienceSavePending={isExperienceSavePending}
+                  isExperienceDialogOpen={isExperienceDialogOpen}
+                  editingExperienceId={editingExperienceId}
+                  experienceFormData={experienceFormData}
+                  onOpenCreateDialog={handleOpenCreateExperienceDialog}
+                  onOpenEditDialog={handleOpenEditExperienceDialog}
+                  onRemoveExperience={handleRemoveExperience}
+                  onCloseDialog={handleCloseExperienceDialog}
+                  onSaveExperience={handleSaveExperience}
+                  onExperienceFieldChange={handleExperienceFieldChange}
+                />
 
                 <div
                   style={{
@@ -1747,7 +1623,7 @@ const Profile = ({
                       onClick={handleOpenCreateEducationDialog}
                       style={{
                         textTransform: "none",
-                        color: "#2e7d32",
+                        color: theme.palette.primary.main,
                         fontWeight: 600,
                         minHeight: 32,
                       }}
@@ -1804,8 +1680,8 @@ const Profile = ({
                             style={{
                               textTransform: "none",
                               borderRadius: 16,
-                              borderColor: "#2e7d32",
-                              color: "#2e7d32",
+                              borderColor: theme.palette.primary.main,
+                              color: theme.palette.primary.main,
                               fontWeight: 600,
                               padding: "2px 10px",
                             }}
@@ -1873,7 +1749,7 @@ const Profile = ({
                       disabled={isSkillMutationPending}
                       style={{
                         textTransform: "none",
-                        backgroundColor: "#2e7d32",
+                        backgroundColor: theme.palette.primary.main,
                         color: "#fff",
                         fontWeight: 600,
                         minHeight: 40,
@@ -1919,83 +1795,6 @@ const Profile = ({
                 )}
               </div>
             )}
-
-            <Dialog
-              open={isExperienceDialogOpen}
-              onClose={() => handleCloseExperienceDialog()}
-              fullWidth
-              maxWidth="sm"
-              aria-labelledby="experience-dialog-title"
-            >
-              <DialogTitle id="experience-dialog-title">
-                {editingExperienceId ? "Edit experience" : "Add experience"}
-              </DialogTitle>
-              <DialogContent dividers>
-                <TextField
-                  label="Title"
-                  value={experienceFormData.title}
-                  onChange={handleExperienceFieldChange("title")}
-                  variant="outlined"
-                  margin="dense"
-                  fullWidth
-                  required
-                />
-                <TextField
-                  label="Company"
-                  value={experienceFormData.company}
-                  onChange={handleExperienceFieldChange("company")}
-                  variant="outlined"
-                  margin="dense"
-                  fullWidth
-                  required
-                />
-                <TextField
-                  label="Start date"
-                  placeholder="e.g. Jan 2022"
-                  value={experienceFormData.startDate}
-                  onChange={handleExperienceFieldChange("startDate")}
-                  variant="outlined"
-                  margin="dense"
-                  fullWidth
-                  required
-                />
-                <TextField
-                  label="End date"
-                  placeholder="e.g. Present"
-                  value={experienceFormData.endDate}
-                  onChange={handleExperienceFieldChange("endDate")}
-                  variant="outlined"
-                  margin="dense"
-                  fullWidth
-                />
-                <TextField
-                  label="Description"
-                  value={experienceFormData.description}
-                  onChange={handleExperienceFieldChange("description")}
-                  variant="outlined"
-                  margin="dense"
-                  fullWidth
-                  multiline
-                  rows={3}
-                />
-              </DialogContent>
-              <DialogActions>
-                <Button
-                  onClick={() => handleCloseExperienceDialog()}
-                  disabled={isExperienceSavePending}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSaveExperience}
-                  variant="contained"
-                  color="primary"
-                  disabled={isExperienceSavePending}
-                >
-                  {editingExperienceId ? "Update" : "Save"}
-                </Button>
-              </DialogActions>
-            </Dialog>
 
             <Dialog
               open={isEducationDialogOpen}
