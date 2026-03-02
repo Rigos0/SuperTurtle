@@ -1,20 +1,18 @@
 /**
  * Session management for Claude Telegram Bot.
  *
- * ClaudeSession class manages Claude Code sessions using the Agent SDK V1.
- * V1 supports full options (cwd, mcpServers, settingSources, etc.)
+ * ClaudeSession class manages Claude Code sessions by spawning the `claude`
+ * CLI as a subprocess with --output-format stream-json. This uses Claude Code
+ * directly (the official product) rather than the Agent SDK.
  */
 
-import {
-  query,
-  type Options,
-  type SDKMessage,
-} from "@anthropic-ai/claude-agent-sdk";
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync } from "fs";
+import { join } from "path";
 import type { Context } from "grammy";
 import {
   ALLOWED_PATHS,
   CLAUDE_CLI_AVAILABLE,
+  CLAUDE_CLI_PATH,
   CODEX_AVAILABLE,
   MCP_SERVERS,
   META_PROMPT,
@@ -42,6 +40,35 @@ import type {
 } from "./types";
 import { claudeLog } from "./logger";
 
+// Stream-json event types from claude CLI
+interface StreamJsonEvent {
+  type: string;
+  session_id?: string;
+  message?: {
+    content: Array<{
+      type: string;
+      text?: string;
+      thinking?: string;
+      name?: string;
+      input?: Record<string, unknown>;
+    }>;
+  };
+  usage?: TokenUsage;
+  [key: string]: unknown;
+}
+
+// Write MCP config to a temp JSON file for --mcp-config flag
+const MCP_CONFIG_FILE = "/tmp/superturtle-mcp-config.json";
+if (Object.keys(MCP_SERVERS).length > 0) {
+  try {
+    mkdirSync("/tmp", { recursive: true });
+    const mcpConfig = { mcpServers: MCP_SERVERS };
+    writeFileSync(MCP_CONFIG_FILE, JSON.stringify(mcpConfig, null, 2));
+  } catch {
+    claudeLog.warn("Failed to write MCP config file");
+  }
+}
+
 /**
  * Determine thinking token budget based on message keywords.
  */
@@ -60,21 +87,6 @@ function getThinkingLevel(message: string): number {
 
   // Default: no thinking
   return 0;
-}
-
-/**
- * Extract text content from SDK message.
- */
-function getTextFromMessage(msg: SDKMessage): string | null {
-  if (msg.type !== "assistant") return null;
-
-  const textParts: string[] = [];
-  for (const block of msg.message.content) {
-    if (block.type === "text") {
-      textParts.push(block.text);
-    }
-  }
-  return textParts.length > 0 ? textParts.join("") : null;
 }
 
 function getErrorMessage(error: unknown): string {
@@ -259,7 +271,7 @@ export class ClaudeSession {
     }
   }
 
-  private abortController: AbortController | null = null;
+  private activeProcess: import("bun").Subprocess | null = null;
   private isQueryRunning = false;
   private stopRequested = false;
   private _isProcessing = false;
@@ -334,11 +346,11 @@ export class ClaudeSession {
    * Returns: "stopped" if query was aborted, "pending" if processing will be cancelled, false if nothing running
    */
   async stop(): Promise<"stopped" | "pending" | false> {
-    // If a query is actively running, abort it
-    if (this.isQueryRunning && this.abortController) {
+    // If a query is actively running, kill the process
+    if (this.isQueryRunning && this.activeProcess) {
       this.stopRequested = true;
-      this.abortController.abort();
-      claudeLog.info("Stop requested - aborting current query");
+      this.activeProcess.kill();
+      claudeLog.info("Stop requested - killing claude process");
       return "stopped";
     }
 
@@ -405,24 +417,34 @@ export class ClaudeSession {
     this.lastMessage = message;
     this.pushRecentMessage("user", message);
 
-    // Build SDK V1 options - supports all features
-    const options: Options = {
-      model: this.model,
-      cwd: WORKING_DIR,
-      settingSources: ["user", "project"],
-      permissionMode: "bypassPermissions",
-      allowDangerouslySkipPermissions: true,
-      systemPrompt: META_PROMPT || undefined,
-      mcpServers: MCP_SERVERS,
-      maxThinkingTokens: thinkingTokens,
-      additionalDirectories: ALLOWED_PATHS,
-      resume: this.sessionId || undefined,
-      ...(this.effort !== "high" && { extraArgs: { effort: this.effort } }),
-    };
+    // Build claude CLI args
+    const claudeBin = process.env.CLAUDE_CODE_PATH || CLAUDE_CLI_PATH;
+    const args: string[] = [
+      claudeBin,
+      "-p", messageToSend,
+      "--output-format", "stream-json",
+      "--model", this.model,
+      "--dangerously-skip-permissions",
+      "--setting-sources", "user,project",
+    ];
 
-    // Add Claude Code executable path if set (required for standalone builds)
-    if (process.env.CLAUDE_CODE_PATH) {
-      options.pathToClaudeCodeExecutable = process.env.CLAUDE_CODE_PATH;
+    if (this.sessionId) {
+      args.push("--resume", this.sessionId);
+    }
+    if (META_PROMPT) {
+      args.push("--system-prompt", META_PROMPT);
+    }
+    if (this.effort !== "high") {
+      args.push("--effort", this.effort);
+    }
+    if (thinkingTokens > 0) {
+      args.push("--max-thinking-tokens", String(thinkingTokens));
+    }
+    for (const dir of ALLOWED_PATHS) {
+      args.push("--add-dir", dir);
+    }
+    if (Object.keys(MCP_SERVERS).length > 0) {
+      args.push("--mcp-config", MCP_CONFIG_FILE);
     }
 
     if (this.sessionId && !isNewSession) {
@@ -449,11 +471,17 @@ export class ClaudeSession {
       throw new Error("Query cancelled");
     }
 
-    // Create abort controller for cancellation
-    this.abortController = new AbortController();
+    // Spawn claude CLI process
     this.stopRequested = false;
     this.queryStarted = new Date();
     this.currentTool = null;
+
+    const proc = Bun.spawn(args, {
+      cwd: WORKING_DIR,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    this.activeProcess = proc;
 
     // Response tracking
     const responseParts: string[] = [];
@@ -466,28 +494,19 @@ export class ClaudeSession {
     let toolActive = false; // true between tool_use event and next non-tool event
 
     try {
-      // Use V1 query() API - supports all options including cwd, mcpServers, etc.
-      const queryInstance = query({
-        prompt: messageToSend,
-        options: {
-          ...options,
-          abortController: this.abortController,
-        },
-      });
-
-      // Process streaming response with stall detection. If the SDK stream stops
-      // yielding events without closing, break out and flush accumulated text.
-      const iterator = queryInstance[Symbol.asyncIterator]();
+      // Read stdout line by line — each line is a JSON event from stream-json
+      const reader = proc.stdout.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
       const stallTimeoutSentinel = Symbol("event-stream-stall-timeout");
 
       while (true) {
-        const iteratorNext = iterator.next();
         let stallTimer: ReturnType<typeof setTimeout> | null = null;
         const activeTimeout = toolActive ? TOOL_ACTIVE_STALL_TIMEOUT_MS : EVENT_STREAM_STALL_TIMEOUT_MS;
         const nextResult = await Promise.race<
-          IteratorResult<SDKMessage> | typeof stallTimeoutSentinel
+          { done: boolean; value?: Uint8Array } | typeof stallTimeoutSentinel
         >([
-          iteratorNext,
+          reader.read(),
           new Promise<typeof stallTimeoutSentinel>((resolve) => {
             stallTimer = setTimeout(
               () => resolve(stallTimeoutSentinel),
@@ -502,9 +521,9 @@ export class ClaudeSession {
         if (nextResult === stallTimeoutSentinel) {
           stalled = true;
           claudeLog.warn(
-            `Event stream stalled for ${activeTimeout}ms (tool_active=${toolActive}); aborting stream and flushing partial response`
+            `Event stream stalled for ${activeTimeout}ms (tool_active=${toolActive}); killing process and flushing partial response`
           );
-          this.abortController?.abort();
+          proc.kill();
           break;
         }
 
@@ -512,27 +531,42 @@ export class ClaudeSession {
           break;
         }
 
-        const event = nextResult.value;
-        // Check for abort
-        if (this.stopRequested) {
-          claudeLog.info("Query aborted by user");
-          break;
-        }
+        buffer += decoder.decode(nextResult.value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || ""; // Keep incomplete last line in buffer
 
-        // Capture session_id from first message
-        if (!this.sessionId && event.session_id) {
-          this.sessionId = event.session_id;
-          claudeLog.info({ sessionId: this.sessionId }, `GOT session_id: ${this.sessionId!.slice(0, 8)}...`);
-          this.saveSession();
-        }
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
 
-        // Handle different message types
-        if (event.type === "assistant") {
-          // Reset tool-active flag when we receive a new assistant message
-          // (tool results come as separate events before the next assistant message)
-          toolActive = false;
+          let event: StreamJsonEvent;
+          try {
+            event = JSON.parse(trimmed);
+          } catch {
+            claudeLog.warn(`Failed to parse stream-json line: ${trimmed.slice(0, 100)}`);
+            continue;
+          }
 
-          for (const block of event.message.content) {
+          // Check for abort
+          if (this.stopRequested) {
+            claudeLog.info("Query aborted by user");
+            proc.kill();
+            break;
+          }
+
+          // Capture session_id from first message
+          if (!this.sessionId && event.session_id) {
+            this.sessionId = event.session_id;
+            claudeLog.info({ sessionId: this.sessionId }, `GOT session_id: ${this.sessionId!.slice(0, 8)}...`);
+            this.saveSession();
+          }
+
+          // Handle different message types
+          if (event.type === "assistant" && event.message) {
+            // Reset tool-active flag when we receive a new assistant message
+            toolActive = false;
+
+            for (const block of event.message.content) {
             // Thinking blocks
             if (block.type === "thinking") {
               const thinkingText = block.thinking;
@@ -545,8 +579,8 @@ export class ClaudeSession {
             // Tool use blocks
             if (block.type === "tool_use") {
               toolActive = true; // Tool is executing — use longer stall patience
-              const toolName = block.name;
-              const toolInput = block.input as Record<string, unknown>;
+              const toolName = block.name || "";
+              const toolInput = (block.input || {}) as Record<string, unknown>;
 
               // Safety check for Bash commands
               if (toolName === "Bash") {
@@ -677,7 +711,7 @@ export class ClaudeSession {
             }
 
             // Text content
-            if (block.type === "text") {
+            if (block.type === "text" && block.text) {
               responseParts.push(block.text);
               currentSegmentText += block.text;
 
@@ -699,33 +733,41 @@ export class ClaudeSession {
 
           // Break out of event loop if ask_user was triggered
           if (askUserTriggered) {
+            proc.kill();
             break;
           }
         }
 
-        // Result message
-        if (event.type === "result") {
-          claudeLog.info("Response complete");
-          queryCompleted = true;
+          // Result message
+          if (event.type === "result") {
+            claudeLog.info("Response complete");
+            queryCompleted = true;
 
-          // Capture usage if available
-          if ("usage" in event && event.usage) {
-            this.lastUsage = event.usage as TokenUsage;
-            const u = this.lastUsage;
-            claudeLog.info(
-              `Usage: in=${u.input_tokens} out=${u.output_tokens} cache_read=${
-                u.cache_read_input_tokens || 0
-              } cache_create=${u.cache_creation_input_tokens || 0}`
-            );
+            // Capture usage if available
+            if (event.usage) {
+              this.lastUsage = event.usage as TokenUsage;
+              const u = this.lastUsage;
+              claudeLog.info(
+                `Usage: in=${u.input_tokens} out=${u.output_tokens} cache_read=${
+                  u.cache_read_input_tokens || 0
+                } cache_create=${u.cache_creation_input_tokens || 0}`
+              );
+            }
           }
+        } // end for-each line
+
+        // If stop was requested inside the line loop, break the outer read loop
+        if (this.stopRequested || askUserTriggered) {
+          break;
         }
-      }
+      } // end while (reader.read())
 
       if (stalled) {
         claudeLog.info("Stall recovery activated; continuing with partial response flush");
       }
 
-      // V1 query completes automatically when the generator ends
+      // Wait for the process to exit
+      await proc.exited;
     } catch (error) {
       const normalizedError = normalizeQueryError(error);
       const errorStr = normalizedError.message.toLowerCase();
@@ -753,7 +795,7 @@ export class ClaudeSession {
       }
     } finally {
       this.isQueryRunning = false;
-      this.abortController = null;
+      this.activeProcess = null;
       this.queryStarted = null;
       this.currentTool = null;
     }
