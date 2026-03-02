@@ -1,5 +1,5 @@
 ## Current Task
-Fix `linkedin-demo/src/convex/posts.ts` updatePost auth check — verify `existingPost.authorId === getAuthUserId(ctx)` before editing.
+Fix `linkedin-demo/src/convex/likes.ts` toggleLike — use `getAuthUserId(ctx)` instead of `args.userId`.
 
 ## End Goal with Specs
 All Convex mutations properly authenticate the calling user and reject unauthorized operations. No mutation should trust client-supplied userId.
@@ -7,8 +7,8 @@ All Convex mutations properly authenticate the calling user and reject unauthori
 ## Backlog
 - [x] Fix `linkedin-demo/src/convex/posts.ts` createPost (line ~337): use `getAuthUserId(ctx)` instead of trusting `args.authorId`. Reject if mismatch. Keep guest user fallback working (guests can still create posts if the app allows).
 - [x] Fix `linkedin-demo/src/convex/posts.ts` deletePost (line ~431): add auth check — verify `post.authorId === getAuthUserId(ctx)` before deleting
-- [ ] Fix `linkedin-demo/src/convex/posts.ts` updatePost (line ~445): add auth check — verify `existingPost.authorId === getAuthUserId(ctx)` before editing <- current
-- [ ] Fix `linkedin-demo/src/convex/likes.ts` toggleLike (line ~35): use `getAuthUserId(ctx)` instead of `args.userId`
+- [x] Fix `linkedin-demo/src/convex/posts.ts` updatePost (line ~445): add auth check — verify `existingPost.authorId === getAuthUserId(ctx)` before editing
+- [ ] Fix `linkedin-demo/src/convex/likes.ts` toggleLike (line ~35): use `getAuthUserId(ctx)` instead of `args.userId` <- current
 - [ ] Fix `linkedin-demo/src/convex/likes.ts` setReaction + removeReaction (line ~82): same auth fix
 - [ ] Fix `linkedin-demo/src/convex/articles.ts` getArticle: add visibility check for connections-only articles
 - [ ] Fix `linkedin-demo/src/convex/postEdits.ts` getEditHistory: consider access control (at minimum, don't expose edits of connections-only posts to non-connections)

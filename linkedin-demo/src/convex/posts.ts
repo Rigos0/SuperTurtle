@@ -467,9 +467,18 @@ export const updatePost = mutation({
     description: v.string(),
   },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
     const existingPost = await ctx.db.get(args.postId);
     if (!existingPost) {
       throw new Error("Post not found");
+    }
+
+    if (existingPost.authorId !== userId) {
+      throw new Error("Cannot edit another user's post");
     }
 
     if (existingPost.description === args.description) {
