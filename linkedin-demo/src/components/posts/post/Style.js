@@ -63,6 +63,41 @@ export default makeStyles((theme) => ({
     paddingTop: 5,
     "& > p": {
       fontSize: 14,
+      margin: 0,
+      width: "100%",
+      wordBreak: "break-word",
+    },
+  },
+  body__linkPreview: {
+    width: "100%",
+    padding: "0 10px 10px",
+  },
+  linkPreviewCard: {
+    width: "100%",
+    display: "block",
+    textDecoration: "none",
+    borderRadius: 8,
+    border: `1px solid ${theme.palette.type === "dark" ? "#455a64" : "#dce6f1"}`,
+    backgroundColor: theme.palette.type === "dark" ? darkSecondary : "#f3f8ff",
+    padding: "10px 12px",
+    transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+    "&:hover": {
+      borderColor: "#2e7d32",
+      boxShadow: "0 0 0 1px rgba(46, 125, 50, 0.2)",
+    },
+    "& > h5": {
+      margin: 0,
+      fontSize: 13,
+      fontWeight: 600,
+      color: theme.palette.type === "dark" ? "lightgrey" : "#1d2226",
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+    },
+    "& > p": {
+      margin: "4px 0 0",
+      fontSize: 13,
+      color: theme.palette.type === "dark" ? "#b0bec5" : "#4f5b67",
+      overflowWrap: "anywhere",
     },
   },
   editTextarea: {
@@ -104,20 +139,41 @@ export default makeStyles((theme) => ({
   },
   body__image: {
     width: "100%",
-    display: "flex",
-    alignItems: "center",
     overflow: "hidden",
-    "& > img": {
-      width: "100%",
-      height: "auto",
-      objectFit: "contain",
-      transition: "all 0.5s ease",
-      "&:hover": {
-        //transform: "scale(1.1)",
-      },
-    },
     "& > div": {
       height: "auto",
+    },
+  },
+  body__imageGrid: {
+    width: "100%",
+    display: "grid",
+    gap: 2,
+    backgroundColor: theme.palette.type === "dark" ? "#1f2a30" : "#f3f2ef",
+  },
+  imageGrid1: {
+    gridTemplateColumns: "1fr",
+  },
+  imageGrid2: {
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  },
+  imageGrid3: {
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  },
+  imageGrid4: {
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  },
+  imageGridItem: {
+    width: "100%",
+    minHeight: 190,
+    backgroundColor: theme.palette.type === "dark" ? "#101214" : "#e7ebef",
+    [theme.breakpoints.down("xs")]: {
+      minHeight: 145,
+    },
+    "& > img": {
+      width: "100%",
+      height: "100%",
+      display: "block",
+      objectFit: "cover",
     },
   },
   post__footer: {
@@ -146,6 +202,79 @@ export default makeStyles((theme) => ({
       marginLeft: 4,
     },
   },
+  reactionSummary: {
+    position: "relative",
+    display: "inline-flex",
+    alignItems: "center",
+    cursor: "default",
+    "&:hover $reactionBreakdown": {
+      opacity: 1,
+      transform: "translateY(0)",
+      pointerEvents: "auto",
+    },
+  },
+  reactionIconStack: {
+    display: "flex",
+    alignItems: "center",
+    marginRight: 2,
+  },
+  reactionIconBadge: {
+    width: 16,
+    height: 16,
+    borderRadius: "50%",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    border: `1px solid ${theme.palette.background.paper}`,
+    marginLeft: -4,
+    "&:first-child": {
+      marginLeft: 0,
+    },
+  },
+  reactionIconGlyph: {
+    fontSize: "10px !important",
+    color: `${theme.palette.common.white} !important`,
+  },
+  reactionBreakdown: {
+    position: "absolute",
+    left: 0,
+    bottom: "calc(100% + 8px)",
+    zIndex: 4,
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+    minWidth: 146,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: theme.palette.background.paper,
+    border: `1px solid ${theme.palette.type === "dark" ? "#455a64" : "#d7dbe0"}`,
+    boxShadow:
+      theme.palette.type === "dark"
+        ? "0 8px 24px rgba(0, 0, 0, 0.42)"
+        : "0 8px 24px rgba(15, 23, 42, 0.16)",
+    opacity: 0,
+    transform: "translateY(6px)",
+    pointerEvents: "none",
+    transition: "opacity 0.15s ease, transform 0.15s ease",
+  },
+  reactionBreakdownItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    color: theme.palette.text.primary,
+    fontSize: 12,
+  },
+  reactionBreakdownIcon: {
+    fontSize: "14px !important",
+  },
+  reactionBreakdownLabel: {
+    flex: 1,
+    color: theme.palette.text.primary,
+  },
+  reactionBreakdownCount: {
+    color: theme.palette.text.secondary,
+    fontWeight: 600,
+  },
   footer__actions: {
     display: "flex",
     justifyContent: "space-evenly",
@@ -154,6 +283,57 @@ export default makeStyles((theme) => ({
     [theme.breakpoints.down("xs")]: {
       padding: 0,
     },
+  },
+  reactionActionWrapper: {
+    flex: 1,
+    position: "relative",
+    display: "flex",
+  },
+  reactionPicker: {
+    position: "absolute",
+    left: "50%",
+    bottom: "calc(100% + 8px)",
+    transform: "translateX(-50%)",
+    zIndex: 5,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "6px 8px",
+    borderRadius: 999,
+    border: `1px solid ${theme.palette.type === "dark" ? "#455a64" : "#d7dbe0"}`,
+    backgroundColor: theme.palette.background.paper,
+    boxShadow:
+      theme.palette.type === "dark"
+        ? "0 8px 22px rgba(0, 0, 0, 0.42)"
+        : "0 8px 22px rgba(15, 23, 42, 0.18)",
+  },
+  reactionPickerButton: {
+    width: 30,
+    height: 30,
+    border: 0,
+    borderRadius: "50%",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    padding: 0,
+    backgroundColor: "transparent",
+    transition: "transform 0.14s ease, background-color 0.14s ease",
+    "&:hover": {
+      transform: "translateY(-3px) scale(1.1)",
+      backgroundColor: theme.palette.type === "dark" ? darkSecondary : "#eef3ee",
+    },
+    "&:focus-visible": {
+      outline: `2px solid ${theme.palette.primary.main}`,
+      outlineOffset: 2,
+    },
+  },
+  reactionPickerButtonActive: {
+    backgroundColor: theme.palette.type === "dark" ? darkSecondary : "#eef3ee",
+    transform: "translateY(-2px)",
+  },
+  reactionPickerIcon: {
+    fontSize: "19px !important",
   },
   action__icons: {
     flex: 1,

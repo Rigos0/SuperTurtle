@@ -7,12 +7,15 @@ import Paper from "@material-ui/core/Paper";
 import MoreHorizOutlinedIcon from "@material-ui/icons/MoreHorizOutlined";
 import ThumbUpAltIcon from "@material-ui/icons/ThumbUpAlt";
 import ThumbUpAltOutlinedIcon from "@material-ui/icons/ThumbUpAltOutlined";
+import FavoriteIcon from "@material-ui/icons/Favorite";
+import EmojiEventsIcon from "@material-ui/icons/EmojiEvents";
+import EmojiObjectsIcon from "@material-ui/icons/EmojiObjects";
+import SentimentVerySatisfiedIcon from "@material-ui/icons/SentimentVerySatisfied";
 import FiberManualRecordRoundedIcon from "@material-ui/icons/FiberManualRecordRounded";
 import CommentOutlinedIcon from "@material-ui/icons/CommentOutlined";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import ReactPlayer from "react-player";
 import ReactTimeago from "react-timeago";
-// Reaction images removed — only thumbs-up like is supported
 import { api } from "../../../convex/_generated/api";
 import { DEFAULT_PHOTO } from "../../../constants";
 import useConvexUser from "../../../hooks/useConvexUser";
@@ -27,6 +30,43 @@ const resolvePhoto = (photoURL) => {
   return photoURL;
 };
 
+const REACTION_ITEMS = [
+  {
+    key: "like",
+    label: "Like",
+    color: "#2e7d32",
+    Icon: ThumbUpAltIcon,
+  },
+  {
+    key: "love",
+    label: "Love",
+    color: "#d32f2f",
+    Icon: FavoriteIcon,
+  },
+  {
+    key: "celebrate",
+    label: "Celebrate",
+    color: "#ed6c02",
+    Icon: EmojiEventsIcon,
+  },
+  {
+    key: "insightful",
+    label: "Insightful",
+    color: "#0288d1",
+    Icon: EmojiObjectsIcon,
+  },
+  {
+    key: "funny",
+    label: "Funny",
+    color: "#f9a825",
+    Icon: SentimentVerySatisfiedIcon,
+  },
+];
+const REACTION_ITEM_BY_KEY = REACTION_ITEMS.reduce((accumulator, item) => {
+  accumulator[item.key] = item;
+  return accumulator;
+}, {});
+
 const Post = forwardRef(
   (
     {
@@ -35,13 +75,15 @@ const Post = forwardRef(
       authorUsername,
       likesCount = 0,
       commentsCount = 0,
-      liked,
+      currentReaction,
+      reactionCounts,
       profile,
       username,
       timestamp,
       description,
       fileType,
       fileData,
+      imageUrls,
       onNavigateProfile,
     },
     ref
@@ -49,7 +91,8 @@ const Post = forwardRef(
     const classes = Style();
     const user = useConvexUser();
     const { isAuthenticated } = useConvexAuth();
-    const toggleLike = useMutation(api.likes.toggleLike);
+    const setReaction = useMutation(api.likes.setReaction);
+    const removeReaction = useMutation(api.likes.removeReaction);
     const addComment = useMutation(api.comments.addComment);
     const deletePost = useMutation(api.posts.deletePost);
     const deleteComment = useMutation(api.comments.deleteComment);
@@ -60,7 +103,12 @@ const Post = forwardRef(
     const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);
     const [isEditing, setIsEditing] = React.useState(false);
     const [editText, setEditText] = React.useState(description ?? "");
-    const [optimisticLike, setOptimisticLike] = React.useState(null);
+    const [optimisticReaction, setOptimisticReaction] = React.useState(undefined);
+    const [isReactionMutationPending, setIsReactionMutationPending] = React.useState(false);
+    const [isReactionPickerOpen, setIsReactionPickerOpen] = React.useState(false);
+    const reactionPickerCloseTimeoutRef = React.useRef(null);
+    const reactionPickerLongPressTimeoutRef = React.useRef(null);
+    const didLongPressOpenReactionPickerRef = React.useRef(false);
     const linkPreview = React.useMemo(
       () => getLinkPreviewFromText(description),
       [description]
@@ -71,17 +119,22 @@ const Post = forwardRef(
       showComments ? { postId } : "skip"
     );
 
-    const serverLiked = liked ?? false;
-    const isLiked = optimisticLike !== null ? optimisticLike : serverLiked;
+    const serverReaction = currentReaction ?? null;
+    const selectedReaction =
+      optimisticReaction !== undefined ? optimisticReaction : serverReaction;
+    const selectedReactionItem = selectedReaction
+      ? REACTION_ITEM_BY_KEY[selectedReaction] ?? null
+      : null;
 
     // Clear optimistic state once server catches up
     React.useEffect(() => {
-      if (liked !== undefined) {
-        setOptimisticLike(null);
+      if (currentReaction !== undefined) {
+        setOptimisticReaction(undefined);
       }
-    }, [liked]);
+    }, [currentReaction]);
     const commentsList = comments ?? [];
     const canInteract = Boolean(isAuthenticated && user?._id);
+    const canReact = canInteract && !isReactionMutationPending;
     const isOwnPost = Boolean(canInteract && authorId && authorId === user._id);
     const isMenuOpen = Boolean(menuAnchorEl);
     const canNavigateProfile =
@@ -93,31 +146,148 @@ const Post = forwardRef(
       }
     }, [description, isEditing]);
 
+    React.useEffect(() => {
+      return () => {
+        if (reactionPickerCloseTimeoutRef.current) {
+          clearTimeout(reactionPickerCloseTimeoutRef.current);
+        }
+        if (reactionPickerLongPressTimeoutRef.current) {
+          clearTimeout(reactionPickerLongPressTimeoutRef.current);
+        }
+      };
+    }, []);
+
     const capitalize = (_string = "") => {
       return _string.charAt(0).toUpperCase() + _string.slice(1);
     };
 
-    const postImageRef = React.useRef(null);
+    const postImages = React.useMemo(() => {
+      if (fileType !== "image") {
+        return [];
+      }
 
-    const PostImage = React.forwardRef((props, ref) => {
-      return <img src={props.src} alt="post" ref={ref} />;
-    });
+      if (Array.isArray(imageUrls) && imageUrls.length > 0) {
+        return imageUrls
+          .filter((imageUrl) => typeof imageUrl === "string" && imageUrl.length > 0)
+          .slice(0, 4);
+      }
 
-    const handleLikeClick = async () => {
+      if (fileData) {
+        return [fileData];
+      }
+
+      return [];
+    }, [fileData, fileType, imageUrls]);
+
+    const imageGridClassName =
+      postImages.length <= 1
+        ? classes.imageGrid1
+        : postImages.length === 2
+          ? classes.imageGrid2
+          : postImages.length === 3
+            ? classes.imageGrid3
+            : classes.imageGrid4;
+
+    const applyReaction = async (nextReaction) => {
+      if (!canReact || !user?._id) {
+        return;
+      }
+
+      setOptimisticReaction(nextReaction);
+      setIsReactionMutationPending(true);
+
+      try {
+        if (nextReaction) {
+          await setReaction({ userId: user._id, postId, reactionType: nextReaction });
+        } else {
+          await removeReaction({ userId: user._id, postId });
+        }
+      } catch (error) {
+        setOptimisticReaction(undefined);
+        console.error("Failed to update reaction:", error);
+      } finally {
+        setIsReactionMutationPending(false);
+      }
+    };
+
+    const handleLikeClick = () => {
+      if (didLongPressOpenReactionPickerRef.current) {
+        didLongPressOpenReactionPickerRef.current = false;
+        return;
+      }
+
+      const nextReaction = selectedReaction === "like" ? null : "like";
+      applyReaction(nextReaction);
+    };
+
+    const clearReactionPickerCloseTimeout = () => {
+      if (reactionPickerCloseTimeoutRef.current) {
+        clearTimeout(reactionPickerCloseTimeoutRef.current);
+        reactionPickerCloseTimeoutRef.current = null;
+      }
+    };
+
+    const scheduleReactionPickerClose = () => {
+      clearReactionPickerCloseTimeout();
+      reactionPickerCloseTimeoutRef.current = setTimeout(() => {
+        setIsReactionPickerOpen(false);
+        reactionPickerCloseTimeoutRef.current = null;
+      }, 120);
+    };
+
+    const clearReactionPickerLongPressTimeout = () => {
+      if (reactionPickerLongPressTimeoutRef.current) {
+        clearTimeout(reactionPickerLongPressTimeoutRef.current);
+        reactionPickerLongPressTimeoutRef.current = null;
+      }
+    };
+
+    const handleReactionActionMouseEnter = () => {
       if (!canInteract) {
         return;
       }
 
-      // Optimistic: toggle immediately in UI
-      setOptimisticLike(!isLiked);
+      clearReactionPickerCloseTimeout();
+      setIsReactionPickerOpen(true);
+    };
 
-      try {
-        await toggleLike({ userId: user._id, postId });
-      } catch (error) {
-        // Revert on failure
-        setOptimisticLike(null);
-        console.error("Failed to toggle like:", error);
+    const handleReactionActionMouseLeave = () => {
+      if (!canInteract) {
+        return;
       }
+
+      scheduleReactionPickerClose();
+    };
+
+    const handleReactionActionTouchStart = () => {
+      if (!canReact) {
+        return;
+      }
+
+      didLongPressOpenReactionPickerRef.current = false;
+      clearReactionPickerLongPressTimeout();
+      reactionPickerLongPressTimeoutRef.current = setTimeout(() => {
+        didLongPressOpenReactionPickerRef.current = true;
+        setIsReactionPickerOpen(true);
+        reactionPickerLongPressTimeoutRef.current = null;
+      }, 350);
+    };
+
+    const handleReactionActionTouchEnd = () => {
+      clearReactionPickerLongPressTimeout();
+    };
+
+    const handleReactionActionTouchCancel = () => {
+      clearReactionPickerLongPressTimeout();
+    };
+
+    const handleReactionSelect = (reactionType) => {
+      const nextReaction = selectedReaction === reactionType ? null : reactionType;
+      clearReactionPickerCloseTimeout();
+      clearReactionPickerLongPressTimeout();
+      didLongPressOpenReactionPickerRef.current = false;
+      setIsReactionPickerOpen(false);
+      applyReaction(nextReaction);
     };
 
     const handleCommentSubmit = async (event) => {
@@ -205,28 +375,82 @@ const Post = forwardRef(
       }
     };
 
-    // Optimistic like count: instant +1/-1 while server catches up
-    const optimisticLikeCount =
-      optimisticLike !== null
-        ? optimisticLike
-          ? likesCount + (serverLiked ? 0 : 1)
-          : Math.max(0, likesCount - (serverLiked ? 1 : 0))
-        : likesCount;
+    const resolvedReactionCounts = {
+      like: reactionCounts?.like ?? likesCount,
+      love: reactionCounts?.love ?? 0,
+      celebrate: reactionCounts?.celebrate ?? 0,
+      insightful: reactionCounts?.insightful ?? 0,
+      funny: reactionCounts?.funny ?? 0,
+    };
+    // Apply optimistic delta for whichever reaction changed.
+    if (optimisticReaction !== undefined) {
+      if (serverReaction) {
+        resolvedReactionCounts[serverReaction] = Math.max(
+          0,
+          resolvedReactionCounts[serverReaction] - 1,
+        );
+      }
 
-    const hasStats = optimisticLikeCount > 0 || commentsCount > 0;
+      if (optimisticReaction) {
+        resolvedReactionCounts[optimisticReaction] += 1;
+      }
+    }
+    const totalReactionCount =
+      resolvedReactionCounts.like +
+      resolvedReactionCounts.love +
+      resolvedReactionCounts.celebrate +
+      resolvedReactionCounts.insightful +
+      resolvedReactionCounts.funny;
+    const visibleReactionItems = REACTION_ITEMS.filter(
+      (item) => resolvedReactionCounts[item.key] > 0,
+    );
+
+    const hasStats = totalReactionCount > 0 || commentsCount > 0;
 
     const Reactions = () => {
       if (!hasStats) return null;
 
       return (
         <div className={classes.footer__stats}>
-          {optimisticLikeCount > 0 && (
-            <>
-              <ThumbUpAltIcon style={{ fontSize: 14, color: "#2e7d32" }} />
-              <h4>{optimisticLikeCount}</h4>
-            </>
+          {totalReactionCount > 0 && (
+            <div className={classes.reactionSummary}>
+              <div className={classes.reactionIconStack}>
+                {visibleReactionItems.slice(0, 3).map((item) => {
+                  const IconComponent = item.Icon;
+
+                  return (
+                    <div
+                      key={item.key}
+                      className={classes.reactionIconBadge}
+                      style={{ backgroundColor: item.color }}
+                    >
+                      <IconComponent className={classes.reactionIconGlyph} />
+                    </div>
+                  );
+                })}
+              </div>
+              <h4>{totalReactionCount}</h4>
+
+              <div className={classes.reactionBreakdown} role="tooltip">
+                {visibleReactionItems.map((item) => {
+                  const IconComponent = item.Icon;
+                  return (
+                    <div key={item.key} className={classes.reactionBreakdownItem}>
+                      <IconComponent
+                        className={classes.reactionBreakdownIcon}
+                        style={{ color: item.color }}
+                      />
+                      <span className={classes.reactionBreakdownLabel}>{item.label}</span>
+                      <span className={classes.reactionBreakdownCount}>
+                        {resolvedReactionCounts[item.key]}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
-          {optimisticLikeCount > 0 && commentsCount > 0 && (
+          {totalReactionCount > 0 && commentsCount > 0 && (
             <FiberManualRecordRoundedIcon
               style={{ fontSize: 6, color: "grey", margin: "0 4px" }}
             />
@@ -305,7 +529,6 @@ const Post = forwardRef(
               <p>{description}</p>
             )}
           </div>
-          {fileData && (
           {!isEditing && linkPreview && (
             <div className={classes.body__linkPreview}>
               <a
@@ -319,32 +542,106 @@ const Post = forwardRef(
               </a>
             </div>
           )}
+          {((fileType === "image" && postImages.length > 0) ||
+            (fileType !== "image" && fileData)) && (
             <div className={classes.body__image}>
               {fileType === "image" ? (
-                // <img src={fileData} alt="post" />
-                <PostImage ref={postImageRef} src={fileData} />
+                <div className={`${classes.body__imageGrid} ${imageGridClassName}`}>
+                  {postImages.map((imageUrl, index) => (
+                    <div
+                      key={`${postId}-image-${index}`}
+                      className={classes.imageGridItem}
+                      style={
+                        postImages.length === 3 && index === 0
+                          ? { gridColumn: "1 / span 2" }
+                          : undefined
+                      }
+                    >
+                      <img src={imageUrl} alt={`post media ${index + 1}`} loading="lazy" />
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <ReactPlayer url={fileData} controls={true} style={{ height: "auto !important" }} />
+                <ReactPlayer
+                  url={fileData}
+                  controls={true}
+                  style={{ height: "auto !important" }}
+                />
               )}
             </div>
           )}
         </div>
         <div className={classes.post__footer}>
           <Reactions />
-            <div className={classes.footer__actions}>
+          <div className={classes.footer__actions}>
+            <div
+              className={classes.reactionActionWrapper}
+              onMouseEnter={canInteract ? handleReactionActionMouseEnter : undefined}
+              onMouseLeave={canInteract ? handleReactionActionMouseLeave : undefined}
+            >
+              {canInteract && isReactionPickerOpen && (
+                <div
+                  className={classes.reactionPicker}
+                  role="menu"
+                  aria-label="Select reaction"
+                  onMouseEnter={handleReactionActionMouseEnter}
+                  onMouseLeave={handleReactionActionMouseLeave}
+                >
+                  {REACTION_ITEMS.map((item) => {
+                    const IconComponent = item.Icon;
+                    const isSelected = selectedReaction === item.key;
+
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        className={`${classes.reactionPickerButton} ${isSelected ? classes.reactionPickerButtonActive : ""}`}
+                        onClick={() => handleReactionSelect(item.key)}
+                        aria-label={item.label}
+                      >
+                        <IconComponent
+                          className={classes.reactionPickerIcon}
+                          style={{ color: item.color }}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div
+                className={classes.action__icons}
+                onClick={canInteract ? handleLikeClick : undefined}
+                onTouchStart={canInteract ? handleReactionActionTouchStart : undefined}
+                onTouchEnd={canInteract ? handleReactionActionTouchEnd : undefined}
+                onTouchCancel={canInteract ? handleReactionActionTouchCancel : undefined}
+                style={!canInteract ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
+              >
+                {canInteract && selectedReaction ? (
+                  <ThumbUpAltIcon
+                    style={{
+                      transform: "scaleX(-1)",
+                      color: selectedReactionItem?.color ?? "#2e7d32",
+                    }}
+                  />
+                ) : (
+                  <ThumbUpAltOutlinedIcon style={{ transform: "scaleX(-1)" }} />
+                )}
+                <h4
+                  style={
+                    canInteract && selectedReaction
+                      ? { color: selectedReactionItem?.color ?? "#2e7d32" }
+                      : undefined
+                  }
+                >
+                  {selectedReactionItem?.label ?? "Like"}
+                </h4>
+              </div>
+            </div>
             <div
               className={classes.action__icons}
-              onClick={canInteract ? handleLikeClick : undefined}
-              style={!canInteract ? { opacity: 0.45, cursor: "not-allowed", pointerEvents: "none" } : undefined}
+              onClick={() => setShowComments((prev) => !prev)}
             >
-              {canInteract && isLiked ? (
-                <ThumbUpAltIcon style={{ transform: "scaleX(-1)", color: "#2e7d32" }} />
-              ) : (
-                <ThumbUpAltOutlinedIcon style={{ transform: "scaleX(-1)" }} />
-              )}
-              <h4 style={canInteract && isLiked ? { color: "#2e7d32" } : undefined}>Like</h4>
-            </div>
-            <div className={classes.action__icons} onClick={() => setShowComments((prev) => !prev)}>
               <CommentOutlinedIcon style={showComments ? { color: "#2e7d32" } : undefined} />
               <h4 style={showComments ? { color: "#2e7d32" } : undefined}>Comment</h4>
             </div>
