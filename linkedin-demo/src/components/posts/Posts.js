@@ -2,6 +2,8 @@ import React from "react";
 import { useQuery } from "convex/react";
 import { makeStyles } from "@material-ui/core/styles";
 import Typography from "@material-ui/core/Typography";
+import Tabs from "@material-ui/core/Tabs";
+import Tab from "@material-ui/core/Tab";
 import FlipMove from "react-flip-move";
 import Post from "./post/Post";
 import { DEFAULT_PHOTO } from "../../constants";
@@ -12,7 +14,8 @@ import LoadingGate from "../LoadingGate";
 
 const Posts = ({ onNavigateProfile }) => {
   const classes = Style();
-  const posts = useConvexPosts();
+  const [sortBy, setSortBy] = React.useState("recent");
+  const posts = useConvexPosts(sortBy);
   const user = useConvexUser();
   const isLoading = posts === undefined;
 
@@ -55,6 +58,20 @@ const Posts = ({ onNavigateProfile }) => {
 
   return (
     <div className={classes.posts}>
+      <div className={classes.feedSort}>
+        <Tabs
+          value={sortBy}
+          onChange={(_, nextSortBy) => setSortBy(nextSortBy)}
+          indicatorColor="primary"
+          textColor="primary"
+          variant="fullWidth"
+          aria-label="Feed sort"
+        >
+          <Tab value="recent" label="Recent" className={classes.sortTab} />
+          <Tab value="top" label="Top" className={classes.sortTab} />
+          <Tab value="following" label="Following" className={classes.sortTab} />
+        </Tabs>
+      </div>
       <LoadingGate isLoading={isLoading}>
         {posts?.length === 0 ? (
           <Typography variant="body2" color="textSecondary">
@@ -92,13 +109,26 @@ const Posts = ({ onNavigateProfile }) => {
   );
 };
 
-const Style = makeStyles(() => ({
+const Style = makeStyles((theme) => ({
   posts: {
     width: "100%",
     height: "100%",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
+  },
+  feedSort: {
+    width: "100%",
+    borderRadius: 10,
+    marginBottom: 10,
+    background: theme.palette.background.paper,
+    border: `1px solid ${theme.palette.divider}`,
+    overflow: "hidden",
+  },
+  sortTab: {
+    minHeight: 44,
+    fontWeight: 600,
+    textTransform: "none",
   },
 }));
 
