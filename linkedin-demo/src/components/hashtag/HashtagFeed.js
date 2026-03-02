@@ -76,6 +76,9 @@ const HashtagFeed = ({ tag, onNavigateProfile }) => {
               timestamp={post.createdAt}
               isEdited={Boolean(post.isEdited)}
               description={post.description}
+              postType={post.type ?? "post"}
+              articleTitle={post.articleTitle}
+              articleBody={post.articleBody}
               fileType={post.fileType}
               fileData={post.fileData}
               imageUrls={post.imageUrls}

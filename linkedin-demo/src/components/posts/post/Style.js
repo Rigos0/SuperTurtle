@@ -120,6 +120,65 @@ export default makeStyles((theme) => ({
       wordBreak: "break-word",
     },
   },
+  body__article: {
+    width: "100%",
+    padding: "8px 10px 10px",
+  },
+  articleCard: {
+    width: "100%",
+    border: `1px solid ${theme.palette.type === "dark" ? "#2f6f34" : "#cfe3d1"}`,
+    background:
+      theme.palette.type === "dark"
+        ? "linear-gradient(135deg, rgba(46, 125, 50, 0.2), rgba(31, 36, 42, 0.9))"
+        : "linear-gradient(135deg, #f2f8f3, #ffffff)",
+    borderRadius: 10,
+    padding: "12px 14px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 8,
+    textAlign: "left",
+    cursor: "pointer",
+    transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+    "&:hover": {
+      borderColor: "#2e7d32",
+      boxShadow: "0 0 0 1px rgba(46, 125, 50, 0.2)",
+    },
+    "&:focus-visible": {
+      outline: `2px solid ${theme.palette.primary.main}`,
+      outlineOffset: 2,
+    },
+  },
+  articleBadge: {
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    color: theme.palette.type === "dark" ? "#a5d6a7" : "#2e7d32",
+  },
+  articleTitle: {
+    margin: 0,
+    fontSize: 20,
+    lineHeight: 1.25,
+    fontWeight: 700,
+    color: theme.palette.type === "dark" ? "lightgrey" : "#1d2226",
+    wordBreak: "break-word",
+  },
+  articlePreview: {
+    margin: 0,
+    fontSize: 14,
+    lineHeight: 1.5,
+    color: theme.palette.type === "dark" ? "#c5d0d5" : "#4f5b67",
+    display: "-webkit-box",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: 3,
+    overflow: "hidden",
+  },
+  articleCta: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: theme.palette.type === "dark" ? "#81c784" : "#2e7d32",
+  },
   hashtag: {
     color: theme.palette.type === "dark" ? "#81c784" : "#2e7d32",
     cursor: "pointer",

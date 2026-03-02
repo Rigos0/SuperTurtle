@@ -57,6 +57,9 @@ const SavedPosts = ({ onNavigateProfile }) => {
               username={post.author?.displayName ?? "Unknown user"}
               timestamp={post.createdAt}
               description={post.description}
+              postType={post.type ?? "post"}
+              articleTitle={post.articleTitle}
+              articleBody={post.articleBody}
               fileType={post.fileType}
               fileData={post.fileData}
               imageUrls={post.imageUrls}

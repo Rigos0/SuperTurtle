@@ -106,6 +106,27 @@ const REACTION_ITEM_BY_KEY = REACTION_ITEMS.reduce((accumulator, item) => {
 }, {});
 const HASHTAG_REGEX = /(^|[^a-zA-Z0-9_])(#([a-zA-Z0-9_]+))/g;
 const MENTION_REGEX = /(^|[^a-z0-9-])(@([a-z0-9]+(?:-[a-z0-9]+)*))/gi;
+const ARTICLE_PREVIEW_MAX_LENGTH = 240;
+
+const buildArticlePreview = (body, fallbackDescription) => {
+  const source =
+    typeof body === "string" && body.trim().length > 0
+      ? body
+      : typeof fallbackDescription === "string"
+        ? fallbackDescription
+        : "";
+  const compactText = source.replace(/\s+/g, " ").trim();
+
+  if (!compactText) {
+    return "";
+  }
+
+  if (compactText.length <= ARTICLE_PREVIEW_MAX_LENGTH) {
+    return compactText;
+  }
+
+  return `${compactText.slice(0, ARTICLE_PREVIEW_MAX_LENGTH).trimEnd()}...`;
+};
 
 const Post = forwardRef(
   (
@@ -123,6 +144,9 @@ const Post = forwardRef(
       timestamp,
       isEdited = false,
       description,
+      postType = "post",
+      articleTitle,
+      articleBody,
       fileType,
       fileData,
       imageUrls,
@@ -268,6 +292,15 @@ const Post = forwardRef(
       Boolean(isRepost && originalPost) &&
       typeof onNavigateProfile === "function" &&
       Boolean(originalPost?.authorId || originalPost?.author?.username);
+    const isArticlePost = !isRepost && postType === "article";
+    const normalizedArticleTitle =
+      typeof articleTitle === "string" && articleTitle.trim().length > 0
+        ? articleTitle.trim()
+        : "Untitled article";
+    const articlePreview = React.useMemo(
+      () => buildArticlePreview(articleBody, description),
+      [articleBody, description],
+    );
     const hasDescription = typeof description === "string" && description.trim().length > 0;
     const originalAuthorDisplayName = originalPost?.author?.displayName ?? "Unknown user";
 
@@ -650,8 +683,14 @@ const Post = forwardRef(
       }
     };
     const handleEditedBadgeClick = (event) => {
-      // Edit history dialog wiring is added in a follow-up task.
       event.preventDefault();
+    };
+    const handleArticleOpen = () => {
+      if (!isArticlePost) {
+        return;
+      }
+
+      navigate(`/article/${postId}`);
     };
     const renderTextWithMentions = (value, segmentIndex) => {
       if (typeof value !== "string" || value.length === 0) {
@@ -934,71 +973,87 @@ const Post = forwardRef(
             )}
           </div>
           <div className={classes.post__body}>
-            {(isEditing || hasDescription) && (
+            {isEditing && (
               <div className={classes.body__description}>
-                {isEditing ? (
-                  <div style={{ width: "100%" }}>
-                    <textarea
-                      className={classes.editTextarea}
-                      value={editText}
-                      onChange={(event) => setEditText(event.target.value)}
-                      rows={3}
-                      aria-label="Edit post description"
-                    />
-                    <div className={classes.editActions}>
-                      <button
-                        type="button"
-                        className={classes.saveButton}
-                        onClick={handleEditSave}
-                        disabled={!editText.trim()}
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        className={classes.cancelButton}
-                        onClick={handleEditCancel}
-                      >
-                        Cancel
-                      </button>
-                    </div>
+                <div style={{ width: "100%" }}>
+                  <textarea
+                    className={classes.editTextarea}
+                    value={editText}
+                    onChange={(event) => setEditText(event.target.value)}
+                    rows={3}
+                    aria-label="Edit post description"
+                  />
+                  <div className={classes.editActions}>
+                    <button
+                      type="button"
+                      className={classes.saveButton}
+                      onClick={handleEditSave}
+                      disabled={!editText.trim()}
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      className={classes.cancelButton}
+                      onClick={handleEditCancel}
+                    >
+                      Cancel
+                    </button>
                   </div>
-                ) : (
-                  <p>
-                    {descriptionSegments.length === 0
-                      ? description
-                      : descriptionSegments.map((segment, index) => {
-                        if (segment.type !== "hashtag") {
-                          return (
-                            <React.Fragment key={`text-${index}`}>
-                              {renderTextWithMentions(segment.value, index)}
-                            </React.Fragment>
-                          );
-                        }
-
-                        return (
-                          <span
-                            key={`hashtag-${index}`}
-                            role="link"
-                            tabIndex={0}
-                            className={classes.hashtag}
-                            onClick={() => handleHashtagClick(segment.tag)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault();
-                                handleHashtagClick(segment.tag);
-                              }
-                            }}
-                          >
-                            {segment.value}
-                          </span>
-                        );
-                      })}
-                  </p>
-                )}
+                </div>
               </div>
             )}
-            {!isEditing && linkPreview && hasDescription && (
+            {!isEditing && isArticlePost && (
+              <div className={classes.body__article}>
+                <button
+                  type="button"
+                  className={classes.articleCard}
+                  onClick={handleArticleOpen}
+                  aria-label={`Open article ${normalizedArticleTitle}`}
+                >
+                  <span className={classes.articleBadge}>Article</span>
+                  <h5 className={classes.articleTitle}>{normalizedArticleTitle}</h5>
+                  {articlePreview && <p className={classes.articlePreview}>{articlePreview}</p>}
+                  <span className={classes.articleCta}>Read article</span>
+                </button>
+              </div>
+            )}
+            {!isEditing && !isArticlePost && hasDescription && (
+              <div className={classes.body__description}>
+                <p>
+                  {descriptionSegments.length === 0
+                    ? description
+                    : descriptionSegments.map((segment, index) => {
+                      if (segment.type !== "hashtag") {
+                        return (
+                          <React.Fragment key={`text-${index}`}>
+                            {renderTextWithMentions(segment.value, index)}
+                          </React.Fragment>
+                        );
+                      }
+
+                      return (
+                        <span
+                          key={`hashtag-${index}`}
+                          role="link"
+                          tabIndex={0}
+                          className={classes.hashtag}
+                          onClick={() => handleHashtagClick(segment.tag)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              handleHashtagClick(segment.tag);
+                            }
+                          }}
+                        >
+                          {segment.value}
+                        </span>
+                      );
+                    })}
+                </p>
+              </div>
+            )}
+            {!isEditing && !isArticlePost && linkPreview && hasDescription && (
               <div className={classes.body__linkPreview}>
                 <a
                   className={classes.linkPreviewCard}
@@ -1011,7 +1066,7 @@ const Post = forwardRef(
                 </a>
               </div>
             )}
-            {!isEditing && !isRepost && <PollDisplay postId={postId} />}
+            {!isEditing && !isRepost && !isArticlePost && <PollDisplay postId={postId} />}
             {isRepost && originalPost && (
               <div className={classes.repost__embed}>
                 <div className={classes.repost__embedHeader}>

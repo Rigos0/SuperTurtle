@@ -1,5 +1,5 @@
 ## Current Task
-Render articles in feed with title + truncated preview (different card style from regular posts).
+Run `cd linkedin-demo && npx convex dev --once` to push schema.
 
 ## End Goal with Specs
 Item 32 from Phase 2: Long-form article posts with rich text editing and dedicated article view page.
@@ -16,8 +16,8 @@ Item 32 from Phase 2: Long-form article posts with rich text editing and dedicat
 - [x] Add `/write-article` route in App.js and "Write article" button near post composer
 - [x] Create article view page `linkedin-demo/src/components/articles/ArticleView.js` — full-page layout with title, author info, body, reactions
 - [x] Add `/article/:id` route in App.js
-- [ ] Render articles in feed with title + truncated preview (different card style from regular posts) <- current
-- [ ] Run `cd linkedin-demo && npx convex dev --once` to push schema
+- [x] Render articles in feed with title + truncated preview (different card style from regular posts)
+- [ ] Run `cd linkedin-demo && npx convex dev --once` to push schema <- current
 - [ ] Test and commit
 
 ## Notes
