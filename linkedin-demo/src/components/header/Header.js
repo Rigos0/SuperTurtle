@@ -14,12 +14,17 @@ import {
 } from "@material-ui/core";
 import SearchIcon from "@material-ui/icons/Search";
 import HomeIcon from "@material-ui/icons/Home";
+import HomeOutlinedIcon from "@material-ui/icons/HomeOutlined";
 import GroupIcon from "@material-ui/icons/Group";
 import TelegramIcon from "@material-ui/icons/Telegram";
 import NotificationsIcon from "@material-ui/icons/Notifications";
-import Brightness4Icon from "@material-ui/icons/Brightness4";
-import BrightnessHighIcon from "@material-ui/icons/BrightnessHigh";
+import NotificationsOutlinedIcon from "@material-ui/icons/NotificationsOutlined";
+import PeopleAltOutlinedIcon from "@material-ui/icons/PeopleAltOutlined";
+import ForumOutlinedIcon from "@material-ui/icons/ForumOutlined";
+import NightsStayOutlinedIcon from "@material-ui/icons/NightsStayOutlined";
+import WbSunnyOutlinedIcon from "@material-ui/icons/WbSunnyOutlined";
 import PersonIcon from "@material-ui/icons/Person";
+import PersonOutlineIcon from "@material-ui/icons/PersonOutline";
 import { api } from "../../convex/_generated/api";
 import useConvexUser from "../../hooks/useConvexUser";
 import MenuItem from "./menuItem/MenuItem";
@@ -134,30 +139,40 @@ const Header = ({
     }, 100);
   };
 
+  const isHomeActive = activeTab === "home";
+  const isNetworkActive = activeTab === "network";
+  const isMessagingActive = activeTab === "messaging";
+  const isNotificationsActive = activeTab === "notifications";
+  const notificationsNavIcon = isNotificationsActive ? (
+    <NotificationsIcon />
+  ) : (
+    <NotificationsOutlinedIcon />
+  );
+
   const items = [
     {
       key: "home",
-      Icon: <HomeIcon />,
+      Icon: isHomeActive ? <HomeIcon /> : <HomeOutlinedIcon />,
       title: "Home",
       arrow: false,
       onClick: () => setActiveTab("home"),
-      isActive: activeTab === "home",
+      isActive: isHomeActive,
     },
     {
       key: "network",
-      Icon: <GroupIcon />,
+      Icon: <PeopleAltOutlinedIcon />,
       title: "My Network",
       arrow: false,
       onClick: () => setActiveTab("network"),
-      isActive: activeTab === "network",
+      isActive: isNetworkActive,
     },
     {
       key: "messaging",
-      Icon: <TelegramIcon />,
+      Icon: <ForumOutlinedIcon />,
       title: "Messaging",
       arrow: false,
       onClick: () => setActiveTab("messaging"),
-      isActive: activeTab === "messaging",
+      isActive: isMessagingActive,
     },
     {
       key: "notifications",
@@ -168,15 +183,15 @@ const Header = ({
           invisible={!unreadCount}
           anchorOrigin={{ vertical: "top", horizontal: "right" }}
         >
-          <NotificationsIcon />
+          {notificationsNavIcon}
         </Badge>
       ) : (
-        <NotificationsIcon />
+        notificationsNavIcon
       ),
       title: "Notifications",
       arrow: false,
       onClick: () => setActiveTab("notifications"),
-      isActive: activeTab === "notifications",
+      isActive: isNotificationsActive,
     },
     isAuthenticated
       ? {
@@ -193,7 +208,7 @@ const Header = ({
         }
       : {
           key: "sign-in",
-          Icon: <PersonIcon />,
+          Icon: <PersonOutlineIcon />,
           title: "Sign In",
           arrow: false,
           onClick: () => onSignInClick?.(),
@@ -389,7 +404,7 @@ const Header = ({
           ))}
           <div className={classes.headerNavItem}>
             <MenuItem
-              Icon={mode ? <Brightness4Icon /> : <BrightnessHighIcon />}
+              Icon={mode ? <NightsStayOutlinedIcon /> : <WbSunnyOutlinedIcon />}
               title={"Theme"}
               onClick={() => dispatch(ChangeTheme())}
             />
