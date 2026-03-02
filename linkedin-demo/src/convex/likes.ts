@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 const REACTION_TYPES = [
   "like",
@@ -34,10 +35,14 @@ const buildEmptyReactionCounts = (): ReactionCounts => ({
 
 export const toggleLike = mutation({
   args: {
-    userId: v.id("users"),
     postId: v.id("posts"),
   },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
     const post = await ctx.db.get(args.postId);
     if (!post) {
       throw new Error("Post not found");
@@ -47,7 +52,7 @@ export const toggleLike = mutation({
       .query("likes")
       .filter((q) =>
         q.and(
-          q.eq(q.field("userId"), args.userId),
+          q.eq(q.field("userId"), userId),
           q.eq(q.field("postId"), args.postId),
         ),
       )
@@ -62,7 +67,7 @@ export const toggleLike = mutation({
     }
 
     await ctx.db.insert("likes", {
-      userId: args.userId,
+      userId,
       postId: args.postId,
     });
     await ctx.db.patch(args.postId, {
@@ -71,7 +76,7 @@ export const toggleLike = mutation({
     await ctx.runMutation(internal.notifications.createNotification, {
       userId: post.authorId,
       type: "like",
-      fromUserId: args.userId,
+      fromUserId: userId,
       postId: args.postId,
     });
 
