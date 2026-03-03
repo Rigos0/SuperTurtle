@@ -80,6 +80,37 @@ function ask(question) {
   });
 }
 
+function pickAvailablePath(basePath) {
+  if (!fs.existsSync(basePath)) return basePath;
+  let suffix = 2;
+  while (fs.existsSync(`${basePath}-${suffix}`)) {
+    suffix += 1;
+  }
+  return `${basePath}-${suffix}`;
+}
+
+function copyDirFiltered(sourceDir, targetDir) {
+  fs.mkdirSync(targetDir, { recursive: true });
+  const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (
+      entry.name === ".DS_Store" ||
+      entry.name === "settings.local.json" ||
+      entry.name === "agent-memory"
+    ) {
+      continue;
+    }
+    const sourcePath = resolve(sourceDir, entry.name);
+    const targetPath = resolve(targetDir, entry.name);
+    if (entry.isDirectory()) {
+      copyDirFiltered(sourcePath, targetPath);
+      continue;
+    }
+    if (fs.existsSync(targetPath)) continue;
+    fs.copyFileSync(sourcePath, targetPath);
+  }
+}
+
 async function init() {
   const cwd = process.cwd();
   const dataDir = resolve(cwd, ".superturtle");
@@ -146,6 +177,28 @@ async function init() {
   if (!fs.existsSync(claudeMdPath) && fs.existsSync(templatePath)) {
     fs.copyFileSync(templatePath, claudeMdPath);
     console.log("Created CLAUDE.md from template");
+  }
+
+  // Create AGENTS.md symlink -> CLAUDE.md if missing
+  const agentsPath = resolve(cwd, "AGENTS.md");
+  if (!fs.existsSync(agentsPath)) {
+    try {
+      fs.symlinkSync("CLAUDE.md", agentsPath);
+      console.log("Created AGENTS.md symlink");
+    } catch (error) {
+      console.warn(`Warning: could not create AGENTS.md symlink: ${error.message}`);
+    }
+  }
+
+  // Copy .claude templates into the project (or a prefixed directory if .claude exists)
+  const claudeTemplateDir = resolve(TEMPLATES_DIR, ".claude");
+  if (fs.existsSync(claudeTemplateDir)) {
+    let targetClaudeDir = resolve(cwd, ".claude");
+    if (fs.existsSync(targetClaudeDir)) {
+      targetClaudeDir = pickAvailablePath(resolve(cwd, ".superturtle-claude"));
+    }
+    copyDirFiltered(claudeTemplateDir, targetClaudeDir);
+    console.log(`Installed Claude config into ${targetClaudeDir.replace(cwd + "/", "")}`);
   }
 
   // Add .superturtle/ and .subturtles/ to project .gitignore

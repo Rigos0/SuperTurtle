@@ -40,6 +40,7 @@
     "subturtle/subturtle_loop/agents.py",
     "state/run_state_writer.py",
     "templates/",
+    "templates/.claude/",
     "setup",
     "LICENSE",
     "README.md"
