@@ -55,7 +55,7 @@ Loop types:
 
 - **yolo** — single Claude Code call per iteration. Fast, autonomous ralph loop. The default for most tasks.
 - **slow** — plan, groom, execute, review. Four agent calls per iteration. More careful, better for complex or risky work.
-- **yolo-codex** — same as yolo but runs Codex instead of Claude. (beta)
+- **yolo-codex** — same as yolo but runs Codex instead of Claude.
 
 ## Architecture
 
