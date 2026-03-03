@@ -1,5 +1,5 @@
 ## Current Task
-Write the review report to `docs/reviews/npm-package-review.md`.
+No current task — backlog complete.
 
 ## End Goal with Specs
 A markdown report at `docs/reviews/npm-package-review.md` covering:
@@ -21,8 +21,11 @@ Run `npm pack --dry-run` from `super_turtle/` to see the exact file list.
 - [x] Check templates (.env.example, CLAUDE.md.template) for completeness
 - [x] Spot-check key source files for hardcoded paths or issues
 - [x] Review package.json fields
-- [ ] Write the review report to `docs/reviews/npm-package-review.md` <- current
-- [ ] Commit the report
+- [x] Write the review report to `docs/reviews/npm-package-review.md`
+- [x] Commit the report
+
+## Loop Control
+STOP
 
 ## Notes
 - Package root is `super_turtle/` (that's where package.json lives)
