@@ -38,6 +38,7 @@
     "subturtle/claude-md-guard/README.md",
     "subturtle/subturtle_loop/__main__.py",
     "subturtle/subturtle_loop/agents.py",
+    "state/run_state_writer.py",
     "templates/",
     "setup",
     "LICENSE",
