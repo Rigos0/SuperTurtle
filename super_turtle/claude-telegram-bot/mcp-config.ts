@@ -15,9 +15,11 @@ export const MCP_SERVERS: Record<
   "send-turtle": {
     command: "bun",
     args: ["run", `${REPO_ROOT}/send_turtle_mcp/server.ts`],
+    env: { SUPERTURTLE_IPC_DIR: process.env.SUPERTURTLE_IPC_DIR || "" },
   },
   "bot-control": {
     command: "bun",
     args: ["run", `${REPO_ROOT}/bot_control_mcp/server.ts`],
+    env: { SUPERTURTLE_IPC_DIR: process.env.SUPERTURTLE_IPC_DIR || "" },
   },
 };

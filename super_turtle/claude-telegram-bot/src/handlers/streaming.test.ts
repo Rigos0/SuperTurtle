@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { mkdirSync } from "fs";
 
 process.env.TELEGRAM_BOT_TOKEN ||= "test-token";
 process.env.TELEGRAM_ALLOWED_USERS ||= "123";
@@ -6,6 +7,8 @@ process.env.CLAUDE_WORKING_DIR ||= process.cwd();
 
 const { createAskUserKeyboard, isAskUserPromptMessage, checkPendingPinoLogsRequests } = await import("./streaming");
 const { PINO_LOG_PATH } = await import("../logger");
+const { IPC_DIR } = await import("../config");
+mkdirSync(IPC_DIR, { recursive: true });
 
 async function withTempPinoLogs(lines: string[], fn: () => Promise<void>) {
   const file = Bun.file(PINO_LOG_PATH);
@@ -94,7 +97,7 @@ describe("checkPendingPinoLogsRequests()", () => {
 
     await withTempPinoLogs(logLines, async () => {
       const requestId = "pino-logs-test-error";
-      const requestFile = `/tmp/pino-logs-${requestId}.json`;
+      const requestFile = `${IPC_DIR}/pino-logs-${requestId}.json`;
       const request = {
         request_id: requestId,
         level: "error",
@@ -126,7 +129,7 @@ describe("checkPendingPinoLogsRequests()", () => {
 
     await withTempPinoLogs(logLines, async () => {
       const requestId = "pino-logs-test-warn";
-      const requestFile = `/tmp/pino-logs-${requestId}.json`;
+      const requestFile = `${IPC_DIR}/pino-logs-${requestId}.json`;
       const request = {
         request_id: requestId,
         levels: ["warn"],

@@ -134,7 +134,7 @@ describe("/restart self-reexec", () => {
     expect(result.payload?.replies).toEqual(["🔄 Restarting bot..."]);
     expect(
       result.payload?.writes.some(
-        (entry) => entry.path.endsWith("claude-telegram-restart.json") || entry.path.endsWith(".restart-pending.json")
+        (entry) => entry.path.endsWith("-restart.json") || entry.path.endsWith(".restart-pending.json")
       )
     ).toBe(true);
 

@@ -15,6 +15,7 @@ import {
   CODEX_USER_ENABLED,
   WORKING_DIR,
   CTL_PATH,
+  IPC_DIR,
 } from "../config";
 import { isAuthorized } from "../security";
 import { auditLog, startTypingIndicator } from "../utils";
@@ -352,7 +353,7 @@ export async function handleCallback(ctx: Context): Promise<void> {
   const optionIndex = Number.parseInt(optionIndexRaw, 10);
 
   // 9. Load request file
-  const requestFile = `/tmp/ask-user-${requestId}.json`;
+  const requestFile = `${IPC_DIR}/ask-user-${requestId}.json`;
   let requestData: {
     question: string;
     options: string[];
@@ -740,7 +741,7 @@ async function handlePinologsCallback(
   const requestId = `pinologs-callback-${Date.now()}-${Math.random()
     .toString(36)
     .slice(2, 10)}`;
-  const requestFile = `/tmp/pino-logs-${requestId}.json`;
+  const requestFile = `${IPC_DIR}/pino-logs-${requestId}.json`;
 
   try {
     await ctx.answerCallbackQuery({ text: `Fetching ${level} logs...` });

@@ -22,6 +22,7 @@ import {
   THINKING_DEEP_KEYWORDS,
   THINKING_KEYWORDS,
   TOKEN_PREFIX,
+  IPC_DIR,
   WORKING_DIR,
 } from "./config";
 import { formatToolStatus } from "./formatting";
@@ -59,6 +60,7 @@ interface StreamJsonEvent {
 }
 
 // Write MCP config to a temp JSON file for --mcp-config flag
+process.env.SUPERTURTLE_IPC_DIR = IPC_DIR;
 const MCP_CONFIG_FILE = `/tmp/superturtle-${TOKEN_PREFIX}-mcp-config.json`;
 if (Object.keys(MCP_SERVERS).length > 0) {
   try {

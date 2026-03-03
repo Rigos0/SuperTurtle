@@ -16,10 +16,10 @@ import {
   CODEX_AVAILABLE,
   CODEX_CLI_AVAILABLE,
   CODEX_USER_ENABLED,
-  TELEGRAM_TOKEN,
   TOKEN_PREFIX,
+  IPC_DIR,
 } from "./config";
-import { unlinkSync, readFileSync, existsSync, writeFileSync, openSync, closeSync } from "fs";
+import { unlinkSync, readFileSync, existsSync, writeFileSync, openSync, closeSync, mkdirSync } from "fs";
 import {
   handleNew,
   handleStatus,
@@ -930,6 +930,7 @@ if (!CLAUDE_CLI_AVAILABLE) {
   process.exit(1);
 }
 
+mkdirSync(IPC_DIR, { recursive: true });
 const releaseInstanceLock = acquireInstanceLockOrExit();
 
 // Get bot info first

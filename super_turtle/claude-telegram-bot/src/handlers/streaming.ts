@@ -19,6 +19,7 @@ import {
   CODEX_ENABLED,
   CODEX_USER_ENABLED,
   RESTART_FILE,
+  IPC_DIR,
 } from "../config";
 import { session, type ClaudeSession } from "../session";
 import { codexSession, type CodexSession } from "../codex-session";
@@ -87,8 +88,8 @@ export async function checkPendingAskUserRequests(
   const glob = new Bun.Glob("ask-user-*.json");
   let buttonsSent = false;
 
-  for await (const filename of glob.scan({ cwd: "/tmp", absolute: false })) {
-    const filepath = `/tmp/${filename}`;
+  for await (const filename of glob.scan({ cwd: IPC_DIR, absolute: false })) {
+    const filepath = `${IPC_DIR}/${filename}`;
     try {
       const file = Bun.file(filepath);
       const text = await file.text();
@@ -131,8 +132,8 @@ export async function checkPendingSendTurtleRequests(
   const glob = new Bun.Glob("send-turtle-*.json");
   let photoSent = false;
 
-  for await (const filename of glob.scan({ cwd: "/tmp", absolute: false })) {
-    const filepath = `/tmp/${filename}`;
+  for await (const filename of glob.scan({ cwd: IPC_DIR, absolute: false })) {
+    const filepath = `${IPC_DIR}/${filename}`;
     try {
       const file = Bun.file(filepath);
       const text = await file.text();
@@ -189,8 +190,8 @@ export async function checkPendingBotControlRequests(
   const glob = new Bun.Glob("bot-control-*.json");
   let handled = false;
 
-  for await (const filename of glob.scan({ cwd: "/tmp", absolute: false })) {
-    const filepath = `/tmp/${filename}`;
+  for await (const filename of glob.scan({ cwd: IPC_DIR, absolute: false })) {
+    const filepath = `${IPC_DIR}/${filename}`;
     try {
       const file = Bun.file(filepath);
       const text = await file.text();
@@ -316,8 +317,8 @@ export async function checkPendingPinoLogsRequests(
   const glob = new Bun.Glob("pino-logs-*.json");
   let handled = false;
 
-  for await (const filename of glob.scan({ cwd: "/tmp", absolute: false })) {
-    const filepath = `/tmp/${filename}`;
+  for await (const filename of glob.scan({ cwd: IPC_DIR, absolute: false })) {
+    const filepath = `${IPC_DIR}/${filename}`;
     try {
       const file = Bun.file(filepath);
       const text = await file.text();

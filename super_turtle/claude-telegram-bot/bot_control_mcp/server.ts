@@ -23,6 +23,7 @@ const POLL_INTERVAL_MS = 100;
 const POLL_TIMEOUT_MS = 10_000;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;
+const IPC_DIR = process.env.SUPERTURTLE_IPC_DIR || "/tmp";
 
 const VALID_ACTIONS = [
   "usage",
@@ -219,7 +220,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       created_at: new Date().toISOString(),
     };
 
-    const requestFile = `/tmp/ask-user-${requestUuid}.json`;
+    const requestFile = `${IPC_DIR}/ask-user-${requestUuid}.json`;
     await Bun.write(requestFile, JSON.stringify(requestData, null, 2));
 
     return {
@@ -269,7 +270,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       created_at: new Date().toISOString(),
     };
 
-    const requestFile = `/tmp/pino-logs-${requestUuid}.json`;
+    const requestFile = `${IPC_DIR}/pino-logs-${requestUuid}.json`;
     await Bun.write(requestFile, JSON.stringify(requestData, null, 2));
 
     const result = await pollForResult(requestFile);
@@ -307,7 +308,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     created_at: new Date().toISOString(),
   };
 
-  const requestFile = `/tmp/bot-control-${requestUuid}.json`;
+  const requestFile = `${IPC_DIR}/bot-control-${requestUuid}.json`;
   await Bun.write(requestFile, JSON.stringify(requestData, null, 2));
 
   // Poll for the bot to process and write a result

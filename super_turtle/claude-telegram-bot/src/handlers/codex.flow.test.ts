@@ -27,6 +27,7 @@ const callbackPath = resolve(import.meta.dir, "callback.ts");
 const sessionPath = resolve(import.meta.dir, "../session.ts");
 const codexPath = resolve(import.meta.dir, "../codex-session.ts");
 const marker = "__CODEX_FLOW_PROBE__=";
+const IPC_DIR = "/tmp/superturtle-test-token";
 
 async function probeCodexFlow(): Promise<CodexFlowResult> {
   const env: Record<string, string> = {
@@ -37,15 +38,20 @@ async function probeCodexFlow(): Promise<CodexFlowResult> {
     CODEX_ENABLED: "true",
     CODEX_CLI_AVAILABLE_OVERRIDE: "true",
     HOME: process.env.HOME || "/tmp",
+    SUPERTURTLE_IPC_DIR: IPC_DIR,
   };
 
   const script = `
-    const marker = ${JSON.stringify(marker)};
-    const commandsPath = ${JSON.stringify(commandsPath)};
-    const textPath = ${JSON.stringify(textPath)};
-    const callbackPath = ${JSON.stringify(callbackPath)};
-    const sessionPath = ${JSON.stringify(sessionPath)};
-    const codexPath = ${JSON.stringify(codexPath)};
+	    const marker = ${JSON.stringify(marker)};
+	    const commandsPath = ${JSON.stringify(commandsPath)};
+	    const textPath = ${JSON.stringify(textPath)};
+	    const callbackPath = ${JSON.stringify(callbackPath)};
+	    const sessionPath = ${JSON.stringify(sessionPath)};
+	    const codexPath = ${JSON.stringify(codexPath)};
+
+	    const ipcDir = process.env.SUPERTURTLE_IPC_DIR || "/tmp";
+	    const { mkdirSync } = await import("fs");
+	    mkdirSync(ipcDir, { recursive: true });
 
     const { handleSwitch, handleModel, handleResume } = await import(commandsPath);
     const { handleText } = await import(textPath);
@@ -107,8 +113,8 @@ async function probeCodexFlow(): Promise<CodexFlowResult> {
       },
     });
 
-    const askUserFile = "/tmp/ask-user-codex-flow-test.json";
-    const botControlFile = "/tmp/bot-control-codex-flow-test.json";
+	    const askUserFile = \`\${ipcDir}/ask-user-codex-flow-test.json\`;
+	    const botControlFile = \`\${ipcDir}/bot-control-codex-flow-test.json\`;
 
     const originalStartNewThread = codexSession.startNewThread;
     const originalSendMessage = codexSession.sendMessage;

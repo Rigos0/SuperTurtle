@@ -19,6 +19,7 @@ import { dirname, resolve } from "path";
 import { mcpLog } from "../src/logger";
 
 const sendTurtleLog = mcpLog.child({ tool: "send_turtle", server: "send-turtle" });
+const IPC_DIR = process.env.SUPERTURTLE_IPC_DIR || "/tmp";
 
 // Load turtle combo lookup table (emoji codepoint → gstatic URL)
 const COMBOS_PATH = resolve(dirname(import.meta.path), "turtle-combos.json");
@@ -182,7 +183,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     created_at: new Date().toISOString(),
   };
 
-  const requestFile = `/tmp/send-turtle-${requestUuid}.json`;
+  const requestFile = `${IPC_DIR}/send-turtle-${requestUuid}.json`;
   await Bun.write(requestFile, JSON.stringify(requestData, null, 2));
 
   return {
