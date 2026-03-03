@@ -32,6 +32,7 @@ import {
   handleCron,
   handleDebug,
   handleRestart,
+  handleStopCommand,
   handleText,
   handleVoice,
   handlePhoto,
@@ -579,6 +580,7 @@ bot.use(
 // ============== Command Handlers ==============
 
 bot.command("new", handleNew);
+bot.command("stop", handleStopCommand);
 bot.command("status", handleStatus);
 bot.command("looplogs", handleLooplogs);
 bot.command("pinologs", handlePinologs);

@@ -19,6 +19,39 @@ const DEDUPE_WINDOW_MS = 5000;
 const queues = new Map<number, DeferredMessage[]>();
 const drainingChats = new Set<number>();
 
+/**
+ * When true, drainDeferredQueue() bails immediately.
+ * Set by stop handlers to prevent finally-block drains from processing
+ * queued messages right after the user said stop.
+ */
+let drainSuppressed = false;
+
+/**
+ * Clear all queued messages for a given chat. Returns the number cleared.
+ */
+export function clearDeferredQueue(chatId: number): number {
+  const queue = queues.get(chatId);
+  const count = queue?.length ?? 0;
+  queues.delete(chatId);
+  return count;
+}
+
+/**
+ * Suppress drain — prevents drainDeferredQueue() from processing items.
+ * Called at the start of stop to win the race against finally-block drains.
+ */
+export function suppressDrain(): void {
+  drainSuppressed = true;
+}
+
+/**
+ * Re-enable drain. Called when the next non-stop message starts processing,
+ * so future drains work normally.
+ */
+export function unsuppressDrain(): void {
+  drainSuppressed = false;
+}
+
 export function enqueueDeferredMessage(item: DeferredMessage): number {
   const queue = queues.get(item.chatId) || [];
   const last = queue[queue.length - 1];
@@ -70,13 +103,13 @@ export function getAllDeferredQueues(): Map<number, ReadonlyArray<DeferredMessag
 }
 
 export async function drainDeferredQueue(ctx: Context, chatId: number): Promise<void> {
-  if (drainingChats.has(chatId) || isAnyDriverRunning()) {
+  if (drainSuppressed || drainingChats.has(chatId) || isAnyDriverRunning()) {
     return;
   }
 
   drainingChats.add(chatId);
   try {
-    while (!isAnyDriverRunning()) {
+    while (!isAnyDriverRunning() && !drainSuppressed) {
       const next = dequeueDeferredMessage(chatId);
       if (!next) {
         break;

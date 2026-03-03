@@ -23,8 +23,8 @@ import {
   runMessageWithActiveDriver,
 } from "./driver-routing";
 import { StreamingState, createStatusCallback } from "./streaming";
-import { drainDeferredQueue, enqueueDeferredMessage } from "../deferred-queue";
-import { stopAllRunningWork } from "./stop";
+import { drainDeferredQueue, enqueueDeferredMessage, unsuppressDrain } from "../deferred-queue";
+import { handleStop } from "./stop";
 import { eventLog, streamLog } from "../logger";
 
 const voiceLog = streamLog.child({ handler: "voice" });
@@ -129,10 +129,12 @@ export async function handleVoice(ctx: Context): Promise<void> {
 
     // 9. Voice stop intent should interrupt active runs immediately.
     if (isStopIntent(transcript)) {
-      await stopAllRunningWork();
-      await ctx.reply("🛑 Stopped.");
+      await handleStop(ctx, chatId);
       return;
     }
+
+    // Clear drain suppression so this message's finally block can drain normally.
+    unsuppressDrain();
 
     // 10. If agent is already answering, queue transcript to run after completion.
     if (isBackgroundRunActive()) {

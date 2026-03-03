@@ -1,6 +1,8 @@
+import type { Context } from "grammy";
 import { WORKING_DIR, CTL_PATH } from "../config";
 import { session } from "../session";
 import { stopActiveDriverQuery } from "./driver-routing";
+import { clearDeferredQueue, suppressDrain } from "../deferred-queue";
 import { streamLog } from "../logger";
 const stopLog = streamLog.child({ handler: "stop" });
 
@@ -12,6 +14,7 @@ export interface StopSubturtlesResult {
 
 export interface StopAllRunningWorkResult extends StopSubturtlesResult {
   driverStopResult: "stopped" | "pending" | false;
+  queueCleared: number;
 }
 
 function parseRunningSubturtleNames(output: string): string[] {
@@ -68,12 +71,45 @@ export function stopAllRunningSubturtles(): StopSubturtlesResult {
   };
 }
 
-export async function stopAllRunningWork(): Promise<StopAllRunningWorkResult> {
+export async function stopAllRunningWork(chatId?: number): Promise<StopAllRunningWorkResult> {
+  // Suppress drain FIRST — wins the race against finally-block drains
+  // that fire when we kill the driver process below.
+  suppressDrain();
+
   session.stopTyping();
   const driverStopResult = await stopActiveDriverQuery();
   const subturtleResult = stopAllRunningSubturtles();
+  const queueCleared = chatId != null ? clearDeferredQueue(chatId) : 0;
+
   return {
     driverStopResult,
+    queueCleared,
     ...subturtleResult,
   };
+}
+
+/**
+ * Unified stop handler — used by text "stop", voice "stop", and /stop command.
+ * Kills current work, clears the queue, stops SubTurtles, confirms to user.
+ */
+export async function handleStop(ctx: Context, chatId: number): Promise<void> {
+  const result = await stopAllRunningWork(chatId);
+
+  let message = "🛑 Stopped.";
+  if (result.queueCleared > 0) {
+    message = `🛑 Stopped. Cleared ${result.queueCleared} queued message${result.queueCleared === 1 ? "" : "s"}.`;
+  }
+
+  stopLog.info(
+    {
+      chatId,
+      driverStopResult: result.driverStopResult,
+      subturtlesAttempted: result.attempted.length,
+      subturtlesStopped: result.stopped.length,
+      queueCleared: result.queueCleared,
+    },
+    "Stop executed"
+  );
+
+  await ctx.reply(message);
 }

@@ -146,6 +146,7 @@ describe("stop handlers", () => {
 
     expect(result).toEqual({
       driverStopResult: "stopped",
+      queueCleared: 0,
       attempted: ["alpha", "gamma"],
       stopped: ["alpha"],
       failed: ["gamma"],

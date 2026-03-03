@@ -14,8 +14,8 @@ import {
   isStopIntent,
   startTypingIndicator,
 } from "../utils";
-import { drainDeferredQueue } from "../deferred-queue";
-import { stopAllRunningWork } from "./stop";
+import { drainDeferredQueue, unsuppressDrain } from "../deferred-queue";
+import { handleStop } from "./stop";
 import {
   StreamingState,
   createSilentStatusCallback,
@@ -108,10 +108,12 @@ export async function handleText(
 
   // 1.5. Bare "stop" — intercept and abort (acts like /stop)
   if (isStopIntent(message)) {
-    await stopAllRunningWork();
-    // Don't send "stop" to Claude — just swallow it
+    await handleStop(ctx, chatId);
     return;
   }
+
+  // Clear drain suppression so this message's finally block can drain normally.
+  unsuppressDrain();
 
   // 2. Check for interrupt prefix
   message = await checkInterrupt(message);
