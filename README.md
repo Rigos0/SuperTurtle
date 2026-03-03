@@ -8,7 +8,7 @@
 <p align="center">
   <a href="https://github.com/Rigos0/superturtle/releases"><img src="https://img.shields.io/github/v/release/Rigos0/superturtle?style=flat-square&label=release" alt="Release" /></a>
   <a href="https://www.npmjs.com/package/superturtle"><img src="https://img.shields.io/npm/v/superturtle?style=flat-square&label=npm" alt="npm" /></a>
-  <a href="https://github.com/Rigos0/superturtle/blob/main/super_turtle/LICENSE"><img src="https://img.shields.io/github/license/Rigos0/superturtle?style=flat-square" alt="License" /></a>
+  <a href="https://github.com/Rigos0/superturtle/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Rigos0/superturtle?style=flat-square" alt="License" /></a>
   <a href="https://www.superturtle.dev/docs"><img src="https://img.shields.io/badge/docs-superturtle.dev-blue?style=flat-square" alt="Docs" /></a>
 </p>
 
