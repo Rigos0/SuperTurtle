@@ -228,12 +228,31 @@ function start() {
   const cmd = `cd "${BOT_DIR}" && "${bunPath}" run src/index.ts`;
 
   console.log("Starting Super Turtle bot...");
+
+  function shouldPassEnvKey(k) {
+    return (
+      k.startsWith("TELEGRAM_") ||
+      k.startsWith("OPENAI_") ||
+      k.startsWith("CLAUDE_") ||
+      k.startsWith("CODEX_") ||
+      k.startsWith("META_") ||
+      k.startsWith("DASHBOARD_") ||
+      k.startsWith("AUDIT_LOG_") ||
+      k.startsWith("RATE_LIMIT_") ||
+      k.startsWith("THINKING_") ||
+      k.startsWith("TRANSCRIPTION_") ||
+      k.startsWith("TURTLE_") ||
+      k === "ALLOWED_PATHS" ||
+      k === "LOG_LEVEL"
+    );
+  }
+
   const startProc = spawnSync("tmux", [
     "new-session", "-d", "-s", TMUX_SESSION,
     "-e", `SUPER_TURTLE_DIR=${PACKAGE_ROOT}`,
     "-e", `CLAUDE_WORKING_DIR=${cwd}`,
     ...Object.entries(env)
-      .filter(([k]) => k.startsWith("TELEGRAM_") || k.startsWith("OPENAI_") || k.startsWith("CLAUDE_") || k.startsWith("CODEX_") || k === "ALLOWED_PATHS")
+      .filter(([k]) => shouldPassEnvKey(k))
       .map(([k, v]) => ["-e", `${k}=${v}`])
       .flat(),
     cmd,
