@@ -37,13 +37,34 @@ function exitFromSpawn(result, context) {
   }
 }
 
+// --- Output helpers (ANSI, no dependencies) ---
+const isTTY = process.stdout.isTTY;
+const c = {
+  green: (s) => isTTY ? `\x1b[32m${s}\x1b[0m` : s,
+  dim: (s) => isTTY ? `\x1b[2m${s}\x1b[0m` : s,
+  bold: (s) => isTTY ? `\x1b[1m${s}\x1b[0m` : s,
+  yellow: (s) => isTTY ? `\x1b[33m${s}\x1b[0m` : s,
+  red: (s) => isTTY ? `\x1b[31m${s}\x1b[0m` : s,
+};
+const ok = (msg) => console.log(`  ${c.green("\u2713")} ${msg}`);
+const warn = (msg) => console.log(`  ${c.yellow("!")} ${msg}`);
+const fail = (msg) => { console.error(`  ${c.red("\u2717")} ${msg}`); };
+const info = (msg) => console.log(`  ${c.dim(msg)}`);
+const blank = () => console.log();
+
+function getVersion() {
+  try {
+    return JSON.parse(fs.readFileSync(resolve(PACKAGE_ROOT, "package.json"), "utf-8")).version;
+  } catch { return "0.0.0"; }
+}
+
 function checkBun() {
   try {
     execSync("bun --version", { stdio: "pipe" });
+    ok("bun");
     return true;
   } catch {
-    console.error("Error: Bun is required but not installed.");
-    console.error("Install it: https://bun.sh");
+    fail("bun not found — https://bun.sh");
     process.exit(1);
   }
 }
@@ -51,10 +72,10 @@ function checkBun() {
 function checkTmux() {
   try {
     execSync("tmux -V", { stdio: "pipe" });
+    ok("tmux");
     return true;
   } catch {
-    console.error("Error: tmux is required but not installed.");
-    console.error("Install it: brew install tmux (macOS) or sudo apt install tmux (Linux)");
+    fail("tmux not found — brew install tmux");
     process.exit(1);
   }
 }
@@ -62,10 +83,10 @@ function checkTmux() {
 function checkClaude() {
   try {
     execSync("claude --version", { stdio: "pipe" });
+    ok("claude");
     return true;
   } catch {
-    console.error("Warning: claude CLI not found on PATH.");
-    console.error("Install Claude Code: https://claude.ai/code");
+    warn("claude CLI not found — https://claude.ai/code");
     return false;
   }
 }
@@ -73,11 +94,30 @@ function checkClaude() {
 function ask(question) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
-    rl.question(question, (answer) => {
+    rl.question(`  ${question}`, (answer) => {
       rl.close();
       resolve(answer.trim());
     });
   });
+}
+
+function parseInitFlags() {
+  const flags = { token: null, user: null, openaiKey: null };
+  const args = process.argv.slice(3); // skip node, script, "init"
+  for (let i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case "--token":
+        flags.token = args[++i] || null;
+        break;
+      case "--user":
+        flags.user = args[++i] || null;
+        break;
+      case "--openai-key":
+        flags.openaiKey = args[++i] || null;
+        break;
+    }
+  }
+  return flags;
 }
 
 function pickAvailablePath(basePath) {
@@ -114,49 +154,75 @@ function copyDirFiltered(sourceDir, targetDir) {
 async function init() {
   const cwd = process.cwd();
   const dataDir = resolve(cwd, ".superturtle");
+  const flags = parseInitFlags();
 
-  console.log("Super Turtle Setup");
-  console.log("==================\n");
+  blank();
+  console.log(`  \u{1F422} ${c.bold("superturtle")} ${c.dim("v" + getVersion())}`);
+  blank();
 
-  // Check prerequisites
+  // --- Prerequisites ---
   checkBun();
   checkTmux();
   checkClaude();
+  blank();
 
-  // Create .superturtle/ directory
+  // --- .superturtle/ directory ---
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
-    console.log("Created .superturtle/");
   }
-
-  // Create .gitignore inside .superturtle/
   const gitignorePath = resolve(dataDir, ".gitignore");
   if (!fs.existsSync(gitignorePath)) {
     fs.writeFileSync(gitignorePath, "*\n");
   }
+  ok(".superturtle/");
 
-  // Prompt for config if .env doesn't exist
+  // --- .env config ---
   const envPath = resolve(dataDir, ".env");
   if (!fs.existsSync(envPath)) {
-    console.log("\nTelegram Bot Configuration:");
-    console.log("  1. Open Telegram and message @BotFather");
-    console.log("  2. Send /newbot and follow the prompts");
-    console.log("  3. Copy the bot token\n");
+    let token = flags.token;
+    let userId = flags.user;
+    let openaiKey = flags.openaiKey;
 
-    const token = await ask("Bot token: ");
-    if (!token) {
-      console.error("Bot token is required.");
-      process.exit(1);
+    if (!token || !userId) {
+      // Non-interactive mode: fail fast
+      if (!process.stdin.isTTY) {
+        blank();
+        fail("Missing required flags for non-interactive mode:");
+        if (!token) fail("  --token <TELEGRAM_BOT_TOKEN>");
+        if (!userId) fail("  --user <TELEGRAM_USER_ID>");
+        blank();
+        info("Usage: superturtle init --token <token> --user <id> [--openai-key <key>]");
+        blank();
+        process.exit(1);
+      }
+
+      // Interactive mode
+      blank();
+      console.log(`  ${c.bold("Telegram Bot Configuration")}`);
+      info("\u2500".repeat(30));
+      blank();
+
+      if (!token) {
+        info("Get a token: message @BotFather on Telegram \u2192 /newbot");
+        blank();
+        token = await ask("Bot token: ");
+        if (!token) { fail("Bot token is required."); process.exit(1); }
+        blank();
+      }
+
+      if (!userId) {
+        info("Find your ID: message @userinfobot on Telegram");
+        blank();
+        userId = await ask("User ID: ");
+        if (!userId) { fail("User ID is required."); process.exit(1); }
+        blank();
+      }
+
+      if (openaiKey === null) {
+        openaiKey = await ask("OpenAI API key " + c.dim("(for voice, Enter to skip)") + ": ");
+        blank();
+      }
     }
-
-    console.log("\n  To find your Telegram user ID, message @userinfobot\n");
-    const userId = await ask("Your Telegram user ID: ");
-    if (!userId) {
-      console.error("User ID is required.");
-      process.exit(1);
-    }
-
-    const openaiKey = await ask("OpenAI API key (for voice, optional — press Enter to skip): ");
 
     let envContent = `TELEGRAM_BOT_TOKEN=${token}\n`;
     envContent += `TELEGRAM_ALLOWED_USERS=${userId}\n`;
@@ -166,31 +232,33 @@ async function init() {
     }
 
     fs.writeFileSync(envPath, envContent);
-    console.log("\nSaved .superturtle/.env");
+    ok(".superturtle/.env");
   } else {
-    console.log(".superturtle/.env already exists, skipping config.");
+    ok(".superturtle/.env " + c.dim("(exists)"));
   }
 
-  // Scaffold CLAUDE.md if not present
+  // --- CLAUDE.md ---
   const claudeMdPath = resolve(cwd, "CLAUDE.md");
   const templatePath = resolve(TEMPLATES_DIR, "CLAUDE.md.template");
   if (!fs.existsSync(claudeMdPath) && fs.existsSync(templatePath)) {
     fs.copyFileSync(templatePath, claudeMdPath);
-    console.log("Created CLAUDE.md from template");
+    ok("CLAUDE.md");
+  } else if (fs.existsSync(claudeMdPath)) {
+    ok("CLAUDE.md " + c.dim("(exists)"));
   }
 
-  // Create AGENTS.md symlink -> CLAUDE.md if missing
+  // --- AGENTS.md symlink ---
   const agentsPath = resolve(cwd, "AGENTS.md");
   if (!fs.existsSync(agentsPath)) {
     try {
       fs.symlinkSync("CLAUDE.md", agentsPath);
-      console.log("Created AGENTS.md symlink");
+      ok("AGENTS.md \u2192 CLAUDE.md");
     } catch (error) {
-      console.warn(`Warning: could not create AGENTS.md symlink: ${error.message}`);
+      warn(`AGENTS.md symlink failed: ${error.message}`);
     }
   }
 
-  // Copy .claude templates into the project (or a prefixed directory if .claude exists)
+  // --- .claude templates ---
   const claudeTemplateDir = resolve(TEMPLATES_DIR, ".claude");
   if (fs.existsSync(claudeTemplateDir)) {
     let targetClaudeDir = resolve(cwd, ".claude");
@@ -198,10 +266,10 @@ async function init() {
       targetClaudeDir = pickAvailablePath(resolve(cwd, ".superturtle-claude"));
     }
     copyDirFiltered(claudeTemplateDir, targetClaudeDir);
-    console.log(`Installed Claude config into ${targetClaudeDir.replace(cwd + "/", "")}`);
+    ok(targetClaudeDir.replace(cwd + "/", ""));
   }
 
-  // Add .superturtle/ and .subturtles/ to project .gitignore
+  // --- .gitignore ---
   const projectGitignore = resolve(cwd, ".gitignore");
   if (fs.existsSync(projectGitignore)) {
     const content = fs.readFileSync(projectGitignore, "utf-8");
@@ -209,17 +277,22 @@ async function init() {
     if (!content.includes(".superturtle/")) additions.push(".superturtle/");
     if (!content.includes(".subturtles/")) additions.push(".subturtles/");
     if (additions.length > 0) {
-      fs.appendFileSync(projectGitignore, "\n# Super Turtle\n" + additions.join("\n") + "\n");
-      console.log("Updated .gitignore");
+      fs.appendFileSync(projectGitignore, "\n# superturtle\n" + additions.join("\n") + "\n");
+      ok(".gitignore");
     }
   }
 
-  // Install bot dependencies
-  console.log("\nInstalling bot dependencies...");
-  const install = spawnSync("bun", ["install"], { cwd: BOT_DIR, stdio: "inherit" });
+  // --- Dependencies ---
+  blank();
+  info("Installing dependencies...");
+  const install = spawnSync("bun", ["install"], { cwd: BOT_DIR, stdio: "pipe" });
   exitFromSpawn(install, "bun install");
+  ok("dependencies installed");
 
-  console.log("\nSetup complete! Run: superturtle start");
+  // --- Done ---
+  blank();
+  console.log(`  ${c.green("Ready!")} Run: ${c.bold("superturtle start")}`);
+  blank();
 }
 
 function start() {
@@ -394,15 +467,20 @@ switch (command) {
     }
     break;
   default:
-    console.log(`Super Turtle - Code from anywhere
+    console.log(`superturtle - Code from anywhere
 
 Usage: superturtle <command>
 
 Commands:
-  init      Set up Super Turtle in the current project
+  init      Set up superturtle in the current project
   start     Launch the bot
   stop      Stop the bot and all SubTurtles
   status    Show bot and SubTurtle status
+
+Init flags (for non-interactive / agent use):
+  --token <token>       Telegram bot token
+  --user <id>           Telegram user ID
+  --openai-key <key>    OpenAI API key (optional)
 
 Options:
   -v, --version  Show version`);

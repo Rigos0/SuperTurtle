@@ -38,7 +38,7 @@ case "$(uname -s)" in
     ;;
 esac
 
-RUN_CMD="cd \"$PWD\" && export SUPERTURTLE_RUN_LOOP=1 && export SUPERTURTLE_LOOP_LOG_PATH=\"$LOOP_LOG_PATH\" && ${KEEP_AWAKE_CMD:+$KEEP_AWAKE_CMD }./run-loop.sh 2>&1 | tee -a \"$LOOP_LOG_PATH\""
+RUN_CMD="cd \"$PWD\" && export CLAUDE_WORKING_DIR=\"$CLAUDE_WORKING_DIR\" && export SUPERTURTLE_RUN_LOOP=1 && export SUPERTURTLE_LOOP_LOG_PATH=\"$LOOP_LOG_PATH\" && ${KEEP_AWAKE_CMD:+$KEEP_AWAKE_CMD }./run-loop.sh 2>&1 | tee -a \"$LOOP_LOG_PATH\""
 
 if ! command -v tmux >/dev/null 2>&1; then
   echo "[live] ERROR: tmux is required."
