@@ -13,7 +13,7 @@
 
 ---
 
-Send a voice message or text on Telegram. superturtle runs [Claude Code](https://claude.ai/code) on your machine, writes code, runs tests, and reports back — while you're on the couch, on a walk, or on a different machine entirely.
+Send a voice message or text on Telegram. superturtle runs [Claude Code](https://claude.ai/code) (or [Codex](https://openai.com/index/introducing-codex/), beta) on your machine, writes code, runs tests, and reports back — while you're on the couch, on a walk, or on a different machine entirely.
 
 For bigger tasks it spins up parallel workers (SubTurtles), each in their own git worktree, and supervises them to completion.
 
