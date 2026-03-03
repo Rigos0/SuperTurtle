@@ -21,8 +21,20 @@ Options:
 EOF
 }
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BOT_DIR="${ROOT_DIR}/super_turtle/claude-telegram-bot"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PACKAGE_DIR="${SCRIPT_DIR}"
+
+# Support both layouts:
+# - Dev monorepo: <repo>/super_turtle/setup (parent has AGENTS.md)
+# - Published npm package: <pkg>/setup (no monorepo parent)
+MONOREPO_ROOT="$(cd "${PACKAGE_DIR}/.." && pwd)"
+if [[ -f "${MONOREPO_ROOT}/AGENTS.md" ]]; then
+  ROOT_DIR="${MONOREPO_ROOT}"
+else
+  ROOT_DIR="${PACKAGE_DIR}"
+fi
+
+BOT_DIR="${PACKAGE_DIR}/claude-telegram-bot"
 DOCS_DIR="${ROOT_DIR}/docs"
 ENV_FILE="${BOT_DIR}/.env"
 ENV_EXAMPLE="${BOT_DIR}/.env.example"
@@ -90,8 +102,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ ! -f "${ROOT_DIR}/AGENTS.md" ]]; then
-  echo "[setup] Run this from the agentic repo root." >&2
+if [[ ! -d "${BOT_DIR}" ]]; then
+  echo "[setup] Bot directory not found at ${BOT_DIR}." >&2
+  exit 1
+fi
+
+if [[ ! -f "${ENV_EXAMPLE}" ]]; then
+  echo "[setup] Missing env template at ${ENV_EXAMPLE}." >&2
   exit 1
 fi
 
@@ -257,7 +274,8 @@ upsert_env_key() {
 
 upsert_env_key "${ENV_FILE}" "TELEGRAM_BOT_TOKEN" "${TELEGRAM_TOKEN}"
 upsert_env_key "${ENV_FILE}" "TELEGRAM_ALLOWED_USERS" "${TELEGRAM_USERS}"
-upsert_env_key "${ENV_FILE}" "CLAUDE_WORKING_DIR" "${ROOT_DIR}"
+WORKING_DIR_VALUE="${CLAUDE_WORKING_DIR:-${ROOT_DIR}}"
+upsert_env_key "${ENV_FILE}" "CLAUDE_WORKING_DIR" "${WORKING_DIR_VALUE}"
 upsert_env_key "${ENV_FILE}" "CODEX_ENABLED" "${CODEX_ENABLED_VALUE}"
 
 if [[ -n "${OPENAI_KEY}" ]]; then
