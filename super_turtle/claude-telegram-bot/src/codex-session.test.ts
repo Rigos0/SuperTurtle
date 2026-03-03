@@ -9,8 +9,9 @@ process.env.CLAUDE_WORKING_DIR ||= process.cwd();
 process.env.CODEX_ENABLED ||= "true";
 process.env.CODEX_CLI_AVAILABLE_OVERRIDE ||= "true";
 
-const CODEX_PREFS_FILE = "/tmp/codex-telegram-prefs.json";
-const CODEX_SESSION_FILE = "/tmp/codex-telegram-session.json";
+const TOKEN_PREFIX = (process.env.TELEGRAM_BOT_TOKEN || "test-token").split(":")[0] || "default";
+const CODEX_PREFS_FILE = `/tmp/codex-telegram-${TOKEN_PREFIX}-prefs.json`;
+const CODEX_SESSION_FILE = `/tmp/codex-telegram-${TOKEN_PREFIX}-session.json`;
 const originalHome = process.env.HOME;
 
 type CodexSessionModule = typeof import("./codex-session");
