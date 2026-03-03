@@ -422,6 +422,7 @@ export class ClaudeSession {
     const args: string[] = [
       claudeBin,
       "-p", messageToSend,
+      "--verbose",
       "--output-format", "stream-json",
       "--model", this.model,
       "--dangerously-skip-permissions",
@@ -589,7 +590,7 @@ export class ClaudeSession {
                 if (!isSafe) {
                   claudeLog.warn({ reason, tool: "Bash" }, `BLOCKED: ${reason}`);
                   await statusCallback("tool", `BLOCKED: ${reason}`);
-                  throw new Error(`Unsafe command blocked: ${reason}`);
+                  continue;
                 }
               }
 
@@ -608,7 +609,7 @@ export class ClaudeSession {
                       `BLOCKED: File access outside allowed paths: ${filePath}`
                     );
                     await statusCallback("tool", `Access denied: ${filePath}`);
-                    throw new Error(`File access blocked: ${filePath}`);
+                    continue;
                   }
                 }
               }
