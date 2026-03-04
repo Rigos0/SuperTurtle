@@ -4,7 +4,6 @@
 
 import type { Context } from "grammy";
 import type { Message } from "grammy/types";
-import type { StreamFlavor } from "@grammyjs/stream";
 
 // Status callback for streaming updates
 export type StatusCallback = (
@@ -95,6 +94,5 @@ export interface PendingMediaGroup {
   timeout: Timer;
 }
 
-// Bot context augmented with the @grammyjs/stream plugin flavor.
-// This adds ctx.replyWithStream() and ctx.api.streamMessage().
-export type BotContext = StreamFlavor<Context>;
+// Bot context with optional message
+export type BotContext = Context;

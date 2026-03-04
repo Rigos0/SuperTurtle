@@ -5,7 +5,6 @@
  */
 
 import { run, sequentialize } from "@grammyjs/runner";
-import { stream } from "@grammyjs/stream";
 import {
   WORKING_DIR,
   SUPER_TURTLE_DIR,
@@ -522,10 +521,6 @@ async function drainPreparedSnapshotsWhenIdle(): Promise<void> {
   }
 }
 
-// Register the stream plugin so ctx.replyWithStream() is available.
-// auto-retry is already installed on the API transformer in bot.ts.
-bot.use(stream());
-
 // Drop duplicate Telegram updates before any handler side effects run.
 bot.use(async (ctx, next) => {
   if (!telegramUpdateDedupe.isDuplicateUpdate(ctx.update)) {
@@ -1023,10 +1018,7 @@ if (existsSync(RESTART_FILE)) {
 
 // Start with concurrent runner (commands work immediately)
 // Retry forever on getUpdates failures (e.g. network drop during sleep)
-// Type assertion: @grammyjs/runner run() has contravariance issues with context
-// flavors — the StreamFlavor adds methods but the runner only reads updates.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const runner = run(bot as any, {
+const runner = run(bot, {
   runner: {
     maxRetryTime: Infinity,
     retryInterval: "exponential",
