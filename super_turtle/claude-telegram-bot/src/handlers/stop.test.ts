@@ -266,11 +266,7 @@ describe("stop handlers", () => {
     );
 
     const chatId = 41001;
-    const state = {
-      toolMessages: [],
-      textMessages: new Map<number, unknown>(),
-      lastContent: new Map<number, string>(),
-    };
+    const state = new actualStreaming.StreamingState();
 
     let clearedChatId: number | null = null;
     let cleanupCalls = 0;

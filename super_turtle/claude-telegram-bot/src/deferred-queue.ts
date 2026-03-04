@@ -2,7 +2,7 @@ import type { Context } from "grammy";
 import { session } from "./session";
 import { auditLog, startTypingIndicator } from "./utils";
 import { isAnyDriverRunning, runMessageWithActiveDriver } from "./handlers/driver-routing";
-import { StreamingState, createStatusCallback } from "./handlers/streaming";
+import { StreamingState, createStatusCallback, getStreamingState } from "./handlers/streaming";
 
 export interface DeferredMessage {
   text: string;
@@ -11,6 +11,23 @@ export interface DeferredMessage {
   chatId: number;
   source: "voice" | "text";
   enqueuedAt: number;
+}
+
+export function makeDrainItemNotifier(
+  ctx: Context,
+  chatId: number
+): (msg: DeferredMessage) => Promise<void> {
+  return async (msg: DeferredMessage): Promise<void> => {
+    const preview = msg.text.replace(/\s+/g, " ").trim();
+    const truncated = preview.length > 40 ? `${preview.slice(0, 40)}…` : preview;
+    const notice = await ctx.reply(
+      truncated ? `💬 Processing queued message…\n${truncated}` : "💬 Processing queued message…"
+    );
+    const state = getStreamingState(chatId);
+    if (state) {
+      state.toolMessages.push(notice);
+    }
+  };
 }
 
 const MAX_QUEUE_PER_CHAT = 10;

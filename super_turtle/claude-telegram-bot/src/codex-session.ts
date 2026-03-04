@@ -927,7 +927,6 @@ ${messageToSend}`;
       this.abortController = new AbortController();
       this.queryStarted = new Date();
       this.isQueryRunning = true;
-      this.stopRequested = false;
 
       // Run with streaming
       const streamedTurn = await this.thread.runStreamed(messageToSend, {

@@ -665,6 +665,7 @@ export async function cleanupToolMessages(ctx: Context, state: StreamingState): 
       console.debug("Failed to delete tool message:", error);
     }
   }
+  state.toolMessages = [];
 }
 
 function decodeBasicHtmlEntities(text: string): string {

@@ -202,6 +202,33 @@ describe("cleanupToolMessages()", () => {
     expect(deleteMessageMock).toHaveBeenCalledWith(chatId, 1001);
     expect(deleteMessageMock).toHaveBeenCalledWith(chatId, 1002);
   });
+
+  it("skips deletion for ask-user prompt messages with inline keyboards", async () => {
+    const state = new StreamingState();
+    const deleteMessageMock = mock(async () => {});
+    const chatId = 77;
+
+    state.toolMessages = [
+      { chat: { id: chatId }, message_id: 2001 } as any,
+      {
+        chat: { id: chatId },
+        message_id: 2002,
+        reply_markup: {
+          inline_keyboard: [[{ text: "Option", callback_data: "askuser:req:0" }]],
+        },
+      } as any,
+      { chat: { id: chatId }, message_id: 2003 } as any,
+    ];
+
+    const ctx = { api: { deleteMessage: deleteMessageMock } } as unknown as Context;
+
+    await cleanupToolMessages(ctx, state);
+
+    expect(deleteMessageMock).toHaveBeenCalledTimes(2);
+    expect(deleteMessageMock).toHaveBeenCalledWith(chatId, 2001);
+    expect(deleteMessageMock).toHaveBeenCalledWith(chatId, 2003);
+    expect(deleteMessageMock).not.toHaveBeenCalledWith(chatId, 2002);
+  });
 });
 
 describe("bot-control dynamic import", () => {

@@ -96,9 +96,8 @@ export async function stopAllRunningWork(chatId?: number): Promise<StopAllRunnin
  * Kills current work, clears the queue, stops SubTurtles, confirms to user.
  */
 export async function handleStop(ctx: Context, chatId: number): Promise<void> {
-  const result = await stopAllRunningWork(chatId);
-
   const state = getStreamingState(chatId);
+  const result = await stopAllRunningWork(chatId);
   if (state) {
     await cleanupToolMessages(ctx, state);
 

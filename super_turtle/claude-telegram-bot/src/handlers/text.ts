@@ -14,13 +14,17 @@ import {
   isStopIntent,
   startTypingIndicator,
 } from "../utils";
-import { drainDeferredQueue, enqueueDeferredMessage, unsuppressDrain } from "../deferred-queue";
+import {
+  drainDeferredQueue,
+  enqueueDeferredMessage,
+  makeDrainItemNotifier,
+  unsuppressDrain,
+} from "../deferred-queue";
 import { handleStop } from "./stop";
 import {
   StreamingState,
   createSilentStatusCallback,
   createStatusCallback,
-  getStreamingState,
   isAskUserPromptMessage,
 } from "./streaming";
 import { eventLog, streamLog } from "../logger";
@@ -358,16 +362,6 @@ export async function handleText(
     stopProcessing();
     typing.stop();
     session.typingController = null;
-    await drainDeferredQueue(ctx, chatId, async (msg) => {
-      const preview = msg.text.replace(/\s+/g, " ").trim();
-      const truncated = preview.length > 40 ? `${preview.slice(0, 40)}…` : preview;
-      const notice = await ctx.reply(
-        truncated ? `💬 Processing queued message…\n${truncated}` : "💬 Processing queued message…"
-      );
-      const state = getStreamingState(chatId);
-      if (state) {
-        state.toolMessages.push(notice);
-      }
-    });
+    await drainDeferredQueue(ctx, chatId, makeDrainItemNotifier(ctx, chatId));
   }
 }
