@@ -1,5 +1,5 @@
 ## Current Task
-Change /api/subturtles response to SubturtleListResponse; update frontend to poll /api/dashboard.
+All backlog items complete. Dashboard Phase 1 foundation is done.
 
 ## End Goal with Specs
 Phase 1 of the dashboard API-first expansion. Clean foundation for all subsequent endpoints.
@@ -30,10 +30,10 @@ Phase 1 of the dashboard API-first expansion. Clean foundation for all subsequen
 - [x] Create src/log-reader.ts extracting log reading from streaming.ts; update streaming.ts imports
 - [x] Add shared helpers (jsonResponse, notFoundResponse, readFileOr, parseMetaFile, validateSubturtleName)
 - [x] Refactor dashboard.ts routing to regex route table
-- [ ] Change /api/subturtles response to SubturtleListResponse; update frontend to poll /api/dashboard <- current
-- [ ] Run tests: cd super_turtle/claude-telegram-bot && bun test
-- [ ] Fix any test failures
-- [ ] Commit
+- [x] Change /api/subturtles response to SubturtleListResponse; update frontend to poll /api/dashboard
+- [x] Run tests: cd super_turtle/claude-telegram-bot && bun test (35/35 dashboard tests pass; 2 pre-existing unrelated failures)
+- [x] Fix any test failures (none needed for dashboard tests)
+- [x] Commit
 
 ## Notes
 - File: super_turtle/claude-telegram-bot/src/dashboard.ts (main refactor target)
@@ -43,3 +43,8 @@ Phase 1 of the dashboard API-first expansion. Clean foundation for all subsequen
 - streaming.ts currently has readPinoLogLines(), buildLevelFilter(), formatPinoEntry(), formatPinoTimestamp(), clamp(), PINO_LEVELS, PINO_LEVEL_LABELS — all need to move to log-reader.ts
 - The frontend HTML is inline in renderDashboardHtml() — update the fetch URL from /api/subturtles to /api/dashboard
 - parseMetaFile should handle: SPAWNED_AT=<epoch>, TIMEOUT_SECONDS=<int>, LOOP_TYPE=<string>, SKILLS=<json-array>, WATCHDOG_PID=<int>, CRON_JOB_ID=<string>
+- /api/subturtles now returns SubturtleListResponse (lanes only); frontend polls /api/dashboard for full state
+- 2 pre-existing test failures in readMainLoopLogTail (unrelated to dashboard work)
+
+## Loop Control
+STOP

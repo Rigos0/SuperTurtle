@@ -2,7 +2,8 @@
  * Shared types for the Super Turtle Dashboard API.
  */
 
-import type { ListedSubTurtle } from "./handlers/commands";
+import type { ListedSubTurtle, ClaudeBacklogItem } from "./handlers/commands";
+import type { MetaFileData } from "./dashboard";
 
 // ── Existing dashboard views ─────────────────────────────────────────
 
@@ -43,9 +44,15 @@ export type SubturtleLaneView = {
 export type CronJobView = {
   id: string;
   type: "one-shot" | "recurring";
+  prompt: string;
   promptPreview: string;
+  fireAt: number;
   fireInMs: number;
+  intervalMs: number | null;
+  intervalHuman: string | null;
   chatId: number;
+  silent: boolean;
+  createdAt: string;
 };
 
 export type DashboardState = {
@@ -73,11 +80,34 @@ export type SubturtleListResponse = {
   lanes: SubturtleLaneView[];
 };
 
+export type BacklogSummary = {
+  done: number;
+  total: number;
+  current: string;
+  progressPct: number;
+};
+
 export type SubturtleDetailResponse = {
   generatedAt: string;
   name: string;
-  lane: SubturtleLaneView;
-  turtle: TurtleView;
+  status: string;
+  type: string;
+  pid: string;
+  elapsed: string;
+  timeRemaining: string;
+  task: string;
+  tunnelUrl: string;
+  claudeMd: string;
+  meta: MetaFileData;
+  backlog: ClaudeBacklogItem[];
+  backlogSummary: BacklogSummary;
+};
+
+export type SubturtleLogsResponse = {
+  generatedAt: string;
+  name: string;
+  lines: string[];
+  totalLines: number;
 };
 
 export type CronListResponse = {
@@ -87,25 +117,31 @@ export type CronListResponse = {
 
 export type SessionResponse = {
   generatedAt: string;
-  claude: {
-    isRunning: boolean;
-    currentTool: string;
-    lastTool: string;
-    elapsed: string;
-  };
-  codex: {
-    isRunning: boolean;
-    isActive: boolean;
-    elapsed: string;
-  };
+  sessionId: string | null;
+  model: string;
+  modelDisplayName: string;
+  effort: string;
+  activeDriver: string;
+  isRunning: boolean;
+  isActive: boolean;
+  currentTool: string | null;
+  lastTool: string | null;
+  lastError: string | null;
+  lastErrorTime: string | null;
+  conversationTitle: string | null;
+  queryStarted: string | null;
+  lastActivity: string | null;
 };
 
 export type ContextResponse = {
   generatedAt: string;
+  claudeMd: string;
   claudeMdPath: string;
   claudeMdExists: boolean;
-  metaPromptPath: string;
+  metaPrompt: string;
+  metaPromptSource: string;
   metaPromptExists: boolean;
+  agentsMdExists: boolean;
 };
 
 export type LogsResponse = {

@@ -1,13 +1,15 @@
-import { WORKING_DIR, CTL_PATH, DASHBOARD_ENABLED, DASHBOARD_AUTH_TOKEN, DASHBOARD_BIND_ADDR, DASHBOARD_PORT } from "./config";
+import { existsSync } from "fs";
+import { resolve } from "path";
+import { WORKING_DIR, CTL_PATH, DASHBOARD_ENABLED, DASHBOARD_AUTH_TOKEN, DASHBOARD_BIND_ADDR, DASHBOARD_PORT, META_PROMPT, SUPER_TURTLE_DIR } from "./config";
 import { getJobs } from "./cron";
 import { parseCtlListOutput, getSubTurtleElapsed, readClaudeBacklogItems, type ListedSubTurtle } from "./handlers/commands";
 import { getAllDeferredQueues } from "./deferred-queue";
-import { session } from "./session";
+import { session, getAvailableModels } from "./session";
 import { codexSession } from "./codex-session";
 import { getPreparedSnapshotCount } from "./cron-supervision-queue";
 import { isBackgroundRunActive, wasBackgroundRunPreempted } from "./handlers/driver-routing";
 import { logger } from "./logger";
-import type { TurtleView, ProcessView, DeferredChatView, SubturtleLaneView, DashboardState } from "./dashboard-types";
+import type { TurtleView, ProcessView, DeferredChatView, SubturtleLaneView, DashboardState, SubturtleListResponse, SubturtleDetailResponse, SubturtleLogsResponse, CronListResponse, CronJobView, SessionResponse, ContextResponse } from "./dashboard-types";
 
 const dashboardLog = logger.child({ module: "dashboard" });
 
@@ -163,6 +165,34 @@ function elapsedFrom(startedAt: Date | null): string {
   return `${sec}s`;
 }
 
+function humanInterval(ms: number | null): string | null {
+  if (ms === null || ms <= 0) return null;
+  const sec = Math.floor(ms / 1000);
+  const min = Math.floor(sec / 60);
+  const hr = Math.floor(min / 60);
+  const day = Math.floor(hr / 24);
+  if (day > 0) return `every ${day}d`;
+  if (hr > 0) return `every ${hr}h`;
+  if (min > 0) return `every ${min}m`;
+  return `every ${sec}s`;
+}
+
+function buildCronJobView(job: ReturnType<typeof getJobs>[number]): CronJobView {
+  return {
+    id: job.id,
+    type: job.type,
+    prompt: job.prompt,
+    promptPreview: safeSubstring(job.prompt, 100),
+    fireAt: job.fire_at,
+    fireInMs: Math.max(0, job.fire_at - Date.now()),
+    intervalMs: job.interval_ms,
+    intervalHuman: humanInterval(job.interval_ms),
+    chatId: job.chat_id || 0,
+    silent: job.silent || false,
+    createdAt: job.created_at,
+  };
+}
+
 async function buildSubturtleLanes(turtles: TurtleView[]): Promise<SubturtleLaneView[]> {
   return Promise.all(
     turtles.map(async (turtle) => {
@@ -201,15 +231,7 @@ async function buildDashboardState(): Promise<DashboardState> {
   const lanes = await buildSubturtleLanes(elapsedByName);
 
   const allJobs = getJobs();
-  const cronJobs = allJobs.map((job) => {
-    return {
-      id: job.id,
-      type: job.type,
-      promptPreview: safeSubstring(job.prompt, 100),
-      fireInMs: Math.max(0, job.fire_at - Date.now()),
-      chatId: job.chat_id || 0,
-    };
-  });
+  const cronJobs = allJobs.map(buildCronJobView);
 
   const deferredQueues = getAllDeferredQueues();
   const chats: DeferredChatView[] = Array.from(deferredQueues.entries()).map(([chatId, messages]) => {
@@ -559,7 +581,7 @@ function renderDashboardHtml(): string {
 
       async function loadData() {
         try {
-          const res = await fetch("/api/subturtles", { cache: "no-store" });
+          const res = await fetch("/api/dashboard", { cache: "no-store" });
           if (!res.ok) throw new Error("Failed request");
           const data = await res.json();
 
@@ -663,12 +685,187 @@ function renderDashboardHtml(): string {
 
 type RouteHandler = (req: Request, url: URL, match: RegExpMatchArray) => Promise<Response>;
 
-const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
+export const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
   {
     pattern: /^\/api\/subturtles$/,
     handler: async () => {
-      const data = await buildDashboardState();
-      return jsonResponse(data);
+      const turtles = await readSubturtles();
+      const elapsedByName = await Promise.all(
+        turtles.map(async (turtle) => {
+          const elapsed = turtle.status === "running" ? await getSubTurtleElapsed(turtle.name) : "0";
+          return { ...turtle, elapsed };
+        })
+      );
+      const lanes = await buildSubturtleLanes(elapsedByName);
+      const response: SubturtleListResponse = {
+        generatedAt: new Date().toISOString(),
+        lanes: lanes.sort((a, b) => {
+          if (a.status === b.status) return a.name.localeCompare(b.name);
+          if (a.status === "running") return -1;
+          if (b.status === "running") return 1;
+          return a.name.localeCompare(b.name);
+        }),
+      };
+      return jsonResponse(response);
+    },
+  },
+  {
+    pattern: /^\/api\/subturtles\/([^/]+)\/logs$/,
+    handler: async (_req, url, match) => {
+      const name = decodeURIComponent(match[1] ?? "");
+      if (!validateSubturtleName(name)) return notFoundResponse("Invalid SubTurtle name");
+
+      const logPath = `${WORKING_DIR}/.subturtles/${name}/subturtle.log`;
+      const pidPath = `${WORKING_DIR}/.subturtles/${name}/subturtle.pid`;
+
+      // Check existence via pid or log file
+      const pidExists = await Bun.file(pidPath).exists();
+      const logExists = await Bun.file(logPath).exists();
+      if (!pidExists && !logExists) return notFoundResponse("SubTurtle not found");
+
+      const linesParam = url.searchParams.get("lines");
+      const lineCount = Math.max(1, Math.min(500, parseInt(linesParam || "100", 10) || 100));
+
+      let lines: string[] = [];
+      let totalLines = 0;
+      if (logExists) {
+        const proc = Bun.spawnSync(["tail", "-n", String(lineCount), logPath]);
+        const output = proc.stdout.toString();
+        lines = output ? output.split("\n").filter((l) => l.length > 0) : [];
+
+        // Approximate total lines via wc -l
+        const wcProc = Bun.spawnSync(["wc", "-l", logPath]);
+        const wcOut = wcProc.stdout.toString().trim();
+        totalLines = parseInt(wcOut, 10) || 0;
+      }
+
+      const response: SubturtleLogsResponse = {
+        generatedAt: new Date().toISOString(),
+        name,
+        lines,
+        totalLines,
+      };
+      return jsonResponse(response);
+    },
+  },
+  {
+    pattern: /^\/api\/subturtles\/([^/]+)$/,
+    handler: async (_req, _url, match) => {
+      const name = decodeURIComponent(match[1] ?? "");
+      if (!validateSubturtleName(name)) return notFoundResponse("Invalid SubTurtle name");
+
+      // Find this turtle in the ctl list output
+      const turtles = await readSubturtles();
+      const turtle = turtles.find((t) => t.name === name);
+      if (!turtle) return notFoundResponse("SubTurtle not found");
+
+      const elapsed = turtle.status === "running" ? await getSubTurtleElapsed(name) : "0";
+
+      const claudeMdPath = `${WORKING_DIR}/.subturtles/${name}/CLAUDE.md`;
+      const metaPath = `${WORKING_DIR}/.subturtles/${name}/subturtle.meta`;
+      const tunnelPath = `${WORKING_DIR}/.subturtles/${name}/.tunnel-url`;
+
+      const [claudeMd, metaContent, tunnelUrl] = await Promise.all([
+        readFileOr(claudeMdPath, ""),
+        readFileOr(metaPath, ""),
+        readFileOr(tunnelPath, ""),
+      ]);
+
+      const meta = parseMetaFile(metaContent);
+      const backlog = await readClaudeBacklogItems(claudeMdPath);
+      const backlogDone = backlog.filter((item) => item.done).length;
+      const backlogCurrent =
+        backlog.find((item) => item.current && !item.done)?.text ||
+        backlog.find((item) => !item.done)?.text ||
+        "";
+
+      const response: SubturtleDetailResponse = {
+        generatedAt: new Date().toISOString(),
+        name,
+        status: turtle.status,
+        type: turtle.type || "unknown",
+        pid: turtle.pid || "",
+        elapsed,
+        timeRemaining: turtle.timeRemaining || "",
+        task: turtle.task || "",
+        tunnelUrl: tunnelUrl.trim(),
+        claudeMd,
+        meta,
+        backlog,
+        backlogSummary: {
+          done: backlogDone,
+          total: backlog.length,
+          current: backlogCurrent,
+          progressPct: computeProgressPct(backlogDone, backlog.length),
+        },
+      };
+      return jsonResponse(response);
+    },
+  },
+  {
+    pattern: /^\/api\/cron\/([^/]+)$/,
+    handler: async (_req, _url, match) => {
+      const id = decodeURIComponent(match[1]);
+      const job = getJobs().find((j) => j.id === id);
+      if (!job) return notFoundResponse("Cron job not found");
+      return jsonResponse(buildCronJobView(job));
+    },
+  },
+  {
+    pattern: /^\/api\/cron$/,
+    handler: async () => {
+      const jobs = getJobs().map(buildCronJobView);
+      const response: CronListResponse = {
+        generatedAt: new Date().toISOString(),
+        jobs,
+      };
+      return jsonResponse(response);
+    },
+  },
+  {
+    pattern: /^\/api\/session$/,
+    handler: async () => {
+      const models = getAvailableModels();
+      const currentModel = models.find((m) => m.value === session.model);
+      const response: SessionResponse = {
+        generatedAt: new Date().toISOString(),
+        sessionId: session.sessionId,
+        model: session.model,
+        modelDisplayName: currentModel?.displayName || session.model,
+        effort: session.effort,
+        activeDriver: session.activeDriver,
+        isRunning: session.isRunning,
+        isActive: session.isActive,
+        currentTool: session.currentTool,
+        lastTool: session.lastTool,
+        lastError: session.lastError,
+        lastErrorTime: session.lastErrorTime?.toISOString() || null,
+        conversationTitle: session.conversationTitle,
+        queryStarted: session.queryStarted?.toISOString() || null,
+        lastActivity: session.lastActivity?.toISOString() || null,
+      };
+      return jsonResponse(response);
+    },
+  },
+  {
+    pattern: /^\/api\/context$/,
+    handler: async () => {
+      const claudeMdPath = `${WORKING_DIR}/CLAUDE.md`;
+      const metaPromptPath = resolve(SUPER_TURTLE_DIR, "meta/META_SHARED.md");
+      const agentsMdPath = `${WORKING_DIR}/AGENTS.md`;
+
+      const claudeMd = await readFileOr(claudeMdPath, "");
+      const response: ContextResponse = {
+        generatedAt: new Date().toISOString(),
+        claudeMd,
+        claudeMdPath,
+        claudeMdExists: claudeMd.length > 0,
+        metaPrompt: META_PROMPT,
+        metaPromptSource: metaPromptPath,
+        metaPromptExists: META_PROMPT.length > 0,
+        agentsMdExists: existsSync(agentsMdPath),
+      };
+      return jsonResponse(response);
     },
   },
   {

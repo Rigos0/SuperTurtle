@@ -1,5 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { DASHBOARD_AUTH_TOKEN } from "./config";
+import { describe, expect, it, beforeAll, afterAll } from "bun:test";
+import { join } from "path";
+import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { DASHBOARD_AUTH_TOKEN, WORKING_DIR } from "./config";
 
 const { isAuthorized, safeSubstring, computeProgressPct, jsonResponse, notFoundResponse, readFileOr, parseMetaFile, validateSubturtleName } = await import("./dashboard");
 
@@ -172,5 +174,117 @@ describe("validateSubturtleName()", () => {
 
   it("rejects excessively long names", () => {
     expect(validateSubturtleName("a".repeat(129))).toBe(false);
+  });
+});
+
+/* ── Route table tests for /api/subturtles/:name and :name/logs ───── */
+
+const { routes } = await import("./dashboard");
+
+function findRoute(path: string) {
+  for (const route of routes) {
+    const match = path.match(route.pattern);
+    if (match) return { handler: route.handler, match };
+  }
+  return null;
+}
+
+function makeReq(path: string): { req: Request; url: URL; } {
+  const fullUrl = `http://localhost${path}`;
+  return { req: new Request(fullUrl), url: new URL(fullUrl) };
+}
+
+describe("GET /api/subturtles/:name", () => {
+  it("matches the route pattern", () => {
+    const result = findRoute("/api/subturtles/my-turtle");
+    expect(result).not.toBeNull();
+    expect(result!.match[1]).toBe("my-turtle");
+  });
+
+  it("returns 404 for invalid name with path traversal", async () => {
+    const result = findRoute("/api/subturtles/..%2Fevil");
+    // The pattern matches, but handler should reject via validateSubturtleName
+    if (result) {
+      const { req, url } = makeReq("/api/subturtles/..%2Fevil");
+      const res = await result.handler(req, url, result.match);
+      expect(res.status).toBe(404);
+      const body = await res.json() as Record<string, unknown>;
+      expect(body.error).toContain("Invalid");
+    }
+  });
+
+  it("returns 404 for non-existent SubTurtle", async () => {
+    // This will go through ctl list which won't find "__nonexistent__"
+    const result = findRoute("/api/subturtles/__nonexistent_test_turtle__");
+    expect(result).not.toBeNull();
+    const { req, url } = makeReq("/api/subturtles/__nonexistent_test_turtle__");
+    const res = await result!.handler(req, url, result!.match);
+    expect(res.status).toBe(404);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.error).toBe("SubTurtle not found");
+  });
+});
+
+describe("GET /api/subturtles/:name/logs", () => {
+  it("matches the route pattern", () => {
+    const result = findRoute("/api/subturtles/my-turtle/logs");
+    expect(result).not.toBeNull();
+    expect(result!.match[1]).toBe("my-turtle");
+  });
+
+  it("does not match the detail route", () => {
+    // /logs path should match the logs route, not the detail route
+    const logsResult = findRoute("/api/subturtles/my-turtle/logs");
+    expect(logsResult).not.toBeNull();
+    // Verify it matched the logs pattern (has /logs suffix)
+    expect(logsResult!.match[0]).toContain("/logs");
+  });
+
+  it("returns 404 for invalid name", async () => {
+    const result = findRoute("/api/subturtles/..%2Fevil/logs");
+    if (result) {
+      const { req, url } = makeReq("/api/subturtles/..%2Fevil/logs");
+      const res = await result.handler(req, url, result.match);
+      expect(res.status).toBe(404);
+      const body = await res.json() as Record<string, unknown>;
+      expect(body.error).toContain("Invalid");
+    }
+  });
+
+  it("returns 404 for non-existent SubTurtle (no pid or log)", async () => {
+    const result = findRoute("/api/subturtles/__nonexistent_test_turtle__/logs");
+    expect(result).not.toBeNull();
+    const { req, url } = makeReq("/api/subturtles/__nonexistent_test_turtle__/logs");
+    const res = await result!.handler(req, url, result!.match);
+    expect(res.status).toBe(404);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.error).toBe("SubTurtle not found");
+  });
+
+  // Test with a real log file in the .subturtles directory
+  const testTurtleName = "__test_logs_turtle__";
+  const testDir = join(WORKING_DIR, ".subturtles", testTurtleName);
+
+  beforeAll(() => {
+    mkdirSync(testDir, { recursive: true });
+    writeFileSync(join(testDir, "subturtle.pid"), "99999");
+    writeFileSync(join(testDir, "subturtle.log"), "line1\nline2\nline3\n");
+  });
+
+  afterAll(() => {
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  it("returns log lines for existing SubTurtle with log file", async () => {
+    const result = findRoute(`/api/subturtles/${testTurtleName}/logs`);
+    expect(result).not.toBeNull();
+    const { req, url } = makeReq(`/api/subturtles/${testTurtleName}/logs?lines=10`);
+    const res = await result!.handler(req, url, result!.match);
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.name).toBe(testTurtleName);
+    expect(body.lines).toBeInstanceOf(Array);
+    expect((body.lines as string[]).length).toBeGreaterThan(0);
+    expect(body.totalLines).toBeGreaterThanOrEqual(3);
   });
 });
