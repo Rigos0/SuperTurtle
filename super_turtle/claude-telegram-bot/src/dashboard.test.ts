@@ -288,3 +288,99 @@ describe("GET /api/subturtles/:name/logs", () => {
     expect(body.totalLines).toBeGreaterThanOrEqual(3);
   });
 });
+
+/* ── Route table tests for /api/cron ──────────────────────────────── */
+
+describe("GET /api/cron", () => {
+  it("matches the route pattern", () => {
+    const result = findRoute("/api/cron");
+    expect(result).not.toBeNull();
+  });
+
+  it("returns 200 with jobs array", async () => {
+    const result = findRoute("/api/cron");
+    expect(result).not.toBeNull();
+    const { req, url } = makeReq("/api/cron");
+    const res = await result!.handler(req, url, result!.match);
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.generatedAt).toBeDefined();
+    expect(body.jobs).toBeInstanceOf(Array);
+  });
+});
+
+describe("GET /api/cron/:id", () => {
+  it("matches the route pattern", () => {
+    const result = findRoute("/api/cron/abc123");
+    expect(result).not.toBeNull();
+    expect(result!.match[1]).toBe("abc123");
+  });
+
+  it("does not match the list route", () => {
+    // /api/cron should match the list route, not the detail route
+    const listResult = findRoute("/api/cron");
+    expect(listResult).not.toBeNull();
+    expect(listResult!.match[0]).toBe("/api/cron");
+  });
+
+  it("returns 404 for non-existent cron job", async () => {
+    const result = findRoute("/api/cron/__nonexistent_job_id__");
+    expect(result).not.toBeNull();
+    const { req, url } = makeReq("/api/cron/__nonexistent_job_id__");
+    const res = await result!.handler(req, url, result!.match);
+    expect(res.status).toBe(404);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.error).toBe("Cron job not found");
+  });
+});
+
+/* ── Route table tests for /api/session ───────────────────────────── */
+
+describe("GET /api/session", () => {
+  it("matches the route pattern", () => {
+    const result = findRoute("/api/session");
+    expect(result).not.toBeNull();
+  });
+
+  it("returns 200 with session state fields", async () => {
+    const result = findRoute("/api/session");
+    expect(result).not.toBeNull();
+    const { req, url } = makeReq("/api/session");
+    const res = await result!.handler(req, url, result!.match);
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.generatedAt).toBeDefined();
+    expect(typeof body.model).toBe("string");
+    expect(typeof body.modelDisplayName).toBe("string");
+    expect(typeof body.effort).toBe("string");
+    expect(typeof body.activeDriver).toBe("string");
+    expect(typeof body.isRunning).toBe("boolean");
+    expect(typeof body.isActive).toBe("boolean");
+  });
+});
+
+/* ── Route table tests for /api/context ───────────────────────────── */
+
+describe("GET /api/context", () => {
+  it("matches the route pattern", () => {
+    const result = findRoute("/api/context");
+    expect(result).not.toBeNull();
+  });
+
+  it("returns 200 with context fields", async () => {
+    const result = findRoute("/api/context");
+    expect(result).not.toBeNull();
+    const { req, url } = makeReq("/api/context");
+    const res = await result!.handler(req, url, result!.match);
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.generatedAt).toBeDefined();
+    expect(typeof body.claudeMd).toBe("string");
+    expect(typeof body.claudeMdPath).toBe("string");
+    expect(typeof body.claudeMdExists).toBe("boolean");
+    expect(typeof body.metaPrompt).toBe("string");
+    expect(typeof body.metaPromptSource).toBe("string");
+    expect(typeof body.metaPromptExists).toBe("boolean");
+    expect(typeof body.agentsMdExists).toBe("boolean");
+  });
+});
