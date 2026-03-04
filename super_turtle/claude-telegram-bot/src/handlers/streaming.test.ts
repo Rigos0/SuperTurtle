@@ -1,4 +1,4 @@
-import { describe, expect, it, mock } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { mkdirSync } from "fs";
 import type { Context } from "grammy";
 
@@ -21,6 +21,30 @@ const {
 const { PINO_LOG_PATH } = await import("../logger");
 const { IPC_DIR } = await import("../config");
 mkdirSync(IPC_DIR, { recursive: true });
+
+async function cleanupIpcFiles(pattern: string): Promise<void> {
+  const glob = new Bun.Glob(pattern);
+  for await (const filename of glob.scan({ cwd: IPC_DIR, absolute: false })) {
+    try {
+      const { unlinkSync } = await import("fs");
+      unlinkSync(`${IPC_DIR}/${filename}`);
+    } catch {
+      // best effort cleanup
+    }
+  }
+}
+
+beforeEach(async () => {
+  await cleanupIpcFiles("ask-user-*.json");
+  await cleanupIpcFiles("pino-logs-*.json");
+  await cleanupIpcFiles("bot-control-*.json");
+});
+
+afterEach(async () => {
+  await cleanupIpcFiles("ask-user-*.json");
+  await cleanupIpcFiles("pino-logs-*.json");
+  await cleanupIpcFiles("bot-control-*.json");
+});
 
 async function withTempPinoLogs(lines: string[], fn: () => Promise<void>) {
   const file = Bun.file(PINO_LOG_PATH);

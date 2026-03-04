@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { PINO_LOG_PATH } from "../logger";
@@ -9,6 +9,7 @@ process.env.CLAUDE_WORKING_DIR ||= process.cwd();
 
 const { handleCallback } = await import("./callback");
 const { ALLOWED_USERS, WORKING_DIR } = await import("../config");
+const { IPC_DIR } = await import("../config");
 const authorizedUserId =
   ALLOWED_USERS[0] ??
   Number((process.env.TELEGRAM_ALLOWED_USERS || "123").split(",")[0]?.trim() || "123");
@@ -24,6 +25,25 @@ afterEach(() => {
   } else {
     rmSync(PINO_LOG_PATH, { force: true });
   }
+});
+
+async function cleanupPinoLogRequests(): Promise<void> {
+  const glob = new Bun.Glob("pino-logs-*.json");
+  for await (const filename of glob.scan({ cwd: IPC_DIR, absolute: false })) {
+    try {
+      rmSync(join(IPC_DIR, filename), { force: true });
+    } catch {
+      // best effort cleanup
+    }
+  }
+}
+
+beforeEach(async () => {
+  await cleanupPinoLogRequests();
+});
+
+afterEach(async () => {
+  await cleanupPinoLogRequests();
 });
 
 function makeCallbackCtx(callbackData: string, chatId = 912345678) {

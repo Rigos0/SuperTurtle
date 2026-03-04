@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 import type { Context } from "grammy";
-import { readFileSync } from "fs";
+import { readFileSync, rmSync } from "fs";
 
 process.env.TELEGRAM_BOT_TOKEN ||= "test-token";
 process.env.TELEGRAM_ALLOWED_USERS ||= "123";
@@ -8,44 +8,50 @@ process.env.CLAUDE_WORKING_DIR ||= process.cwd();
 
 const originalSpawn = Bun.spawn;
 
-let checkPendingAskUserRequestsMock: ReturnType<typeof mock>;
+const { IPC_DIR } = await import("./config");
+
+async function cleanupAskUserFiles(): Promise<void> {
+  const glob = new Bun.Glob("ask-user-*.json");
+  for await (const filename of glob.scan({ cwd: IPC_DIR, absolute: false })) {
+    try {
+      rmSync(`${IPC_DIR}/${filename}`, { force: true });
+    } catch {
+      // best effort cleanup
+    }
+  }
+}
 
 async function loadSessionModule() {
   return import(`./session.ts?ask-user-test=${Date.now()}-${Math.random()}`);
 }
 
-beforeEach(async () => {
-  const actualImportSuffix = `${Date.now()}-${Math.random()}`;
-  const actualStreaming = await import(
-    `./handlers/streaming.ts?actual=${actualImportSuffix}`
-  );
-
-  checkPendingAskUserRequestsMock = mock(async () => true);
-  const checkPendingSendTurtleRequestsMock = mock(async () => false);
-  const checkPendingBotControlRequestsMock = mock(async () => false);
-  const checkPendingPinoLogsRequestsMock = mock(async () => false);
-
-  mock.module("./handlers/streaming", () => ({
-    ...actualStreaming,
-    checkPendingAskUserRequests: (ctx: Context, chatId: number) =>
-      checkPendingAskUserRequestsMock(ctx, chatId),
-    checkPendingSendTurtleRequests: (ctx: Context, chatId: number) =>
-      checkPendingSendTurtleRequestsMock(ctx, chatId),
-    checkPendingBotControlRequests: (sessionLike: unknown, chatId: number) =>
-      checkPendingBotControlRequestsMock(sessionLike, chatId),
-    checkPendingPinoLogsRequests: (chatId: number) =>
-      checkPendingPinoLogsRequestsMock(chatId),
-  }));
-});
-
-afterEach(() => {
+afterEach(async () => {
   Bun.spawn = originalSpawn;
-  mock.restore();
+  await cleanupAskUserFiles();
 });
 
 describe("ClaudeSession ask_user tool routing", () => {
   it("handles ask_user calls from bot-control namespace", async () => {
     let killed = false;
+    const chatId = 6769019304;
+    const requestId = `ask-user-test-${Date.now()}-${Math.random()}`;
+    const requestFile = `${IPC_DIR}/ask-user-${requestId}.json`;
+
+    await Bun.write(
+      requestFile,
+      JSON.stringify(
+        {
+          request_id: requestId,
+          question: "Pick one",
+          options: ["A", "B"],
+          status: "pending",
+          chat_id: String(chatId),
+          created_at: new Date().toISOString(),
+        },
+        null,
+        2
+      )
+    );
 
     Bun.spawn = ((_cmd: unknown, _opts?: unknown) => {
       const lines = [
@@ -100,7 +106,7 @@ describe("ClaudeSession ask_user tool routing", () => {
     const statusEvents: string[] = [];
 
     const ctx = {
-      chat: { id: 6769019304, type: "private" },
+      chat: { id: chatId, type: "private" },
       reply: async () => ({ message_id: 1 }),
     } as unknown as Context;
 
@@ -108,17 +114,17 @@ describe("ClaudeSession ask_user tool routing", () => {
       "show me buttons",
       "tester",
       123,
-      async (type) => {
+      async (type: string) => {
         statusEvents.push(type);
       },
-      6769019304,
+      chatId,
       ctx
     );
 
+    const updated = JSON.parse(await Bun.file(requestFile).text());
     expect(response).toBe("[Waiting for user selection]");
     expect(killed).toBe(true);
-    expect(checkPendingAskUserRequestsMock).toHaveBeenCalled();
-    expect(checkPendingAskUserRequestsMock.mock.calls[0]?.[1]).toBe(6769019304);
+    expect(updated.status).toBe("sent");
     expect(statusEvents).toContain("done");
   });
 

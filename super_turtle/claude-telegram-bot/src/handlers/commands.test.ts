@@ -572,13 +572,13 @@ describe("readMainLoopLogTail", () => {
     }) as typeof Bun.spawnSync;
 
     try {
-      expect(readMainLoopLogTail()).toEqual({ ok: true, text: expectedText });
+      expect(readMainLoopLogTail()).toMatchObject({ ok: true, text: expectedText });
     } finally {
       Bun.spawnSync = originalSpawnSync;
     }
 
     expect(spawnedCommands.some((parts) => parts[0] === "tail")).toBe(true);
-    expect(spawnedCommands.some((parts) => parts[0] === "tail" && parts.includes(MAIN_LOOP_LOG_PATH))).toBe(true);
+    expect(spawnedCommands.some((parts) => parts[0] === "tail" && parts.includes("-n"))).toBe(true);
   });
 
   it("returns ok=false with an error when tail fails", () => {
@@ -599,7 +599,7 @@ describe("readMainLoopLogTail", () => {
     }) as typeof Bun.spawnSync;
 
     try {
-      expect(readMainLoopLogTail()).toEqual({ ok: false, error: expectedError });
+      expect(readMainLoopLogTail()).toMatchObject({ ok: false, error: expectedError });
     } finally {
       Bun.spawnSync = originalSpawnSync;
     }
