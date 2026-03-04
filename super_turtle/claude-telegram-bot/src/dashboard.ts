@@ -659,6 +659,35 @@ function renderDashboardHtml(): string {
 </html>`;
 }
 
+/* ── Route table ──────────────────────────────────────────────────── */
+
+type RouteHandler = (req: Request, url: URL, match: RegExpMatchArray) => Promise<Response>;
+
+const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
+  {
+    pattern: /^\/api\/subturtles$/,
+    handler: async () => {
+      const data = await buildDashboardState();
+      return jsonResponse(data);
+    },
+  },
+  {
+    pattern: /^\/api\/dashboard$/,
+    handler: async () => {
+      const data = await buildDashboardState();
+      return jsonResponse(data);
+    },
+  },
+  {
+    pattern: /^(?:\/|\/dashboard|\/index\.html)$/,
+    handler: async () => {
+      return new Response(renderDashboardHtml(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    },
+  },
+];
+
 export function startDashboardServer(): void {
   if (!DASHBOARD_ENABLED) {
     return;
@@ -683,19 +712,9 @@ export function startDashboardServer(): void {
       if (!isAuthorized(req)) return unauthorizedResponse();
 
       const url = new URL(req.url);
-      if (url.pathname === "/api/subturtles") {
-        const data = await buildDashboardState();
-        return jsonResponse(data);
-      }
-      if (url.pathname === "/api/dashboard") {
-        const data = await buildDashboardState();
-        return jsonResponse(data);
-      }
-
-      if (url.pathname === "/" || url.pathname === "/dashboard" || url.pathname === "/index.html") {
-        return new Response(renderDashboardHtml(), {
-          headers: { "content-type": "text/html; charset=utf-8" },
-        });
+      for (const route of routes) {
+        const match = url.pathname.match(route.pattern);
+        if (match) return route.handler(req, url, match);
       }
 
       return notFoundResponse();

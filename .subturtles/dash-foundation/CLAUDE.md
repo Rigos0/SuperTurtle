@@ -1,5 +1,5 @@
 ## Current Task
-Refactor dashboard.ts routing from if/else chain to regex route table pattern.
+Change /api/subturtles response to SubturtleListResponse; update frontend to poll /api/dashboard.
 
 ## End Goal with Specs
 Phase 1 of the dashboard API-first expansion. Clean foundation for all subsequent endpoints.
@@ -29,8 +29,8 @@ Phase 1 of the dashboard API-first expansion. Clean foundation for all subsequen
 - [x] Create src/dashboard-types.ts with all response types
 - [x] Create src/log-reader.ts extracting log reading from streaming.ts; update streaming.ts imports
 - [x] Add shared helpers (jsonResponse, notFoundResponse, readFileOr, parseMetaFile, validateSubturtleName)
-- [ ] Refactor dashboard.ts routing to regex route table <- current
-- [ ] Change /api/subturtles response to SubturtleListResponse; update frontend to poll /api/dashboard
+- [x] Refactor dashboard.ts routing to regex route table
+- [ ] Change /api/subturtles response to SubturtleListResponse; update frontend to poll /api/dashboard <- current
 - [ ] Run tests: cd super_turtle/claude-telegram-bot && bun test
 - [ ] Fix any test failures
 - [ ] Commit
