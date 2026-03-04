@@ -263,7 +263,7 @@ bun run --bun tsc --noEmit
 
 > **⚠️ Important:** This bot runs Claude Code with **all permission prompts bypassed**. Claude can read, write, and execute commands without confirmation within the allowed paths. This is intentional for a seamless mobile experience, but you should understand the implications before deploying.
 
-**→ [Read the full Security Model](SECURITY.md)** for details on how permissions work and what protections are in place.
+**→ [Read the full Security Model](https://www.superturtle.dev/docs/config/security)** for details on how permissions work and what protections are in place.
 
 Multiple layers protect against misuse:
 

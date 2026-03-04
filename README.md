@@ -59,21 +59,10 @@ Loop types:
 
 ## Architecture
 
-```
-┌─────────────┐       ┌──────────────┐       ┌─────────────────┐
-│  You         │       │  Meta Agent   │       │  SubTurtles     │
-│  (Telegram)  │──────▶│  (the bot)    │──────▶│  yolo / slow /  │
-│  text/voice  │◀──────│  plans, delegates,    │  yolo-codex     │
-└─────────────┘       │  supervises   │◀──────│  (ralph loops)  │
-                       └──────┬───────┘       └────────┬────────┘
-                              │                        │
-                       ┌──────▼───────┐         ┌──────▼────────┐
-                       │  MCP servers  │         │  .subturtles/  │
-                       │  stickers,    │         │  task files,   │
-                       │  bot-control, │         │  CLAUDE.md,    │
-                       │  ask-user     │         │  logs, git     │
-                       └──────────────┘         └───────────────┘
-```
+- **Meta Agent** — the bot itself. Plans, delegates, supervises.
+- **SubTurtles** — autonomous workers running in ralph loops (yolo, slow, yolo-codex).
+- **MCP servers** — stickers, bot-control, ask-user (inline buttons).
+- **Drivers** — Claude Code (primary), Codex (optional).
 
 <p align="center">
   <img src="assets/readme-stickers/architecture-gear-turtle.png" width="108" alt="Architecture" />
@@ -88,6 +77,31 @@ Loop types:
 | Windows  | Not yet (WSL2 may work) |
 
 **macOS note:** Enable `System Settings → Battery → Options → Prevent automatic sleeping when the display is off` when on power adapter.
+
+## TOS compliance
+
+Super Turtle spawns the `claude` CLI binary as a child process (`claude -p --output-format stream-json`). This is the [officially documented headless usage](https://docs.anthropic.com/en/docs/claude-code/cli-usage) — the same way CI pipelines and editor extensions invoke Claude Code.
+
+**What Super Turtle does:**
+- Spawns `claude` as a subprocess with standard CLI flags
+- Uses your existing CLI authentication (your logged-in session)
+- Reads structured output from stdout
+
+**What Super Turtle does NOT do:**
+- Extract or reuse OAuth tokens from your keychain for model inference
+- Proxy your subscription credentials to other users or services
+- Use the Anthropic API or Agent SDK with subscription OAuth tokens
+- Circumvent Claude Code's rate limiting or usage caps
+
+The `/usage` bot command reads your local OAuth token solely to call Anthropic's own usage-reporting endpoint (`api.anthropic.com/api/oauth/usage`) — the same endpoint Claude Code's built-in `/usage` displays. It is read-only and never used for model inference.
+
+See the [full TOS compliance page](https://www.superturtle.dev/docs/config/tos-compliance) for details.
+
+## Security
+
+Super Turtle runs Claude Code with `--dangerously-skip-permissions`. Every file read, file write, and shell command happens without a confirmation prompt. This is by design — confirming each action from your phone would make the tool unusable.
+
+You should run Super Turtle in a sandboxed or dedicated environment (VM, container, separate user account) — it has full access to read, write, and execute within configured paths. Multiple defense layers (user allowlist, rate limiting, path validation, command blocking, audit logging) reduce risk, but the permission model is inherently open. Read the [full security model](https://www.superturtle.dev/docs/config/security) for threat model, incident response, and deployment checklist.
 
 ## Documentation
 
