@@ -1,145 +1,86 @@
-# SuperTurtle Onboarding Agent Runbook
+# Super Turtle — Dev Branch
 
-This file guides Claude Code through first-run onboarding when a developer clones this repo.
+You are Super Turtle 🐢 — an autonomous coding agent controlled from Telegram. You spawn SubTurtles to do work, supervise them, and report back. This repo is the agent itself.
 
-## Rules
+## Architecture
 
-1. Be concrete and step-by-step. No vague summaries.
-2. Do not ask users to manually edit `.env` or config files.
-3. Execute setup commands yourself (the agent runs with permissions).
-4. Ask the user only for external actions (Telegram/BotFather/userinfobot) and secrets.
+- **`super_turtle/claude-telegram-bot/`** — Telegram bot (TypeScript/Bun). The meta agent's runtime. Handles messages, voice, streaming, driver routing (Claude/Codex), MCP tools, session management.
+- **`super_turtle/subturtle/`** — SubTurtle orchestration (Python). Loop types: `slow`, `yolo`, `yolo-codex`, `yolo-codex-spark`. Includes `ctl` CLI, watchdog, loop runner, browser screenshot helper, tunnel helper.
+- **`super_turtle/meta/`** — Meta agent prompts: `META_SHARED.md` (system prompt), `ORCHESTRATOR_PROMPT.md`, `DECOMPOSITION_PROMPT.md`.
+- **`super_turtle/setup`** — Onboarding setup script for fresh clones.
+- **`super_turtle/bin/`** — CLI entry point (`superturtle` npm package).
+- **`super_turtle/templates/`** — Templates for CLAUDE.md, etc.
+- **`super_turtle/docs/`** — Documentation site source.
 
-## Onboarding Trigger
+## Tech Stack
 
-Run this flow when:
+- **Bot runtime:** Bun + TypeScript
+- **AI drivers:** Claude CLI (primary), Codex CLI (optional)
+- **SubTurtle loops:** Python 3.13
+- **MCP servers:** send-turtle (stickers), bot-control (session/model/usage), ask-user (inline buttons)
+- **Telegram:** Grammy framework
+- **Package:** npm (`superturtle`)
 
-- This is the user's first setup in this clone.
-- The user asks to set up SuperTurtle.
+## Key Files
 
-## Onboarding Sequence
+- `super_turtle/claude-telegram-bot/src/handlers/text.ts` — text message handler
+- `super_turtle/claude-telegram-bot/src/handlers/voice.ts` — voice message handler + transcription
+- `super_turtle/claude-telegram-bot/src/handlers/stop.ts` — stop logic (`stopAllRunningWork()`)
+- `super_turtle/claude-telegram-bot/src/handlers/driver-routing.ts` — Claude/Codex driver selection
+- `super_turtle/claude-telegram-bot/src/session.ts` — session state, process management, query execution
+- `super_turtle/claude-telegram-bot/src/deferred-queue.ts` — voice message queue (max 10 per chat)
+- `super_turtle/claude-telegram-bot/src/utils.ts` — `isStopIntent()` detection (line ~302)
+- `super_turtle/claude-telegram-bot/src/config.ts` — bot configuration, system prompt injection
+- `super_turtle/subturtle/ctl` — SubTurtle CLI (spawn, stop, status, logs, list)
 
-### 0. Verify prerequisites
+## Branch Merge Instructions (dev <-> main)
 
-Confirm the user has **Telegram** installed (phone or desktop): https://telegram.org/
+`CLAUDE.md` is **branch-specific**: `main` has the public onboarding runbook, `dev` has the working developer state. `.gitattributes` uses `merge=ours` driver to prevent merges from overwriting the target branch's `CLAUDE.md`.
 
-Then verify local tools (run commands yourself):
-
-- `claude --version` (required)
-- `bun --version` (required)
-- `tmux -V` (required)
-
-If any are missing, tell the user which one and provide the install link. Do not proceed.
-
-Platform note: macOS is fully supported. Linux is alpha. On Mac laptops, advise enabling `System Settings > Battery > Options > Prevent automatic sleeping when the display is off` (on power adapter).
-
-### 1. Guide BotFather token creation
-
-Tell the user exactly:
-
-1. Open Telegram and message `@BotFather`
-2. Send `/newbot`
-3. BotFather asks for a **display name** (can be anything, e.g. "My SuperTurtle")
-4. BotFather asks for a **username** (must end in `bot`, must be globally unique). If taken, try variations with their name or numbers.
-5. Copy the bot token (looks like `123456789:ABCDefGhijKLmNoPqrsTUVwxyz`)
-6. Paste it here
-
-Validate token format (`^\d+:[A-Za-z0-9_-]+$`). If invalid, explain and ask again.
-
-### 2. Guide Telegram user ID discovery
-
-Tell the user:
-
-1. Open Telegram and message `@userinfobot`
-2. Copy the numeric user ID
-3. Paste it here
-
-Validate as digits only.
-
-### 3. Ask about voice transcription
-
-Ask with buttons if `ask_user` is available:
-
-- `Yes, enable voice transcription`
-- `No, skip for now`
-
-If yes, collect `OPENAI_API_KEY`. If no, continue without it.
-
-### 4. Run init
-
-Run with the collected values:
-
+**One-time setup (per clone):**
 ```bash
-node super_turtle/bin/superturtle.js init --token "<token>" --user "<id>"
+git config merge.ours.driver true
 ```
 
-If OpenAI key was provided, add `--openai-key "<key>"`.
-
-After init completes, verify `.superturtle/.env` exists and contains `TELEGRAM_BOT_TOKEN`. If it doesn't, re-run init. Do not create `.env` manually.
-
-### 5. Hand off bot start to user
-
-**CRITICAL: Never run `bun run start` or `superturtle start` as an agent command.**
-
-These use tmux which requires an interactive terminal. Running from an agent always fails.
-
-Tell the user to run in their own terminal:
-
+**Merging (always use `--no-ff`):**
 ```bash
-cd super_turtle/claude-telegram-bot
-bun run start
+# dev -> main
+git checkout main && git merge --no-ff dev && git push origin main
+
+# main -> dev
+git checkout dev && git merge --no-ff main
 ```
 
-Explain:
-- This opens a tmux session called `superturtle-bot`
-- The bot survives terminal disconnects
-- Re-attach later: `tmux attach -t superturtle-bot`
-- Stop: `tmux kill-session -t superturtle-bot`
-
-Wait for user confirmation before proceeding.
-
-### 6. Telegram verification
-
-Tell the user:
-
-1. Open Telegram
-2. Find their bot
-3. Send `/start` or any message
-
-Confirm the bot responds. If not, check logs at `/tmp/claude-telegram-*-bot-ts.log` and diagnose.
-
-### 7. Done
-
-Tell the user setup is complete. They can now send coding tasks to the bot in plain language via text or voice.
+Fast-forward merges skip merge drivers entirely, so `--no-ff` is required. If CLAUDE.md gets overwritten: `git checkout HEAD~1 -- CLAUDE.md && git commit -m "restore branch-specific CLAUDE.md"`.
 
 ---
 
-## Meta Agent Runtime Behavior (Telegram)
+## Current task
+None — multi-instance isolation complete. Ready for next priority.
 
-If your system prompt contains content from `super_turtle/meta/META_SHARED.md`
-(i.e., you are the Meta Agent running from the Telegram bot, not the onboarding agent),
-follow these rules instead of the onboarding sequence above.
+## End goal with specs
+Multiple Super Turtle instances (dev + prod, different projects) run on the same Mac with zero cross-instance interference. All shared `/tmp/` resources namespaced by bot token prefix.
 
-### First Message Greeting
+## Roadmap (Completed)
+- ✅ Core bot: Telegram integration, Claude driver, streaming responses, voice transcription
+- ✅ SubTurtle system: spawn/stop/status/logs, yolo + slow loops, watchdog, cron supervision
+- ✅ Meta agent: META_SHARED.md prompt, orchestrator cron, decomposition, silent-first supervision
+- ✅ MCP tools: send-turtle stickers, bot-control (usage/model/sessions), ask-user buttons
+- ✅ Codex driver: optional Codex CLI integration, driver switching, quota-aware routing
+- ✅ Package refactor: decoupled paths, CLI subprocess (replaced Agent SDK), npm package structure
+- ✅ Auth & security: user allowlist, rate limiting, audit logging
+- ✅ Deferred queue: voice message queuing when driver is busy, dedup, drain-on-complete
+- ✅ Tunnel support: cloudflared helper for frontend preview links
+- ✅ Screenshot support: Playwright-based browser screenshots for visual QA
+- ✅ Stop behavior: unified stop across text/voice/button, deferred queue clearing, `/stop` command
+- ✅ Multi-instance isolation: TOKEN_PREFIX namespacing for all /tmp files, MCP IPC directory, logs, tmux sessions
 
-On the very first message of a new session, before responding to whatever the user said:
+## Backlog
+(empty — waiting for next priority)
 
-1. Call `send_turtle` with a fun emoji to send a turtle sticker. Pick based on context
-   or default to: `send_turtle({ emoji: "👋" })`
-2. Then respond naturally to what the user asked or said.
-
-Do not send a generic "Hi how is it going what are we working on?" greeting.
-
-### You Are the Meta Agent
-
-- You run from Telegram. The user communicates via text, voice, and media.
-- Delegate coding tasks to SubTurtles. Do small tasks yourself.
-- Keep responses concise. This is a chat interface, not a terminal.
-- Use `send_turtle` freely for reactions, celebrations, and personality.
-
-### Onboarding Prompt After First Message
-
-After your first-message greeting, if this is a brand new session:
-
-1. Tell the user to try `/status` to see capabilities (model, effort, drivers).
-2. Offer CLAUDE.md cleanup: "Want to refine project instructions based on your workflow?"
-3. If yes, spawn a SubTurtle or do it directly.
+## Notes
+- Multi-instance audit: `docs/audits/multi-instance-isolation.md`
+- TOKEN_PREFIX lives in `src/token-prefix.ts` (standalone leaf module, no circular deps)
+- MCP IPC files isolated in `/tmp/superturtle-{tokenPrefix}/`, passed to MCP servers via `SUPERTURTLE_IPC_DIR` env var
+- The bot is the meta agent — system prompt is `super_turtle/meta/META_SHARED.md`, injected via `config.ts`
+- LinkedIn demo (Turtle In) lives in separate repo: `https://github.com/turtleagent/TurtleIn`
