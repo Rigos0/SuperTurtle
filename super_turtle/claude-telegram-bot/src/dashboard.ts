@@ -277,7 +277,7 @@ async function buildDashboardState(): Promise<DashboardState> {
   const turtles = await readSubturtles();
   const elapsedByName = await Promise.all(
     turtles.map(async (turtle) => {
-      const elapsed = turtle.status === "running" ? await getSubTurtleElapsed(turtle.name) : "0";
+      const elapsed = turtle.status === "running" ? await getSubTurtleElapsed(turtle.name) : "0s";
       return { ...turtle, elapsed };
     })
   );
@@ -654,7 +654,7 @@ async function buildSubturtleDetail(name: string): Promise<SubturtleDetailRespon
   const turtle = turtles.find((t) => t.name === name);
   if (!turtle) return null;
 
-  const elapsed = turtle.status === "running" ? await getSubTurtleElapsed(name) : "0";
+  const elapsed = turtle.status === "running" ? await getSubTurtleElapsed(name) : "0s";
 
   const claudeMdPath = `${WORKING_DIR}/.subturtles/${name}/CLAUDE.md`;
   const metaPath = `${WORKING_DIR}/.subturtles/${name}/subturtle.meta`;
@@ -990,7 +990,7 @@ export const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
       const turtles = await readSubturtles();
       const elapsedByName = await Promise.all(
         turtles.map(async (turtle) => {
-          const elapsed = turtle.status === "running" ? await getSubTurtleElapsed(turtle.name) : "0";
+          const elapsed = turtle.status === "running" ? await getSubTurtleElapsed(turtle.name) : "0s";
           return { ...turtle, elapsed };
         })
       );
