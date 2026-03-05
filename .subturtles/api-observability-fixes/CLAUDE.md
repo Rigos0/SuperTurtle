@@ -1,5 +1,5 @@
 ## Current task
-Update/add tests in `super_turtle/claude-telegram-bot/src/dashboard.test.ts` to validate `/api/queue`, queued status semantics, and formatting.
+Backlog complete for API observability fixes; awaiting next assignment.
 
 ## End goal with specs
 Dashboard/API consumers can accurately answer: what is running, what is queued, what is stopped/error, and what messages are deferred.
@@ -16,8 +16,8 @@ Acceptance criteria:
 - [x] Add `GET /api/queue` route in `dashboard.ts` and ensure response shape matches `QueueResponse` in `dashboard-types.ts`
 - [x] Update process status mapping in `buildDashboardState()` to emit `queued` where queue pressure exists and avoid flattening all non-running SubTurtle states to generic idle (preserve useful status via `detail`/status mapping)
 - [x] Normalize elapsed formatting for non-running entries to `0s` (remove mixed `0` vs `0s` outputs)
-- [ ] Update/add tests in `super_turtle/claude-telegram-bot/src/dashboard.test.ts` to validate `/api/queue`, queued status semantics, and formatting <- current
-- [ ] Run targeted tests for dashboard API and commit with a scoped message
+- [x] Update/add tests in `super_turtle/claude-telegram-bot/src/dashboard.test.ts` to validate `/api/queue`, queued status semantics, and formatting
+- [x] Run targeted tests for dashboard API and commit with a scoped message
 
 ## Notes
 Files:
@@ -26,3 +26,6 @@ Files:
 - `super_turtle/claude-telegram-bot/src/dashboard.test.ts`
 
 Keep changes scoped to observability API polish only. Do not refactor unrelated modules.
+
+## Loop Control
+STOP

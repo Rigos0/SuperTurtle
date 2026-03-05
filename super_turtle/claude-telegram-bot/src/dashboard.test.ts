@@ -1,9 +1,11 @@
-import { describe, expect, it, beforeAll, afterAll } from "bun:test";
+import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
 import { join } from "path";
 import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { DASHBOARD_AUTH_TOKEN, WORKING_DIR } from "./config";
 
 const { isAuthorized, safeSubstring, computeProgressPct, jsonResponse, notFoundResponse, readFileOr, parseMetaFile, validateSubturtleName } = await import("./dashboard");
+const { session } = await import("./session");
+const { enqueueDeferredMessage, clearDeferredQueue } = await import("./deferred-queue");
 
 const hasAuthToken = DASHBOARD_AUTH_TOKEN.length > 0;
 const validToken = hasAuthToken ? DASHBOARD_AUTH_TOKEN : "any-token";
@@ -194,6 +196,17 @@ function makeReq(path: string): { req: Request; url: URL; } {
   return { req: new Request(fullUrl), url: new URL(fullUrl) };
 }
 
+function enqueueTestMessage(chatId: number, text: string, enqueuedAt: number): void {
+  enqueueDeferredMessage({
+    text,
+    userId: 1,
+    username: "queue-test",
+    chatId,
+    source: "text",
+    enqueuedAt,
+  });
+}
+
 describe("GET /api/subturtles/:name", () => {
   it("matches the route pattern", () => {
     const result = findRoute("/api/subturtles/my-turtle");
@@ -360,9 +373,78 @@ describe("GET /api/processes", () => {
       expect((p.detailLink as string)).toContain("/api/processes/");
     }
   });
+
+  it("marks the active driver as queued when deferred messages exist", async () => {
+    const queueChatId = 980101;
+    const originalDriver = session.activeDriver;
+    clearDeferredQueue(queueChatId);
+
+    try {
+      session.activeDriver = "claude";
+      enqueueTestMessage(queueChatId, "queued while active", Date.now() - 1500);
+
+      const result = findRoute("/api/processes");
+      expect(result).not.toBeNull();
+      const { req, url } = makeReq("/api/processes");
+      const res = await result!.handler(req, url, result!.match);
+      expect(res.status).toBe(200);
+
+      const body = await res.json() as Record<string, unknown>;
+      const processes = body.processes as Array<Record<string, unknown>>;
+      const claude = processes.find((p) => p.id === "driver-claude");
+      const codex = processes.find((p) => p.id === "driver-codex");
+
+      expect(claude).toBeDefined();
+      expect(claude?.status).toBe("queued");
+      expect(String(claude?.detail || "")).toContain("queued msg");
+      expect(codex).toBeDefined();
+      expect(codex?.status).not.toBe("queued");
+    } finally {
+      clearDeferredQueue(queueChatId);
+      session.activeDriver = originalDriver;
+    }
+  });
+
+  it("keeps stopped subturtles as stopped and formats elapsed as 0s", async () => {
+    const testTurtleName = "__test_stopped_status_turtle__";
+    const testDir = join(WORKING_DIR, ".subturtles", testTurtleName);
+    mkdirSync(testDir, { recursive: true });
+    writeFileSync(join(testDir, "CLAUDE.md"), "# Current task\nCheck stopped formatting\n");
+
+    try {
+      const result = findRoute("/api/processes");
+      expect(result).not.toBeNull();
+      const { req, url } = makeReq("/api/processes");
+      const res = await result!.handler(req, url, result!.match);
+      expect(res.status).toBe(200);
+
+      const body = await res.json() as Record<string, unknown>;
+      const processes = body.processes as Array<Record<string, unknown>>;
+      const subturtle = processes.find((p) => p.id === `subturtle-${testTurtleName}`);
+
+      expect(subturtle).toBeDefined();
+      expect(subturtle?.status).toBe("stopped");
+      expect(subturtle?.elapsed).toBe("0s");
+    } finally {
+      rmSync(testDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("GET /api/queue", () => {
+  const queueChatA = 980001;
+  const queueChatB = 980002;
+
+  beforeEach(() => {
+    clearDeferredQueue(queueChatA);
+    clearDeferredQueue(queueChatB);
+  });
+
+  afterEach(() => {
+    clearDeferredQueue(queueChatA);
+    clearDeferredQueue(queueChatB);
+  });
+
   it("matches the route pattern", () => {
     const result = findRoute("/api/queue");
     expect(result).not.toBeNull();
@@ -379,6 +461,34 @@ describe("GET /api/queue", () => {
     expect(typeof body.totalChats).toBe("number");
     expect(typeof body.totalMessages).toBe("number");
     expect(body.chats).toBeInstanceOf(Array);
+  });
+
+  it("returns queue payload without nested dashboard wrappers", async () => {
+    const now = Date.now();
+    enqueueTestMessage(queueChatA, "first queue message", now - 5000);
+    enqueueTestMessage(queueChatA, "second queue message", now - 2000);
+    enqueueTestMessage(queueChatB, "single queue message", now - 1000);
+
+    const result = findRoute("/api/queue");
+    expect(result).not.toBeNull();
+    const { req, url } = makeReq("/api/queue");
+    const res = await result!.handler(req, url, result!.match);
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.deferredQueue).toBeUndefined();
+    expect(body.totalChats).toBe(2);
+    expect(body.totalMessages).toBe(3);
+
+    const chats = body.chats as Array<Record<string, unknown>>;
+    const chatA = chats.find((chat) => chat.chatId === queueChatA);
+    const chatB = chats.find((chat) => chat.chatId === queueChatB);
+    expect(chatA).toBeDefined();
+    expect(chatB).toBeDefined();
+    expect(chatA?.size).toBe(2);
+    expect(chatB?.size).toBe(1);
+    expect(chatA?.preview).toBeInstanceOf(Array);
+    expect((chatA?.preview as string[])[0]).toContain("first queue message");
   });
 });
 
