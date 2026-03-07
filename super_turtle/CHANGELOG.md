@@ -10,6 +10,10 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 - `superturtle doctor`: one-command observability snapshot (bot tmux state, SubTurtles, cron summary, log health, recent loop failures)
 - `superturtle logs`: tail namespaced loop/pino/audit logs with optional pino pretty-printing
+- dashboard session observability:
+  - new APIs: `/api/sessions` and `/api/sessions/:driver/:sessionId`
+  - new UI section on `/dashboard` for active + recent sessions
+  - new detail page: `/dashboard/sessions/:driver/:sessionId` with recent message timeline + runtime metadata
 
 ### Changed
 - `superturtle start` now launches via `run-loop.sh` with loop-log tee output (`/tmp/claude-telegram-<tokenPrefix>-bot-ts.log`) and fails fast with last-log context when the tmux session exits immediately

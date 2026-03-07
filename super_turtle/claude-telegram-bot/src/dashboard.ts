@@ -9,7 +9,8 @@ import { codexSession } from "./codex-session";
 import { getPreparedSnapshotCount } from "./cron-supervision-queue";
 import { isBackgroundRunActive, wasBackgroundRunPreempted } from "./handlers/driver-routing";
 import { logger } from "./logger";
-import type { TurtleView, ProcessView, DeferredChatView, SubturtleLaneView, DashboardState, SubturtleListResponse, SubturtleDetailResponse, SubturtleLogsResponse, CronListResponse, CronJobView, SessionResponse, ContextResponse, ProcessDetailView, ProcessDetailResponse, DriverExtra, SubturtleExtra, BackgroundExtra, CurrentJobView, CurrentJobsResponse, JobDetailResponse, QueueResponse } from "./dashboard-types";
+import type { RecentMessage, SavedSession } from "./types";
+import type { TurtleView, ProcessView, DeferredChatView, SubturtleLaneView, DashboardState, SubturtleListResponse, SubturtleDetailResponse, SubturtleLogsResponse, CronListResponse, CronJobView, SessionResponse, SessionDriver, SessionListItem, SessionListResponse, SessionMessageView, SessionMetaView, SessionDetailResponse, ContextResponse, ProcessDetailView, ProcessDetailResponse, DriverExtra, SubturtleExtra, BackgroundExtra, CurrentJobView, CurrentJobsResponse, JobDetailResponse, QueueResponse } from "./dashboard-types";
 
 const dashboardLog = logger.child({ module: "dashboard" });
 
@@ -246,6 +247,253 @@ function buildCronJobView(job: ReturnType<typeof getJobs>[number]): CronJobView 
   };
 }
 
+type SessionSnapshot = {
+  row: SessionListItem;
+  messages: SessionMessageView[];
+  meta: SessionMetaView;
+};
+
+const SESSION_STATUS_ORDER: Record<SessionListItem["status"], number> = {
+  "active-running": 0,
+  "active-idle": 1,
+  saved: 2,
+};
+
+function buildSessionKey(driver: SessionDriver, sessionId: string): string {
+  return `${driver}:${sessionId}`;
+}
+
+function validateSessionId(sessionId: string): boolean {
+  if (!sessionId || sessionId.length > 256) return false;
+  if (sessionId.includes("/") || sessionId.includes("\\")) return false;
+  return true;
+}
+
+function mapRecentMessages(recentMessages?: RecentMessage[], preview?: string): SessionMessageView[] {
+  if (recentMessages && recentMessages.length > 0) {
+    return recentMessages.map((msg) => ({
+      role: msg.role,
+      text: msg.text,
+      timestamp: msg.timestamp,
+      charCount: msg.text.length,
+    }));
+  }
+
+  if (!preview) return [];
+  const lines = preview
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .slice(0, 2);
+
+  const synthetic: SessionMessageView[] = [];
+  for (const line of lines) {
+    if (line.startsWith("You: ")) {
+      const text = line.slice(5).trim();
+      synthetic.push({
+        role: "user",
+        text,
+        timestamp: "",
+        charCount: text.length,
+      });
+    } else if (line.startsWith("Assistant: ")) {
+      const text = line.slice(11).trim();
+      synthetic.push({
+        role: "assistant",
+        text,
+        timestamp: "",
+        charCount: text.length,
+      });
+    }
+  }
+  return synthetic;
+}
+
+function buildMessagePreview(messages: SessionMessageView[], fallback?: string | null): string | null {
+  if (messages.length === 0) return fallback || null;
+  const first = messages[0]!;
+  const second = messages[1];
+  const left = `${first.role === "user" ? "You" : "Assistant"}: ${first.text}`;
+  const right = second
+    ? `\n${second.role === "user" ? "You" : "Assistant"}: ${second.text}`
+    : "";
+  const combined = `${left}${right}`;
+  return combined.length > 280 ? `${combined.slice(0, 277)}...` : combined;
+}
+
+function defaultSessionMeta(driver: SessionDriver): SessionMetaView {
+  if (driver === "claude") {
+    return {
+      model: session.model,
+      effort: session.effort,
+      isRunning: false,
+      queryStarted: null,
+      lastUsage: null,
+      lastError: null,
+      lastErrorTime: null,
+      currentTool: null,
+      lastTool: null,
+    };
+  }
+  return {
+    model: codexSession.model,
+    effort: codexSession.reasoningEffort,
+    isRunning: false,
+    queryStarted: null,
+    lastUsage: null,
+    lastError: null,
+    lastErrorTime: null,
+    currentTool: null,
+    lastTool: null,
+  };
+}
+
+function upsertSavedSession(
+  snapshots: Map<string, SessionSnapshot>,
+  driver: SessionDriver,
+  saved: SavedSession
+): void {
+  if (!validateSessionId(saved.session_id)) return;
+
+  const messages = mapRecentMessages(saved.recentMessages, saved.preview);
+  const key = buildSessionKey(driver, saved.session_id);
+  snapshots.set(key, {
+    row: {
+      id: key,
+      driver,
+      sessionId: saved.session_id,
+      title: saved.title || `${driver} session`,
+      savedAt: saved.saved_at || null,
+      lastActivity: null,
+      status: "saved",
+      messageCount: messages.length,
+      workingDir: saved.working_dir || null,
+      preview: buildMessagePreview(messages, saved.preview || null),
+    },
+    messages,
+    meta: defaultSessionMeta(driver),
+  });
+}
+
+function sortSessionRows(rows: SessionListItem[]): SessionListItem[] {
+  return [...rows].sort((a, b) => {
+    const rankDiff = SESSION_STATUS_ORDER[a.status] - SESSION_STATUS_ORDER[b.status];
+    if (rankDiff !== 0) return rankDiff;
+    const left = Date.parse(a.lastActivity || a.savedAt || "") || 0;
+    const right = Date.parse(b.lastActivity || b.savedAt || "") || 0;
+    if (left !== right) return right - left;
+    return a.title.localeCompare(b.title);
+  });
+}
+
+function buildSessionSnapshots(): Map<string, SessionSnapshot> {
+  const snapshots = new Map<string, SessionSnapshot>();
+
+  for (const saved of session.getSessionList()) {
+    upsertSavedSession(snapshots, "claude", saved);
+  }
+  for (const saved of codexSession.getSessionList()) {
+    upsertSavedSession(snapshots, "codex", saved);
+  }
+
+  const claudeSessionId = session.sessionId;
+  if (claudeSessionId && validateSessionId(claudeSessionId)) {
+    const key = buildSessionKey("claude", claudeSessionId);
+    const existing = snapshots.get(key);
+    const messages = mapRecentMessages(
+      session.recentMessages,
+      existing?.row.preview || undefined
+    );
+    snapshots.set(key, {
+      row: {
+        id: key,
+        driver: "claude",
+        sessionId: claudeSessionId,
+        title: session.conversationTitle || existing?.row.title || "Active Claude session",
+        savedAt: existing?.row.savedAt || null,
+        lastActivity: session.lastActivity?.toISOString() || existing?.row.lastActivity || null,
+        status: session.isRunning ? "active-running" : "active-idle",
+        messageCount: messages.length,
+        workingDir: WORKING_DIR,
+        preview: buildMessagePreview(messages, existing?.row.preview || null),
+      },
+      messages,
+      meta: {
+        model: session.model,
+        effort: session.effort,
+        isRunning: session.isRunning,
+        queryStarted: session.queryStarted?.toISOString() || null,
+        lastUsage: session.lastUsage as Record<string, unknown> | null,
+        lastError: session.lastError,
+        lastErrorTime: session.lastErrorTime?.toISOString() || null,
+        currentTool: session.currentTool,
+        lastTool: session.lastTool,
+      },
+    });
+  }
+
+  const codexSessionId = codexSession.getThreadId();
+  if (codexSessionId && validateSessionId(codexSessionId)) {
+    const key = buildSessionKey("codex", codexSessionId);
+    const existing = snapshots.get(key);
+    const messages = mapRecentMessages(
+      codexSession.recentMessages,
+      existing?.row.preview || undefined
+    );
+    snapshots.set(key, {
+      row: {
+        id: key,
+        driver: "codex",
+        sessionId: codexSessionId,
+        title: existing?.row.title || "Active Codex session",
+        savedAt: existing?.row.savedAt || null,
+        lastActivity: codexSession.lastActivity?.toISOString() || existing?.row.lastActivity || null,
+        status: codexSession.isRunning ? "active-running" : "active-idle",
+        messageCount: messages.length,
+        workingDir: WORKING_DIR,
+        preview: buildMessagePreview(messages, existing?.row.preview || null),
+      },
+      messages,
+      meta: {
+        model: codexSession.model,
+        effort: codexSession.reasoningEffort,
+        isRunning: codexSession.isRunning,
+        queryStarted: codexSession.runningSince?.toISOString() || null,
+        lastUsage: codexSession.lastUsage as Record<string, unknown> | null,
+        lastError: codexSession.lastError,
+        lastErrorTime: codexSession.lastErrorTime?.toISOString() || null,
+        currentTool: null,
+        lastTool: null,
+      },
+    });
+  }
+
+  return snapshots;
+}
+
+function buildSessionListResponse(): SessionListResponse {
+  const snapshots = buildSessionSnapshots();
+  const sessions = sortSessionRows(Array.from(snapshots.values()).map((snapshot) => snapshot.row));
+  return {
+    generatedAt: new Date().toISOString(),
+    sessions,
+  };
+}
+
+function buildSessionDetail(driver: SessionDriver, sessionId: string): SessionDetailResponse | null {
+  if (!validateSessionId(sessionId)) return null;
+  const key = buildSessionKey(driver, sessionId);
+  const snapshot = buildSessionSnapshots().get(key);
+  if (!snapshot) return null;
+
+  return {
+    generatedAt: new Date().toISOString(),
+    session: snapshot.row,
+    messages: snapshot.messages,
+    meta: snapshot.meta,
+  };
+}
+
 async function buildSubturtleLanes(turtles: TurtleView[]): Promise<SubturtleLaneView[]> {
   return Promise.all(
     turtles.map(async (turtle) => {
@@ -394,6 +642,7 @@ function renderDashboardHtml(): string {
       <h1>Super Turtle Dashboard</h1>
       <p>
         <span id="updateBadge">Loading…</span> |
+        <span id="sessionBadge">Sessions: 0</span> |
         <span id="countBadge">SubTurtles: 0</span> |
         <span id="processBadge">Processes: 0</span> |
         <span id="queueBadge">Queued messages: 0</span> |
@@ -401,6 +650,17 @@ function renderDashboardHtml(): string {
         <span id="bgBadge">Background checks: 0</span> |
         <span id="jobBadge">Current jobs: 0</span>
       </p>
+      <section>
+        <h2>Sessions</h2>
+        <table>
+          <thead>
+            <tr><th>Session</th><th>Driver</th><th>Status</th><th>Messages</th><th>Last seen</th></tr>
+          </thead>
+          <tbody id="sessionRows">
+            <tr><td colspan="5">No sessions found.</td></tr>
+          </tbody>
+        </table>
+      </section>
       <section>
         <h2>SubTurtle Race Lanes</h2>
         <ul id="laneRows">
@@ -455,11 +715,13 @@ function renderDashboardHtml(): string {
     </main>
     <script>
       const laneRows = document.getElementById("laneRows");
+      const sessionRows = document.getElementById("sessionRows");
       const processRows = document.getElementById("processRows");
       const queueRows = document.getElementById("queueRows");
       const cronRows = document.getElementById("cronRows");
       const jobRows = document.getElementById("jobRows");
       const updateBadge = document.getElementById("updateBadge");
+      const sessionBadge = document.getElementById("sessionBadge");
       const countBadge = document.getElementById("countBadge");
       const processBadge = document.getElementById("processBadge");
       const queueBadge = document.getElementById("queueBadge");
@@ -470,6 +732,10 @@ function renderDashboardHtml(): string {
 
       function setSubturtleBadge(value) {
         countBadge.textContent = "SubTurtles: " + value;
+      }
+
+      function setSessionBadge(value) {
+        sessionBadge.textContent = "Sessions: " + value;
       }
 
       function setProcessBadge(value) {
@@ -518,22 +784,47 @@ function renderDashboardHtml(): string {
 
       async function loadData() {
         try {
-          const [dashboardRes, jobsRes] = await Promise.all([
+          const [dashboardRes, jobsRes, sessionsRes] = await Promise.all([
             fetch("/api/dashboard", { cache: "no-store" }),
             fetch("/api/jobs/current", { cache: "no-store" }),
+            fetch("/api/sessions", { cache: "no-store" }),
           ]);
           if (!dashboardRes.ok) throw new Error("Failed dashboard request");
           if (!jobsRes.ok) throw new Error("Failed jobs request");
+          if (!sessionsRes.ok) throw new Error("Failed sessions request");
           const data = await dashboardRes.json();
           const jobsData = await jobsRes.json();
+          const sessionsData = await sessionsRes.json();
 
           updateBadge.textContent = "Updated " + new Date(data.generatedAt).toLocaleTimeString();
+          setSessionBadge(sessionsData.sessions.length);
           setSubturtleBadge(data.turtles.length);
           setProcessBadge(data.processes.length);
           setQueueBadge(data.deferredQueue.totalMessages);
           setCronBadge(data.cronJobs.length);
           setJobBadge(jobsData.jobs.length);
           setBackgroundBadge(data.background.runActive, data.background.supervisionQueue);
+
+          if (!sessionsData.sessions.length) {
+            sessionRows.innerHTML = "<tr><td colspan='5'>No sessions found.</td></tr>";
+          } else {
+            const rows = sessionsData.sessions.map((s) => {
+              const shortId = s.sessionId.length > 8 ? s.sessionId.slice(0, 8) + "…" : s.sessionId;
+              const title = s.title ? s.title : "(untitled)";
+              const lastSeen = s.lastActivity || s.savedAt || "n/a";
+              return "<tr>" +
+                "<td><a href='/dashboard/sessions/" + encodeURIComponent(s.driver) + "/" + encodeURIComponent(s.sessionId) + "'>" +
+                escapeHtml(title) +
+                " (" + escapeHtml(shortId) + ")" +
+                "</a></td>" +
+                "<td>" + escapeHtml(s.driver) + "</td>" +
+                "<td>" + escapeHtml(s.status) + "</td>" +
+                "<td>" + String(s.messageCount) + "</td>" +
+                "<td>" + escapeHtml(lastSeen) + "</td>" +
+                "</tr>";
+            });
+            sessionRows.innerHTML = rows.join("");
+          }
 
           if (!data.lanes.length) {
             laneRows.innerHTML = "<li>No SubTurtle lanes yet.</li>";
@@ -627,6 +918,8 @@ function renderDashboardHtml(): string {
 
           statusLine.textContent =
             "Status: " +
+            sessionsData.sessions.length +
+            " sessions, " +
             data.turtles.length +
             " turtles, " +
             data.processes.length +
@@ -811,6 +1104,65 @@ function renderSubturtleDetailHtml(detail: SubturtleDetailResponse, logs: Subtur
     <pre>${escapeHtml(detail.claudeMd || "(empty)")}</pre>
     <h2>Logs</h2>
     <pre>${escapeHtml(logs?.lines.join("\\n") || "No logs")}</pre>
+  </body>
+</html>`;
+}
+
+function renderSessionDetailHtml(detail: SessionDetailResponse): string {
+  const messageRows = detail.messages.length > 0
+    ? detail.messages.map((msg) => {
+        const ts = msg.timestamp || "n/a";
+        return "<tr>" +
+          "<td>" + escapeHtml(msg.role) + "</td>" +
+          "<td>" + escapeHtml(ts) + "</td>" +
+          "<td>" + String(msg.charCount) + "</td>" +
+          "<td><pre>" + escapeHtml(msg.text) + "</pre></td>" +
+          "</tr>";
+      }).join("")
+    : "<tr><td colspan='4'>No recent messages available.</td></tr>";
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Session ${escapeHtml(detail.session.sessionId)} detail</title>
+  </head>
+  <body>
+    <h1>Session detail</h1>
+    <p><a href="/dashboard">← Back to dashboard</a></p>
+    <h2>Overview</h2>
+    <ul>
+      <li>Driver: ${escapeHtml(detail.session.driver)}</li>
+      <li>Session ID: ${escapeHtml(detail.session.sessionId)}</li>
+      <li>Title: ${escapeHtml(detail.session.title)}</li>
+      <li>Status: ${escapeHtml(detail.session.status)}</li>
+      <li>Saved at: ${escapeHtml(detail.session.savedAt || "n/a")}</li>
+      <li>Last activity: ${escapeHtml(detail.session.lastActivity || "n/a")}</li>
+      <li>Messages: ${detail.session.messageCount}</li>
+    </ul>
+    <h2>Runtime Meta</h2>
+    <ul>
+      <li>Model: ${escapeHtml(detail.meta.model)}</li>
+      <li>Effort: ${escapeHtml(detail.meta.effort)}</li>
+      <li>Running: ${detail.meta.isRunning ? "yes" : "no"}</li>
+      <li>Query started: ${escapeHtml(detail.meta.queryStarted || "n/a")}</li>
+      <li>Current tool: ${escapeHtml(detail.meta.currentTool || "n/a")}</li>
+      <li>Last tool: ${escapeHtml(detail.meta.lastTool || "n/a")}</li>
+      <li>Last error: ${escapeHtml(detail.meta.lastError || "n/a")}</li>
+      <li>Last error time: ${escapeHtml(detail.meta.lastErrorTime || "n/a")}</li>
+    </ul>
+    <h2>Usage</h2>
+    ${renderJsonPre(detail.meta.lastUsage)}
+    <h2>Messages</h2>
+    <table>
+      <thead>
+        <tr><th>Role</th><th>Timestamp</th><th>Chars</th><th>Text</th></tr>
+      </thead>
+      <tbody>
+        ${messageRows}
+      </tbody>
+    </table>
   </body>
 </html>`;
 }
@@ -1075,6 +1427,25 @@ export const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
     },
   },
   {
+    pattern: /^\/api\/sessions$/,
+    handler: async () => {
+      return jsonResponse(buildSessionListResponse());
+    },
+  },
+  {
+    pattern: /^\/api\/sessions\/(claude|codex)\/([^/]+)$/,
+    handler: async (_req, _url, match) => {
+      const driver = decodeURIComponent(match[1] ?? "") as SessionDriver;
+      const sessionId = decodeURIComponent(match[2] ?? "");
+      if ((driver !== "claude" && driver !== "codex") || !validateSessionId(sessionId)) {
+        return notFoundResponse("Invalid session identifier");
+      }
+      const detail = buildSessionDetail(driver, sessionId);
+      if (!detail) return notFoundResponse("Session not found");
+      return jsonResponse(detail);
+    },
+  },
+  {
     pattern: /^\/api\/context$/,
     handler: async () => {
       const claudeMdPath = `${WORKING_DIR}/CLAUDE.md`;
@@ -1164,6 +1535,21 @@ export const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
       if (!detail) return notFoundResponse("SubTurtle not found");
       const logs = await buildSubturtleLogs(name, 200);
       return new Response(renderSubturtleDetailHtml(detail, logs), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    },
+  },
+  {
+    pattern: /^\/dashboard\/sessions\/(claude|codex)\/([^/]+)$/,
+    handler: async (_req, _url, match) => {
+      const driver = decodeURIComponent(match[1] ?? "") as SessionDriver;
+      const sessionId = decodeURIComponent(match[2] ?? "");
+      if ((driver !== "claude" && driver !== "codex") || !validateSessionId(sessionId)) {
+        return notFoundResponse("Invalid session identifier");
+      }
+      const detail = buildSessionDetail(driver, sessionId);
+      if (!detail) return notFoundResponse("Session not found");
+      return new Response(renderSessionDetailHtml(detail), {
         headers: { "content-type": "text/html; charset=utf-8" },
       });
     },

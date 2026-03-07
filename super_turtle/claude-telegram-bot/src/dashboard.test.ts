@@ -596,6 +596,18 @@ describe("GET /dashboard", () => {
     expect(html.toLowerCase()).toContain("<html");
     expect(html.toLowerCase()).not.toContain("<style>");
   });
+
+  it("renders JavaScript that parses successfully", async () => {
+    const result = findRoute("/dashboard");
+    expect(result).not.toBeNull();
+    const { req, url } = makeReq("/dashboard");
+    const res = await result!.handler(req, url, result!.match);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    const scriptMatch = html.match(/<script>([\s\S]*?)<\/script>/);
+    expect(scriptMatch).not.toBeNull();
+    expect(() => new Function(scriptMatch![1]!)).not.toThrow();
+  });
 });
 
 describe("GET /dashboard/subturtles/:name", () => {
@@ -633,6 +645,15 @@ describe("GET /dashboard/jobs/:id", () => {
   });
 });
 
+describe("GET /dashboard/sessions/:driver/:sessionId", () => {
+  it("matches the route pattern", () => {
+    const result = findRoute("/dashboard/sessions/claude/session-123");
+    expect(result).not.toBeNull();
+    expect(result!.match[1]).toBe("claude");
+    expect(result!.match[2]).toBe("session-123");
+  });
+});
+
 /* ── Route table tests for /api/session ───────────────────────────── */
 
 describe("GET /api/session", () => {
@@ -655,6 +676,111 @@ describe("GET /api/session", () => {
     expect(typeof body.activeDriver).toBe("string");
     expect(typeof body.isRunning).toBe("boolean");
     expect(typeof body.isActive).toBe("boolean");
+  });
+});
+
+describe("GET /api/sessions", () => {
+  const originalState = {
+    sessionId: session.sessionId,
+    conversationTitle: session.conversationTitle,
+    recentMessages: [...session.recentMessages],
+    lastActivity: session.lastActivity,
+  };
+
+  afterEach(() => {
+    session.sessionId = originalState.sessionId;
+    session.conversationTitle = originalState.conversationTitle;
+    session.recentMessages = [...originalState.recentMessages];
+    session.lastActivity = originalState.lastActivity;
+  });
+
+  it("matches the route pattern", () => {
+    const result = findRoute("/api/sessions");
+    expect(result).not.toBeNull();
+  });
+
+  it("returns active claude session with recent messages", async () => {
+    session.sessionId = "dashboard-test-session";
+    session.conversationTitle = "Dashboard test title";
+    session.lastActivity = new Date("2026-03-07T15:00:00.000Z");
+    session.recentMessages = [
+      {
+        role: "user",
+        text: "Hello dashboard",
+        timestamp: "2026-03-07T15:00:00.000Z",
+      },
+      {
+        role: "assistant",
+        text: "Hi from assistant",
+        timestamp: "2026-03-07T15:00:01.000Z",
+      },
+    ];
+
+    const listRoute = findRoute("/api/sessions");
+    expect(listRoute).not.toBeNull();
+    const { req, url } = makeReq("/api/sessions");
+    const listRes = await listRoute!.handler(req, url, listRoute!.match);
+    expect(listRes.status).toBe(200);
+    const listBody = await listRes.json() as Record<string, unknown>;
+    expect(listBody.generatedAt).toBeDefined();
+    expect(listBody.sessions).toBeInstanceOf(Array);
+
+    const sessions = listBody.sessions as Array<Record<string, unknown>>;
+    const match = sessions.find((entry) => entry.sessionId === "dashboard-test-session");
+    expect(match).toBeDefined();
+    expect(match?.driver).toBe("claude");
+    expect(match?.status).toBe("active-idle");
+    expect(match?.messageCount).toBe(2);
+  });
+});
+
+describe("GET /api/sessions/:driver/:sessionId", () => {
+  const originalState = {
+    sessionId: session.sessionId,
+    recentMessages: [...session.recentMessages],
+  };
+
+  afterEach(() => {
+    session.sessionId = originalState.sessionId;
+    session.recentMessages = [...originalState.recentMessages];
+  });
+
+  it("matches the route pattern", () => {
+    const result = findRoute("/api/sessions/claude/session-123");
+    expect(result).not.toBeNull();
+    expect(result!.match[1]).toBe("claude");
+    expect(result!.match[2]).toBe("session-123");
+  });
+
+  it("returns detail payload for active claude session", async () => {
+    session.sessionId = "session-detail-test";
+    session.recentMessages = [
+      { role: "user", text: "A", timestamp: "2026-03-07T15:10:00.000Z" },
+      { role: "assistant", text: "B", timestamp: "2026-03-07T15:10:01.000Z" },
+    ];
+
+    const result = findRoute("/api/sessions/claude/session-detail-test");
+    expect(result).not.toBeNull();
+    const { req, url } = makeReq("/api/sessions/claude/session-detail-test");
+    const res = await result!.handler(req, url, result!.match);
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.generatedAt).toBeDefined();
+    const sessionInfo = body.session as Record<string, unknown>;
+    expect(sessionInfo.sessionId).toBe("session-detail-test");
+    const messages = body.messages as Array<Record<string, unknown>>;
+    expect(messages.length).toBe(2);
+    const meta = body.meta as Record<string, unknown>;
+    expect(typeof meta.model).toBe("string");
+    expect(typeof meta.effort).toBe("string");
+  });
+
+  it("returns 404 for missing session", async () => {
+    const result = findRoute("/api/sessions/claude/__nope__");
+    expect(result).not.toBeNull();
+    const { req, url } = makeReq("/api/sessions/claude/__nope__");
+    const res = await result!.handler(req, url, result!.match);
+    expect(res.status).toBe(404);
   });
 });
 

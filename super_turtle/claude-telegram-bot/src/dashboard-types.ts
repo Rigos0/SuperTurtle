@@ -133,6 +133,53 @@ export type SessionResponse = {
   lastActivity: string | null;
 };
 
+export type SessionDriver = "claude" | "codex";
+export type SessionStatus = "active-running" | "active-idle" | "saved";
+
+export type SessionListItem = {
+  id: string; // `${driver}:${sessionId}`
+  driver: SessionDriver;
+  sessionId: string;
+  title: string;
+  savedAt: string | null;
+  lastActivity: string | null;
+  status: SessionStatus;
+  messageCount: number;
+  workingDir: string | null;
+  preview: string | null;
+};
+
+export type SessionListResponse = {
+  generatedAt: string;
+  sessions: SessionListItem[];
+};
+
+export type SessionMessageView = {
+  role: "user" | "assistant";
+  text: string;
+  timestamp: string;
+  charCount: number;
+};
+
+export type SessionMetaView = {
+  model: string;
+  effort: string;
+  isRunning: boolean;
+  queryStarted: string | null;
+  lastUsage: Record<string, unknown> | null;
+  lastError: string | null;
+  lastErrorTime: string | null;
+  currentTool: string | null;
+  lastTool: string | null;
+};
+
+export type SessionDetailResponse = {
+  generatedAt: string;
+  session: SessionListItem;
+  messages: SessionMessageView[];
+  meta: SessionMetaView;
+};
+
 export type ContextResponse = {
   generatedAt: string;
   claudeMd: string;
