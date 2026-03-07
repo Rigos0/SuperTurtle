@@ -43,6 +43,7 @@ import { claudeLog } from "./logger";
 import type { DriverRunSource } from "./drivers/types";
 import { appendTurnLogEntry, type TurnLogStatus, type TurnLogUsage } from "./turn-log";
 import { buildInjectedArtifacts, readClaudeMdSnapshot } from "./injected-artifacts";
+import { buildSavedSessionHistory, buildTurnLogHistory, toRecentMessages } from "./session-history";
 
 // Stream-json event types from claude CLI
 interface StreamJsonEvent {
@@ -1103,7 +1104,27 @@ export class ClaudeSession {
     this.sessionId = sessionData.session_id;
     this.conversationTitle = sessionData.title;
     this.lastActivity = new Date();
-    this.recentMessages = sessionData.recentMessages || [];
+    const resumeHistory =
+      buildTurnLogHistory("claude", sessionId)
+      || buildSavedSessionHistory(sessionData);
+    if (resumeHistory) {
+      this.recentMessages = toRecentMessages(
+        resumeHistory,
+        ClaudeSession.MAX_RECENT_MESSAGES,
+        ClaudeSession.MAX_MESSAGE_TEXT
+      );
+      const lastUser = [...resumeHistory.messages].reverse().find((message) => message.role === "user");
+      const lastAssistant = [...resumeHistory.messages].reverse().find((message) => message.role === "assistant");
+      this.lastMessage = lastUser?.text || null;
+      this.lastAssistantMessage = lastAssistant?.text || null;
+    } else {
+      this.recentMessages = sessionData.recentMessages || [];
+      const lastUser = [...this.recentMessages].reverse().find((message) => message.role === "user");
+      const lastAssistant = [...this.recentMessages].reverse().find((message) => message.role === "assistant");
+      this.lastMessage = lastUser?.text || null;
+      this.lastAssistantMessage = lastAssistant?.text || null;
+    }
+    this.saveSession();
 
     claudeLog.info(
       `Resumed session ${sessionData.session_id.slice(0, 8)}... - "${sessionData.title}"`

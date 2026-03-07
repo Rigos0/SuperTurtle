@@ -23,11 +23,15 @@ import { codexLog } from "./logger";
 import type { DriverRunSource } from "./drivers/types";
 import { appendTurnLogEntry, type TurnLogStatus, type TurnLogUsage } from "./turn-log";
 import { buildInjectedArtifacts, readClaudeMdSnapshot } from "./injected-artifacts";
+import type { InjectedArtifact } from "./injected-artifacts";
+import { buildExternalSessionHistory, buildSavedSessionHistory, buildTurnLogHistory, toRecentMessages } from "./session-history";
 
 // Prefs file for Codex (separate from Claude)
 const CODEX_PREFS_FILE = `/tmp/codex-telegram-${TOKEN_PREFIX}-prefs.json`;
 const CODEX_SESSION_FILE = `/tmp/codex-telegram-${TOKEN_PREFIX}-session.json`;
 const MAX_CODEX_SESSIONS = 5;
+const MAX_RECENT_MESSAGES = 10;
+const MAX_MESSAGE_TEXT = 500;
 const APP_SERVER_TIMEOUT_MS = 6000;
 const MODEL_CACHE_TTL_MS = 60_000;
 const EVENT_STREAM_STALL_TIMEOUT_MS = (() => {
@@ -208,6 +212,140 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
+function normalizeTranscriptText(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function extractMessageTextFromContent(
+  content: unknown,
+  itemType: "input_text" | "output_text"
+): string {
+  if (!Array.isArray(content)) return "";
+  return content
+    .filter((item) => item && typeof item === "object" && "type" in item && item.type === itemType)
+    .map((item) => normalizeTranscriptText((item as { text?: unknown }).text))
+    .join("");
+}
+
+function stripMetaPrompt(text: string): {
+  text: string;
+  artifact: string | null;
+} {
+  const match = text.match(/^<system-instructions>\n([\s\S]*?)\n<\/system-instructions>\n\n?/);
+  if (!match) {
+    return { text, artifact: null };
+  }
+  return {
+    text: text.slice(match[0].length),
+    artifact: match[1] || "",
+  };
+}
+
+function stripDatePrefix(text: string): {
+  text: string;
+  artifact: string | null;
+} {
+  const match = text.match(/^(\[Current date\/time:[^\n]*\]\n\n)/);
+  if (!match) {
+    return { text, artifact: null };
+  }
+  return {
+    text: text.slice(match[1].length),
+    artifact: match[1],
+  };
+}
+
+export function parseCodexTranscript(
+  sessionId: string,
+  transcriptText: string,
+  path: string | null = null
+): CodexTranscriptData {
+  const messages: CodexTranscriptMessage[] = [];
+  let metaPromptText: string | null = null;
+  let datePrefixText: string | null = null;
+
+  for (const line of transcriptText.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+
+    if (parsed.type !== "response_item") continue;
+    const payload = parsed.payload;
+    if (!payload || typeof payload !== "object") continue;
+    if ((payload as { type?: unknown }).type !== "message") continue;
+
+    const role = (payload as { role?: unknown }).role;
+    const content = (payload as { content?: unknown }).content;
+    const timestamp = typeof parsed.timestamp === "string" ? parsed.timestamp : "";
+
+    if (role === "user") {
+      const rawText = extractMessageTextFromContent(content, "input_text");
+      if (!rawText) continue;
+      const meta = stripMetaPrompt(rawText);
+      if (!metaPromptText && meta.artifact) {
+        metaPromptText = meta.artifact;
+      }
+      const dated = stripDatePrefix(meta.text);
+      if (!datePrefixText && dated.artifact) {
+        datePrefixText = dated.artifact;
+      }
+      const cleaned = dated.text.trim();
+      if (!cleaned) continue;
+      messages.push({
+        role: "user",
+        text: cleaned,
+        timestamp,
+      });
+      continue;
+    }
+
+    if (role === "assistant") {
+      const text = extractMessageTextFromContent(content, "output_text").trim();
+      if (!text) continue;
+      messages.push({
+        role: "assistant",
+        text,
+        timestamp,
+      });
+    }
+  }
+
+  const injectedArtifacts: InjectedArtifact[] = [];
+  if (metaPromptText) {
+    injectedArtifacts.push({
+      id: "meta-prompt",
+      label: "Meta system prompt",
+      order: 20,
+      text: metaPromptText,
+      applied: true,
+    });
+  }
+  if (datePrefixText) {
+    injectedArtifacts.push({
+      id: "date-prefix",
+      label: "Date/time prefix",
+      order: 30,
+      text: datePrefixText,
+      applied: true,
+    });
+  }
+
+  return {
+    sessionId,
+    path,
+    messages,
+    injectedArtifacts,
+    metaSharedLoaded: metaPromptText !== null,
+    datePrefixApplied: datePrefixText !== null,
+  };
+}
+
 /**
  * Check if MCP servers are already configured in ~/.codex/config.toml.
  * Returns true if any of our built-in servers are found.
@@ -332,17 +470,44 @@ type AppServerModelListResponse = {
 };
 
 type AppServerConversation = {
+  id?: string;
   conversationId?: string;
+  name?: string | null;
   preview?: string;
-  timestamp?: string | null;
-  updatedAt?: string | null;
+  timestamp?: string | number | null;
+  createdAt?: string | number | null;
+  updatedAt?: string | number | null;
   cwd?: string;
 };
 
 type AppServerConversationListResponse = {
+  data?: AppServerConversation[];
   items?: AppServerConversation[];
   nextCursor?: string | null;
 };
+
+type AppServerThreadReadResponse = {
+  thread?: {
+    id?: string;
+    path?: string | null;
+    cwd?: string;
+  } | null;
+};
+
+export interface CodexTranscriptMessage {
+  role: "user" | "assistant";
+  text: string;
+  timestamp: string;
+}
+
+export interface CodexTranscriptData {
+  sessionId: string;
+  path: string | null;
+  messages: CodexTranscriptMessage[];
+  injectedArtifacts: InjectedArtifact[];
+  metaSharedLoaded: boolean;
+  datePrefixApplied: boolean;
+}
 
 let cachedModelCatalog:
   | {
@@ -511,6 +676,21 @@ async function requestAppServer<T>(
   return response;
 }
 
+async function fetchTranscriptPathFromAppServer(sessionId: string): Promise<string | null> {
+  const result = await requestAppServer<AppServerThreadReadResponse>(
+    "thread/read",
+    { threadId: sessionId }
+  );
+  const thread = result?.thread;
+  if (!thread || typeof thread.path !== "string" || thread.path.length === 0) {
+    return null;
+  }
+  if (thread.cwd && thread.cwd !== WORKING_DIR) {
+    return null;
+  }
+  return thread.path;
+}
+
 async function fetchModelsFromAppServer(): Promise<CodexModelInfo[]> {
   const models: CodexModelInfo[] = [];
   let cursor: string | null = null;
@@ -561,30 +741,70 @@ async function fetchConversationsFromAppServer(
   const sessions: SavedSession[] = [];
   let cursor: string | null = null;
 
+  const normalizeTimestamp = (value: string | number | null | undefined): string | null => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      const ms = value > 1e12 ? value : value * 1000;
+      return new Date(ms).toISOString();
+    }
+    if (typeof value === "string" && value.trim().length > 0) {
+      const parsed = Date.parse(value);
+      return Number.isNaN(parsed) ? value : new Date(parsed).toISOString();
+    }
+    return null;
+  };
+
   while (sessions.length < maxSessions) {
-    const result: AppServerConversationListResponse | null =
+    const pageSize = Math.min(25, maxSessions - sessions.length);
+    const result =
       await requestAppServer<AppServerConversationListResponse>(
-      "listConversations",
-      {
-        pageSize: Math.min(25, maxSessions - sessions.length),
-        cursor,
-        modelProviders: null,
-      }
+        "thread/list",
+        {
+          cursor,
+          limit: pageSize,
+        }
+      )
+      || await requestAppServer<AppServerConversationListResponse>(
+        "listConversations",
+        {
+          pageSize,
+          cursor,
+          modelProviders: null,
+        }
       );
 
-    if (!result || !Array.isArray(result.items)) {
+    const items = Array.isArray(result?.data)
+      ? result.data
+      : Array.isArray(result?.items)
+        ? result.items
+        : null;
+
+    if (!items) {
       break;
     }
 
-    for (const item of result.items) {
-      if (!item || typeof item.conversationId !== "string") continue;
+    for (const item of items) {
+      const sessionId =
+        typeof item?.id === "string"
+          ? item.id
+          : typeof item?.conversationId === "string"
+            ? item.conversationId
+            : null;
+      if (!item || !sessionId) continue;
       if (item.cwd && item.cwd !== WORKING_DIR) continue;
 
       const preview = (item.preview || "").trim();
-      const firstLine = preview.split("\n")[0]?.trim() || "Codex session";
+      const firstLine =
+        preview.split("\n")[0]?.trim()
+        || (typeof item.name === "string" ? item.name.trim() : "")
+        || "Codex session";
+      const savedAt =
+        normalizeTimestamp(item.updatedAt)
+        || normalizeTimestamp(item.timestamp)
+        || normalizeTimestamp(item.createdAt)
+        || new Date().toISOString();
       sessions.push({
-        session_id: item.conversationId,
-        saved_at: item.updatedAt || item.timestamp || new Date().toISOString(),
+        session_id: sessionId,
+        saved_at: savedAt,
         working_dir: item.cwd || WORKING_DIR,
         title: firstLine.length > 80 ? firstLine.slice(0, 77) + "..." : firstLine,
         ...(preview ? { preview } : {}),
@@ -644,21 +864,48 @@ export class CodexSession {
   lastUsage: { input_tokens: number; output_tokens: number } | null = null;
   recentMessages: RecentMessage[] = []; // Rolling buffer for resume preview
 
-  private static readonly MAX_RECENT_MESSAGES = 10;
-  private static readonly MAX_MESSAGE_TEXT = 500;
-
   /** Push a user or assistant message into the rolling buffer. */
   pushRecentMessage(role: "user" | "assistant", text: string): void {
-    const truncated = text.length > CodexSession.MAX_MESSAGE_TEXT
-      ? text.slice(0, CodexSession.MAX_MESSAGE_TEXT - 3) + "..."
+    const truncated = text.length > MAX_MESSAGE_TEXT
+      ? text.slice(0, MAX_MESSAGE_TEXT - 3) + "..."
       : text;
     this.recentMessages.push({
       role,
       text: truncated,
       timestamp: new Date().toISOString(),
     });
-    if (this.recentMessages.length > CodexSession.MAX_RECENT_MESSAGES) {
-      this.recentMessages = this.recentMessages.slice(-CodexSession.MAX_RECENT_MESSAGES);
+    if (this.recentMessages.length > MAX_RECENT_MESSAGES) {
+      this.recentMessages = this.recentMessages.slice(-MAX_RECENT_MESSAGES);
+    }
+  }
+
+  private hydrateRecentMessages(messages: CodexTranscriptMessage[]): void {
+    this.recentMessages = toRecentMessages(
+      buildExternalSessionHistory({
+        source: "codex-jsonl",
+        messages,
+      })!,
+      MAX_RECENT_MESSAGES,
+      MAX_MESSAGE_TEXT
+    );
+    const lastUser = [...messages].reverse().find((message) => message.role === "user");
+    const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
+    this.lastMessage = lastUser?.text || null;
+    this.lastAssistantMessage = lastAssistant?.text || null;
+  }
+
+  async getSessionTranscript(sessionId: string): Promise<CodexTranscriptData | null> {
+    const transcriptPath = await fetchTranscriptPathFromAppServer(sessionId);
+    if (!transcriptPath || !existsSync(transcriptPath)) {
+      return null;
+    }
+
+    try {
+      const transcriptText = readFileSync(transcriptPath, "utf-8");
+      return parseCodexTranscript(sessionId, transcriptText, transcriptPath);
+    } catch (error) {
+      codexLog.warn({ err: error, sessionId, transcriptPath }, "Failed to load Codex transcript");
+      return null;
     }
   }
 
@@ -1435,7 +1682,40 @@ ${messageToSend}`;
 
     try {
       await this.resumeThread(sessionId);
-      this.recentMessages = sessionData.recentMessages || [];
+      const transcript = await this.getSessionTranscript(sessionId);
+      const resumeHistory =
+        (transcript
+          ? buildExternalSessionHistory({
+              source: "codex-jsonl",
+              path: transcript.path,
+              messages: transcript.messages,
+              injectedArtifacts: transcript.injectedArtifacts,
+              context: {
+                metaSharedLoaded: transcript.metaSharedLoaded,
+                datePrefixApplied: transcript.datePrefixApplied,
+              },
+            })
+          : null)
+        || buildTurnLogHistory("codex", sessionId)
+        || buildSavedSessionHistory(sessionData);
+      if (resumeHistory) {
+        this.recentMessages = toRecentMessages(
+          resumeHistory,
+          MAX_RECENT_MESSAGES,
+          MAX_MESSAGE_TEXT
+        );
+        const lastUser = [...resumeHistory.messages].reverse().find((message) => message.role === "user");
+        const lastAssistant = [...resumeHistory.messages].reverse().find((message) => message.role === "assistant");
+        this.lastMessage = lastUser?.text || null;
+        this.lastAssistantMessage = lastAssistant?.text || null;
+      } else {
+        this.recentMessages = sessionData.recentMessages || [];
+        const lastUser = [...this.recentMessages].reverse().find((message) => message.role === "user");
+        const lastAssistant = [...this.recentMessages].reverse().find((message) => message.role === "assistant");
+        this.lastMessage = lastUser?.text || null;
+        this.lastAssistantMessage = lastAssistant?.text || null;
+      }
+      this.lastActivity = new Date();
       this.saveSession(sessionData.title);
       codexLog.info(
         `Resumed Codex session ${sessionData.session_id.slice(0, 8)}... - "${sessionData.title}"`

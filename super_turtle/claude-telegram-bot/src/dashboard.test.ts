@@ -3,8 +3,19 @@ import { join } from "path";
 import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { DASHBOARD_AUTH_TOKEN, WORKING_DIR } from "./config";
 
-const { isAuthorized, safeSubstring, computeProgressPct, jsonResponse, notFoundResponse, readFileOr, parseMetaFile, validateSubturtleName } = await import("./dashboard");
+const {
+  isAuthorized,
+  safeSubstring,
+  computeProgressPct,
+  jsonResponse,
+  notFoundResponse,
+  readFileOr,
+  parseMetaFile,
+  validateSubturtleName,
+  resetDashboardSessionCachesForTests,
+} = await import("./dashboard");
 const { session } = await import("./session");
+const { codexSession } = await import("./codex-session");
 const { enqueueDeferredMessage, clearDeferredQueue, getAllDeferredQueues } = await import("./deferred-queue");
 const { appendTurnLogEntry, clearTurnLogFile } = await import("./turn-log");
 
@@ -19,10 +30,12 @@ function clearAllDeferredQueuesForTest(): void {
 
 beforeEach(() => {
   clearAllDeferredQueuesForTest();
+  resetDashboardSessionCachesForTests();
 });
 
 afterEach(() => {
   clearAllDeferredQueuesForTest();
+  resetDashboardSessionCachesForTests();
 });
 
 describe("isAuthorized()", () => {
@@ -669,10 +682,16 @@ describe("GET /dashboard/sessions/:driver/:sessionId", () => {
     sessionId: session.sessionId,
     conversationTitle: session.conversationTitle,
   };
+  const originalCodexState = {
+    getSessionList: codexSession.getSessionList,
+    getSessionTranscript: codexSession.getSessionTranscript,
+  };
 
   afterEach(() => {
     session.sessionId = originalState.sessionId;
     session.conversationTitle = originalState.conversationTitle;
+    codexSession.getSessionList = originalCodexState.getSessionList;
+    codexSession.getSessionTranscript = originalCodexState.getSessionTranscript;
     clearTurnLogFile();
   });
 
@@ -814,6 +833,63 @@ describe("GET /dashboard/sessions/:driver/:sessionId", () => {
     expect(html).toContain("Legacy turn log");
     expect(html).toContain("No captured injected artifacts for this turn (legacy log entry).");
   });
+
+  it("renders transcript-backed Codex history and meta prompt evidence without turn logs", async () => {
+    codexSession.getSessionList = () => [
+      {
+        session_id: "codex-transcript-session",
+        saved_at: "2026-03-07T16:00:00.000Z",
+        working_dir: WORKING_DIR,
+        title: "Codex transcript session",
+      },
+    ];
+    codexSession.getSessionTranscript = async () => ({
+      sessionId: "codex-transcript-session",
+      path: "/tmp/codex-transcript-session.jsonl",
+      messages: [
+        {
+          role: "user",
+          text: "Older Codex user message",
+          timestamp: "2026-03-07T16:00:00.000Z",
+        },
+        {
+          role: "assistant",
+          text: "Older Codex assistant reply",
+          timestamp: "2026-03-07T16:00:01.000Z",
+        },
+      ],
+      injectedArtifacts: [
+        {
+          id: "meta-prompt",
+          label: "Meta system prompt",
+          order: 20,
+          text: "meta prompt from transcript",
+          applied: true,
+        },
+        {
+          id: "date-prefix",
+          label: "Date/time prefix",
+          order: 30,
+          text: "[Current date/time: Saturday, March 7, 2026 at 05:00 PM GMT+1]\n\n",
+          applied: true,
+        },
+      ],
+      metaSharedLoaded: true,
+      datePrefixApplied: true,
+    });
+
+    const result = findRoute("/dashboard/sessions/codex/codex-transcript-session");
+    expect(result).not.toBeNull();
+    const { req, url } = makeReq("/dashboard/sessions/codex/codex-transcript-session");
+    const res = await result!.handler(req, url, result!.match);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("Older Codex user message");
+    expect(html).toContain("Older Codex assistant reply");
+    expect(html).toContain("Meta system prompt");
+    expect(html).toContain("meta prompt from transcript");
+    expect(html).not.toContain("No captured injections for this session.");
+  });
 });
 
 /* ── Route table tests for /api/session ───────────────────────────── */
@@ -848,12 +924,23 @@ describe("GET /api/sessions", () => {
     recentMessages: [...session.recentMessages],
     lastActivity: session.lastActivity,
   };
+  const originalCodexState = {
+    recentMessages: [...codexSession.recentMessages],
+    lastActivity: codexSession.lastActivity,
+    getSessionList: codexSession.getSessionList,
+    getSessionListLive: codexSession.getSessionListLive,
+  };
 
   afterEach(() => {
     session.sessionId = originalState.sessionId;
     session.conversationTitle = originalState.conversationTitle;
     session.recentMessages = [...originalState.recentMessages];
     session.lastActivity = originalState.lastActivity;
+    codexSession.recentMessages = [...originalCodexState.recentMessages];
+    codexSession.lastActivity = originalCodexState.lastActivity;
+    codexSession.getSessionList = originalCodexState.getSessionList;
+    codexSession.getSessionListLive = originalCodexState.getSessionListLive;
+    resetDashboardSessionCachesForTests();
   });
 
   it("matches the route pattern", () => {
@@ -893,6 +980,33 @@ describe("GET /api/sessions", () => {
     expect(match?.driver).toBe("claude");
     expect(match?.status).toBe("active-idle");
     expect(match?.messageCount).toBe(2);
+  });
+
+  it("includes live-only codex sessions from the app-server listing", async () => {
+    codexSession.recentMessages = [];
+    codexSession.lastActivity = null;
+    codexSession.getSessionList = () => [];
+    codexSession.getSessionListLive = async () => [
+      {
+        session_id: "codex-live-session",
+        saved_at: "2026-03-07T16:30:00.000Z",
+        working_dir: WORKING_DIR,
+        title: "Live Codex session",
+        preview: "You: check dashboard",
+      },
+    ];
+
+    const listRoute = findRoute("/api/sessions");
+    expect(listRoute).not.toBeNull();
+    const { req, url } = makeReq("/api/sessions");
+    const listRes = await listRoute!.handler(req, url, listRoute!.match);
+    expect(listRes.status).toBe(200);
+    const listBody = await listRes.json() as Record<string, unknown>;
+    const sessions = listBody.sessions as Array<Record<string, unknown>>;
+    const match = sessions.find((entry) => entry.sessionId === "codex-live-session");
+    expect(match).toBeDefined();
+    expect(match?.driver).toBe("codex");
+    expect(match?.status).toBe("saved");
   });
 });
 

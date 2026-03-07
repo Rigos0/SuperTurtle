@@ -46,6 +46,58 @@ afterEach(() => {
 });
 
 describe("CodexSession", () => {
+  it("parses Codex transcripts into conversation history and injection evidence", async () => {
+    const { parseCodexTranscript } = await loadCodexSessionModule("parse-transcript");
+    const transcript = [
+      JSON.stringify({
+        timestamp: "2026-03-07T17:00:00.000Z",
+        type: "response_item",
+        payload: {
+          type: "message",
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: "<system-instructions>\nmeta prompt text\n</system-instructions>\n\n[Current date/time: Saturday, March 7, 2026 at 06:00 PM GMT+1]\n\nHello from resume",
+            },
+          ],
+        },
+      }),
+      JSON.stringify({
+        timestamp: "2026-03-07T17:00:02.000Z",
+        type: "response_item",
+        payload: {
+          type: "message",
+          role: "assistant",
+          content: [
+            {
+              type: "output_text",
+              text: "Transcript assistant reply",
+            },
+          ],
+        },
+      }),
+    ].join("\n");
+
+    const result = parseCodexTranscript("transcript-session", transcript, "/tmp/transcript.jsonl");
+
+    expect(result.messages).toEqual([
+      {
+        role: "user",
+        text: "Hello from resume",
+        timestamp: "2026-03-07T17:00:00.000Z",
+      },
+      {
+        role: "assistant",
+        text: "Transcript assistant reply",
+        timestamp: "2026-03-07T17:00:02.000Z",
+      },
+    ]);
+    expect(result.metaSharedLoaded).toBe(true);
+    expect(result.datePrefixApplied).toBe(true);
+    expect(result.injectedArtifacts.map((item) => item.id)).toEqual(["meta-prompt", "date-prefix"]);
+  });
+
   it("initializes SDK and persists thread/model/reasoning on new thread", async () => {
     const constructorCalls: Array<Record<string, unknown> | undefined> = [];
     const startThreadCalls: Array<Record<string, unknown> | undefined> = [];
@@ -211,5 +263,83 @@ describe("CodexSession", () => {
       expect(typeof server.cwd).toBe("string");
       expect(server.cwd).toBe(WORKING_DIR);
     }
+  });
+
+  it("hydrates resumed sessions from transcript history before saving", async () => {
+    mock.module("@openai/codex-sdk", () => ({
+      Codex: class {
+        startThread() {
+          throw new Error("not used");
+        }
+
+        resumeThread(threadId: string) {
+          return {
+            id: threadId,
+            run: async () => ({ finalResponse: "", usage: null }),
+            runStreamed: async () => ({ events: (async function* () {})() }),
+          };
+        }
+      },
+    }));
+
+    writeFileSync(
+      CODEX_SESSION_FILE,
+      JSON.stringify({
+        sessions: [
+          {
+            session_id: "resume-history-session",
+            saved_at: "2026-03-07T17:00:00.000Z",
+            working_dir: process.env.CLAUDE_WORKING_DIR,
+            title: "Resume history session",
+          },
+        ],
+      })
+    );
+
+    const { CodexSession } = await loadCodexSessionModule("resume-hydration");
+    const codex = new CodexSession();
+    codex.getSessionTranscript = async () => ({
+      sessionId: "resume-history-session",
+      path: "/tmp/fake-codex-transcript.jsonl",
+      messages: [
+        {
+          role: "user",
+          text: "Older user message",
+          timestamp: "2026-03-07T17:00:00.000Z",
+        },
+        {
+          role: "assistant",
+          text: "Older assistant message",
+          timestamp: "2026-03-07T17:00:01.000Z",
+        },
+      ],
+      injectedArtifacts: [],
+      metaSharedLoaded: false,
+      datePrefixApplied: false,
+    });
+
+    const [success] = await codex.resumeSession("resume-history-session");
+    expect(success).toBe(true);
+    expect(codex.recentMessages).toEqual([
+      {
+        role: "user",
+        text: "Older user message",
+        timestamp: "2026-03-07T17:00:00.000Z",
+      },
+      {
+        role: "assistant",
+        text: "Older assistant message",
+        timestamp: "2026-03-07T17:00:01.000Z",
+      },
+    ]);
+
+    const saved = JSON.parse(readFileSync(CODEX_SESSION_FILE, "utf-8")) as {
+      sessions: Array<{ session_id: string; recentMessages?: Array<{ text: string }> }>;
+    };
+    expect(saved.sessions[0]?.session_id).toBe("resume-history-session");
+    expect(saved.sessions[0]?.recentMessages?.map((message) => message.text)).toEqual([
+      "Older user message",
+      "Older assistant message",
+    ]);
   });
 });

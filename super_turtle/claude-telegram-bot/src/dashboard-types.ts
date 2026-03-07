@@ -5,6 +5,7 @@
 import type { ListedSubTurtle, ClaudeBacklogItem } from "./handlers/commands";
 import type { MetaFileData } from "./dashboard";
 import type { InjectedArtifact } from "./injected-artifacts";
+import type { SessionHistoryView } from "./session-history";
 
 // ── Existing dashboard views ─────────────────────────────────────────
 
@@ -179,6 +180,7 @@ export type SessionDetailResponse = {
   session: SessionListItem;
   messages: SessionMessageView[];
   meta: SessionMetaView;
+  history?: SessionHistoryView | null;
 };
 
 export type SessionTurnView = {

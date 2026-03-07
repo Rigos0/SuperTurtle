@@ -10,6 +10,7 @@ import { getPreparedSnapshotCount } from "./cron-supervision-queue";
 import { isBackgroundRunActive, wasBackgroundRunPreempted } from "./handlers/driver-routing";
 import { logger } from "./logger";
 import { readTurnLogEntries } from "./turn-log";
+import { buildExternalSessionHistory, buildSavedSessionHistory, buildTurnLogHistory } from "./session-history";
 import type { RecentMessage, SavedSession } from "./types";
 import type { TurtleView, ProcessView, DeferredChatView, SubturtleLaneView, DashboardState, SubturtleListResponse, SubturtleDetailResponse, SubturtleLogsResponse, CronListResponse, CronJobView, SessionResponse, SessionDriver, SessionListItem, SessionListResponse, SessionMessageView, SessionMetaView, SessionDetailResponse, SessionTurnView, SessionTurnsResponse, ContextResponse, ProcessDetailView, ProcessDetailResponse, DriverExtra, SubturtleExtra, BackgroundExtra, CurrentJobView, CurrentJobsResponse, JobDetailResponse, QueueResponse } from "./dashboard-types";
 
@@ -274,6 +275,22 @@ type SessionSnapshot = {
   meta: SessionMetaView;
 };
 
+const DASHBOARD_CODEX_SESSION_CACHE_TTL_MS = 5000;
+const DASHBOARD_CODEX_SESSION_LIMIT = 50;
+
+let cachedDashboardCodexSessions:
+  | {
+      fetchedAt: number;
+      sessions: SavedSession[];
+    }
+  | null = null;
+let pendingDashboardCodexSessions: Promise<SavedSession[]> | null = null;
+
+export function resetDashboardSessionCachesForTests(): void {
+  cachedDashboardCodexSessions = null;
+  pendingDashboardCodexSessions = null;
+}
+
 const SESSION_STATUS_ORDER: Record<SessionListItem["status"], number> = {
   "active-running": 0,
   "active-idle": 1,
@@ -328,6 +345,30 @@ function mapRecentMessages(recentMessages?: RecentMessage[], preview?: string): 
     }
   }
   return synthetic;
+}
+
+async function loadSessionHistory(driver: SessionDriver, saved: SavedSession | null, sessionId: string) {
+  if (driver === "claude") {
+    return buildTurnLogHistory("claude", sessionId) || buildSavedSessionHistory(saved);
+  }
+
+  const transcript = await codexSession.getSessionTranscript(sessionId);
+  const codexHistory = transcript
+    ? buildExternalSessionHistory({
+        source: "codex-jsonl",
+        path: transcript.path,
+        messages: transcript.messages,
+        injectedArtifacts: transcript.injectedArtifacts,
+        context: {
+          metaSharedLoaded: transcript.metaSharedLoaded,
+          datePrefixApplied: transcript.datePrefixApplied,
+        },
+      })
+    : null;
+
+  return codexHistory
+    || buildTurnLogHistory("codex", sessionId)
+    || buildSavedSessionHistory(saved);
 }
 
 function buildMessagePreview(messages: SessionMessageView[], fallback?: string | null): string | null {
@@ -407,13 +448,41 @@ function sortSessionRows(rows: SessionListItem[]): SessionListItem[] {
   });
 }
 
-function buildSessionSnapshots(): Map<string, SessionSnapshot> {
+async function getDashboardCodexSessions(): Promise<SavedSession[]> {
+  if (
+    cachedDashboardCodexSessions
+    && Date.now() - cachedDashboardCodexSessions.fetchedAt < DASHBOARD_CODEX_SESSION_CACHE_TTL_MS
+  ) {
+    return cachedDashboardCodexSessions.sessions;
+  }
+
+  if (pendingDashboardCodexSessions) {
+    return pendingDashboardCodexSessions;
+  }
+
+  pendingDashboardCodexSessions = (async () => {
+    const sessions = await codexSession.getSessionListLive(DASHBOARD_CODEX_SESSION_LIMIT);
+    cachedDashboardCodexSessions = {
+      fetchedAt: Date.now(),
+      sessions,
+    };
+    return sessions;
+  })();
+
+  try {
+    return await pendingDashboardCodexSessions;
+  } finally {
+    pendingDashboardCodexSessions = null;
+  }
+}
+
+async function buildSessionSnapshots(): Promise<Map<string, SessionSnapshot>> {
   const snapshots = new Map<string, SessionSnapshot>();
 
   for (const saved of session.getSessionList()) {
     upsertSavedSession(snapshots, "claude", saved);
   }
-  for (const saved of codexSession.getSessionList()) {
+  for (const saved of await getDashboardCodexSessions()) {
     upsertSavedSession(snapshots, "codex", saved);
   }
 
@@ -492,8 +561,8 @@ function buildSessionSnapshots(): Map<string, SessionSnapshot> {
   return snapshots;
 }
 
-function buildSessionListResponse(): SessionListResponse {
-  const snapshots = buildSessionSnapshots();
+async function buildSessionListResponse(): Promise<SessionListResponse> {
+  const snapshots = await buildSessionSnapshots();
   const sessions = sortSessionRows(Array.from(snapshots.values()).map((snapshot) => snapshot.row));
   return {
     generatedAt: new Date().toISOString(),
@@ -501,26 +570,55 @@ function buildSessionListResponse(): SessionListResponse {
   };
 }
 
-function buildSessionDetail(driver: SessionDriver, sessionId: string): SessionDetailResponse | null {
+async function buildSessionDetail(
+  driver: SessionDriver,
+  sessionId: string
+): Promise<SessionDetailResponse | null> {
   if (!validateSessionId(sessionId)) return null;
   const key = buildSessionKey(driver, sessionId);
-  const snapshot = buildSessionSnapshots().get(key);
+  const snapshot = (await buildSessionSnapshots()).get(key);
   if (!snapshot) return null;
+  const history = await loadSessionHistory(driver, {
+    session_id: snapshot.row.sessionId,
+    saved_at: snapshot.row.savedAt || "",
+    working_dir: snapshot.row.workingDir || WORKING_DIR,
+    title: snapshot.row.title,
+    ...(snapshot.row.preview ? { preview: snapshot.row.preview } : {}),
+    ...(snapshot.messages.length > 0
+      ? {
+          recentMessages: snapshot.messages.map((message) => ({
+            role: message.role,
+            text: message.text,
+            timestamp: message.timestamp,
+          })),
+        }
+      : {}),
+  }, sessionId);
+  const messages =
+    history && history.messages.length > 0
+      ? history.messages.map((message) => ({
+          role: message.role,
+          text: message.text,
+          timestamp: message.timestamp,
+          charCount: message.text.length,
+        }))
+      : snapshot.messages;
 
   return {
     generatedAt: new Date().toISOString(),
     session: snapshot.row,
-    messages: snapshot.messages,
+    messages,
     meta: snapshot.meta,
+    history,
   };
 }
 
-function buildSessionTurns(
+async function buildSessionTurns(
   driver: SessionDriver,
   sessionId: string,
   limit = 200
-): SessionTurnsResponse | null {
-  const detail = buildSessionDetail(driver, sessionId);
+): Promise<SessionTurnsResponse | null> {
+  const detail = await buildSessionDetail(driver, sessionId);
   if (!detail) return null;
 
   const turns: SessionTurnView[] = readTurnLogEntries({
@@ -1513,7 +1611,11 @@ function renderSessionDetailHtml(
 
   const hasTurns = turns.length > 0;
   const firstTurn = turns[0];
-  const injectedArtifacts: InjectedArtifactView[] = (firstTurn?.injectedArtifacts || []).map((artifact) => {
+  const history = detail.history || null;
+  const sourceArtifacts = hasTurns
+    ? firstTurn?.injectedArtifacts || []
+    : history?.injectedArtifacts || [];
+  const injectedArtifacts: InjectedArtifactView[] = sourceArtifacts.map((artifact) => {
     const fallbackOrder = artifact.id === "claude-md"
       ? 10
       : artifact.id === "meta-prompt"
@@ -1560,7 +1662,7 @@ function renderSessionDetailHtml(
   const conversationRows: ConversationRow[] = [
     {
       role: "system",
-      timestamp: formatTimestamp(firstTurn?.startedAt || detail.messages[0]?.timestamp || null),
+      timestamp: formatTimestamp(firstTurn?.startedAt || history?.messages[0]?.timestamp || detail.messages[0]?.timestamp || null),
       text: "",
       html: injectedListHtml,
     },
@@ -1588,7 +1690,7 @@ function renderSessionDetailHtml(
       });
     }
   } else {
-    for (const msg of detail.messages) {
+    for (const msg of history?.messages || detail.messages) {
       conversationRows.push({
         role: msg.role,
         timestamp: formatTimestamp(msg.timestamp),
@@ -2062,7 +2164,7 @@ export const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
   {
     pattern: /^\/api\/sessions$/,
     handler: async () => {
-      return jsonResponse(buildSessionListResponse());
+      return jsonResponse(await buildSessionListResponse());
     },
   },
   {
@@ -2077,7 +2179,7 @@ export const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
       const limit = Number.isFinite(rawLimit)
         ? Math.max(1, Math.min(5000, rawLimit))
         : 200;
-      const turns = buildSessionTurns(driver, sessionId, limit);
+      const turns = await buildSessionTurns(driver, sessionId, limit);
       if (!turns) return notFoundResponse("Session not found");
       return jsonResponse(turns);
     },
@@ -2090,7 +2192,7 @@ export const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
       if ((driver !== "claude" && driver !== "codex") || !validateSessionId(sessionId)) {
         return notFoundResponse("Invalid session identifier");
       }
-      const detail = buildSessionDetail(driver, sessionId);
+      const detail = await buildSessionDetail(driver, sessionId);
       if (!detail) return notFoundResponse("Session not found");
       return jsonResponse(detail);
     },
@@ -2197,13 +2299,13 @@ export const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
       if ((driver !== "claude" && driver !== "codex") || !validateSessionId(sessionId)) {
         return notFoundResponse("Invalid session identifier");
       }
-      const detail = buildSessionDetail(driver, sessionId);
+      const detail = await buildSessionDetail(driver, sessionId);
       if (!detail) return notFoundResponse("Session not found");
       const rawLimit = parseInt(url.searchParams.get("limit") || "200", 10);
       const limit = Number.isFinite(rawLimit)
         ? Math.max(1, Math.min(5000, rawLimit))
         : 200;
-      const turns = buildSessionTurns(driver, sessionId, limit)?.turns || [];
+      const turns = (await buildSessionTurns(driver, sessionId, limit))?.turns || [];
       return new Response(renderSessionDetailHtml(detail, turns), {
         headers: { "content-type": "text/html; charset=utf-8" },
       });
