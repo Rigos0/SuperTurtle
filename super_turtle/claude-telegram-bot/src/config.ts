@@ -324,6 +324,17 @@ export const TRANSCRIPTION_PROMPT = TRANSCRIPTION_CONTEXT
 
 export const TRANSCRIPTION_AVAILABLE = !!OPENAI_API_KEY;
 
+// ============== Default Model & Effort ==============
+
+export type EffortLevel = "low" | "medium" | "high";
+
+export const DEFAULT_MODEL = process.env.DEFAULT_MODEL || "claude-opus-4-6";
+export const DEFAULT_EFFORT: EffortLevel = (() => {
+  const val = process.env.DEFAULT_EFFORT?.toLowerCase();
+  if (val === "low" || val === "medium" || val === "high") return val;
+  return "high";
+})();
+
 // ============== Thinking Keywords ==============
 
 const thinkingKeywordsStr =
