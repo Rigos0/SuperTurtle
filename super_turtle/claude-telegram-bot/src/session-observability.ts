@@ -10,7 +10,7 @@ import {
 import { getExecutingDriverId } from "./handlers/driver-routing";
 import { readTurnLogEntries, type TurnLogEntry } from "./turn-log";
 import type { SavedSession, RecentMessage } from "./types";
-import type { SessionDriver, SessionMetaView } from "./dashboard-types";
+import type { DriverExtra, SessionDriver, SessionMetaView } from "./dashboard-types";
 
 export interface InstructionDeliveryItem {
   label: string;
@@ -28,10 +28,23 @@ export interface DriverRunningState {
   isRunning: boolean;
 }
 
+export interface DriverProcessState {
+  driver: SessionDriver;
+  processId: string;
+  label: string;
+  runningState: DriverRunningState;
+  runningSince: Date | null;
+  detail: string;
+  currentJobName: string | null;
+  extra: DriverExtra;
+}
+
 export interface SessionObservabilityProvider {
   driver: SessionDriver;
   listTrackedSessions(): Promise<SavedSession[]>;
   getActiveSessionSnapshot(): SavedSession | null;
+  getRunningState(): DriverRunningState;
+  getDriverProcessState(): DriverProcessState;
   getDefaultMeta(): SessionMetaView;
   getActiveMeta(isRunning: boolean): SessionMetaView;
   loadDurableHistory(sessionId: string, saved: SavedSession | null): Promise<SessionHistoryView | null>;
@@ -43,6 +56,41 @@ export interface SessionObservabilityProvider {
   listTurns(sessionId: string, limit: number): TurnLogEntry[];
   getInstructionDelivery(): InstructionDeliveryInfo;
 }
+
+const DRIVER_LABELS: Record<SessionDriver, string> = {
+  claude: "Claude driver",
+  codex: "Codex driver",
+};
+
+const DRIVER_PROCESS_IDS: Record<SessionDriver, string> = {
+  claude: "driver-claude",
+  codex: "driver-codex",
+};
+
+const INSTRUCTION_DELIVERY_TITLE = "How instructions reach this CLI";
+
+type RuntimeMetaSource = {
+  model: string;
+  effort: string;
+  queryStarted: Date | null;
+  lastUsage: Record<string, unknown> | null;
+  lastError: string | null;
+  lastErrorTime: Date | null;
+  currentTool: string | null;
+  lastTool: string | null;
+};
+
+type RuntimeProcessSource = {
+  sessionId: string | null;
+  model: string;
+  effort: string;
+  isActive: boolean;
+  currentTool: string | null;
+  lastTool: string | null;
+  lastError: string | null;
+  queryStarted: Date | null;
+  lastActivity: Date | null;
+};
 
 function buildRecentPreview(recentMessages?: RecentMessage[]): string | null {
   if (!recentMessages || recentMessages.length === 0) return null;
@@ -56,6 +104,76 @@ function buildRecentPreview(recentMessages?: RecentMessage[]): string | null {
 
 function messageKey(message: { role: "user" | "assistant"; text: string }): string {
   return `${message.role}\u0000${message.text}`;
+}
+
+function buildInstructionDelivery(items: InstructionDeliveryItem[]): InstructionDeliveryInfo {
+  return {
+    title: INSTRUCTION_DELIVERY_TITLE,
+    items,
+  };
+}
+
+function buildDriverExtra(source: RuntimeProcessSource): DriverExtra {
+  return {
+    kind: "driver",
+    sessionId: source.sessionId,
+    model: source.model,
+    effort: source.effort,
+    isActive: source.isActive,
+    currentTool: source.currentTool,
+    lastTool: source.lastTool,
+    lastError: source.lastError,
+    queryStarted: source.queryStarted?.toISOString() || null,
+    lastActivity: source.lastActivity?.toISOString() || null,
+  };
+}
+
+function buildDefaultMetaView(source: Pick<RuntimeMetaSource, "model" | "effort">): SessionMetaView {
+  return {
+    model: source.model,
+    effort: source.effort,
+    isRunning: false,
+    queryStarted: null,
+    lastUsage: null,
+    lastError: null,
+    lastErrorTime: null,
+    currentTool: null,
+    lastTool: null,
+  };
+}
+
+function buildActiveMetaView(source: RuntimeMetaSource, isRunning: boolean): SessionMetaView {
+  return {
+    model: source.model,
+    effort: source.effort,
+    isRunning,
+    queryStarted: source.queryStarted?.toISOString() || null,
+    lastUsage: source.lastUsage,
+    lastError: source.lastError,
+    lastErrorTime: source.lastErrorTime?.toISOString() || null,
+    currentTool: source.currentTool,
+    lastTool: source.lastTool,
+  };
+}
+
+function buildDriverProcessState(
+  driver: SessionDriver,
+  runningState: DriverRunningState,
+  runningSince: Date | null,
+  detail: string,
+  currentJobName: string | null,
+  extraSource: RuntimeProcessSource
+): DriverProcessState {
+  return {
+    driver,
+    processId: DRIVER_PROCESS_IDS[driver],
+    label: DRIVER_LABELS[driver],
+    runningState,
+    runningSince,
+    detail,
+    currentJobName,
+    extra: buildDriverExtra(extraSource),
+  };
 }
 
 function mergeActiveHistory(
@@ -190,32 +308,50 @@ const claudeProvider: SessionObservabilityProvider = {
     };
   },
 
+  getRunningState(): DriverRunningState {
+    return getDriverRunningSnapshot("claude");
+  },
+
+  getDriverProcessState(): DriverProcessState {
+    const runningState = this.getRunningState();
+    return buildDriverProcessState(
+      "claude",
+      runningState,
+      session.queryStarted,
+      session.currentTool || session.lastTool || "idle",
+      runningState.isRunning ? session.currentTool || session.lastTool || "query running" : null,
+      {
+        sessionId: session.sessionId,
+        model: session.model,
+        effort: session.effort,
+        isActive: session.isActive,
+        currentTool: session.currentTool,
+        lastTool: session.lastTool,
+        lastError: session.lastError,
+        queryStarted: session.queryStarted,
+        lastActivity: session.lastActivity,
+      }
+    );
+  },
+
   getDefaultMeta(): SessionMetaView {
-    return {
+    return buildDefaultMetaView({
       model: session.model,
       effort: session.effort,
-      isRunning: false,
-      queryStarted: null,
-      lastUsage: null,
-      lastError: null,
-      lastErrorTime: null,
-      currentTool: null,
-      lastTool: null,
-    };
+    });
   },
 
   getActiveMeta(isRunning: boolean): SessionMetaView {
-    return {
+    return buildActiveMetaView({
       model: session.model,
       effort: session.effort,
-      isRunning,
-      queryStarted: session.queryStarted?.toISOString() || null,
       lastUsage: session.lastUsage as Record<string, unknown> | null,
       lastError: session.lastError,
-      lastErrorTime: session.lastErrorTime?.toISOString() || null,
+      lastErrorTime: session.lastErrorTime,
       currentTool: session.currentTool,
       lastTool: session.lastTool,
-    };
+      queryStarted: session.queryStarted,
+    }, isRunning);
   },
 
   async loadDurableHistory(sessionId: string, saved: SavedSession | null): Promise<SessionHistoryView | null> {
@@ -239,23 +375,20 @@ const claudeProvider: SessionObservabilityProvider = {
   },
 
   getInstructionDelivery(): InstructionDeliveryInfo {
-    return {
-      title: "How instructions reach this CLI",
-      items: [
-        {
-          label: "Project instructions",
-          description: "Claude Code runs from the repo root with --setting-sources user,project, so project instructions are loaded by the CLI.",
-        },
-        {
-          label: "META prompt",
-          description: "The wrapper passes META_SHARED.md via --system-prompt on each query.",
-        },
-        {
-          label: "Date/time prefix",
-          description: "The wrapper prepends the date/time prefix when starting a new session.",
-        },
-      ],
-    };
+    return buildInstructionDelivery([
+      {
+        label: "Project instructions",
+        description: "Claude Code runs from the repo root with --setting-sources user,project, so project instructions are loaded by the CLI.",
+      },
+      {
+        label: "META prompt",
+        description: "The wrapper passes META_SHARED.md via --system-prompt on each query.",
+      },
+      {
+        label: "Date/time prefix",
+        description: "The wrapper prepends the date/time prefix when starting a new session.",
+      },
+    ]);
   },
 };
 
@@ -308,32 +441,50 @@ const codexProvider: SessionObservabilityProvider = {
     return codexSession.getActiveSessionSnapshot();
   },
 
+  getRunningState(): DriverRunningState {
+    return getDriverRunningSnapshot("codex");
+  },
+
+  getDriverProcessState(): DriverProcessState {
+    const runningState = this.getRunningState();
+    return buildDriverProcessState(
+      "codex",
+      runningState,
+      codexSession.runningSince,
+      codexSession.isActive ? "thread active" : "idle",
+      runningState.isRunning ? "query running" : null,
+      {
+        sessionId: codexSession.getThreadId(),
+        model: codexSession.model,
+        effort: codexSession.reasoningEffort,
+        isActive: codexSession.isActive,
+        currentTool: null,
+        lastTool: null,
+        lastError: codexSession.lastError,
+        queryStarted: codexSession.runningSince,
+        lastActivity: codexSession.lastActivity,
+      }
+    );
+  },
+
   getDefaultMeta(): SessionMetaView {
-    return {
+    return buildDefaultMetaView({
       model: codexSession.model,
       effort: codexSession.reasoningEffort,
-      isRunning: false,
-      queryStarted: null,
-      lastUsage: null,
-      lastError: null,
-      lastErrorTime: null,
-      currentTool: null,
-      lastTool: null,
-    };
+    });
   },
 
   getActiveMeta(isRunning: boolean): SessionMetaView {
-    return {
+    return buildActiveMetaView({
       model: codexSession.model,
       effort: codexSession.reasoningEffort,
-      isRunning,
-      queryStarted: codexSession.runningSince?.toISOString() || null,
       lastUsage: codexSession.lastUsage as Record<string, unknown> | null,
       lastError: codexSession.lastError,
-      lastErrorTime: codexSession.lastErrorTime?.toISOString() || null,
+      lastErrorTime: codexSession.lastErrorTime,
       currentTool: null,
       lastTool: null,
-    };
+      queryStarted: codexSession.runningSince,
+    }, isRunning);
   },
 
   async loadDurableHistory(sessionId: string, saved: SavedSession | null): Promise<SessionHistoryView | null> {
@@ -373,23 +524,20 @@ const codexProvider: SessionObservabilityProvider = {
   },
 
   getInstructionDelivery(): InstructionDeliveryInfo {
-    return {
-      title: "How instructions reach this CLI",
-      items: [
-        {
-          label: "Project instructions",
-          description: "Codex runs with workingDirectory set to the repo root, so repo-root AGENTS.md / project instructions are loaded by the CLI.",
-        },
-        {
-          label: "META prompt",
-          description: "The wrapper wraps META_SHARED.md in <system-instructions> and prepends it to the first message of a thread only.",
-        },
-        {
-          label: "Date/time prefix",
-          description: "The wrapper prepends the date/time prefix on the first message of a thread.",
-        },
-      ],
-    };
+    return buildInstructionDelivery([
+      {
+        label: "Project instructions",
+        description: "Codex runs with workingDirectory set to the repo root, so repo-root AGENTS.md / project instructions are loaded by the CLI.",
+      },
+      {
+        label: "META prompt",
+        description: "The wrapper wraps META_SHARED.md in <system-instructions> and prepends it to the first message of a thread only.",
+      },
+      {
+        label: "Date/time prefix",
+        description: "The wrapper prepends the date/time prefix on the first message of a thread.",
+      },
+    ]);
   },
 };
 
@@ -407,8 +555,10 @@ export function getSessionObservabilityProviders(): SessionObservabilityProvider
 }
 
 export function getDashboardDriverRunningState(): Record<SessionDriver, DriverRunningState> {
+  const claude = observabilityProviders.claude.getRunningState();
+  const codex = observabilityProviders.codex.getRunningState();
   return {
-    claude: getDriverRunningSnapshot("claude"),
-    codex: getDriverRunningSnapshot("codex"),
+    claude,
+    codex,
   };
 }

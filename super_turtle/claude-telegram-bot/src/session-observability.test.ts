@@ -16,6 +16,8 @@ describe("session observability providers", () => {
     lastActivity: session.lastActivity,
     recentMessages: [...session.recentMessages],
     activeDriver: session.activeDriver,
+    currentTool: session.currentTool,
+    lastTool: session.lastTool,
   };
   const originalCodexState = {
     getSessionList: codexSession.getSessionList,
@@ -23,7 +25,7 @@ describe("session observability providers", () => {
     getActiveSessionSnapshot: codexSession.getActiveSessionSnapshot,
     getSessionTranscript: codexSession.getSessionTranscript,
     isProcessing: (codexSession as unknown as { _isProcessing: boolean })._isProcessing,
-    isQueryRunning: codexSession.isQueryRunning,
+    isQueryRunning: (codexSession as unknown as { isQueryRunning: boolean }).isQueryRunning,
   };
 
   afterEach(() => {
@@ -32,13 +34,15 @@ describe("session observability providers", () => {
     session.lastActivity = originalClaudeState.lastActivity;
     session.recentMessages = [...originalClaudeState.recentMessages];
     session.activeDriver = originalClaudeState.activeDriver;
+    session.currentTool = originalClaudeState.currentTool;
+    session.lastTool = originalClaudeState.lastTool;
 
     codexSession.getSessionList = originalCodexState.getSessionList;
     codexSession.getSessionListLive = originalCodexState.getSessionListLive;
     codexSession.getActiveSessionSnapshot = originalCodexState.getActiveSessionSnapshot;
     codexSession.getSessionTranscript = originalCodexState.getSessionTranscript;
     (codexSession as unknown as { _isProcessing: boolean })._isProcessing = originalCodexState.isProcessing;
-    codexSession.isQueryRunning = originalCodexState.isQueryRunning;
+    (codexSession as unknown as { isQueryRunning: boolean }).isQueryRunning = originalCodexState.isQueryRunning;
     setExecutingDriverForTests(null);
   });
 
@@ -63,6 +67,19 @@ describe("session observability providers", () => {
       title: "Claude runtime title",
       working_dir: WORKING_DIR,
     });
+  });
+
+  it("builds provider-owned driver process state for Claude", () => {
+    session.activeDriver = "claude";
+    session.currentTool = "running tests";
+
+    const provider = getSessionObservabilityProvider("claude");
+    const state = provider.getDriverProcessState();
+
+    expect(state.processId).toBe("driver-claude");
+    expect(state.label).toBe("Claude driver");
+    expect(state.detail).toBe("running tests");
+    expect(state.extra.currentTool).toBe("running tests");
   });
 
   it("uses the Codex active snapshot as a tracked session source", async () => {
@@ -194,7 +211,7 @@ describe("session observability providers", () => {
     session.activeDriver = "codex";
     const stopProcessing = session.startProcessing();
     (codexSession as unknown as { _isProcessing: boolean })._isProcessing = true;
-    codexSession.isQueryRunning = false;
+    (codexSession as unknown as { isQueryRunning: boolean }).isQueryRunning = false;
     setExecutingDriverForTests(null);
 
     const runningState = getDashboardDriverRunningState();

@@ -249,9 +249,10 @@ function stripDatePrefix(text: string): {
   if (!match) {
     return { text, artifact: null };
   }
+  const prefix = match[1] ?? "";
   return {
-    text: text.slice(match[1].length),
-    artifact: match[1],
+    text: text.slice(prefix.length),
+    artifact: prefix || null,
   };
 }
 
@@ -719,10 +720,11 @@ async function fetchModelsFromAppServer(): Promise<CodexModelInfo[]> {
       });
     }
 
-    cursor =
-      typeof result.nextCursor === "string" && result.nextCursor.length > 0
-        ? result.nextCursor
-        : null;
+    const rawNextCursor: string | null | undefined = result.nextCursor;
+    const nextCursor: string | null = typeof rawNextCursor === "string" && rawNextCursor.length > 0
+      ? rawNextCursor
+      : null;
+    cursor = nextCursor;
     if (!cursor) break;
   }
 
@@ -755,7 +757,7 @@ async function fetchConversationsFromAppServer(
 
   while (sessions.length < maxSessions) {
     const pageSize = Math.min(25, maxSessions - sessions.length);
-    const result =
+    const result: AppServerConversationListResponse | null =
       await requestAppServer<AppServerConversationListResponse>(
         "thread/list",
         {
@@ -811,10 +813,11 @@ async function fetchConversationsFromAppServer(
       });
     }
 
-    cursor =
-      typeof result.nextCursor === "string" && result.nextCursor.length > 0
-        ? result.nextCursor
-        : null;
+    const rawNextCursor: string | null | undefined = result?.nextCursor;
+    const nextCursor: string | null = typeof rawNextCursor === "string" && rawNextCursor.length > 0
+      ? rawNextCursor
+      : null;
+    cursor = nextCursor;
     if (!cursor) break;
   }
 

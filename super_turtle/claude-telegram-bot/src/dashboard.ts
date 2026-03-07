@@ -7,10 +7,10 @@ import { getAllDeferredQueues } from "./deferred-queue";
 import { session, getAvailableModels } from "./session";
 import { codexSession } from "./codex-session";
 import { getPreparedSnapshotCount } from "./cron-supervision-queue";
-import { getExecutingDriverId, isBackgroundRunActive, wasBackgroundRunPreempted } from "./handlers/driver-routing";
+import { isBackgroundRunActive, wasBackgroundRunPreempted } from "./handlers/driver-routing";
 import { logger } from "./logger";
 import {
-  getDashboardDriverRunningState,
+  type DriverProcessState,
   getSessionObservabilityProvider,
   getSessionObservabilityProviders,
 } from "./session-observability";
@@ -389,25 +389,19 @@ function sortSessionRows(rows: SessionListItem[]): SessionListItem[] {
   });
 }
 
-function getDriverRunningState(): {
-  activeDriverId: SessionDriver;
-  executingDriverId: SessionDriver | null;
-  claudeRunning: boolean;
-  codexRunning: boolean;
-} {
-  const runningState = getDashboardDriverRunningState();
-  const executingDriverId = getExecutingDriverId();
-  return {
-    activeDriverId: runningState.claude.activeDriverId,
-    executingDriverId,
-    claudeRunning: runningState.claude.isRunning,
-    codexRunning: runningState.codex.isRunning,
-  };
+function getDriverProcessStates(): DriverProcessState[] {
+  return getSessionObservabilityProviders().map((provider) => provider.getDriverProcessState());
+}
+
+function getDriverProcessStateById(processId: string): DriverProcessState | null {
+  return getDriverProcessStates().find((state) => state.processId === processId) || null;
 }
 
 async function buildSessionSnapshots(): Promise<Map<string, SessionSnapshot>> {
   const snapshots = new Map<string, SessionSnapshot>();
-  const runningState = getDriverRunningState();
+  const driverStates = new Map(
+    getDriverProcessStates().map((state) => [state.driver, state] satisfies [SessionDriver, DriverProcessState])
+  );
 
   for (const provider of getSessionObservabilityProviders()) {
     for (const saved of await provider.listTrackedSessions()) {
@@ -425,9 +419,7 @@ async function buildSessionSnapshots(): Promise<Map<string, SessionSnapshot>> {
       activeSession.recentMessages,
       activeSession.preview || existing?.row.preview || undefined
     );
-    const isRunning = provider.driver === "claude"
-      ? runningState.claudeRunning
-      : runningState.codexRunning;
+    const isRunning = driverStates.get(provider.driver)?.runningState.isRunning || false;
 
     snapshots.set(key, {
       row: {
@@ -608,39 +600,25 @@ async function buildDashboardState(): Promise<DashboardState> {
   }
   const hasQueuePressure = totalMessages > 0;
   const queueSummary = queuePressureSummary(totalMessages, chats.length);
-  const { activeDriverId, claudeRunning, codexRunning } = getDriverRunningState();
-  const claudeStatus = mapDriverStatus(
-    claudeRunning,
-    hasQueuePressure,
-    activeDriverId === "claude"
-  );
-  const codexStatus = mapDriverStatus(
-    codexRunning,
-    hasQueuePressure,
-    activeDriverId === "codex"
-  );
-  const claudeBaseDetail = session.currentTool || session.lastTool || "idle";
-  const codexBaseDetail = codexSession.isActive ? "thread active" : "idle";
+  const driverProcesses: ProcessView[] = getDriverProcessStates().map((state) => {
+    const status = mapDriverStatus(
+      state.runningState.isRunning,
+      hasQueuePressure,
+      state.runningState.activeDriverId === state.driver
+    );
+    return {
+      id: state.processId,
+      kind: "driver",
+      label: state.label,
+      status,
+      pid: state.runningState.isRunning ? "active" : "-",
+      elapsed: state.runningState.isRunning ? elapsedFrom(state.runningSince) : "0s",
+      detail: status === "queued" ? `${state.detail} · ${queueSummary}` : state.detail,
+    };
+  });
 
   const processes: ProcessView[] = [
-    {
-      id: "driver-claude",
-      kind: "driver",
-      label: "Claude driver",
-      status: claudeStatus,
-      pid: claudeRunning ? "active" : "-",
-      elapsed: claudeRunning ? elapsedFrom(session.queryStarted) : "0s",
-      detail: claudeStatus === "queued" ? `${claudeBaseDetail} · ${queueSummary}` : claudeBaseDetail,
-    },
-    {
-      id: "driver-codex",
-      kind: "driver",
-      label: "Codex driver",
-      status: codexStatus,
-      pid: codexRunning ? "active" : "-",
-      elapsed: codexRunning ? elapsedFrom(codexSession.runningSince) : "0s",
-      detail: codexStatus === "queued" ? `${codexBaseDetail} · ${queueSummary}` : codexBaseDetail,
-    },
+    ...driverProcesses,
     {
       id: "background-check",
       kind: "background",
@@ -1402,14 +1380,13 @@ async function buildCurrentJobDetail(id: string): Promise<JobDetailResponse | nu
       progressPct: computeProgressPct(backlogDone, backlog.length),
     };
     extra.elapsed = await getSubTurtleElapsed(name);
-  } else if (job.ownerId === "driver-claude") {
-    extra.elapsed = getDriverRunningState().claudeRunning ? elapsedFrom(session.queryStarted) : "0s";
-    extra.currentTool = session.currentTool;
-    extra.lastTool = session.lastTool;
-  } else if (job.ownerId === "driver-codex") {
-    extra.elapsed = getDriverRunningState().codexRunning
-      ? elapsedFrom(codexSession.runningSince)
-      : "0s";
+  } else {
+    const driverState = getDriverProcessStateById(job.ownerId);
+    if (driverState) {
+      extra.elapsed = driverState.runningState.isRunning ? elapsedFrom(driverState.runningSince) : "0s";
+      extra.currentTool = driverState.extra.currentTool;
+      extra.lastTool = driverState.extra.lastTool;
+    }
   }
 
   return {
@@ -1929,33 +1906,11 @@ function addDetailLink(p: ProcessView): ProcessDetailView {
 }
 
 async function buildProcessExtra(p: ProcessView): Promise<DriverExtra | SubturtleExtra | BackgroundExtra> {
-  if (p.kind === "driver" && p.id === "driver-claude") {
-    return {
-      kind: "driver",
-      sessionId: session.sessionId,
-      model: session.model,
-      effort: session.effort,
-      isActive: session.isActive,
-      currentTool: session.currentTool,
-      lastTool: session.lastTool,
-      lastError: session.lastError,
-      queryStarted: session.queryStarted?.toISOString() || null,
-      lastActivity: session.lastActivity?.toISOString() || null,
-    };
-  }
-  if (p.kind === "driver" && p.id === "driver-codex") {
-    return {
-      kind: "driver",
-      sessionId: null,
-      model: "codex",
-      effort: "n/a",
-      isActive: codexSession.isActive,
-      currentTool: null,
-      lastTool: null,
-      lastError: null,
-      queryStarted: codexSession.runningSince?.toISOString() || null,
-      lastActivity: null,
-    };
+  if (p.kind === "driver") {
+    const driverState = getDriverProcessStateById(p.id);
+    if (driverState) {
+      return driverState.extra;
+    }
   }
   if (p.kind === "background") {
     return {
@@ -1989,25 +1944,16 @@ async function buildProcessExtra(p: ProcessView): Promise<DriverExtra | Subturtl
 
 async function buildCurrentJobs(): Promise<CurrentJobView[]> {
   const jobs: CurrentJobView[] = [];
-  const { claudeRunning, codexRunning } = getDriverRunningState();
-
-  // Driver activity
-  if (claudeRunning) {
+  for (const driverState of getDriverProcessStates()) {
+    if (!driverState.runningState.isRunning || !driverState.currentJobName) {
+      continue;
+    }
     jobs.push({
-      id: "driver:claude:active",
-      name: session.currentTool || session.lastTool || "query running",
+      id: `driver:${driverState.driver}:active`,
+      name: driverState.currentJobName,
       ownerType: "driver",
-      ownerId: "driver-claude",
-      detailLink: "/api/jobs/driver:claude:active",
-    });
-  }
-  if (codexRunning) {
-    jobs.push({
-      id: "driver:codex:active",
-      name: "codex query running",
-      ownerType: "driver",
-      ownerId: "driver-codex",
-      detailLink: "/api/jobs/driver:codex:active",
+      ownerId: driverState.processId,
+      detailLink: `/api/jobs/${encodeURIComponent(`driver:${driverState.driver}:active`)}`,
     });
   }
 
