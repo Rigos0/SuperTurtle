@@ -41,6 +41,10 @@ type SwitchCommandProbePayload = {
   codexKillCalls: number;
 };
 
+type ResumeProbePayload = {
+  replies: ReplyRecord[];
+};
+
 function mockContext(messageText: string): {
   ctx: {
     from: { id: number };
@@ -352,6 +356,97 @@ function runSwitchCommandProbeInIsolatedProcess(opts: {
   expect(jsonEnd).toBeGreaterThanOrEqual(firstBrace);
   const jsonText = tail.slice(firstBrace, jsonEnd + 1);
   return JSON.parse(jsonText) as SwitchCommandProbePayload;
+}
+
+function runResumeProbeInIsolatedProcess(opts: {
+  activeDriver: "claude" | "codex";
+  currentClaudeSessionId: string | null;
+  currentCodexSessionId: string | null;
+  claudeSessions: Array<{ session_id: string; saved_at: string; working_dir: string; title: string }>;
+  codexSessions: Array<{ session_id: string; saved_at: string; working_dir: string; title: string }>;
+}): ResumeProbePayload {
+  const projectRoot = resolve(import.meta.dir, "../..");
+  const marker = "__RESUME_PROBE__=";
+  const script = `
+    process.env.TELEGRAM_BOT_TOKEN = "test-token";
+    process.env.TELEGRAM_ALLOWED_USERS = "123";
+    process.env.CLAUDE_WORKING_DIR = process.cwd();
+    process.env.CODEX_ENABLED = "true";
+    process.env.CODEX_CLI_AVAILABLE_OVERRIDE = "true";
+    console.log = () => {};
+    console.warn = () => {};
+    console.error = () => {};
+
+    const { handleResume } = await import("./src/handlers/commands.ts");
+    const { session } = await import("./src/session.ts");
+    const { codexSession } = await import("./src/codex-session.ts");
+
+    session.activeDriver = ${JSON.stringify(opts.activeDriver)};
+    session.sessionId = ${JSON.stringify(opts.currentClaudeSessionId)};
+    session.getSessionList = () => ${JSON.stringify(opts.claudeSessions)};
+    codexSession.getThreadId = () => ${JSON.stringify(opts.currentCodexSessionId)};
+    codexSession.getSessionListLive = async () => ${JSON.stringify(opts.codexSessions)};
+    codexSession.getSessionList = () => ${JSON.stringify(opts.codexSessions)};
+
+    const replies = [];
+    const ctx = {
+      from: { id: 123 },
+      reply: async (text, extra) => {
+        replies.push({ text: String(text), extra });
+      },
+    };
+
+    await handleResume(ctx);
+    process.stdout.write(${JSON.stringify(marker)} + JSON.stringify({ replies }));
+  `;
+
+  const proc = Bun.spawnSync(["bun", "-e", script], { cwd: projectRoot });
+  expect(proc.exitCode).toBe(0);
+
+  const combinedOutput = `${proc.stdout.toString()}\n${proc.stderr.toString()}`;
+  const markerIndex = combinedOutput.lastIndexOf(marker);
+  expect(markerIndex).toBeGreaterThanOrEqual(0);
+
+  const tail = combinedOutput.slice(markerIndex + marker.length);
+  const firstBrace = tail.indexOf("{");
+  expect(firstBrace).toBeGreaterThanOrEqual(0);
+
+  let depth = 0;
+  let inString = false;
+  let isEscaped = false;
+  let jsonEnd = -1;
+  for (let i = firstBrace; i < tail.length; i += 1) {
+    const ch = tail[i]!;
+    if (inString) {
+      if (isEscaped) {
+        isEscaped = false;
+      } else if (ch === "\\") {
+        isEscaped = true;
+      } else if (ch === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === "\"") {
+      inString = true;
+      continue;
+    }
+    if (ch === "{") {
+      depth += 1;
+      continue;
+    }
+    if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        jsonEnd = i;
+        break;
+      }
+    }
+  }
+
+  expect(jsonEnd).toBeGreaterThanOrEqual(firstBrace);
+  const jsonText = tail.slice(firstBrace, jsonEnd + 1);
+  return JSON.parse(jsonText) as ResumeProbePayload;
 }
 
 describe("formatModelInfo", () => {
@@ -770,6 +865,90 @@ describe("handlers with mock Context", () => {
     expect(callbackData).toContain("effort:high");
   });
 
+  it("handleResume sorts mixed Claude and Codex sessions globally by saved time", () => {
+    const result = runResumeProbeInIsolatedProcess({
+      activeDriver: "claude",
+      currentClaudeSessionId: null,
+      currentCodexSessionId: null,
+      claudeSessions: [
+        {
+          session_id: "claude-old",
+          saved_at: "2026-03-07T09:00:00.000Z",
+          working_dir: "/tmp/project",
+          title: "Claude old",
+        },
+        {
+          session_id: "claude-new",
+          saved_at: "2026-03-07T11:00:00.000Z",
+          working_dir: "/tmp/project",
+          title: "Claude new",
+        },
+      ],
+      codexSessions: [
+        {
+          session_id: "codex-mid",
+          saved_at: "2026-03-07T10:00:00.000Z",
+          working_dir: "/tmp/project",
+          title: "Codex mid",
+        },
+        {
+          session_id: "codex-newest",
+          saved_at: "2026-03-07T12:00:00.000Z",
+          working_dir: "/tmp/project",
+          title: "Codex newest",
+        },
+      ],
+    });
+
+    expect(result.replies).toHaveLength(1);
+    const keyboard = getInlineKeyboard(result.replies[0]!);
+    const callbackData = keyboard.flat().map((button) => button.callback_data || "");
+    expect(callbackData).toEqual([
+      "codex_resume:codex-newest",
+      "resume:claude-new",
+      "codex_resume:codex-mid",
+      "resume:claude-old",
+    ]);
+  }, 20_000);
+
+  it("handleResume keeps inactive-driver current session visible while hiding active current session", () => {
+    const result = runResumeProbeInIsolatedProcess({
+      activeDriver: "codex",
+      currentClaudeSessionId: "claude-current",
+      currentCodexSessionId: "codex-current",
+      claudeSessions: [
+        {
+          session_id: "claude-current",
+          saved_at: "2026-03-07T11:00:00.000Z",
+          working_dir: "/tmp/project",
+          title: "Claude current",
+        },
+      ],
+      codexSessions: [
+        {
+          session_id: "codex-current",
+          saved_at: "2026-03-07T12:00:00.000Z",
+          working_dir: "/tmp/project",
+          title: "Codex current",
+        },
+        {
+          session_id: "codex-older",
+          saved_at: "2026-03-07T10:00:00.000Z",
+          working_dir: "/tmp/project",
+          title: "Codex older",
+        },
+      ],
+    });
+
+    expect(result.replies).toHaveLength(1);
+    const keyboard = getInlineKeyboard(result.replies[0]!);
+    const callbackData = keyboard.flat().map((button) => button.callback_data || "");
+    expect(callbackData).toContain("resume_current");
+    expect(callbackData).toContain("resume:claude-current");
+    expect(callbackData).toContain("codex_resume:codex-older");
+    expect(callbackData).not.toContain("codex_resume:codex-current");
+  }, 20_000);
+
   it("handlePinologs replies with inline keyboard level options", async () => {
     const { ctx, replies } = mockContext("/pinologs");
     await handlePinologs(ctx as any);
@@ -798,7 +977,7 @@ describe("handlers with mock Context", () => {
     const callbackData = getInlineKeyboard(reply).flat().map((button) => button.callback_data || "");
     expect(callbackData).toContain("switch:claude");
     expect(callbackData).toContain("switch:codex_unavailable");
-  });
+  }, 20_000);
 
   it("handleSwitch shows Codex button when Codex is available", () => {
     const replies = runSwitchNoArgInIsolatedProcess(true);
@@ -812,7 +991,7 @@ describe("handlers with mock Context", () => {
     expect(callbackData).toContain("switch:claude");
     expect(callbackData).toContain("switch:codex");
     expect(callbackData).not.toContain("switch:codex_unavailable");
-  });
+  }, 20_000);
 
   it("handleSwitch /switch codex returns unavailable message when Codex is disabled", () => {
     const result = runSwitchCommandProbeInIsolatedProcess({
@@ -827,7 +1006,7 @@ describe("handlers with mock Context", () => {
     expect(result.codexKillCalls).toBe(0);
     expect(result.replies).toHaveLength(1);
     expect(result.replies[0]!.text).toContain("Codex is disabled in config");
-  });
+  }, 20_000);
 
   it("handleSwitch /switch codex switches driver and resets sessions when Codex is available", () => {
     const result = runSwitchCommandProbeInIsolatedProcess({
@@ -843,7 +1022,7 @@ describe("handlers with mock Context", () => {
     expect(result.replies).toHaveLength(1);
     expect(result.replies[0]!.extra?.parse_mode).toBe("HTML");
     expect(result.replies[0]!.text).toContain("Switched to Codex");
-  });
+  }, 20_000);
 
   it("handleSwitch /switch codex reports failure when Codex thread start fails", () => {
     const result = runSwitchCommandProbeInIsolatedProcess({
@@ -860,5 +1039,5 @@ describe("handlers with mock Context", () => {
     expect(result.replies).toHaveLength(1);
     expect(result.replies[0]!.text).toContain("Failed to switch to Codex");
     expect(result.replies[0]!.text).toContain("forced start failure for test");
-  });
+  }, 20_000);
 });

@@ -1786,6 +1786,9 @@ ${messageToSend}`;
    * Kill the session (clear thread).
    */
   async kill(): Promise<void> {
+    // Persist the linked thread before clearing so /resume remains stable
+    // across driver switches and explicit resets.
+    this.saveSession();
     this.thread = null;
     this.threadId = null;
     this.systemPromptPrepended = false;

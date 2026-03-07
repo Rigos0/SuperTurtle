@@ -491,6 +491,14 @@ export async function handleResume(ctx: Context): Promise<void> {
     if (base.length <= BUTTON_LABEL_MAX_LENGTH) return base;
     return `${base.slice(0, Math.max(1, BUTTON_LABEL_MAX_LENGTH - 1)).trimEnd()}…`;
   };
+  type ResumeOption = {
+    session_id: string;
+    saved_at: string;
+    working_dir: string;
+    title: string;
+    driverEmoji: "🔵" | "🟢";
+    callbackData: string;
+  };
 
   // Gather both drivers so users can switch contexts without using /switch first.
   let claudeSessions: Array<{
@@ -513,14 +521,14 @@ export async function handleResume(ctx: Context): Promise<void> {
     }
   }
 
-  // Hide currently linked sessions/threads for both drivers so picker options
-  // are always actionable and never a no-op.
+  // Hide only the active driver's current session from the picker.
+  // Inactive-driver sessions should remain selectable so users can switch back.
   const currentClaudeSessionId = session.sessionId;
   const currentCodexSessionId = codexSession.getThreadId();
-  if (currentClaudeSessionId) {
+  if (session.activeDriver === "claude" && currentClaudeSessionId) {
     claudeSessions = claudeSessions.filter((s) => s.session_id !== currentClaudeSessionId);
   }
-  if (currentCodexSessionId) {
+  if (session.activeDriver === "codex" && currentCodexSessionId) {
     codexSessions = codexSessions.filter((s) => s.session_id !== currentCodexSessionId);
   }
 
@@ -551,20 +559,25 @@ export async function handleResume(ctx: Context): Promise<void> {
     ]);
   }
 
-  for (const s of claudeSessions) {
-    buttons.push([
-      {
-        text: formatResumeButtonLabel("🔵", s.saved_at, s.title),
-        callback_data: `resume:${s.session_id}`,
-      },
-    ]);
-  }
+  const mergedSessions: ResumeOption[] = [
+    ...claudeSessions.map((s) => ({
+      ...s,
+      driverEmoji: "🔵" as const,
+      callbackData: `resume:${s.session_id}`,
+    })),
+    ...codexSessions.map((s) => ({
+      ...s,
+      driverEmoji: "🟢" as const,
+      callbackData: `codex_resume:${s.session_id}`,
+    })),
+  ]
+    .sort((a, b) => byNewest(a, b));
 
-  for (const s of codexSessions) {
+  for (const s of mergedSessions) {
     buttons.push([
       {
-        text: formatResumeButtonLabel("🟢", s.saved_at, s.title),
-        callback_data: `codex_resume:${s.session_id}`,
+        text: formatResumeButtonLabel(s.driverEmoji, s.saved_at, s.title),
+        callback_data: s.callbackData,
       },
     ]);
   }

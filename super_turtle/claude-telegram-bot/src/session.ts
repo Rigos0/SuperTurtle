@@ -994,6 +994,9 @@ export class ClaudeSession {
    * Kill the current session (clear session_id).
    */
   async kill(): Promise<void> {
+    // Persist the linked session before clearing so /resume remains stable
+    // across driver switches and explicit resets.
+    this.saveSession();
     this.sessionId = null;
     this.lastActivity = null;
     this.conversationTitle = null;

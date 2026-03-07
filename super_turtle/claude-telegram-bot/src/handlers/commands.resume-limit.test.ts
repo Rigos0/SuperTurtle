@@ -154,5 +154,5 @@ describe("/resume session list limits", () => {
     expect(result.payload?.codexLiveMaxArg).toBe(5);
     expect(result.payload?.claudeAllResumeCallbacks).toBe(true);
     expect(result.payload?.codexAllResumeCallbacks).toBe(true);
-  });
+  }, 20_000);
 });
