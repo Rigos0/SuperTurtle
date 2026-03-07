@@ -73,7 +73,7 @@ import {
 import { buildCronScheduledPrompt } from "./cron-scheduled-prompt";
 import { UpdateDedupeCache } from "./update-dedupe";
 import { startTurtleGreetings } from "./turtle-greetings";
-import { botLog, cronLog } from "./logger";
+import { botLog, cronLog, eventLog } from "./logger";
 
 // Re-export for any existing consumers
 export { bot };
@@ -535,6 +535,22 @@ bot.use(async (ctx, next) => {
       // ignore duplicate callback ack errors
     }
   }
+});
+
+// Canonical command ingress events for replay/debug.
+bot.use(async (ctx, next) => {
+  const text = ctx.message?.text;
+  if (text?.startsWith("/")) {
+    eventLog.info({
+      event: "user.command",
+      userId: ctx.from?.id,
+      username: ctx.from?.username || "unknown",
+      chatId: ctx.chat?.id,
+      command: text.split(/\s+/)[0],
+      rawLength: text.length,
+    });
+  }
+  await next();
 });
 
 // User updates should preempt low-priority cron/background work.
