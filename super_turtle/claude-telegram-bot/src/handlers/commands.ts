@@ -806,6 +806,7 @@ function getClaudeCredentials(): Record<string, unknown> | null {
 
       // Fallback: try reading from Claude Code config directory
       const credPaths = [
+        `${process.env.HOME}/.claude/.credentials.json`,
         `${process.env.HOME}/.config/claude-code/credentials.json`,
         `${process.env.HOME}/.claude/credentials.json`,
       ];
