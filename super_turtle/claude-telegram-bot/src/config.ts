@@ -295,7 +295,7 @@ export const BLOCKED_PATTERNS: Array<{ regex: string; label: string }> = [
 
 // Hide tool call status messages from Telegram chat (only show final text)
 export const HIDE_TOOL_STATUS =
-  (process.env.HIDE_TOOL_STATUS || "true").toLowerCase() === "true";
+  (process.env.HIDE_TOOL_STATUS || "false").toLowerCase() === "true";
 
 // Query timeout (3 minutes)
 export const QUERY_TIMEOUT_MS = 180_000;
