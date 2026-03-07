@@ -369,6 +369,31 @@ function start() {
     return;
   }
 
+  // Clean up orphaned bot process (tmux died but bot survived)
+  const tokenPrefix = (env.TELEGRAM_BOT_TOKEN || "").split(":")[0];
+  if (tokenPrefix) {
+    const lockFile = `/tmp/claude-telegram-bot.${tokenPrefix}.instance.lock`;
+    try {
+      const holderPid = Number.parseInt(fs.readFileSync(lockFile, "utf-8").trim(), 10);
+      if (Number.isFinite(holderPid) && holderPid > 0) {
+        let alive = false;
+        try { process.kill(holderPid, 0); alive = true; } catch {}
+        if (alive) {
+          warn(`Killing orphaned bot process (PID ${holderPid}) from a previous session`);
+          try { process.kill(holderPid, "SIGTERM"); } catch {}
+          // Give it a moment to release the lock
+          try { execSync("sleep 1", { stdio: "pipe" }); } catch {}
+          try { fs.unlinkSync(lockFile); } catch {}
+        } else {
+          // Stale lock file, just remove it
+          try { fs.unlinkSync(lockFile); } catch {}
+        }
+      }
+    } catch {
+      // No lock file or unreadable — nothing to clean up
+    }
+  }
+
   // Start bot in a new tmux session
   let bunPath;
   try {
@@ -430,6 +455,26 @@ function stop() {
     console.log("Bot stopped.");
   } else {
     console.log("Bot is not running.");
+  }
+
+  // Kill orphaned bot process if tmux is gone but process survived
+  const tokenPrefix = (env.TELEGRAM_BOT_TOKEN || "").split(":")[0];
+  if (tokenPrefix) {
+    const lockFile = `/tmp/claude-telegram-bot.${tokenPrefix}.instance.lock`;
+    try {
+      const holderPid = Number.parseInt(fs.readFileSync(lockFile, "utf-8").trim(), 10);
+      if (Number.isFinite(holderPid) && holderPid > 0) {
+        let alive = false;
+        try { process.kill(holderPid, 0); alive = true; } catch {}
+        if (alive) {
+          try { process.kill(holderPid, "SIGTERM"); } catch {}
+          console.log(`Killed orphaned bot process (PID ${holderPid}).`);
+        }
+        try { fs.unlinkSync(lockFile); } catch {}
+      }
+    } catch {
+      // No lock file — nothing to clean up
+    }
   }
 
   // Stop SubTurtles
