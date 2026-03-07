@@ -8,6 +8,7 @@
  *   superturtle start   — launch the bot (requires Bun + tmux)
  *   superturtle stop    — stop bot + all SubTurtles
  *   superturtle restart — stop and restart (errors if not running)
+ *   superturtle logs    — show recent logs (-f to follow)
  *   superturtle status  — show bot and SubTurtle status
  */
 
@@ -469,6 +470,38 @@ function restart() {
   start();
 }
 
+function logs() {
+  const env = loadDotEnv();
+  const token = env.TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || "";
+  const prefix = token.split(":")[0];
+  const logFile = `/tmp/claude-telegram-${prefix}-bot.log.jsonl`;
+
+  if (!fs.existsSync(logFile)) {
+    console.error(`No log file found at ${logFile}`);
+    console.error("Is the bot running? Try 'superturtle start' first.");
+    process.exit(1);
+  }
+
+  const follow = process.argv.includes("-f") || process.argv.includes("--follow");
+  const tailArgs = follow ? ["-f", logFile] : ["-n", "50", logFile];
+
+  // Pipe through pino-pretty if available, otherwise raw output
+  const bunPath = (() => {
+    try { return execSync("which bun", { encoding: "utf-8" }).trim(); } catch { return null; }
+  })();
+  const pinoPrettyPath = resolve(BOT_DIR, "node_modules", ".bin", "pino-pretty");
+
+  if (bunPath && fs.existsSync(pinoPrettyPath)) {
+    const proc = spawnSync("sh", ["-c", `tail ${tailArgs.join(" ")} | "${pinoPrettyPath}"`], {
+      stdio: "inherit",
+    });
+    process.exit(proc.status || 0);
+  } else {
+    const proc = spawnSync("tail", tailArgs, { stdio: "inherit" });
+    process.exit(proc.status || 0);
+  }
+}
+
 function status() {
   const env = loadDotEnv();
   const tmuxSession = resolveTmuxSession(env);
@@ -514,6 +547,9 @@ switch (command) {
   case "restart":
     restart();
     break;
+  case "logs":
+    logs();
+    break;
   case "status":
     status();
     break;
@@ -536,6 +572,7 @@ Commands:
   start     Launch the bot
   stop      Stop the bot and all SubTurtles
   restart   Stop and restart the bot (errors if not running)
+  logs      Show recent bot logs (use -f to follow)
   status    Show bot and SubTurtle status
 
 Init flags (for non-interactive / agent use):
