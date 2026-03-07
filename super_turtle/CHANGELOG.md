@@ -7,6 +7,14 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- `superturtle doctor`: one-command observability snapshot (bot tmux state, SubTurtles, cron summary, log health, recent loop failures)
+- `superturtle logs`: tail namespaced loop/pino/audit logs with optional pino pretty-printing
+
+### Changed
+- `superturtle start` now launches via `run-loop.sh` with loop-log tee output (`/tmp/claude-telegram-<tokenPrefix>-bot-ts.log`) and fails fast with last-log context when the tmux session exits immediately
+- bot runtime now treats `uncaughtException` and `unhandledRejection` as fatal, logs them to pino/events, and exits for supervised restart
+
 ## [0.1.4] - 2026-03-04
 
 ### Fixed

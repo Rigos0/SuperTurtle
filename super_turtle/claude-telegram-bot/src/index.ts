@@ -1042,13 +1042,37 @@ const runner = run(bot, {
 });
 
 // Graceful shutdown
+let shutdownInitiated = false;
+
 const stopRunner = () => {
+  if (shutdownInitiated) return;
+  shutdownInitiated = true;
   if (runner.isRunning()) {
     botLog.info("Stopping bot...");
     runner.stop();
   }
   releaseInstanceLock();
 };
+
+process.on("uncaughtException", (error) => {
+  botLog.fatal({ err: error }, "Uncaught exception");
+  eventLog.error(
+    { eventType: "process_uncaught_exception", error: summarizeCronError(error) },
+    "Process-level crash"
+  );
+  stopRunner();
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  botLog.fatal({ err: reason }, "Unhandled promise rejection");
+  eventLog.error(
+    { eventType: "process_unhandled_rejection", error: summarizeCronError(reason) },
+    "Process-level crash"
+  );
+  stopRunner();
+  process.exit(1);
+});
 
 process.on("SIGINT", () => {
   botLog.info("Received SIGINT");
