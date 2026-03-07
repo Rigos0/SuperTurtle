@@ -14,6 +14,9 @@ import {
   CLAUDE_CLI_AVAILABLE,
   CLAUDE_CLI_PATH,
   CODEX_AVAILABLE,
+  DEFAULT_EFFORT,
+  DEFAULT_MODEL,
+  HIDE_TOOL_STATUS,
   MCP_SERVERS,
   META_PROMPT,
   SESSION_FILE,
@@ -25,6 +28,7 @@ import {
   IPC_DIR,
   WORKING_DIR,
 } from "./config";
+import type { EffortLevel } from "./config";
 import { formatToolStatus } from "./formatting";
 import {
   checkPendingAskUserRequests,
@@ -145,13 +149,13 @@ const TOOL_ACTIVE_STALL_TIMEOUT_MS = (() => {
   return Number.isFinite(parsed) && parsed >= 1_000 ? parsed : 180_000;
 })();
 
-// Model configuration
-export type EffortLevel = "low" | "medium" | "high";
+// Model configuration — EffortLevel type imported from config.ts
+export { type EffortLevel } from "./config";
 
 export const EFFORT_DISPLAY: Record<EffortLevel, string> = {
-  low: "Low",
-  medium: "Medium",
-  high: "High (default)",
+  low: `Low${DEFAULT_EFFORT === "low" ? " (default)" : ""}`,
+  medium: `Medium${DEFAULT_EFFORT === "medium" ? " (default)" : ""}`,
+  high: `High${DEFAULT_EFFORT === "high" ? " (default)" : ""}`,
 };
 
 const PREFS_FILE = `/tmp/claude-telegram-${TOKEN_PREFIX}-prefs.json`;
@@ -257,8 +261,8 @@ export class ClaudeSession {
 
   constructor() {
     const prefs = loadPrefs();
-    this._model = prefs.model || "claude-opus-4-6";
-    this._effort = prefs.effort || "high";
+    this._model = prefs.model || DEFAULT_MODEL;
+    this._effort = prefs.effort || DEFAULT_EFFORT;
 
     const preferredDriver = prefs.activeDriver || "claude";
     let resolvedDriver: "claude" | "codex" = preferredDriver;
@@ -681,8 +685,10 @@ export class ClaudeSession {
               const isBotControlServerTool =
                 normalizedToolName.startsWith("mcp__bot_control");
 
-              // Don't show tool status for MCP tools that handle their own output
+              // Don't show tool status for MCP tools that handle their own output,
+              // or when HIDE_TOOL_STATUS is enabled (hide all tool calls)
               if (
+                !HIDE_TOOL_STATUS &&
                 !isAskUserTool &&
                 !isSendTurtleTool &&
                 !isBotControlServerTool &&
