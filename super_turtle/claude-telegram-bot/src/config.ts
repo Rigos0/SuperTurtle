@@ -335,6 +335,8 @@ export const DEFAULT_EFFORT: EffortLevel = (() => {
   return "high";
 })();
 
+configLog.info({ model: DEFAULT_MODEL, effort: DEFAULT_EFFORT }, "Default model & effort");
+
 // ============== Thinking Keywords ==============
 
 const thinkingKeywordsStr =
