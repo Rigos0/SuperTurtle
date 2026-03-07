@@ -21,6 +21,7 @@ export interface CronJob {
   interval_ms: number | null;
   silent?: boolean; // optional — true means job output should stay silent unless notable
   fire_at: number; // milliseconds since epoch
+  fire_at_iso?: string; // human-readable fire_at (auto-computed on save)
   created_at: string; // ISO 8601 format
 }
 
@@ -67,6 +68,7 @@ function normalizeJob(raw: unknown): CronJob {
     interval_ms: interval,
     silent,
     fire_at: value.fire_at,
+    fire_at_iso: typeof value.fire_at_iso === "string" ? value.fire_at_iso : undefined,
     created_at: value.created_at,
   };
 }
@@ -111,6 +113,10 @@ export function loadJobs(): CronJob[] {
 export function saveJobs(): void {
   // Intentionally throws — callers must handle so job mutations aren't silently lost
   mkdirSync(SUPERTURTLE_DATA_DIR, { recursive: true });
+  // Compute fire_at_iso for human readability before writing
+  for (const job of jobsCache) {
+    job.fire_at_iso = new Date(job.fire_at).toISOString();
+  }
   writeFileSync(CRON_JOBS_FILE, JSON.stringify(jobsCache, null, 2));
 }
 
