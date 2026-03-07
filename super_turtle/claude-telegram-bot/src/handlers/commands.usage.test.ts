@@ -335,7 +335,9 @@ describe("/usage command with CODEX_ENABLED variations", () => {
     }
     expect(result.payload).not.toBeNull();
     expect(result.payload?.replyCount).toBe(1);
-    expect(result.payload?.replyText).toContain("Usage API is rate-limited right now");
+    expect(result.payload?.replyText).toContain(
+      "Claude usage is temporarily unavailable due to Anthropic service limits"
+    );
     expect(result.payload?.replyText).toContain("❓ <b>Status:</b> Claude usage data unavailable");
     expect(result.payload?.usageFetchCalls).toBeGreaterThan(0);
   });

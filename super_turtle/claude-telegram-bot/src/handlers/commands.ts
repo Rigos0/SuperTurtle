@@ -37,6 +37,8 @@ export const MAIN_LOOP_LOG_PATH = `/tmp/claude-telegram-${TOKEN_PREFIX}-bot-ts.l
 const LEGACY_MAIN_LOOP_LOG_PATH = "/tmp/claude-telegram-bot-ts.log";
 const LOOPLOGS_LINE_COUNT = 50;
 const RESUME_SESSIONS_LIMIT = 5;
+const CLAUDE_USAGE_RATE_LIMIT_MESSAGE =
+  "Claude usage is temporarily unavailable due to Anthropic service limits. This comes from Anthropic's usage endpoint, not from Super Turtle.";
 
 /**
  * Shared command list for display in /new and /status, and new_session bot-control.
@@ -949,7 +951,7 @@ export async function getUsageLines(): Promise<string[]> {
     });
     if (!res.ok) {
       if (res.status === 429) {
-        return ["<i>Usage API is rate-limited right now. Try /usage again shortly.</i>"];
+        return [`<i>${CLAUDE_USAGE_RATE_LIMIT_MESSAGE}</i>`];
       }
       if (res.status === 401 || res.status === 403) {
         return ["<i>Claude credentials were rejected. Re-run Claude login.</i>"];
