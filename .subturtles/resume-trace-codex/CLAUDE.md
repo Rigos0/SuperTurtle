@@ -1,5 +1,5 @@
 ## Current task
-Reproduce logic-level failure path: Claude session active -> switch to Codex -> /resume visibility.
+Identify exact sorting bug and exact persistence/save bug with code references.
 
 ## End goal with specs
 Produce a root-cause analysis with exact file/function references and a minimal, correct fix plan for both issues.
@@ -7,8 +7,8 @@ Produce a root-cause analysis with exact file/function references and a minimal,
 ## Backlog
 - [x] Inspect /resume session list build path in super_turtle/claude-telegram-bot/src/handlers/commands.ts
 - [x] Trace driver-switch and new-session behavior in callback/commands/streaming handlers and session managers
-- [ ] Reproduce logic-level failure path: Claude session active -> switch to Codex -> /resume visibility <- current
-- [ ] Identify exact sorting bug and exact persistence/save bug with code references
+- [x] Reproduce logic-level failure path: Claude session active -> switch to Codex -> /resume visibility
+- [ ] Identify exact sorting bug and exact persistence/save bug with code references <- current
 - [ ] Propose smallest safe fix and tests to prevent regression
 
 ## Notes
@@ -25,3 +25,4 @@ Focus on:
 - Trace coverage in `super_turtle/claude-telegram-bot/src/handlers/switch-new-session.trace.test.ts` now pins the control flow:
   - `handleSwitch()` in `src/handlers/commands.ts`, callback `switch:*` in `src/handlers/callback.ts`, and bot-control `switch_driver` in `src/handlers/streaming.ts` all go through `resetAllDriverSessions({ stopRunning: true })`; Codex switch paths then call `codexSession.startNewThread()` before flipping `session.activeDriver`.
   - `/new` in `src/handlers/commands.ts` resets both drivers, but bot-control `new_session` in `src/handlers/streaming.ts` only calls `sessionObj.stop()` and `sessionObj.kill()` for the invoking driver, leaving the other driver's linked session untouched.
+- `super_turtle/claude-telegram-bot/src/handlers/switch-resume-visibility.trace.test.ts` now reproduces the exact command path: active Claude session -> `/switch codex` -> `/resume`; it confirms the prior Claude session is persisted to disk, the new Codex thread becomes the hidden current session, and `/resume` exposes `resume_current` plus the saved Claude session.
