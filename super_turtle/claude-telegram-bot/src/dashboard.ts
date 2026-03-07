@@ -1503,10 +1503,13 @@ function renderSessionDetailHtml(
   const hasTurns = turns.length > 0;
   const firstTurn = turns[0];
   const history = detail.history || null;
-  const sourceArtifacts = hasTurns
-    ? firstTurn?.injectedArtifacts || []
-    : history?.injectedArtifacts || [];
-  const injectedArtifacts: InjectedArtifactView[] = sourceArtifacts.map((artifact) => {
+  const injectedArtifactsById = new Map<string, InjectedArtifactView>();
+  const pushNormalizedArtifact = (artifact: {
+    id: string;
+    label: string;
+    order?: number;
+    text?: string;
+  }): void => {
     const fallbackOrder = artifact.id === "claude-md"
       ? 10
       : artifact.id === "meta-prompt"
@@ -1518,14 +1521,39 @@ function renderSessionDetailHtml(
             : artifact.id === "background-snapshot"
               ? 50
               : 999;
-    return {
+    const normalized: InjectedArtifactView = {
       id: artifact.id,
       label: artifact.label,
       order: Number.isFinite(artifact.order) ? artifact.order : fallbackOrder,
       exactText: artifact.text || "",
       preview: buildPreview(artifact.text || ""),
     };
-  });
+    const existing = injectedArtifactsById.get(normalized.id);
+    if (!existing) {
+      injectedArtifactsById.set(normalized.id, normalized);
+      return;
+    }
+
+    const preferredText = normalized.exactText.trim().length > 0
+      ? normalized.exactText
+      : existing.exactText;
+    injectedArtifactsById.set(normalized.id, {
+      ...existing,
+      label: existing.label || normalized.label,
+      order: Math.min(existing.order, normalized.order),
+      exactText: preferredText,
+      preview: buildPreview(preferredText),
+    });
+  };
+
+  for (const artifact of history?.injectedArtifacts || []) {
+    pushNormalizedArtifact(artifact);
+  }
+  for (const artifact of firstTurn?.injectedArtifacts || []) {
+    pushNormalizedArtifact(artifact);
+  }
+
+  const injectedArtifacts = [...injectedArtifactsById.values()];
   if (firstTurn && injectedArtifacts.length === 0) {
     pushArtifact(
       injectedArtifacts,

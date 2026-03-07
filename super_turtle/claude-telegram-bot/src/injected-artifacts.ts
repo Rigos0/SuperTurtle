@@ -39,8 +39,10 @@ export function readClaudeMdSnapshot(workingDir: string): ClaudeMdSnapshot {
 }
 
 function extractDatePrefix(prompt: string): string {
-  const match = prompt.match(/^\[Current date\/time:[\s\S]*?\]\n\n/);
-  return match?.[0] || "";
+  const match = prompt.match(
+    /^(?:<system-instructions>\n[\s\S]*?\n<\/system-instructions>\n\n)?(\[Current date\/time:[^\n]*\]\n\n)/
+  );
+  return match?.[1] || "";
 }
 
 export function buildInjectedArtifacts(params: {

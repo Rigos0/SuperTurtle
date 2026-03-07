@@ -98,6 +98,25 @@ describe("CodexSession", () => {
     expect(result.injectedArtifacts.map((item) => item.id)).toEqual(["meta-prompt", "date-prefix"]);
   });
 
+  it("extracts the Codex date prefix even when system instructions are prepended", async () => {
+    const { buildInjectedArtifacts } = await import("./injected-artifacts");
+
+    const artifacts = buildInjectedArtifacts({
+      source: "text",
+      effectivePrompt: "<system-instructions>\nmeta prompt text\n</system-instructions>\n\n[Current date/time: Saturday, March 7, 2026 at 06:00 PM GMT+1]\n\nHello from resume",
+      originalMessage: "Hello from resume",
+      datePrefixApplied: true,
+      metaPromptApplied: true,
+      claudeMdLoaded: false,
+      claudeMdText: "",
+      metaPromptText: "meta prompt text",
+    });
+
+    expect(artifacts.find((item) => item.id === "date-prefix")?.text).toBe(
+      "[Current date/time: Saturday, March 7, 2026 at 06:00 PM GMT+1]\n\n"
+    );
+  });
+
   it("initializes SDK and persists thread/model/reasoning on new thread", async () => {
     const constructorCalls: Array<Record<string, unknown> | undefined> = [];
     const startThreadCalls: Array<Record<string, unknown> | undefined> = [];

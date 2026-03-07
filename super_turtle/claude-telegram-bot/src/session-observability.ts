@@ -1,5 +1,6 @@
 import { WORKING_DIR } from "./config";
 import { codexSession } from "./codex-session";
+import { readClaudeMdSnapshot } from "./injected-artifacts";
 import { session } from "./session";
 import {
   buildExternalSessionHistory,
@@ -153,6 +154,42 @@ function buildActiveMetaView(source: RuntimeMetaSource, isRunning: boolean): Ses
     lastErrorTime: source.lastErrorTime?.toISOString() || null,
     currentTool: source.currentTool,
     lastTool: source.lastTool,
+  };
+}
+
+function withCurrentClaudeMdArtifact(history: SessionHistoryView | null): SessionHistoryView | null {
+  if (!history) return null;
+
+  const claudeMdSnapshot = readClaudeMdSnapshot(WORKING_DIR);
+  if (!claudeMdSnapshot.loaded) {
+    return history;
+  }
+
+  const existingArtifact = history.injectedArtifacts.find((artifact) => artifact.id === "claude-md");
+  const injectedArtifacts = existingArtifact
+    ? history.injectedArtifacts.map((artifact) =>
+        artifact.id === "claude-md" && !artifact.text && claudeMdSnapshot.text
+          ? { ...artifact, text: claudeMdSnapshot.text }
+          : artifact
+      )
+    : [
+        {
+          id: "claude-md" as const,
+          label: "CLAUDE.md context",
+          order: 10,
+          text: claudeMdSnapshot.text,
+          applied: true,
+        },
+        ...history.injectedArtifacts,
+      ].sort((left, right) => left.order - right.order);
+
+  return {
+    ...history,
+    injectedArtifacts,
+    context: {
+      ...history.context,
+      claudeMdLoaded: history.context.claudeMdLoaded ?? true,
+    },
   };
 }
 
@@ -490,7 +527,7 @@ const codexProvider: SessionObservabilityProvider = {
   async loadDurableHistory(sessionId: string, saved: SavedSession | null): Promise<SessionHistoryView | null> {
     const transcript = await codexSession.getSessionTranscript(sessionId);
     const transcriptHistory = transcript
-      ? buildExternalSessionHistory({
+      ? withCurrentClaudeMdArtifact(buildExternalSessionHistory({
           source: "codex-jsonl",
           path: transcript.path,
           messages: transcript.messages,
@@ -499,12 +536,12 @@ const codexProvider: SessionObservabilityProvider = {
             metaSharedLoaded: transcript.metaSharedLoaded,
             datePrefixApplied: transcript.datePrefixApplied,
           },
-        })
+        }))
       : null;
 
     return transcriptHistory
       || buildTurnLogHistory("codex", sessionId)
-      || buildSavedSessionHistory(saved);
+      || withCurrentClaudeMdArtifact(buildSavedSessionHistory(saved));
   },
 
   async loadDisplayHistory(

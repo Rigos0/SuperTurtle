@@ -933,6 +933,7 @@ describe("GET /dashboard/sessions/:driver/:sessionId", () => {
     expect(html).toContain("<div class=\"injected-heading\">");
     expect(html).toContain("<ol class=\"injected-list\">");
     expect(html).toContain("Project instructions");
+    expect(html).toContain("CLAUDE.md context");
     expect(html).toContain("Meta system prompt");
     expect(html).toContain("Date/time prefix");
     expect(html).toContain("meta prompt from transcript");
@@ -940,6 +941,106 @@ describe("GET /dashboard/sessions/:driver/:sessionId", () => {
     expect(html).toContain("workingDirectory set to the repo root");
     expect(html).toContain("&lt;system-instructions&gt;");
     expect(html).not.toContain("No captured injections for this session.");
+  });
+
+  it("merges Codex transcript artifacts with turn-log artifacts for stable session detail", async () => {
+    codexSession.getSessionList = () => [
+      {
+        session_id: "codex-merged-artifacts",
+        saved_at: "2026-03-07T16:00:00.000Z",
+        working_dir: WORKING_DIR,
+        title: "Codex merged artifacts session",
+      },
+    ];
+    codexSession.getSessionTranscript = async () => ({
+      sessionId: "codex-merged-artifacts",
+      path: "/tmp/codex-merged-artifacts.jsonl",
+      messages: [
+        {
+          role: "user",
+          text: "Transcript user message",
+          timestamp: "2026-03-07T16:00:00.000Z",
+        },
+        {
+          role: "assistant",
+          text: "Transcript assistant reply",
+          timestamp: "2026-03-07T16:00:01.000Z",
+        },
+      ],
+      injectedArtifacts: [
+        {
+          id: "meta-prompt",
+          label: "Meta system prompt",
+          order: 20,
+          text: "meta prompt from transcript",
+          applied: true,
+        },
+        {
+          id: "date-prefix",
+          label: "Date/time prefix",
+          order: 30,
+          text: "[Current date/time: Saturday, March 7, 2026 at 05:00 PM GMT+1]\n\n",
+          applied: true,
+        },
+      ],
+      metaSharedLoaded: true,
+      datePrefixApplied: true,
+    });
+
+    appendTurnLogEntry({
+      driver: "codex",
+      source: "text",
+      sessionId: "codex-merged-artifacts",
+      userId: 1,
+      username: "tester",
+      chatId: 1,
+      model: "gpt-5.3-codex",
+      effort: "high",
+      originalMessage: "Transcript user message",
+      effectivePrompt: "Transcript user message",
+      injectedArtifacts: [
+        {
+          id: "claude-md",
+          label: "CLAUDE.md context",
+          order: 10,
+          text: "## Current task\nStabilize session detail\n",
+          applied: true,
+        },
+      ],
+      injections: {
+        datePrefixApplied: false,
+        metaPromptApplied: false,
+        cronScheduledPromptApplied: false,
+        backgroundSnapshotPromptApplied: false,
+      },
+      context: {
+        claudeMdLoaded: true,
+        metaSharedLoaded: true,
+      },
+      startedAt: "2026-03-07T16:00:00.000Z",
+      completedAt: "2026-03-07T16:00:02.000Z",
+      elapsedMs: 2000,
+      status: "completed",
+      response: "Transcript assistant reply",
+      error: null,
+      usage: {
+        inputTokens: 5,
+        outputTokens: 8,
+      },
+    });
+
+    const result = findRoute("/dashboard/sessions/codex/codex-merged-artifacts");
+    expect(result).not.toBeNull();
+    const { req, url } = makeReq("/dashboard/sessions/codex/codex-merged-artifacts");
+    const res = await result!.handler(req, url, result!.match);
+    expect(res.status).toBe(200);
+
+    const html = await res.text();
+    expect(html).toContain("CLAUDE.md context");
+    expect(html).toContain("Meta system prompt");
+    expect(html).toContain("Date/time prefix");
+    expect(html).toContain("meta prompt from transcript");
+    expect(html).toContain("Stabilize session detail");
   });
 
   it("prefers fresher active Codex messages over stale transcript history", async () => {
