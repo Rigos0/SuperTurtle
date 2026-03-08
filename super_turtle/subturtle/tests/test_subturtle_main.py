@@ -10,6 +10,22 @@ def _write_state_file(tmp_path) -> None:
     (tmp_path / "CLAUDE.md").write_text("# Current task\n\nTest task\n", encoding="utf-8")
 
 
+def test_yolo_prompt_allows_rewriting_blocked_backlog_items() -> None:
+    prompt = subturtle_main.YOLO_PROMPT.format(state_file=".subturtles/demo/CLAUDE.md")
+
+    assert "If it is blocked, too vague, or not feasible with the current repo/context, rewrite the backlog" in prompt
+    assert "move `<- current` to the next actionable item" in prompt
+    assert "MUST NOT leave a blocked current item unchanged" in prompt
+
+
+def test_slow_loop_prompts_allow_blocked_item_replanning() -> None:
+    prompts = subturtle_main.build_prompts(".subturtles/demo/CLAUDE.md")
+
+    assert "plan the smallest\n  actionable unblocker or backlog rewrite needed to restore forward progress" in prompts["planner"]
+    assert "rewrite it\n     into concrete unblocker tasks" in prompts["groomer"]
+    assert "Rewrite the backlog so the next iteration has a concrete unblocker" in prompts["reviewer"]
+
+
 def test_require_cli_exits_with_clear_error(monkeypatch, capsys) -> None:
     monkeypatch.setattr(subturtle_main.shutil, "which", lambda _cli: None)
 

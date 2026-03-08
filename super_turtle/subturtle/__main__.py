@@ -57,6 +57,8 @@ Produce a concrete implementation plan for the next iteration — one commit's
 worth of focused work. The plan must:
 
 - Address the item marked `<- current` in the backlog (or the current task).
+- If the current item is blocked or too large as written, plan the smallest
+  actionable unblocker or backlog rewrite needed to restore forward progress.
 - List specific files to create/modify and what changes to make.
 - Be scoped so a single agent can execute it without ambiguity.
 - NOT include any code — describe what to do, not how to write it.
@@ -81,6 +83,9 @@ Your only job is to update {state_file}. Do not write code or touch other files.
 4. Groom the **Backlog** section:
    - Mark the active item with `<- current`. Remove the marker from all others.
    - If the plan spans multiple items, combine them or clarify which is active.
+   - If the current item is blocked, too vague, or not yet feasible, rewrite it
+     into concrete unblocker tasks, add any prerequisite work, and move
+     `<- current` to the next actionable item.
    - If the plan introduces new work not in the backlog, add it.
    - Check off (`[x]`) items that are done based on codebase/git history.
    - Reorder if priorities shifted.
@@ -120,7 +125,12 @@ You are the reviewer. The plan below has been implemented. Your job:
    - Do NOT fix them now.
    - Add a backlog item to {state_file} for the next iteration describing the
      refactoring or cleanup needed.
-5. If ALL backlog items in {state_file} are `[x]`, append `## Loop Control\nSTOP`
+5. If the current backlog item turns out to be blocked or not completable as
+   written:
+   - Rewrite the backlog so the next iteration has a concrete unblocker instead
+     of retrying the same vague item.
+   - Split the blocked item into smaller steps, prerequisites, or diagnostics.
+6. If ALL backlog items in {state_file} are `[x]`, append `## Loop Control\nSTOP`
    to {state_file}.
 
 ## The plan that was executed
@@ -153,6 +163,8 @@ Do ONE commit's worth of focused work on the current task. Follow this sequence:
 4. **Update state** — Edit `{state_file}`:
    - If the current backlog item is DONE, check it off (`[x]`) and move `<- current` to the next unchecked item.
    - If it is NOT done but you made progress, leave it as `<- current` and optionally add a note.
+   - If it is blocked, too vague, or not feasible with the current repo/context, rewrite the backlog before finishing this iteration:
+     add concrete unblocker or prerequisite tasks, rewrite the blocked item with explicit unblock conditions, and move `<- current` to the next actionable item.
    - Update **Current task** to reflect what `<- current` now points to.
    - Do NOT touch End Goal, Roadmap (Completed), or Roadmap (Upcoming) sections.
 
@@ -167,6 +179,7 @@ Do ONE commit's worth of focused work on the current task. Follow this sequence:
 - You MUST read `{state_file}` before doing anything else.
 - You MUST commit before you finish. No uncommitted work.
 - You MUST update `{state_file}` to reflect progress. The next iteration of this loop will read it.
+- You MUST NOT leave a blocked current item unchanged and simply retry it next iteration without new evidence, a narrower plan, or a rewritten actionable backlog item.
 - Do NOT ask questions. Make reasonable decisions and move forward.
 - Do NOT over-scope. One commit, one focused change. Stop after committing.
 """
