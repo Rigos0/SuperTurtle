@@ -830,6 +830,38 @@ test_status_stopped() {
   return 0
 }
 
+test_status_stale_pid_preserves_meta() {
+  local name ws meta_path pid_path stale_pid status_output
+  name="$(make_test_name "status-stale-pid")"
+  ws="${SUBTURTLES_DIR}/${name}"
+  meta_path="${ws}/subturtle.meta"
+  pid_path="${ws}/subturtle.pid"
+
+  mkdir -p "$ws"
+  write_valid_state_file "${ws}/CLAUDE.md" "status stale pid preserves meta"
+  track_subturtle "$name"
+
+  cat > "$meta_path" <<'META'
+SPAWNED_AT=1700000000
+TIMEOUT_SECONDS=7200
+LOOP_TYPE=yolo-codex
+SKILLS=["frontend"]
+META
+
+  sleep 0.1 &
+  stale_pid=$!
+  wait "$stale_pid" || true
+  assert_pid_dead "$stale_pid" || return 1
+  printf '%s\n' "$stale_pid" > "$pid_path"
+
+  status_output="$("$CTL" status "$name")"
+  assert_contains "$status_output" "[subturtle:${name}] not running" || return 1
+  [[ ! -f "$pid_path" ]] || fail "expected stale PID file to be removed for ${name}"
+  assert_file_exists "$meta_path" || return 1
+  assert_file_contains "$meta_path" 'LOOP_TYPE=yolo-codex' || return 1
+  return 0
+}
+
 test_spawn_missing_state_file() {
   local name missing_state out_file err_file output
   name="$(make_test_name "spawn-missing-state-file")"
@@ -1410,6 +1442,7 @@ register_test test_spawn_with_skills
 register_test test_status_running
 register_test test_status_mocked_shell_output
 register_test test_status_stopped
+register_test test_status_stale_pid_preserves_meta
 register_test test_spawn_missing_state_file
 register_test test_spawn_rejects_invalid_state_file
 register_test test_stop_kills_process
