@@ -7,6 +7,15 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-03-08
+
+### Changed
+- removed message keyword-based reasoning escalation for both Claude and Codex turns
+- removed the related thinking-keyword environment variables from packaged templates and operator docs
+
+### Added
+- regression coverage to ensure message content no longer changes Claude thinking tokens or Codex reasoning effort
+
 ## [0.2.0] - 2026-03-08
 
 ### Added
