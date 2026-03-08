@@ -20,7 +20,6 @@ import datetime
 import json
 import os
 import re
-import secrets
 import shutil
 import subprocess
 import sys
@@ -205,125 +204,6 @@ def _resolve_state_ref(state_dir: Path, name: str) -> tuple[Path, str]:
         state_ref = str(state_file)
 
     return state_file, state_ref
-
-
-def _write_completion_notification(state_dir: Path, name: str, project_dir: Path) -> None:
-    """Queue completion handoff: immediate UX ping + meta-agent follow-up check."""
-    state_file = state_dir / "CLAUDE.md"
-    cron_jobs_path = project_dir / ".superturtle/cron-jobs.json"
-
-    try:
-        state_text = state_file.read_text(encoding="utf-8")
-    except OSError as error:
-        print(
-            f"[subturtle:{name}] WARNING: could not read {state_file} for completion notification: {error}",
-            file=sys.stderr,
-        )
-        return
-
-    in_backlog = False
-    completed_items: list[str] = []
-    for line in state_text.splitlines():
-        stripped = line.strip()
-        if not in_backlog:
-            if stripped.lower() == "# backlog":
-                in_backlog = True
-            continue
-
-        if stripped.startswith("#"):
-            break
-
-        match = re.match(r"^\s*-\s*\[x\]\s+(.*\S)\s*$", line, flags=re.IGNORECASE)
-        if not match:
-            continue
-        item = re.sub(r"\s*<-\s*current\s*$", "", match.group(1)).strip()
-        if item:
-            completed_items.append(item)
-
-    message_lines = [f"🎉 Finished: {name}"]
-    message_lines.extend(f"✓ {item}" for item in completed_items)
-    summary_text = "\n".join(message_lines)
-    checking_prompt = (
-        "BOT_MESSAGE_ONLY:"
-        f"{summary_text}\n\n"
-        "🔄 Meta agent checking in the background now to verify cleanup and report next steps."
-    )
-    followup_prompt = (
-        f"[AUTO-COMPLETION HANDOFF] SubTurtle {name} reported completion.\n"
-        f"Summary from SubTurtle:\n{summary_text}\n\n"
-        f"Now perform meta-agent completion handling for {name}:\n"
-        f"1. Run `{Path(__file__).resolve().with_name('ctl')} status {name}`.\n"
-        f"2. Run `{Path(__file__).resolve().with_name('ctl')} stop {name}` to ensure recurring cron/meta cleanup and archiving are complete.\n"
-        f"3. Confirm whether any cron for {name} remains (if yes, remove it).\n"
-        f"4. Send the user one concise completion update with what shipped and what starts next (or that roadmap is complete).\n"
-        "If everything is already clean, still send the completion update."
-    )
-
-    try:
-        jobs: list[dict] = []
-        if cron_jobs_path.exists():
-            raw = cron_jobs_path.read_text(encoding="utf-8").strip()
-            if raw:
-                parsed = json.loads(raw)
-                if not isinstance(parsed, list):
-                    raise ValueError("cron-jobs.json must contain a JSON array")
-                jobs = parsed
-
-        existing_ids = {
-            str(job.get("id")) for job in jobs if isinstance(job, dict) and "id" in job
-        }
-
-        job_id = ""
-        for _ in range(32):
-            candidate = secrets.token_hex(3)
-            if candidate not in existing_ids:
-                job_id = candidate
-                break
-        if not job_id:
-            raise RuntimeError("failed to generate unique cron job id")
-
-        now = datetime.datetime.now(datetime.timezone.utc)
-        now_ms = int(now.timestamp() * 1000)
-        jobs.append(
-            {
-                "id": job_id,
-                "prompt": checking_prompt,
-                "type": "one-shot",
-                "fire_at": now_ms + 1000,
-                "interval_ms": None,
-                "created_at": now.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-            }
-        )
-        followup_job_id = ""
-        for _ in range(32):
-            candidate = secrets.token_hex(3)
-            if candidate not in existing_ids and candidate != job_id:
-                followup_job_id = candidate
-                break
-        if not followup_job_id:
-            raise RuntimeError("failed to generate unique follow-up cron job id")
-        jobs.append(
-            {
-                "id": followup_job_id,
-                "prompt": followup_prompt,
-                "type": "one-shot",
-                "fire_at": now_ms + 3000,
-                "interval_ms": None,
-                "created_at": now.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-            }
-        )
-
-        cron_jobs_path.write_text(json.dumps(jobs, indent=2) + "\n", encoding="utf-8")
-    except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as error:
-        print(
-            f"[subturtle:{name}] WARNING: failed to queue completion notification: {error}",
-            file=sys.stderr,
-        )
-        return
-
-    print(
-        f"[subturtle:{name}] queued completion notification jobs {job_id}, {followup_job_id}"
-    )
 
 
 # ---------------------------------------------------------------------------
