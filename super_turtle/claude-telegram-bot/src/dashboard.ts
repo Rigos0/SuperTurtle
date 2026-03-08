@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "fs";
-import { resolve } from "path";
-import { WORKING_DIR, CTL_PATH, DASHBOARD_ENABLED, DASHBOARD_AUTH_TOKEN, DASHBOARD_BIND_ADDR, DASHBOARD_PORT, META_PROMPT, SUPER_TURTLE_DIR } from "./config";
+import { join, resolve } from "path";
+import { WORKING_DIR, CTL_PATH, DASHBOARD_ENABLED, DASHBOARD_AUTH_TOKEN, DASHBOARD_BIND_ADDR, DASHBOARD_PORT, META_PROMPT, SUPER_TURTLE_DIR, SUPERTURTLE_DATA_DIR } from "./config";
 import { getJobs } from "./cron";
 import { parseCtlListOutput, getSubTurtleElapsed, readClaudeBacklogItems, type ListedSubTurtle } from "./handlers/commands";
 import { getAllDeferredQueues } from "./deferred-queue";
@@ -9,6 +9,8 @@ import { codexSession } from "./codex-session";
 import { getPreparedSnapshotCount } from "./cron-supervision-queue";
 import { isBackgroundRunActive, wasBackgroundRunPreempted } from "./handlers/driver-routing";
 import { logger } from "./logger";
+import { listPendingMetaAgentInboxItems } from "./conductor-inbox";
+import { loadPendingWakeups, loadWorkerStates } from "./conductor-supervisor";
 import {
   type DriverProcessState,
   getSessionObservabilityProvider,
@@ -18,6 +20,7 @@ import type { RecentMessage, SavedSession } from "./types";
 import type { TurtleView, ProcessView, DeferredChatView, SubturtleLaneView, DashboardState, SubturtleListResponse, SubturtleDetailResponse, SubturtleLogsResponse, CronListResponse, CronJobView, SessionResponse, SessionDriver, SessionListItem, SessionListResponse, SessionMessageView, SessionMetaView, SessionDetailResponse, SessionTurnView, SessionTurnsResponse, ContextResponse, ProcessDetailView, ProcessDetailResponse, DriverExtra, SubturtleExtra, BackgroundExtra, CurrentJobView, CurrentJobsResponse, JobDetailResponse, QueueResponse } from "./dashboard-types";
 
 const dashboardLog = logger.child({ module: "dashboard" });
+const CONDUCTOR_STATE_DIR = join(SUPERTURTLE_DATA_DIR, "state");
 
 /* ── Shared response helpers ────────────────────────────────────────── */
 
@@ -171,7 +174,7 @@ function isObjectLike(value: unknown): value is Record<string, unknown> {
 }
 
 function readConductorWorkerState(name: string): ConductorWorkerLaneState | null {
-  const path = resolve(WORKING_DIR, ".superturtle/state/workers", `${name}.json`);
+  const path = join(CONDUCTOR_STATE_DIR, "workers", `${name}.json`);
   if (!existsSync(path)) return null;
 
   try {
@@ -713,13 +716,26 @@ async function buildDashboardState(): Promise<DashboardState> {
   };
 }
 
+function buildConductorResponse() {
+  return {
+    generatedAt: new Date().toISOString(),
+    workers: loadWorkerStates(CONDUCTOR_STATE_DIR),
+    wakeups: loadPendingWakeups(CONDUCTOR_STATE_DIR),
+    inbox: listPendingMetaAgentInboxItems({
+      stateDir: CONDUCTOR_STATE_DIR,
+      limit: Number.MAX_SAFE_INTEGER,
+    }),
+  };
+}
+
 function renderDashboardHtml(): string {
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Super Turtle Dashboard</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐢</text></svg>" />
+    <title>SuperTurtle Dashboard</title>
     <style>
       html, body { height: 100%; }
       :root {
@@ -826,11 +842,9 @@ function renderDashboardHtml(): string {
         grid-column: 8 / span 5;
         grid-row: 2;
       }
-      .panel-queue { grid-column: span 6; }
-      .panel-jobs { grid-column: span 6; }
-      .panel-queue { grid-row: 3; }
-      .panel-jobs { grid-row: 3; }
-      .panel-cron {
+      .panel-cron { grid-column: span 6; grid-row: 3; }
+      .panel-jobs { grid-column: span 6; grid-row: 3; }
+      .panel-queue {
         grid-column: span 12;
         grid-row: 4;
       }
@@ -1062,7 +1076,7 @@ function renderDashboardHtml(): string {
   </head>
   <body>
     <main class="page">
-      <h1>Super Turtle Dashboard</h1>
+      <h1>SuperTurtle Dashboard</h1>
       <p class="badge-row">
         <span id="updateBadge" class="badge">Loading…</span>
         <span id="sessionBadge" class="badge">Sessions: 0</span>
@@ -1113,24 +1127,25 @@ function renderDashboardHtml(): string {
           </table>
         </div>
       </section>
-      <section class="panel panel-queue">
+      <section class="panel panel-cron">
         <div class="panel-head">
-          <h2>Queued Messages</h2>
+          <h2>Scheduled Jobs</h2>
+          <p class="panel-note">Pending one-shot and recurring jobs that will fire later.</p>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>Chat</th><th>Count</th><th>Oldest</th><th>Preview</th></tr>
+              <tr><th>Type</th><th>Next in</th><th>Prompt</th></tr>
             </thead>
-            <tbody id="queueRows">
-              <tr><td colspan="4">No queued messages.</td></tr>
+            <tbody id="cronRows">
+              <tr><td colspan="3">No jobs scheduled.</td></tr>
             </tbody>
           </table>
         </div>
       </section>
       <section class="panel panel-jobs">
         <div class="panel-head">
-          <h2>Current Jobs (Running Now)</h2>
+          <h2>Running Jobs</h2>
           <p class="panel-note">Actively executing jobs owned by current processes.</p>
         </div>
         <div class="table-wrap">
@@ -1144,18 +1159,17 @@ function renderDashboardHtml(): string {
           </table>
         </div>
       </section>
-      <section class="panel panel-cron">
+      <section class="panel panel-queue">
         <div class="panel-head">
-          <h2>Scheduled Cron Jobs (Upcoming)</h2>
-          <p class="panel-note">Pending one-shot and recurring jobs that will fire later.</p>
+          <h2>Queued Messages</h2>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>Type</th><th>Next in</th><th>Prompt</th></tr>
+              <tr><th>Chat</th><th>Count</th><th>Oldest</th><th>Preview</th></tr>
             </thead>
-            <tbody id="cronRows">
-              <tr><td colspan="3">No jobs scheduled.</td></tr>
+            <tbody id="queueRows">
+              <tr><td colspan="4">No queued messages.</td></tr>
             </tbody>
           </table>
         </div>
@@ -2490,6 +2504,12 @@ export const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
     handler: async () => {
       const data = await buildDashboardState();
       return jsonResponse(data);
+    },
+  },
+  {
+    pattern: /^\/api\/conductor$/,
+    handler: async () => {
+      return jsonResponse(buildConductorResponse());
     },
   },
   {

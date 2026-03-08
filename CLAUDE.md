@@ -49,7 +49,7 @@ git checkout dev && git merge main
 ---
 
 ## Current task
-Redesign SubTurtle orchestration so durable state, not chat/session memory, is the control plane. Current focus: lock the core user-facing orchestration contract behind a 15-path test matrix that covers single-worker happy/error/timeout/stuck flows, parallel SubTurtles, and driver/model changes while workers are still running.
+Dashboard redesign: surface conductor state (worker lifecycle, wakeups, inbox) in the dashboard, fix layout issues, and make it a proper operational tool aligned with the new durable state model.
 
 ## SubTurtle orchestration redesign scope
 
@@ -106,6 +106,7 @@ We are redesigning the weak parts:
 - ✅ Current worker execution model: isolated workspaces, `CLAUDE.md` state files, commit-per-iteration yolo/slow loops, and self-stop directives
 
 ## Roadmap (Upcoming)
+- Dashboard redesign: conductor state visibility, layout fixes, operational polish
 - Build out and maintain the core 15-path conductor contract across single-worker, multi-worker, and cross-driver/model user flows
 - Add the remaining restart/manual validation coverage after the core live-user paths are locked down
 
@@ -124,7 +125,15 @@ We are redesigning the weak parts:
 - [x] Persist `worker.cron_removed` and clear `cron_job_id` on the stop path, not only in supervisor reconciliation
 - [x] Render archived completed/failed workers in `handoff.md` recent updates using canonical terminal outcome
 - [x] Add end-to-end tests for restart recovery, stale cron cleanup, mid-chat completion delivery, reused worker names, and multi-worker orchestration
-- [ ] Lock the conductor behind a 15-path core-flow matrix that matches real user behavior <- current
+- [ ] Fix dashboard favicon, title, and layout (Cron+Jobs side by side, Queue below) <- done by meta agent
+- [ ] Add `/api/conductor` endpoint for worker states, wakeups, inbox <- current (SubTurtle: dashboard-v2)
+- [ ] Add conductor types to `dashboard-types.ts`
+- [ ] Enhance race lanes with conductor lifecycle state badges
+- [ ] Add Conductor panel to main dashboard grid
+- [ ] Add conductor header badge and auto-hide empty Queue panel
+- [ ] Add event timeline to SubTurtle detail page
+- [ ] Typecheck and commit
+- [ ] Lock the conductor behind a 15-path core-flow matrix that matches real user behavior
 - [ ] Fill any remaining matrix gaps, especially true switch-command/manual Telegram validation with multiple live SubTurtles
 - [ ] Add conductor state retention/gc so `.superturtle/state/` does not grow forever: prune old sent wakeups, acknowledged inbox items, stale archived worker records, and rotate/archive `events.jsonl`
 
@@ -156,3 +165,4 @@ We are redesigning the weak parts:
 - MCP IPC files are isolated in `/tmp/superturtle-{tokenPrefix}/`, passed to MCP servers via `SUPERTURTLE_IPC_DIR`
 - The bot is the meta agent; system prompt injection still lives in `super_turtle/claude-telegram-bot/src/config.ts`
 - The redesign should preserve the existing good operator ergonomics: `ctl list`, `ctl status`, worker logs, `/debug`, `/status`, dashboard views, and preview URLs
+- Dashboard layout fixes (favicon, title, Cron+Jobs side by side) applied directly by meta agent; conductor state integration delegated to SubTurtle `dashboard-v2` (yolo-codex)

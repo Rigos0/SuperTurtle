@@ -218,7 +218,7 @@ function loadWakeupsByDeliveryStates(
     });
 }
 
-function loadPendingWakeups(stateDir: string): WakeupRecord[] {
+export function loadPendingWakeups(stateDir: string): WakeupRecord[] {
   return loadWakeupsByDeliveryStates(stateDir, new Set(["pending"]));
 }
 
@@ -232,7 +232,7 @@ function loadWakeups(stateDir: string): WakeupRecord[] {
     .filter((value): value is WakeupRecord => value !== null);
 }
 
-function loadWorkerStates(stateDir: string): WorkerStateRecord[] {
+export function loadWorkerStates(stateDir: string): WorkerStateRecord[] {
   const { workersDir } = statePaths(stateDir);
   if (!existsSync(workersDir)) return [];
 

@@ -55,7 +55,7 @@ interface EnsureMetaAgentInboxItemOptions {
 
 interface ListPendingMetaAgentInboxItemsOptions {
   stateDir?: string;
-  chatId: number;
+  chatId?: number;
   limit?: number;
 }
 
@@ -177,6 +177,9 @@ export function listPendingMetaAgentInboxItems(
     .filter((item): item is MetaAgentInboxItemRecord => {
       if (!item) return false;
       if (normalizeState(item.delivery_state) !== "pending") return false;
+      if (typeof options.chatId !== "number" || !Number.isFinite(options.chatId)) {
+        return true;
+      }
       return item.chat_id === null || item.chat_id === options.chatId;
     })
     .sort((left, right) => {
