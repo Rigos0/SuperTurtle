@@ -171,22 +171,8 @@ printf '%s\n' "$TUNNEL_URL" > "$TUNNEL_URL_FILE"
 echo "[start-tunnel] Tunnel started! URL written to ${TUNNEL_URL_FILE}"
 echo "$TUNNEL_URL"
 
-# Keep the script running to maintain the trap handler
-# The processes will be cleaned up when this script is killed
-# Use wait to block on child processes so signals are properly handled
-(
-  wait $DEV_PID 2>/dev/null
-  DEV_EXIT=$?
-) &
-DEV_WAIT_PID=$!
-
-(
-  wait $TUNNEL_PID 2>/dev/null
-  TUNNEL_EXIT=$?
-) &
-TUNNEL_WAIT_PID=$!
-
-# Wait for either child process to exit
+# Keep the script running to maintain the trap handler.
+# The polling loop below monitors both children directly.
 while kill -0 "$DEV_PID" 2>/dev/null && kill -0 "$TUNNEL_PID" 2>/dev/null; do
   sleep 1
 done
