@@ -95,7 +95,10 @@ describe("CodexSession", () => {
     ]);
     expect(result.metaSharedLoaded).toBe(true);
     expect(result.datePrefixApplied).toBe(true);
-    expect(result.injectedArtifacts.map((item) => item.id)).toEqual(["meta-prompt", "date-prefix"]);
+    expect(result.injectedArtifacts.map((item) => item.id)).toEqual([
+      "codex-bootstrap-prompt",
+      "date-prefix",
+    ]);
   });
 
   it("extracts the Codex date prefix even when system instructions are prepended", async () => {
@@ -110,6 +113,8 @@ describe("CodexSession", () => {
       claudeMdLoaded: false,
       claudeMdText: "",
       metaPromptText: "meta prompt text",
+      metaPromptArtifactId: "codex-bootstrap-prompt",
+      metaPromptLabel: "Codex bootstrap prompt",
     });
 
     expect(artifacts.find((item) => item.id === "date-prefix")?.text).toBe(
@@ -432,5 +437,53 @@ describe("CodexSession", () => {
       "Older user message",
       "Older assistant message",
     ]);
+  });
+
+  it("does not reapply Codex bootstrap prompt on the first turn after resume", async () => {
+    let sentMessage = "";
+
+    mock.module("@openai/codex-sdk", () => ({
+      Codex: class {
+        startThread() {
+          throw new Error("not used");
+        }
+
+        resumeThread(threadId: string) {
+          return {
+            id: threadId,
+            run: async () => ({ finalResponse: "", usage: null }),
+            runStreamed: async (message: string) => {
+              sentMessage = message;
+              return {
+                events: (async function* () {
+                  yield {
+                    type: "item.completed",
+                    item: {
+                      type: "agent_message",
+                      id: "msg-1",
+                      text: "resumed reply",
+                    },
+                  };
+                  yield {
+                    type: "turn.completed",
+                    usage: {
+                      input_tokens: 3,
+                      output_tokens: 4,
+                    },
+                  };
+                })(),
+              };
+            },
+          };
+        }
+      },
+    }));
+
+    const { CodexSession } = await loadCodexSessionModule("resume-bootstrap-turn");
+    const codex = new CodexSession();
+    await codex.resumeThread("resume-thread-bootstrap");
+    await codex.sendMessage("Spawn a subturtle");
+
+    expect(sentMessage).toBe("Spawn a subturtle");
   });
 });

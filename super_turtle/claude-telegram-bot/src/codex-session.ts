@@ -10,7 +10,7 @@ import { resolve } from "path";
 import {
   WORKING_DIR,
   BOT_DIR,
-  META_PROMPT,
+  CODEX_META_BOOTSTRAP_PROMPT,
   MCP_SERVERS,
   META_CODEX_APPROVAL_POLICY,
   META_CODEX_NETWORK_ACCESS,
@@ -262,7 +262,7 @@ export function parseCodexTranscript(
   path: string | null = null
 ): CodexTranscriptData {
   const messages: CodexTranscriptMessage[] = [];
-  let metaPromptText: string | null = null;
+  let bootstrapPromptText: string | null = null;
   let datePrefixText: string | null = null;
 
   for (const line of transcriptText.split("\n")) {
@@ -289,8 +289,8 @@ export function parseCodexTranscript(
       const rawText = extractMessageTextFromContent(content, "input_text");
       if (!rawText) continue;
       const meta = stripMetaPrompt(rawText);
-      if (!metaPromptText && meta.artifact) {
-        metaPromptText = meta.artifact;
+      if (!bootstrapPromptText && meta.artifact) {
+        bootstrapPromptText = meta.artifact;
       }
       const dated = stripDatePrefix(meta.text);
       if (!datePrefixText && dated.artifact) {
@@ -318,12 +318,12 @@ export function parseCodexTranscript(
   }
 
   const injectedArtifacts: InjectedArtifact[] = [];
-  if (metaPromptText) {
+  if (bootstrapPromptText) {
     injectedArtifacts.push({
-      id: "meta-prompt",
-      label: "Meta system prompt",
+      id: "codex-bootstrap-prompt",
+      label: "Codex bootstrap prompt",
       order: 20,
-      text: metaPromptText,
+      text: bootstrapPromptText,
       applied: true,
     });
   }
@@ -342,7 +342,7 @@ export function parseCodexTranscript(
     path,
     messages,
     injectedArtifacts,
-    metaSharedLoaded: metaPromptText !== null,
+    metaSharedLoaded: bootstrapPromptText !== null,
     datePrefixApplied: datePrefixText !== null,
   };
 }
@@ -1052,7 +1052,7 @@ export class CodexSession {
       }
 
       this.threadId = this.thread.id || null;
-      this.systemPromptPrepended = false; // Reset flag for new thread
+      this.systemPromptPrepended = false; // Reset bootstrap state for new thread
 
       codexLog.info(
         { sessionId: this.threadId },
@@ -1103,7 +1103,7 @@ export class CodexSession {
         modelReasoningEffort: threadEffort,
       });
       this.threadId = threadId;
-      this.systemPromptPrepended = true; // Already sent in original thread
+      this.systemPromptPrepended = true; // Resumed thread already contains its earlier bootstrap turn
 
       codexLog.info({ sessionId: threadId }, `Resumed Codex thread: ${threadId.slice(0, 8)}...`);
       this.upsertTrackedSession();
@@ -1119,7 +1119,7 @@ export class CodexSession {
    * Send a message to the current Codex thread with streaming support.
    * Returns the final response text.
    *
-   * On first message, prepends system prompt (META_SHARED.md content).
+   * On new-thread bootstrap turns, prepends the Codex Telegram bootstrap prompt.
    * Uses thread.runStreamed() to process events in real-time via statusCallback.
    *
    * mcpCompletionCallback: Optional callback fired when an mcp_tool_call completes.
@@ -1171,7 +1171,7 @@ export class CodexSession {
       this.lastMessage = userMessage;
       this.pushRecentMessage("user", userMessage);
 
-      // Prepend system prompt and date/time prefix to first message in a new thread.
+      // Prepend bootstrap prompt and date/time prefix on thread bootstrap turns.
       if (!this.systemPromptPrepended) {
         const now = new Date();
         const datePrefix = `[Current date/time: ${now.toLocaleDateString(
@@ -1188,9 +1188,9 @@ export class CodexSession {
         )}]\n\n`;
         messageToSend = `${datePrefix}${userMessage}`;
         datePrefixApplied = true;
-        if (META_PROMPT) {
+        if (CODEX_META_BOOTSTRAP_PROMPT) {
           messageToSend = `<system-instructions>
-${META_PROMPT}
+${CODEX_META_BOOTSTRAP_PROMPT}
 </system-instructions>
 
 ${messageToSend}`;
@@ -1560,7 +1560,9 @@ ${messageToSend}`;
           metaPromptApplied: metaPromptAppliedThisTurn,
           claudeMdLoaded,
           claudeMdText: claudeMdSnapshot.text,
-          metaPromptText: META_PROMPT,
+          metaPromptText: CODEX_META_BOOTSTRAP_PROMPT,
+          metaPromptArtifactId: "codex-bootstrap-prompt",
+          metaPromptLabel: "Codex bootstrap prompt",
         }),
         injections: {
           datePrefixApplied,
@@ -1570,7 +1572,7 @@ ${messageToSend}`;
         },
         context: {
           claudeMdLoaded,
-          metaSharedLoaded: META_PROMPT.length > 0,
+          metaSharedLoaded: CODEX_META_BOOTSTRAP_PROMPT.length > 0,
         },
         startedAt: turnStartedAt.toISOString(),
         completedAt: completedAt.toISOString(),

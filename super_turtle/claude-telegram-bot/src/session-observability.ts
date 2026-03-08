@@ -567,12 +567,12 @@ const codexProvider: SessionObservabilityProvider = {
         description: "Codex runs with workingDirectory set to the repo root, so repo-root AGENTS.md / project instructions are loaded by the CLI.",
       },
       {
-        label: "META prompt",
-        description: "The wrapper wraps META_SHARED.md in <system-instructions> and prepends it to the first message of a thread only.",
+        label: "Codex bootstrap prompt",
+        description: "The Telegram wrapper prepends CODEX_TELEGRAM_BOOTSTRAP.md inside <system-instructions> on new-thread bootstrap turns.",
       },
       {
         label: "Date/time prefix",
-        description: "The wrapper prepends the date/time prefix on the first message of a thread.",
+        description: "The wrapper prepends the date/time prefix on Codex bootstrap turns.",
       },
     ]);
   },
