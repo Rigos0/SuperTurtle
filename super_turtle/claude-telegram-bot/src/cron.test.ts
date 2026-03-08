@@ -68,6 +68,46 @@ describe("loadJobs()", () => {
         type: "one-shot",
         interval_ms: null,
         silent: undefined,
+        job_kind: undefined,
+        worker_name: undefined,
+        supervision_mode: undefined,
+        fire_at: 1000,
+        created_at: "2026-02-01T00:00:00.000Z",
+      },
+    ]);
+  });
+
+  it("preserves structured supervision metadata when present", () => {
+    writeFileSync(
+      fixtureJobsFile,
+      JSON.stringify([
+        {
+          id: "job-structured",
+          prompt: "check worker-a",
+          type: "recurring",
+          interval_ms: 600000,
+          silent: true,
+          job_kind: "subturtle_supervision",
+          worker_name: "worker-a",
+          supervision_mode: "silent",
+          fire_at: 1000,
+          created_at: "2026-02-01T00:00:00.000Z",
+        },
+      ])
+    );
+
+    const jobs = loadJobs();
+    expect(jobs).toEqual([
+      {
+        id: "job-structured",
+        prompt: "check worker-a",
+        chat_id: undefined,
+        type: "recurring",
+        interval_ms: 600000,
+        silent: true,
+        job_kind: "subturtle_supervision",
+        worker_name: "worker-a",
+        supervision_mode: "silent",
         fire_at: 1000,
         created_at: "2026-02-01T00:00:00.000Z",
       },
@@ -114,7 +154,42 @@ describe("addJob() and removeJob()", () => {
       chat_id: 123,
       type: "one-shot",
       interval_ms: null,
+      job_kind: undefined,
+      worker_name: undefined,
+      supervision_mode: undefined,
       fire_at: 15_000,
+    });
+  });
+
+  it("stores optional structured metadata", () => {
+    Date.now = () => 30_000;
+
+    const added = addJob(
+      "check worker-a",
+      321,
+      "recurring",
+      undefined,
+      60_000,
+      true,
+      {
+        job_kind: "subturtle_supervision",
+        worker_name: "worker-a",
+        supervision_mode: "silent",
+      }
+    );
+
+    const fromDisk = loadJobs();
+    expect(fromDisk[0]).toMatchObject({
+      id: added.id,
+      prompt: "check worker-a",
+      chat_id: 321,
+      type: "recurring",
+      interval_ms: 60_000,
+      silent: true,
+      job_kind: "subturtle_supervision",
+      worker_name: "worker-a",
+      supervision_mode: "silent",
+      fire_at: 90_000,
     });
   });
 

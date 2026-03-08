@@ -257,11 +257,18 @@ function humanInterval(ms: number | null): string | null {
 }
 
 function buildCronJobView(job: ReturnType<typeof getJobs>[number]): CronJobView {
+  const promptPreview = job.job_kind === "subturtle_supervision" && job.worker_name
+    ? `SubTurtle ${job.worker_name} (${job.supervision_mode || (job.silent ? "silent" : "unknown")})`
+    : safeSubstring(job.prompt, 100);
+
   return {
     id: job.id,
     type: job.type,
+    jobKind: job.job_kind,
+    workerName: job.worker_name,
+    supervisionMode: job.supervision_mode,
     prompt: job.prompt,
-    promptPreview: safeSubstring(job.prompt, 100),
+    promptPreview,
     fireAt: job.fire_at,
     fireInMs: Math.max(0, job.fire_at - Date.now()),
     intervalMs: job.interval_ms,

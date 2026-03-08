@@ -451,6 +451,41 @@ PY
   fi
 }
 
+assert_cron_job_field_equals() {
+  local job_id="$1"
+  local field_name="$2"
+  local expected_value="$3"
+
+  assert_not_empty "$job_id" "cron job id" || return 1
+  assert_not_empty "$field_name" "cron job field name" || return 1
+
+  if ! python3 - "$CRON_JOBS_FILE" "$job_id" "$field_name" "$expected_value" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+cron_jobs_path = Path(sys.argv[1])
+job_id = sys.argv[2]
+field_name = sys.argv[3]
+expected_value = sys.argv[4]
+raw = cron_jobs_path.read_text(encoding="utf-8").strip() if cron_jobs_path.exists() else ""
+jobs = json.loads(raw) if raw else []
+if not isinstance(jobs, list):
+    raise SystemExit(2)
+
+for job in jobs:
+    if isinstance(job, dict) and str(job.get("id")) == job_id:
+        actual = job.get(field_name)
+        raise SystemExit(0 if str(actual) == expected_value else 1)
+
+raise SystemExit(1)
+PY
+  then
+    fail "expected cron job ${job_id} field ${field_name}=${expected_value}"
+    return 1
+  fi
+}
+
 stop_subturtle_if_running() {
   local name="$1"
   "$CTL" stop "$name" >/dev/null 2>&1 || true
@@ -545,6 +580,9 @@ test_spawn_creates_workspace() {
     fail "cron job ${cron_job_id} not present in ${CRON_JOBS_FILE}"
     return 1
   fi
+  assert_cron_job_field_equals "$cron_job_id" "job_kind" "subturtle_supervision" || return 1
+  assert_cron_job_field_equals "$cron_job_id" "worker_name" "$name" || return 1
+  assert_cron_job_field_equals "$cron_job_id" "supervision_mode" "silent" || return 1
   run_id="$(meta_value "$name" "RUN_ID")"
   assert_not_empty "$run_id" "RUN_ID" || return 1
 
@@ -1238,13 +1276,14 @@ test_spawn_orchestrator_cron_mode() {
   cron_job_id="$(meta_value "$name" "CRON_JOB_ID")"
   assert_not_empty "$cron_job_id" "CRON_JOB_ID" || return 1
 
-  if ! python3 - "$CRON_JOBS_FILE" "$cron_job_id" <<'PY'
+  if ! python3 - "$CRON_JOBS_FILE" "$cron_job_id" "$name" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 cron_jobs_path = Path(sys.argv[1])
 cron_job_id = sys.argv[2]
+name = sys.argv[3]
 
 raw = cron_jobs_path.read_text(encoding="utf-8").strip() if cron_jobs_path.exists() else ""
 jobs = json.loads(raw) if raw else []
@@ -1264,6 +1303,9 @@ checks = [
     match.get("type") == "recurring",
     int(match.get("interval_ms", -1)) == 1200000,
     match.get("silent") is False,
+    match.get("job_kind") == "subturtle_supervision",
+    match.get("worker_name") == name,
+    match.get("supervision_mode") == "orchestrator",
     "Orchestrator Wake-Up" in str(match.get("prompt", "")),
 ]
 raise SystemExit(0 if all(checks) else 1)

@@ -46,6 +46,9 @@ export type SubturtleLaneView = {
 export type CronJobView = {
   id: string;
   type: "one-shot" | "recurring";
+  jobKind?: string;
+  workerName?: string;
+  supervisionMode?: string;
   prompt: string;
   promptPreview: string;
   fireAt: number;

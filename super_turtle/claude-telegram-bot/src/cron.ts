@@ -4,7 +4,8 @@
  * Jobs are stored in a JSON file and loaded/saved synchronously.
  * Each job has an ID, prompt, chat_id, type (one-shot or recurring),
  * fire_at timestamp, optional interval_ms for recurring jobs,
- * and optional silent flag for background-only processing.
+ * optional silent flag for background-only processing,
+ * and optional structured metadata for conductor-owned supervision jobs.
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
@@ -13,6 +14,9 @@ import { SUPERTURTLE_DATA_DIR } from "./config";
 import { cronLog } from "./logger";
 
 // Job type definition
+export type CronJobKind = "generic" | "subturtle_supervision";
+export type CronSupervisionMode = "silent" | "orchestrator";
+
 export interface CronJob {
   id: string;
   prompt: string;
@@ -20,6 +24,9 @@ export interface CronJob {
   type: "one-shot" | "recurring";
   interval_ms: number | null;
   silent?: boolean; // optional — true means job output should stay silent unless notable
+  job_kind?: CronJobKind;
+  worker_name?: string;
+  supervision_mode?: CronSupervisionMode;
   fire_at: number; // milliseconds since epoch
   created_at: string; // ISO 8601 format
 }
@@ -28,6 +35,26 @@ export interface CronJob {
 const CRON_JOBS_FILE = join(SUPERTURTLE_DATA_DIR, "cron-jobs.json");
 
 let jobsCache: CronJob[] = [];
+
+function normalizeCronJobKind(value: unknown): CronJobKind | undefined {
+  if (value === "generic" || value === "subturtle_supervision") {
+    return value;
+  }
+  return undefined;
+}
+
+function normalizeCronSupervisionMode(value: unknown): CronSupervisionMode | undefined {
+  if (value === "silent" || value === "orchestrator") {
+    return value;
+  }
+  return undefined;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
 
 function normalizeJob(raw: unknown): CronJob {
   if (!raw || typeof raw !== "object") {
@@ -58,6 +85,9 @@ function normalizeJob(raw: unknown): CronJob {
       ? value.interval_ms
       : null;
   const silent = typeof value.silent === "boolean" ? value.silent : undefined;
+  const jobKind = normalizeCronJobKind(value.job_kind);
+  const workerName = normalizeOptionalString(value.worker_name);
+  const supervisionMode = normalizeCronSupervisionMode(value.supervision_mode);
 
   return {
     id: value.id,
@@ -66,9 +96,18 @@ function normalizeJob(raw: unknown): CronJob {
     type: value.type,
     interval_ms: interval,
     silent,
+    job_kind: jobKind,
+    worker_name: workerName,
+    supervision_mode: supervisionMode,
     fire_at: value.fire_at,
     created_at: value.created_at,
   };
+}
+
+export interface AddCronJobMetadata {
+  job_kind?: CronJobKind;
+  worker_name?: string;
+  supervision_mode?: CronSupervisionMode;
 }
 
 /**
@@ -125,7 +164,8 @@ export function addJob(
   type: "one-shot" | "recurring",
   delay_ms?: number,
   interval_ms?: number,
-  silent?: boolean
+  silent?: boolean,
+  metadata?: AddCronJobMetadata
 ): CronJob {
   // Load existing jobs if not already loaded
   loadJobs();
@@ -148,6 +188,9 @@ export function addJob(
     type,
     interval_ms: interval_ms || null,
     silent: silent === true ? true : undefined,
+    job_kind: metadata?.job_kind,
+    worker_name: normalizeOptionalString(metadata?.worker_name),
+    supervision_mode: metadata?.supervision_mode,
     fire_at,
     created_at: new Date().toISOString(),
   };

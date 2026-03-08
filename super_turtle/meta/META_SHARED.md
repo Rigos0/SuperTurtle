@@ -114,7 +114,7 @@ When the human wants to build something new:
    {{CTL_PATH}} spawn <name> --type <type> --timeout <duration> --state-file /tmp/<name>-state.md
    ```
    This atomically: creates workspace, writes state, symlinks AGENTS.md, starts the SubTurtle, registers cron supervision with `silent: true` by default, and **prints `ctl list` at the end** so you immediately see confirmation that the SubTurtle is running. No need to run `ctl list` separately after spawning.
-5. Confirm briefly: *"On it. Silent supervision is running every 5 minutes; I'll only message you on milestones, completion, stuck states, or errors."*
+5. Confirm briefly: *"On it. Silent supervision is running every 10 minutes; I'll only message you on milestones, completion, stuck states, or errors."*
 
 **Do not** manually create directories, symlinks, or edit cron-jobs.json. `ctl spawn` owns all of that.
 
@@ -266,7 +266,7 @@ For frontend SubTurtles, include screenshot capture in the backlog before final 
 
 ## Autonomous supervision (cron check-ins)
 
-Every SubTurtle you spawn gets a recurring cron job that wakes you up to supervise it. This is **mandatory** and auto-registered by `ctl spawn` (default interval: 5 minutes).
+Every SubTurtle you spawn gets a recurring cron job that wakes you up to supervise it. This is **mandatory** and auto-registered by `ctl spawn` (default interval: 10 minutes).
 
 Important split:
 - Deterministic lifecycle events now have a conductor lane outside your chat session.
@@ -276,6 +276,7 @@ Important split:
 
 **Silent-first default:**
 - New `ctl spawn` cron jobs are marked `silent: true`.
+- New `ctl spawn` cron jobs also carry structured worker metadata: `job_kind=subturtle_supervision`, `worker_name=<name>`, and `supervision_mode=<silent|orchestrator>`.
 - If a silent check-in finds no notable event, do the supervision work and respond with exactly `[SILENT]` (no user-facing chatter).
 - Legacy cron jobs without a `silent` field are treated as non-silent (backward compatible behavior).
 

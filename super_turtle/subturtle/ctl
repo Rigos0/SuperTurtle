@@ -857,7 +857,7 @@ register_spawn_cron_job() {
     is_silent="false"
   fi
 
-  "$PYTHON" - "$cron_jobs_file" "$name" "$interval_ms" "$is_silent" "$prompt_text" "${SCRIPT_DIR}/ctl" <<'PY'
+  "$PYTHON" - "$cron_jobs_file" "$name" "$interval_ms" "$is_silent" "$prompt_text" "${SCRIPT_DIR}/ctl" "$cron_mode" <<'PY'
 import datetime
 import json
 import secrets
@@ -872,6 +872,7 @@ custom_prompt = sys.argv[5] if len(sys.argv) > 5 else ""
 ctl_path = sys.argv[6] if len(sys.argv) > 6 else "./super_turtle/subturtle/ctl"
 
 is_silent = is_silent_str.lower() == "true"
+cron_mode = sys.argv[7] if len(sys.argv) > 7 else ("silent" if is_silent else "orchestrator")
 
 if custom_prompt:
     prompt = custom_prompt
@@ -916,6 +917,9 @@ job = {
     "id": job_id,
     "prompt": prompt,
     "silent": is_silent,
+    "job_kind": "subturtle_supervision",
+    "worker_name": name,
+    "supervision_mode": cron_mode,
     "type": "recurring",
     "fire_at": now_ms + interval_ms,
     "interval_ms": interval_ms,

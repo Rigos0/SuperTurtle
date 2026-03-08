@@ -2001,8 +2001,11 @@ export async function handleCron(ctx: Context): Promise<void> {
       timeStr = `${dateStr} ${timeOfDayStr}`;
     }
 
-    // Get prompt preview
-    const promptPreview = job.prompt.length > 40 ? job.prompt.slice(0, 37) + "..." : job.prompt;
+    // Prefer structured supervision metadata over raw prompt text when available.
+    const rawPreview = job.job_kind === "subturtle_supervision" && job.worker_name
+      ? `SubTurtle ${job.worker_name} (${job.supervision_mode || (job.silent ? "silent" : "unknown")})`
+      : job.prompt;
+    const promptPreview = rawPreview.length > 40 ? rawPreview.slice(0, 37) + "..." : rawPreview;
 
     // Build the job line
     const typeEmoji = job.type === "recurring" ? "🔁" : "⏱️";

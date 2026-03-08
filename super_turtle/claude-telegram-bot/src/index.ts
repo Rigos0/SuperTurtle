@@ -62,6 +62,7 @@ import {
 import { StreamingState, createSilentStatusCallback, createStatusCallback } from "./handlers/streaming";
 import { getSilentNotificationText } from "./silent-notifications";
 import type { DriverId } from "./drivers/types";
+import type { CronJob } from "./cron";
 import { isStopIntent } from "./utils";
 import {
   dequeuePreparedSnapshot,
@@ -161,9 +162,32 @@ function isAllowedInteractiveUpdate(ctx: import("grammy").Context): boolean {
   return Boolean(ctx.message || ctx.callbackQuery);
 }
 
-function extractCheckedSubturtleName(prompt: string): string | null {
+function extractLegacyCheckedSubturtleName(prompt: string): string | null {
   const match = prompt.match(/^\[SILENT CHECK-IN\]\s+Check SubTurtle\s+([a-zA-Z0-9._-]+):/m);
   return match?.[1] || null;
+}
+
+function resolveSubturtleSupervisionTarget(
+  job: Pick<CronJob, "prompt" | "silent" | "job_kind" | "worker_name" | "supervision_mode">
+): { workerName: string; mode: "silent" | "orchestrator" | null } | null {
+  if (job.job_kind === "subturtle_supervision" && typeof job.worker_name === "string") {
+    const workerName = job.worker_name.trim();
+    if (workerName.length > 0) {
+      return {
+        workerName,
+        mode: job.supervision_mode || (job.silent ? "silent" : null),
+      };
+    }
+  }
+
+  const legacyWorkerName = extractLegacyCheckedSubturtleName(job.prompt);
+  if (!legacyWorkerName) {
+    return null;
+  }
+  return {
+    workerName: legacyWorkerName,
+    mode: "silent",
+  };
 }
 
 function isSubturtleRunning(name: string): boolean {
@@ -172,12 +196,14 @@ function isSubturtleRunning(name: string): boolean {
   return output.includes("running as");
 }
 
-function shouldPrepareSilentSubturtleSnapshot(job: {
-  prompt: string;
-  silent?: boolean;
-}): string | null {
+function shouldPrepareSilentSubturtleSnapshot(
+  job: Pick<CronJob, "prompt" | "silent" | "job_kind" | "worker_name" | "supervision_mode">
+): string | null {
   if (!job.silent) return null;
-  return extractCheckedSubturtleName(job.prompt);
+  const target = resolveSubturtleSupervisionTarget(job);
+  if (!target) return null;
+  if (target.mode && target.mode !== "silent") return null;
+  return target.workerName;
 }
 
 async function prepareSubturtleSnapshot(
@@ -645,7 +671,8 @@ const startCronTimer = () => {
                 await bot.api.sendMessage(resolvedChatId, notificationText);
               }
 
-              const subturtleName = extractCheckedSubturtleName(job.prompt);
+              const subturtleTarget = resolveSubturtleSupervisionTarget(job);
+              const subturtleName = subturtleTarget?.workerName || null;
               if (subturtleName && job.type === "recurring") {
                 const running = isSubturtleRunning(subturtleName);
                 const recurringStillExists = getJobs().some((j) => j.id === job.id);

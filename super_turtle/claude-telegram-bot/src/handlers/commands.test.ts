@@ -839,6 +839,39 @@ describe("handlers with mock Context", () => {
     expect(keyboard?.flat().some((button) => button.callback_data === "cron_cancel:job-2")).toBe(true);
   });
 
+  it("handleCron prefers structured SubTurtle supervision labels", async () => {
+    const now = Date.now();
+
+    writeFileSync(
+      cronJobsPath,
+      JSON.stringify(
+        [
+          {
+            id: "job-structured",
+            prompt: "legacy prompt fallback should not be shown",
+            chat_id: 123,
+            type: "recurring",
+            interval_ms: 10 * 60 * 1000,
+            silent: true,
+            job_kind: "subturtle_supervision",
+            worker_name: "worker-a",
+            supervision_mode: "silent",
+            fire_at: now + 60 * 1000,
+            created_at: new Date(now).toISOString(),
+          },
+        ],
+        null,
+        2
+      )
+    );
+
+    const { ctx, replies } = mockContext("/cron");
+    await handleCron(ctx as any);
+
+    expect(replies).toHaveLength(1);
+    expect(replies[0]!.text).toContain("🔁 <code>SubTurtle worker-a (silent)</code>");
+  });
+
   it("handleModel replies with inline keyboard model options for Claude", async () => {
     session.activeDriver = "claude";
     session.model = getAvailableModels()[0]!.value;
