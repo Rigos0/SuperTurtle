@@ -5,6 +5,10 @@ export interface PreparedSupervisionSnapshot {
   sourcePrompt: string;
   preparedAtMs: number;
   snapshotSeq: number;
+  conductorSummary: string;
+  workerStateJson: string;
+  recentEventsJson: string;
+  wakeupsJson: string;
   statusOutput: string;
   stateExcerpt: string;
   gitLog: string;

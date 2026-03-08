@@ -268,23 +268,30 @@ For frontend SubTurtles, include screenshot capture in the backlog before final 
 
 Every SubTurtle you spawn gets a recurring cron job that wakes you up to supervise it. This is **mandatory** and auto-registered by `ctl spawn` (default interval: 5 minutes).
 
+Important split:
+- Deterministic lifecycle events now have a conductor lane outside your chat session.
+- Completion, fatal failure, and timeout wake-ups are delivered directly by the bot from durable state and should not rely on silent cron inference.
+- Those lifecycle events also land in a durable meta-agent inbox so the next interactive turn can update planning state without faking a chat message into the session history.
+- Silent cron remains for milestone detection, stuck detection, and course-correction when human-facing judgment is still needed.
+
 **Silent-first default:**
 - New `ctl spawn` cron jobs are marked `silent: true`.
 - If a silent check-in finds no notable event, do the supervision work and respond with exactly `[SILENT]` (no user-facing chatter).
 - Legacy cron jobs without a `silent` field are treated as non-silent (backward compatible behavior).
 
 **What to do when cron wakes you:**
-1. Check status via `{{CTL_PATH}} status <name>`.
-2. Read `.subturtles/<name>/CLAUDE.md` for backlog progress.
-3. Review `git log --oneline -10` for meaningful movement.
-4. Check logs if needed (`{{CTL_PATH}} logs <name>`).
-5. Check `.subturtles/<name>/.tunnel-url`; if a new URL appears, include it in the next milestone update.
+1. Read the prepared canonical conductor snapshot first (`workers/<name>.json`, recent worker events, and worker wakeups).
+2. Use `{{CTL_PATH}} status <name>` as supporting liveness context.
+3. Read `.subturtles/<name>/CLAUDE.md` for backlog progress and current task detail.
+4. Review `git log --oneline -10` for meaningful movement.
+5. Check logs if needed (`{{CTL_PATH}} logs <name>`).
+6. Check `.subturtles/<name>/.tunnel-url`; if a new URL appears, include it in the next milestone update.
 
 **Only notify the user when there is actual news:**
-- `🎉 Finished` — all backlog items are done. Stop the SubTurtle, report what shipped, and state what starts next (or that the roadmap is complete).
+- `🎉 Finished` — all backlog items are done. In normal operation this is delivered by the conductor wake-up queue after cleanup verification; if cron discovers it first, verify state and avoid duplicate reporting.
 - `🚀 Milestone` — significant progress since the last report (major backlog checkpoint, first working feature, or new tunnel URL ready).
 - `⚠️ Stuck` — no meaningful progress across 2+ check-ins, repeated loops/retries, or off-track work that requires intervention.
-- `❌ Error` — crash, hard failure, or broken environment preventing autonomous progress.
+- `❌ Error` — crash, timeout, or hard failure preventing autonomous progress. Fatal failure/timeout may already have been surfaced by the conductor wake-up queue; check state before sending a second alert.
 
 **Notification format (keep brief and structured):**
 ```text
@@ -420,7 +427,7 @@ SubTurtles can now signal that their work is done. When a SubTurtle finishes all
 STOP
 ```
 
-The Python loop checks for this directive after each iteration. If present, it logs the stop event and exits cleanly.
+The Python loop checks for this directive after each iteration. If present, it records a durable `completion_pending` fact, exits, and hands off completion delivery to the conductor wake-up queue.
 
 Lifecycle control is now shared between self-completion and external safeguards:
 - **Start** — the meta agent should use `{{CTL_PATH}} spawn` (or `ctl start` only for low-level/manual cases).
@@ -428,7 +435,7 @@ Lifecycle control is now shared between self-completion and external safeguards:
 - **External stop** — the meta agent can still stop it via `{{CTL_PATH}} stop` (which also removes the SubTurtle's cron job).
 - **Timeout fallback** — the watchdog still enforces timeout and kills overdue processes.
 
-This keeps completion autonomous while preserving watchdog and cron supervision as fallbacks.
+This keeps completion autonomous while preserving watchdog and cron supervision as fallbacks. Completion handoff should not depend on a cron prompt being injected back into your chat session.
 
 ## SubTurtle commands (internal — don't expose these to the human)
 

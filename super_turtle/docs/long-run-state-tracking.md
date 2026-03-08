@@ -1,41 +1,469 @@
-# Long-Run State Tracking
+# Long-Run State Tracking and Conductor V2
 
-Super Turtle persists long-running SubTurtle progress in two files under `super_turtle/state/`:
+## Goal
 
-- `runs.jsonl`: append-only event ledger (`spawn`, `milestone`, `stop`, `completion`, etc.).
-- `handoff.md`: human-readable summary refreshed from ledger data.
+Make SubTurtle orchestration reliable even when:
 
-## Why this exists
+- the bot restarts
+- the meta agent is mid-conversation with the human
+- the active driver changes between Claude and Codex
+- silent check-ins are delayed or skipped
+- workers finish, fail, or time out in the background
 
-Meta sessions can restart, but run history must survive. These files make status and cron supervision resumable without depending on chat context.
+The system must be able to reconstruct exact worker state from disk without relying on chat history, prompt memory, or human-readable summaries.
 
-## Write events
+## Core concept
 
-Use the helper CLI:
+Workers emit facts. The supervisor reconciles facts. The meta agent explains facts.
+
+This is the control-plane split:
+
+- SubTurtles are execution workers.
+- The supervisor is the conductor.
+- The meta agent is the human-facing interface.
+- Durable state is the score they all read from.
+
+Chat is not the control plane.
+Silent check-ins are not the control plane.
+`handoff.md` is not the control plane.
+
+## Why SubTurtles exist
+
+SubTurtles exist to give Super Turtle capabilities that the main chat loop should not own directly:
+
+- long-running focused execution
+- parallel workstreams
+- isolated worker context
+- independent worker failure domains
+- explicit handoff points between planning and execution
+
+The main agent should stay coherent with the human. The workers should grind through bounded implementation tasks. The supervisor should keep the whole system correct.
+
+## Ownership boundaries
+
+### Human
+
+The human owns product direction, priorities, approvals, and questions that materially change behavior or risk.
+
+The human does not own:
+
+- worker lifecycle bookkeeping
+- background completion detection
+- restart recovery
+- cron cleanup
+- internal orchestration state
+
+### Meta agent
+
+The meta agent owns:
+
+- translating human intent into work
+- decomposing work into SubTurtles
+- explaining progress, completions, and blockers to the human
+- reading durable orchestration state and making planning decisions from it
+
+The meta agent does not own:
+
+- being the only place where worker state exists
+- remembering whether a worker already completed
+- inferring truth from a prompt when the system can read a fact from disk
+
+### Supervisor / conductor
+
+The supervisor owns:
+
+- worker lifecycle reconciliation
+- durable event ingestion
+- wake-up and notification queueing
+- cleanup validation
+- recovery after bot or session restart
+- turning worker facts into deterministic state transitions
+
+The supervisor is the single authority that decides whether a worker is:
+
+- running
+- completed
+- failed
+- timed_out
+- stopped
+- archived
+
+### SubTurtle worker
+
+Each SubTurtle owns:
+
+- executing its assigned scope
+- updating its local `CLAUDE.md`
+- committing its work
+- emitting checkpoints after successful iterations
+- self-reporting completion
+- self-reporting fatal failure when it cannot continue
+
+A worker does not own:
+
+- marking itself globally completed before cleanup is confirmed
+- removing its own orchestration history
+- deciding whether the human has already been notified
+
+### Rendered views
+
+Rendered views include:
+
+- `handoff.md`
+- dashboard summaries
+- `/status` formatting
+- Telegram notification text
+
+These are outputs of orchestration state, never the source of truth.
+
+## Lifecycle state model
+
+Each worker has one canonical lifecycle state.
+
+### Non-terminal states
+
+- `planned`
+  - The supervisor intends for this worker to exist, but spawn has not started.
+- `starting`
+  - Workspace creation, state seeding, or process launch is in progress.
+- `running`
+  - The worker process is alive and eligible to emit checkpoints.
+- `completion_pending`
+  - The worker declared itself done, but the supervisor has not yet reconciled cleanup, cron removal, and completion delivery.
+- `failure_pending`
+  - The worker reported a fatal error, but the supervisor has not yet reconciled process death, cleanup, and failure delivery.
+- `stop_pending`
+  - An external stop was requested and cleanup is underway.
+
+### Terminal states
+
+- `completed`
+  - Completion was reconciled successfully.
+- `failed`
+  - The worker cannot continue due to a fatal error.
+- `timed_out`
+  - The watchdog or supervisor terminated the worker for exceeding its limit.
+- `stopped`
+  - The worker was intentionally stopped before completion.
+- `archived`
+  - The workspace has been archived after reaching a terminal state.
+
+## State transition rules
+
+- Only the supervisor may transition a worker into a terminal orchestration state.
+- A worker may request completion or report failure, but that is not the same as the system declaring final completion.
+- `failure_pending` is the failure-side analog of `completion_pending`: it means the worker emitted a fatal fact, but supervisor reconciliation still owns the terminal `failed` transition.
+- `completed` means all of the following are true:
+  - the worker reported completion
+  - the process is no longer running
+  - recurring supervision for that worker has been removed
+  - the completion event was persisted
+  - a completion notification was queued
+- `archived` is always downstream of another terminal state.
+- Silent cron checks may observe or trigger reconciliation, but they do not define truth on their own.
+
+## Event model
+
+The event log is append-only and records facts, not prose.
+
+### Event categories
+
+#### Intent events
+
+- `worker.planned`
+- `worker.spawn_requested`
+- `worker.stop_requested`
+
+#### Lifecycle events
+
+- `worker.starting`
+- `worker.started`
+- `worker.running_confirmed`
+- `worker.stop_started`
+- `worker.stopped`
+- `worker.timed_out`
+- `worker.archived`
+
+#### Worker fact events
+
+- `worker.checkpoint`
+- `worker.completion_requested`
+- `worker.fatal_error`
+
+#### Supervisor reconciliation events
+
+- `worker.completed`
+- `worker.failed`
+- `worker.recovered`
+- `worker.cron_removed`
+- `worker.cleanup_verified`
+
+#### Delivery events
+
+- `worker.wakeup_requested`
+- `worker.notification_enqueued`
+- `worker.notification_sent`
+- `worker.notification_suppressed`
+- `worker.inbox_enqueued`
+
+### Event requirements
+
+Every event must include enough structure to answer:
+
+- which worker did this affect?
+- when did it happen?
+- who emitted it?
+- what state transition or fact does it represent?
+- is it idempotent or retryable?
+
+The exact schema is a follow-up design task. The invariant is more important than the field names: events must be machine-usable without reading surrounding chat context.
+
+## Wake-up model
+
+The system needs a durable way to wake the meta agent without depending on the current conversation turn.
+
+### Required behavior
+
+- Background worker events must land safely while the meta agent is busy with the human.
+- High-priority events must not be lost just because the current chat turn is still running.
+- Low-priority events must not interrupt a human conversation unnecessarily.
+- Delivery must be retryable and idempotent.
+
+### Conceptual model
+
+The supervisor creates wake-up records when notable worker transitions occur.
+
+Examples:
+
+- completion became `completion_pending`
+- worker transitioned to `failed`
+- worker transitioned to `timed_out`
+- milestone policy says a user-visible update is due
+- a dependency was unblocked and new work can now be spawned
+
+Those wake-up records are consumed separately from the human chat transcript. The active chat session may later receive a compact summary, but the event itself already exists durably before any message is sent.
+
+### Delivery classes
+
+- `critical`
+  - failures, timeouts, stuck workers, cleanup corruption
+  - may send a standalone Telegram message immediately
+- `notable`
+  - completion, important milestone, dependency release
+  - should enqueue for near-term delivery without depending on conversational memory
+- `silent`
+  - routine confirmations with no human-facing consequence
+  - persisted for audit/recovery, not sent to the human
+
+## Silent check-ins in V2
+
+Silent check-ins still have value, but their role changes.
+
+In V1, silent check-ins were asked to infer what was happening.
+
+In V2, silent check-ins should:
+
+- reconcile durable worker state against live process facts
+- detect missing cleanup
+- detect missing notifications
+- trigger wake-up records when needed
+- collect extra diagnostics only when structured state is insufficient
+
+They should not be the primary source of worker truth.
+
+## Recovery model
+
+After any restart, the supervisor must be able to:
+
+1. load the canonical worker states
+2. replay or scan the event log
+3. inspect live processes and worker workspaces
+4. repair stale states
+5. re-enqueue any unsent wake-ups or notifications
+
+If the bot crashes while the meta agent is mid-conversation, worker correctness must remain intact. At worst, delivery of a notification is delayed. The event itself cannot disappear.
+
+## Invariants
+
+These are the core conductor guarantees.
+
+1. Durable state beats conversational state.
+2. A worker cannot be both terminal and running after reconciliation.
+3. No worker completion is considered final until cleanup is verified.
+4. A notable background event may be delayed, but it may not be lost.
+5. Replaying supervisor reconciliation after a restart must be safe and idempotent.
+6. Derived views may be stale, but canonical worker state may not depend on them.
+7. Silent check-ins may fail completely without corrupting the source of truth.
+8. Multi-instance isolation must apply to orchestration artifacts just like logs and IPC.
+
+## Current implementation gap
+
+Current state tracking already has useful pieces:
+
+- per-worker runtime metadata in `.subturtles/<name>/subturtle.meta`
+- an append-only ledger in `.superturtle/state/runs.jsonl`
+- a rendered summary in `.superturtle/state/handoff.md`
+
+Those pieces are not yet enough to serve as the conductor control plane because:
+
+- `subturtle.meta` is mostly spawn-time metadata
+- `runs.jsonl` is too sparse for deterministic orchestration
+- `handoff.md` is rendered summary, not canonical state
+- silent check-ins still infer too much from prompts and repo state
+
+## What stays the same
+
+- `CLAUDE.md` remains the worker's task and progress document
+- SubTurtles still self-stop via `## Loop Control` + `STOP`
+- isolated workspaces remain the execution unit
+- `ctl list`, `ctl status`, logs, dashboard, and Telegram updates remain operator-facing surfaces
+
+## What changes
+
+- orchestration truth moves out of prompts and summaries into structured state
+- completion handoff becomes a deterministic supervisor path
+- background wake-ups become queue-driven, not prompt-driven
+- `handoff.md` becomes optional or purely rendered
+- silent cron becomes reconciliation, not inference
+
+## Minimal durable data model
+
+The first control-plane scaffold now exists in `super_turtle/state/conductor_state.py`.
+
+### File layout
+
+Under `.superturtle/state/`:
+
+- `events.jsonl`
+  - canonical append-only conductor event log
+- `workers/<name>.json`
+  - canonical mutable worker state
+- `wakeups/<id>.json`
+  - durable wake-up and delivery records
+- `inbox/<id>.json`
+  - durable meta-agent inbox items for background worker events that need to be surfaced on the next interactive turn
+- `runs.jsonl`
+  - legacy ledger kept for compatibility during migration
+- `handoff.md`
+  - rendered summary view
+
+### Worker state record
+
+Each worker state file currently tracks:
+
+- `worker_name`
+- `run_id`
+- `lifecycle_state`
+- `workspace`
+- `loop_type`
+- `pid`
+- `timeout_seconds`
+- `cron_job_id`
+- `current_task`
+- `stop_reason`
+- `completion_requested_at`
+- `terminal_at`
+- `created_at`
+- `updated_at`
+- `updated_by`
+- `last_event_id`
+- `last_event_at`
+- `checkpoint`
+- `metadata`
+
+### Event record
+
+Each event record currently tracks:
+
+- `id`
+- `timestamp`
+- `worker_name`
+- `run_id`
+- `event_type`
+- `emitted_by`
+- `lifecycle_state`
+- `idempotency_key`
+- `payload`
+
+### Wake-up record
+
+Each wake-up record currently tracks:
+
+- `id`
+- `worker_name`
+- `run_id`
+- `reason_event_id`
+- `category`
+- `delivery_state`
+- `summary`
+- `created_at`
+- `updated_at`
+- `delivery`
+- `payload`
+- `metadata`
+
+### Meta-agent inbox record
+
+Each inbox record currently tracks:
+
+- `id`
+- `chat_id`
+- `worker_name`
+- `run_id`
+- `priority`
+- `category`
+- `title`
+- `text`
+- `delivery_state`
+- `source_event_id`
+- `source_wakeup_id`
+- `created_at`
+- `updated_at`
+- `delivery`
+- `metadata`
+
+### Current status
+
+The control-plane scaffold is now live in runtime paths.
+
+Current producer coverage:
+
+- `subturtle/ctl` writes canonical worker state and events for:
+  - `worker.started`
+  - `worker.stop_requested`
+  - `worker.stopped`
+  - `worker.timed_out`
+  - `worker.archived`
+- `subturtle/ctl` enqueues canonical wake-ups for watchdog timeouts
+- the Python worker loop writes `worker.checkpoint` after successful iterations and refreshes the mutable worker checkpoint record
+- the Python worker loop writes `worker.completion_requested`, transitions the worker to `completion_pending`, and enqueues a notable wake-up before self-stop
+- the Python worker loop writes `worker.fatal_error`, transitions the worker to `failure_pending`, and enqueues a critical wake-up when an unhandled loop error escapes
+- the bot timer consumes pending wake-ups directly from `.superturtle/state/wakeups/`, appends reconciliation events (`worker.completed`, `worker.failed`, `worker.cleanup_verified`, `worker.cron_removed`, `worker.inbox_enqueued`, `worker.notification_sent`), and sends Telegram notifications without injecting those lifecycle facts into the meta-agent session
+- the bot timer also writes `.superturtle/state/inbox/<id>.json` for notable/critical lifecycle wake-ups so the next successful interactive Claude/Codex turn sees those background events as injected context and then acknowledges them durably
+
+The migration is still in a mixed mode:
+
+- legacy `.subturtles/<name>/subturtle.meta` remains the runtime metadata source for PID/timeout/cron details
+- legacy `.superturtle/state/runs.jsonl` and `handoff.md` still exist for compatibility and current operator surfaces
+- silent cron now prepares snapshots from canonical worker state, filtered worker events, and worker wakeups before falling back to `ctl status`, `CLAUDE.md`, git history, and tunnel metadata
+- milestone/stuck judgment is still model-mediated, and silent milestone/stuck updates do not yet share the same inbox/reconciliation path as deterministic lifecycle events
+
+The next step is to move silent milestone/stuck handling onto the same reconciliation lane instead of relying on prompt interpretation alone.
+
+## Verification
+
+Focused tests for this slice:
 
 ```bash
-python3 super_turtle/state/run_state_writer.py --state-dir super_turtle/state append \
-  --run-name demo-run \
-  --event milestone \
-  --status running \
-  --payload-json '{"note":"checkpoint reached"}'
+python3 -m unittest super_turtle.state.test_run_state_writer super_turtle.state.test_conductor_state
+python3 -m py_compile super_turtle/state/run_state_writer.py super_turtle/state/conductor_state.py super_turtle/state/test_conductor_state.py
+python3 -m pytest super_turtle/subturtle/tests/test_subturtle_main.py
+bash super_turtle/subturtle/tests/test_ctl_integration.sh
 ```
 
-## Refresh the handoff summary
+## Next implementation slice
 
-```bash
-python3 super_turtle/state/run_state_writer.py --state-dir super_turtle/state update-handoff \
-  --active-run "demo-run (last event: milestone at 2026-02-27T00:00:00Z)" \
-  --milestone "demo-run: milestone (running) at 2026-02-27T00:00:00Z" \
-  --note "Auto-refreshed by cron check-ins from runs.jsonl."
-```
+Expand structured-state supervision beyond deterministic lifecycle wake-ups:
 
-## Minimal verification
-
-Run:
-
-```bash
-python3 -m unittest super_turtle.state.test_run_state_writer
-```
-
-This validates bootstrap file creation, JSONL append behavior, handoff rendering, and CLI smoke paths.
+- move milestone/stuck detection and operator summaries onto canonical state instead of `runs.jsonl` / `handoff.md` heuristics
+- extend the inbox/reconciliation model beyond deterministic lifecycle events so silent milestone/stuck updates follow the same durable path

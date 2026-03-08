@@ -33,6 +33,8 @@ describe("getSilentNotificationText", () => {
       "⚠",
       "❌",
       "🚀",
+      "📍",
+      "🔗",
       "🔔",
     ]);
   });

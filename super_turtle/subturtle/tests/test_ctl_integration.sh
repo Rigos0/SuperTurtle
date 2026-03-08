@@ -4,6 +4,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 CTL="${ROOT_DIR}/super_turtle/subturtle/ctl"
 CRON_JOBS_FILE="${ROOT_DIR}/.superturtle/cron-jobs.json"
+RUN_STATE_DIR="${ROOT_DIR}/.superturtle/state"
+CONDUCTOR_EVENTS_FILE="${RUN_STATE_DIR}/events.jsonl"
+CONDUCTOR_WORKERS_DIR="${RUN_STATE_DIR}/workers"
+CONDUCTOR_WAKEUPS_DIR="${RUN_STATE_DIR}/wakeups"
 SUBTURTLES_DIR="${ROOT_DIR}/.subturtles"
 ARCHIVE_DIR="${SUBTURTLES_DIR}/.archive"
 
@@ -170,6 +174,172 @@ assert_file_contains() {
   local needle="$2"
   assert_file_exists "$path" || return 1
   grep -Fq -- "$needle" "$path" || fail "expected '$path' to contain '$needle'"
+}
+
+worker_state_path() {
+  local name="$1"
+  echo "${CONDUCTOR_WORKERS_DIR}/${name}.json"
+}
+
+assert_json_field_equals() {
+  local path="$1"
+  local field_path="$2"
+  local expected="$3"
+
+  assert_file_exists "$path" || return 1
+
+  if ! python3 - "$path" "$field_path" "$expected" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+field_path = sys.argv[2].split(".")
+expected = sys.argv[3]
+value = json.loads(path.read_text(encoding="utf-8"))
+
+for segment in field_path:
+    if not isinstance(value, dict) or segment not in value:
+        raise SystemExit(1)
+    value = value[segment]
+
+raise SystemExit(0 if str(value) == expected else 1)
+PY
+  then
+    fail "expected ${path} field ${field_path} to equal '${expected}'"
+    return 1
+  fi
+}
+
+assert_json_field_nonempty() {
+  local path="$1"
+  local field_path="$2"
+
+  assert_file_exists "$path" || return 1
+
+  if ! python3 - "$path" "$field_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+field_path = sys.argv[2].split(".")
+value = json.loads(path.read_text(encoding="utf-8"))
+
+for segment in field_path:
+    if not isinstance(value, dict) or segment not in value:
+        raise SystemExit(1)
+    value = value[segment]
+
+if value in ("", None):
+    raise SystemExit(1)
+if isinstance(value, (list, dict)) and len(value) == 0:
+    raise SystemExit(1)
+raise SystemExit(0)
+PY
+  then
+    fail "expected ${path} field ${field_path} to be non-empty"
+    return 1
+  fi
+}
+
+assert_worker_state_field_equals() {
+  local name="$1"
+  local field_path="$2"
+  local expected="$3"
+  assert_json_field_equals "$(worker_state_path "$name")" "$field_path" "$expected"
+}
+
+assert_worker_state_field_nonempty() {
+  local name="$1"
+  local field_path="$2"
+  assert_json_field_nonempty "$(worker_state_path "$name")" "$field_path"
+}
+
+assert_event_exists() {
+  local worker_name="$1"
+  local event_type="$2"
+  local emitted_by="${3:-}"
+  local lifecycle_state="${4:-}"
+
+  assert_file_exists "$CONDUCTOR_EVENTS_FILE" || return 1
+
+  if ! python3 - "$CONDUCTOR_EVENTS_FILE" "$worker_name" "$event_type" "$emitted_by" "$lifecycle_state" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+events_path = Path(sys.argv[1])
+worker_name = sys.argv[2]
+event_type = sys.argv[3]
+emitted_by = sys.argv[4]
+lifecycle_state = sys.argv[5]
+
+for raw_line in events_path.read_text(encoding="utf-8").splitlines():
+    if not raw_line.strip():
+        continue
+    entry = json.loads(raw_line)
+    if entry.get("worker_name") != worker_name:
+        continue
+    if entry.get("event_type") != event_type:
+        continue
+    if emitted_by and entry.get("emitted_by") != emitted_by:
+        continue
+    if lifecycle_state and entry.get("lifecycle_state") != lifecycle_state:
+        continue
+    raise SystemExit(0)
+
+raise SystemExit(1)
+PY
+  then
+    fail "expected conductor event ${event_type} for ${worker_name}"
+    return 1
+  fi
+}
+
+assert_wakeup_exists() {
+  local worker_name="$1"
+  local category="$2"
+  local field_path="${3:-}"
+  local expected="${4:-}"
+
+  assert_dir_exists "$CONDUCTOR_WAKEUPS_DIR" || return 1
+
+  if ! python3 - "$CONDUCTOR_WAKEUPS_DIR" "$worker_name" "$category" "$field_path" "$expected" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+wakeups_dir = Path(sys.argv[1])
+worker_name = sys.argv[2]
+category = sys.argv[3]
+field_path = sys.argv[4]
+expected = sys.argv[5]
+
+for path in sorted(wakeups_dir.glob("*.json")):
+    wakeup = json.loads(path.read_text(encoding="utf-8"))
+    if wakeup.get("worker_name") != worker_name:
+      continue
+    if wakeup.get("category") != category:
+      continue
+    if not field_path:
+      raise SystemExit(0)
+
+    value = wakeup
+    for segment in field_path.split("."):
+      if not isinstance(value, dict) or segment not in value:
+        break
+      value = value[segment]
+    else:
+      if str(value) == expected:
+        raise SystemExit(0)
+
+raise SystemExit(1)
+PY
+  then
+    fail "expected wakeup for ${worker_name} in category ${category}"
+    return 1
+  fi
 }
 
 assert_equals() {
@@ -346,7 +516,7 @@ STATE
 }
 
 test_spawn_creates_workspace() {
-  local name state_path ws pid meta cron_job_id
+  local name state_path ws pid meta cron_job_id run_id
   name="$(make_test_name "spawn-workspace")"
   state_path="${TMP_DIR}/${name}.md"
   ws="${SUBTURTLES_DIR}/${name}"
@@ -375,6 +545,20 @@ test_spawn_creates_workspace() {
     fail "cron job ${cron_job_id} not present in ${CRON_JOBS_FILE}"
     return 1
   fi
+  run_id="$(meta_value "$name" "RUN_ID")"
+  assert_not_empty "$run_id" "RUN_ID" || return 1
+
+  assert_file_exists "$(worker_state_path "$name")" || return 1
+  assert_worker_state_field_equals "$name" "worker_name" "$name" || return 1
+  assert_worker_state_field_equals "$name" "run_id" "$run_id" || return 1
+  assert_worker_state_field_equals "$name" "lifecycle_state" "running" || return 1
+  assert_worker_state_field_equals "$name" "workspace" "$ws" || return 1
+  assert_worker_state_field_equals "$name" "pid" "$pid" || return 1
+  assert_worker_state_field_equals "$name" "cron_job_id" "$cron_job_id" || return 1
+  assert_worker_state_field_equals "$name" "current_task" "spawn workspace creation test" || return 1
+  assert_worker_state_field_nonempty "$name" "last_event_id" || return 1
+  assert_worker_state_field_nonempty "$name" "last_event_at" || return 1
+  assert_event_exists "$name" "worker.started" "supervisor" "running" || return 1
 
   stop_subturtle_if_running "$name"
   return 0
@@ -691,6 +875,12 @@ test_stop_archives_workspace() {
   assert_dir_not_exists "$ws" || return 1
   assert_dir_exists "$archive_ws" || return 1
   assert_file_exists "${archive_ws}/CLAUDE.md" || return 1
+  assert_worker_state_field_equals "$name" "lifecycle_state" "archived" || return 1
+  assert_worker_state_field_equals "$name" "workspace" "$archive_ws" || return 1
+  assert_worker_state_field_nonempty "$name" "terminal_at" || return 1
+  assert_event_exists "$name" "worker.stop_requested" "supervisor" "stop_pending" || return 1
+  assert_event_exists "$name" "worker.stopped" "supervisor" "stopped" || return 1
+  assert_event_exists "$name" "worker.archived" "supervisor" "archived" || return 1
   return 0
 }
 
@@ -874,13 +1064,38 @@ test_watchdog_timeout() {
 
   for _ in $(seq 1 20); do
     if grep -Fq "TIMEOUT" "$log_path" 2>/dev/null; then
-      return 0
+      break
     fi
     sleep 0.25
   done
 
-  fail "expected timeout log entry in ${log_path}"
-  return 1
+  if ! grep -Fq "TIMEOUT" "$log_path" 2>/dev/null; then
+    fail "expected timeout log entry in ${log_path}"
+    return 1
+  fi
+
+  for _ in $(seq 1 20); do
+    if [[ -f "$(worker_state_path "$name")" ]] \
+      && python3 - "$(worker_state_path "$name")" <<'PY' >/dev/null 2>&1
+import json
+import sys
+from pathlib import Path
+
+state = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+raise SystemExit(0 if state.get("lifecycle_state") == "timed_out" else 1)
+PY
+    then
+      break
+    fi
+    sleep 0.25
+  done
+
+  assert_worker_state_field_equals "$name" "lifecycle_state" "timed_out" || return 1
+  assert_worker_state_field_equals "$name" "stop_reason" "timed_out" || return 1
+  assert_worker_state_field_nonempty "$name" "terminal_at" || return 1
+  assert_event_exists "$name" "worker.timed_out" "watchdog" "timed_out" || return 1
+  assert_wakeup_exists "$name" "critical" "payload.kind" "timeout" || return 1
+  return 0
 }
 
 test_gc_archives_old() {

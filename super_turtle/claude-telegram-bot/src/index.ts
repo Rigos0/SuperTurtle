@@ -7,8 +7,6 @@
 import { run, sequentialize } from "@grammyjs/runner";
 import {
   WORKING_DIR,
-  SUPER_TURTLE_DIR,
-  SUPERTURTLE_DATA_DIR,
   CTL_PATH,
   ALLOWED_USERS,
   RESTART_FILE,
@@ -73,6 +71,11 @@ import {
 import { buildCronScheduledPrompt } from "./cron-scheduled-prompt";
 import { UpdateDedupeCache } from "./update-dedupe";
 import { startTurtleGreetings } from "./turtle-greetings";
+import { processPendingConductorWakeups } from "./conductor-supervisor";
+import {
+  buildPreparedSnapshotPrompt,
+  loadConductorSnapshotContext,
+} from "./conductor-snapshot";
 import { botLog, cronLog, eventLog } from "./logger";
 
 // Re-export for any existing consumers
@@ -80,146 +83,7 @@ export { bot };
 
 // Use bot token prefix in lock file so multiple bots can run on one machine
 const INSTANCE_LOCK_FILE = `/tmp/claude-telegram-bot.${TOKEN_PREFIX}.instance.lock`;
-const RUN_STATE_WRITER = `${SUPER_TURTLE_DIR}/state/run_state_writer.py`;
-const RUN_STATE_DIR = `${SUPERTURTLE_DATA_DIR}/state`;
-const RUN_STATE_LEDGER = `${RUN_STATE_DIR}/runs.jsonl`;
-const SUBTURTLE_VENV_PYTHON = `${SUPER_TURTLE_DIR}/subturtle/.venv/bin/python3`;
 const telegramUpdateDedupe = new UpdateDedupeCache();
-
-interface RunLedgerEntry {
-  timestamp: string;
-  runName: string;
-  event: string;
-  status: string;
-}
-
-function chooseRunStatePythonBinary(): string {
-  return existsSync(SUBTURTLE_VENV_PYTHON) ? SUBTURTLE_VENV_PYTHON : "python3";
-}
-
-function parseRunLedgerEntries(rawLedger: string): RunLedgerEntry[] {
-  const entries: RunLedgerEntry[] = [];
-  const lines = rawLedger
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
-  for (const line of lines) {
-    try {
-      const parsed = JSON.parse(line);
-      if (!parsed || typeof parsed !== "object") continue;
-
-      const runName = typeof parsed.run_name === "string" ? parsed.run_name.trim() : "";
-      const event = typeof parsed.event === "string" ? parsed.event.trim() : "";
-      const timestamp = typeof parsed.timestamp === "string" ? parsed.timestamp.trim() : "";
-      const status = typeof parsed.status === "string" ? parsed.status.trim() : "";
-      if (!runName || !event) continue;
-
-      entries.push({
-        timestamp,
-        runName,
-        event,
-        status,
-      });
-    } catch {
-      continue;
-    }
-  }
-
-  return entries;
-}
-
-function buildActiveRunLines(entries: RunLedgerEntry[]): string[] {
-  const latestByRun = new Map<string, RunLedgerEntry>();
-  for (const entry of entries) {
-    latestByRun.set(entry.runName, entry);
-  }
-
-  return Array.from(latestByRun.values())
-    .filter((entry) => entry.status.toLowerCase() === "running")
-    .sort((a, b) => a.runName.localeCompare(b.runName))
-    .map((entry) => {
-      const when = entry.timestamp || "unknown time";
-      return `${entry.runName} (last event: ${entry.event} at ${when})`;
-    });
-}
-
-function isMilestoneEntry(entry: RunLedgerEntry): boolean {
-  const event = entry.event.toLowerCase();
-  const status = entry.status.toLowerCase();
-  return (
-    event.includes("milestone") ||
-    event === "complete" ||
-    event === "completed" ||
-    event === "completion" ||
-    status === "complete" ||
-    status === "completed" ||
-    status === "done"
-  );
-}
-
-function buildRecentMilestoneLines(entries: RunLedgerEntry[]): string[] {
-  const lines: string[] = [];
-  for (let idx = entries.length - 1; idx >= 0; idx--) {
-    const entry = entries[idx]!;
-    if (!isMilestoneEntry(entry)) continue;
-
-    const statusPart = entry.status ? ` (${entry.status})` : "";
-    const when = entry.timestamp || "unknown time";
-    lines.push(`${entry.runName}: ${entry.event}${statusPart} at ${when}`);
-    if (lines.length >= 5) break;
-  }
-  return lines;
-}
-
-function summarizeProcessFailure(proc: {
-  exitCode: number;
-  stderr: Uint8Array;
-  stdout: Uint8Array;
-}): string {
-  const stderr = proc.stderr.toString().replace(/\s+/g, " ").trim();
-  const stdout = proc.stdout.toString().replace(/\s+/g, " ").trim();
-  const detail = stderr || stdout || "no output";
-  return `exit=${proc.exitCode} ${detail}`.slice(0, 240);
-}
-
-function refreshHandoffSummaryFromRunLedger(): string | null {
-  if (!existsSync(RUN_STATE_WRITER)) {
-    return `handoff refresh skipped: missing ${RUN_STATE_WRITER}`;
-  }
-
-  let entries: RunLedgerEntry[] = [];
-  try {
-    const rawLedger = existsSync(RUN_STATE_LEDGER) ? readFileSync(RUN_STATE_LEDGER, "utf-8") : "";
-    entries = parseRunLedgerEntries(rawLedger);
-  } catch (error) {
-    return `handoff refresh skipped: failed reading run ledger (${summarizeCronError(error)})`;
-  }
-
-  const activeRuns = buildActiveRunLines(entries);
-  const milestones = buildRecentMilestoneLines(entries);
-  const args = [
-    chooseRunStatePythonBinary(),
-    RUN_STATE_WRITER,
-    "--state-dir",
-    RUN_STATE_DIR,
-    "update-handoff",
-  ];
-
-  for (const activeRun of activeRuns) {
-    args.push("--active-run", activeRun);
-  }
-  for (const milestone of milestones) {
-    args.push("--milestone", milestone);
-  }
-  args.push("--note", "Auto-refreshed by cron check-ins from runs.jsonl.");
-
-  const updateProc = Bun.spawnSync(args, { cwd: WORKING_DIR });
-  if (updateProc.exitCode !== 0) {
-    return `handoff refresh failed: ${summarizeProcessFailure(updateProc)}`;
-  }
-  return null;
-}
 
 function acquireInstanceLockOrExit(): () => void {
   const thisPid = process.pid;
@@ -322,11 +186,12 @@ async function prepareSubturtleSnapshot(
   chatId: number,
   subturtleName: string
 ) {
-  const prepErrors: string[] = [];
-
-  const handoffRefreshError = refreshHandoffSummaryFromRunLedger();
-  if (handoffRefreshError) {
-    prepErrors.push(handoffRefreshError);
+  const conductorContext = loadConductorSnapshotContext({ workerName: subturtleName });
+  const prepErrors = [...conductorContext.prepErrors];
+  const workspaceDir = conductorContext.workspacePath || `${WORKING_DIR}/.subturtles/${subturtleName}`;
+  const gitCwd = existsSync(workspaceDir) ? workspaceDir : WORKING_DIR;
+  if (!existsSync(workspaceDir)) {
+    prepErrors.push(`workspace missing: ${workspaceDir}`);
   }
 
   const statusProc = Bun.spawnSync([CTL_PATH, "status", subturtleName], {
@@ -337,7 +202,7 @@ async function prepareSubturtleSnapshot(
     prepErrors.push(`ctl status exit=${statusProc.exitCode}`);
   }
 
-  const statePath = `${WORKING_DIR}/.subturtles/${subturtleName}/CLAUDE.md`;
+  const statePath = `${workspaceDir}/CLAUDE.md`;
   let stateExcerpt = "";
   try {
     const stateText = await Bun.file(statePath).text();
@@ -348,14 +213,14 @@ async function prepareSubturtleSnapshot(
   }
 
   const gitProc = Bun.spawnSync(["git", "log", "--oneline", "-10"], {
-    cwd: WORKING_DIR,
+    cwd: gitCwd,
   });
   const gitLog = gitProc.stdout.toString().trim() || gitProc.stderr.toString().trim();
   if (gitProc.exitCode !== 0) {
     prepErrors.push(`git log exit=${gitProc.exitCode}`);
   }
 
-  const tunnelPath = `${WORKING_DIR}/.subturtles/${subturtleName}/.tunnel-url`;
+  const tunnelPath = `${workspaceDir}/.tunnel-url`;
   let tunnelUrl: string | null = null;
   try {
     const txt = (await Bun.file(tunnelPath).text()).trim();
@@ -370,64 +235,16 @@ async function prepareSubturtleSnapshot(
     chatId,
     sourcePrompt: prompt,
     preparedAtMs: Date.now(),
+    conductorSummary: conductorContext.conductorSummary,
+    workerStateJson: conductorContext.workerStateJson,
+    recentEventsJson: conductorContext.recentEventsJson,
+    wakeupsJson: conductorContext.wakeupsJson,
     statusOutput,
     stateExcerpt,
     gitLog,
     tunnelUrl,
     prepErrors,
   });
-}
-
-function buildPreparedSnapshotPrompt(snapshot: {
-  subturtleName: string;
-  sourcePrompt: string;
-  preparedAtMs: number;
-  statusOutput: string;
-  stateExcerpt: string;
-  gitLog: string;
-  tunnelUrl: string | null;
-  prepErrors: string[];
-  snapshotSeq: number;
-}): string {
-  const preparedAt = new Date(snapshot.preparedAtMs).toISOString();
-  const prepErrors = snapshot.prepErrors.length > 0
-    ? snapshot.prepErrors.map((e) => `- ${e}`).join("\n")
-    : "- none";
-  const tunnelLine = snapshot.tunnelUrl ? snapshot.tunnelUrl : "(none)";
-
-  return [
-    `[SILENT CHECK-IN SNAPSHOT] SubTurtle ${snapshot.subturtleName}`,
-    `Snapshot seq: ${snapshot.snapshotSeq}`,
-    `Prepared at (UTC): ${preparedAt}`,
-    "",
-    "Original cron prompt:",
-    snapshot.sourcePrompt,
-    "",
-    "Prepared data:",
-    `<ctl_status>`,
-    snapshot.statusOutput || "(empty)",
-    `</ctl_status>`,
-    "",
-    `<state_excerpt>`,
-    snapshot.stateExcerpt || "(empty)",
-    `</state_excerpt>`,
-    "",
-    `<git_log>`,
-    snapshot.gitLog || "(empty)",
-    `</git_log>`,
-    "",
-    `<tunnel_url>`,
-    tunnelLine,
-    `</tunnel_url>`,
-    "",
-    "<prep_errors>",
-    prepErrors,
-    "</prep_errors>",
-    "",
-    "Decide if this is notable for the user.",
-    "If no notable event, respond exactly: [SILENT]",
-    "If notable, include one marker and concise update: 🎉 or ⚠️ or ❌ or 🚀 or 🔗.",
-  ].join("\n");
 }
 
 async function drainPreparedSnapshotsWhenIdle(): Promise<void> {
@@ -664,6 +481,24 @@ const startCronTimer = () => {
 
   setInterval(async () => {
     try {
+      const supervisorTick = await processPendingConductorWakeups({
+        listJobs: getJobs,
+        removeJob,
+        sendMessage: async (chatId, text) => {
+          await bot.api.sendMessage(chatId, text);
+        },
+      });
+      if (
+        supervisorTick.sent > 0 ||
+        supervisorTick.reconciled > 0 ||
+        supervisorTick.errors > 0
+      ) {
+        cronLog.info(
+          { supervisorTick },
+          `[conductor] sent=${supervisorTick.sent} reconciled=${supervisorTick.reconciled} errors=${supervisorTick.errors} skipped=${supervisorTick.skipped}`
+        );
+      }
+
       const dueJobs = getDueJobs();
       if (dueJobs.length === 0) {
         await drainPreparedSnapshotsWhenIdle();

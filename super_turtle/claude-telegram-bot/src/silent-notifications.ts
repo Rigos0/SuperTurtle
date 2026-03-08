@@ -10,6 +10,8 @@ export const SILENT_NOTIFICATION_MARKERS = [
   "⚠",
   "❌",
   "🚀",
+  "📍",
+  "🔗",
   "🔔",
 ] as const;
 

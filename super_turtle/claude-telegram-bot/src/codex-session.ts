@@ -24,6 +24,13 @@ import type { DriverRunSource } from "./drivers/types";
 import { appendTurnLogEntry, type TurnLogStatus, type TurnLogUsage } from "./turn-log";
 import { buildInjectedArtifacts, readClaudeMdSnapshot } from "./injected-artifacts";
 import type { InjectedArtifact } from "./injected-artifacts";
+import {
+  acknowledgeMetaAgentInboxItems,
+  buildMetaAgentInboxPrompt,
+  injectMetaAgentInboxIntoPrompt,
+  listPendingMetaAgentInboxItems,
+  shouldInjectMetaAgentInbox,
+} from "./conductor-inbox";
 import { buildExternalSessionHistory, buildSavedSessionHistory, buildTurnLogHistory, toRecentMessages } from "./session-history";
 
 // Prefs file for Codex (separate from Claude)
@@ -1145,6 +1152,8 @@ export class CodexSession {
     let messageToSend = userMessage;
     let datePrefixApplied = false;
     let metaPromptAppliedThisTurn = false;
+    let metaAgentInboxText = "";
+    let metaAgentInboxItemIds: string[] = [];
     let turnStatus: TurnLogStatus = "completed";
     let turnError: string | null = null;
     let turnResponse: string | null = null;
@@ -1197,6 +1206,15 @@ ${messageToSend}`;
           metaPromptAppliedThisTurn = true;
         }
         this.systemPromptPrepended = true;
+      }
+
+      if (chatId && shouldInjectMetaAgentInbox(source)) {
+        const inboxItems = listPendingMetaAgentInboxItems({ chatId });
+        if (inboxItems.length > 0) {
+          metaAgentInboxText = buildMetaAgentInboxPrompt(inboxItems);
+          metaAgentInboxItemIds = inboxItems.map((item) => item.id);
+          messageToSend = injectMetaAgentInboxIntoPrompt(messageToSend, metaAgentInboxText);
+        }
       }
 
       // Check if stop was requested during processing phase.
@@ -1541,7 +1559,7 @@ ${messageToSend}`;
           }
         : null;
 
-      appendTurnLogEntry({
+      const turnEntry = appendTurnLogEntry({
         driver: "codex",
         source,
         sessionId: this.threadId || sessionIdAtStart,
@@ -1563,6 +1581,7 @@ ${messageToSend}`;
           metaPromptText: CODEX_META_BOOTSTRAP_PROMPT,
           metaPromptArtifactId: "codex-bootstrap-prompt",
           metaPromptLabel: "Codex bootstrap prompt",
+          metaAgentInboxText,
         }),
         injections: {
           datePrefixApplied,
@@ -1582,6 +1601,15 @@ ${messageToSend}`;
         error: turnError,
         usage,
       });
+
+      if (turnStatus === "completed" && metaAgentInboxItemIds.length > 0) {
+        acknowledgeMetaAgentInboxItems({
+          itemIds: metaAgentInboxItemIds,
+          driver: "codex",
+          turnId: turnEntry.id,
+          sessionId: turnEntry.sessionId,
+        });
+      }
     }
   }
 

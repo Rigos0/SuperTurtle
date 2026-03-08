@@ -109,6 +109,131 @@ class RunStateWriterTests(unittest.TestCase):
             self.assertIn("long-run-beta", runs_jsonl_file.read_text(encoding="utf-8"))
             self.assertIn("long-run-beta", handoff_md_file.read_text(encoding="utf-8"))
 
+    def test_conductor_cli_commands_smoke(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.assertEqual(
+                main(
+                    [
+                        "--state-dir",
+                        tmp_dir,
+                        "put-worker",
+                        "--worker-name",
+                        "gamma-run",
+                        "--lifecycle-state",
+                        "running",
+                        "--updated-by",
+                        "supervisor",
+                        "--run-id",
+                        "run-123",
+                        "--workspace",
+                        ".subturtles/gamma-run",
+                        "--checkpoint-json",
+                        '{"commit_sha":"abc123"}',
+                    ]
+                ),
+                0,
+            )
+            self.assertEqual(
+                main(
+                    [
+                        "--state-dir",
+                        tmp_dir,
+                        "append-conductor-event",
+                        "--worker-name",
+                        "gamma-run",
+                        "--event-type",
+                        "worker.started",
+                        "--emitted-by",
+                        "supervisor",
+                        "--lifecycle-state",
+                        "running",
+                    ]
+                ),
+                0,
+            )
+            self.assertEqual(
+                main(
+                    [
+                        "--state-dir",
+                        tmp_dir,
+                        "enqueue-wakeup",
+                        "--worker-name",
+                        "gamma-run",
+                        "--category",
+                        "notable",
+                        "--summary",
+                        "gamma-run completed",
+                        "--payload-json",
+                        '{"kind":"completion"}',
+                    ]
+                ),
+                0,
+            )
+
+            worker_path = Path(tmp_dir) / "workers" / "gamma-run.json"
+            events_path = Path(tmp_dir) / "events.jsonl"
+            wakeups_dir = Path(tmp_dir) / "wakeups"
+
+            self.assertTrue(worker_path.exists())
+            self.assertTrue(events_path.exists())
+            self.assertTrue(wakeups_dir.exists())
+            self.assertIn("gamma-run", worker_path.read_text(encoding="utf-8"))
+            self.assertIn("worker.started", events_path.read_text(encoding="utf-8"))
+            wakeup_files = list(wakeups_dir.glob("*.json"))
+            self.assertEqual(len(wakeup_files), 1)
+            self.assertIn(
+                "gamma-run completed",
+                wakeup_files[0].read_text(encoding="utf-8"),
+            )
+
+    def test_put_worker_merges_existing_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.assertEqual(
+                main(
+                    [
+                        "--state-dir",
+                        tmp_dir,
+                        "put-worker",
+                        "--worker-name",
+                        "delta-run",
+                        "--lifecycle-state",
+                        "running",
+                        "--updated-by",
+                        "supervisor",
+                        "--run-id",
+                        "run-999",
+                        "--cron-job-id",
+                        "cron-1",
+                        "--current-task",
+                        "Initial task",
+                    ]
+                ),
+                0,
+            )
+            self.assertEqual(
+                main(
+                    [
+                        "--state-dir",
+                        tmp_dir,
+                        "put-worker",
+                        "--worker-name",
+                        "delta-run",
+                        "--lifecycle-state",
+                        "archived",
+                        "--updated-by",
+                        "supervisor",
+                    ]
+                ),
+                0,
+            )
+
+            worker_path = Path(tmp_dir) / "workers" / "delta-run.json"
+            parsed = json.loads(worker_path.read_text(encoding="utf-8"))
+            self.assertEqual(parsed["lifecycle_state"], "archived")
+            self.assertEqual(parsed["run_id"], "run-999")
+            self.assertEqual(parsed["cron_job_id"], "cron-1")
+            self.assertEqual(parsed["current_task"], "Initial task")
+
 
 if __name__ == "__main__":
     unittest.main()

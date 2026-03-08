@@ -44,6 +44,13 @@ import type { DriverRunSource } from "./drivers/types";
 import { appendTurnLogEntry, type TurnLogStatus, type TurnLogUsage } from "./turn-log";
 import { buildInjectedArtifacts, readClaudeMdSnapshot } from "./injected-artifacts";
 import { buildSavedSessionHistory, buildTurnLogHistory, toRecentMessages } from "./session-history";
+import {
+  acknowledgeMetaAgentInboxItems,
+  buildMetaAgentInboxPrompt,
+  injectMetaAgentInboxIntoPrompt,
+  listPendingMetaAgentInboxItems,
+  shouldInjectMetaAgentInbox,
+} from "./conductor-inbox";
 
 // Stream-json event types from claude CLI
 interface StreamJsonEvent {
@@ -414,6 +421,8 @@ export class ClaudeSession {
     const claudeMdSnapshot = readClaudeMdSnapshot(WORKING_DIR);
     const claudeMdLoaded = claudeMdSnapshot.loaded;
     let messageToSend = message;
+    let metaAgentInboxText = "";
+    let metaAgentInboxItemIds: string[] = [];
     let turnStatus: TurnLogStatus = "completed";
     let turnError: string | null = null;
     let turnResponse: string | null = null;
@@ -455,6 +464,15 @@ export class ClaudeSession {
         }
       )}]\n\n`;
       messageToSend = datePrefix + message;
+    }
+
+    if (chatId && shouldInjectMetaAgentInbox(source)) {
+      const inboxItems = listPendingMetaAgentInboxItems({ chatId });
+      if (inboxItems.length > 0) {
+        metaAgentInboxText = buildMetaAgentInboxPrompt(inboxItems);
+        metaAgentInboxItemIds = inboxItems.map((item) => item.id);
+        messageToSend = injectMetaAgentInboxIntoPrompt(messageToSend, metaAgentInboxText);
+      }
     }
 
     // Store latest user message for session previews.
@@ -948,10 +966,10 @@ export class ClaudeSession {
         }
       : null;
 
-    appendTurnLogEntry({
-      driver: "claude",
-      source,
-      sessionId: this.sessionId || sessionIdAtStart,
+      const turnEntry = appendTurnLogEntry({
+        driver: "claude",
+        source,
+        sessionId: this.sessionId || sessionIdAtStart,
       userId,
       username,
       chatId: chatId ?? 0,
@@ -959,16 +977,17 @@ export class ClaudeSession {
       effort: this.effort,
       originalMessage: message,
       effectivePrompt: messageToSend,
-      injectedArtifacts: buildInjectedArtifacts({
-        source,
-        effectivePrompt: messageToSend,
-        originalMessage: message,
-        datePrefixApplied: isNewSession,
-        metaPromptApplied: META_PROMPT.length > 0,
-        claudeMdLoaded,
-        claudeMdText: claudeMdSnapshot.text,
-        metaPromptText: META_PROMPT,
-      }),
+        injectedArtifacts: buildInjectedArtifacts({
+          source,
+          effectivePrompt: messageToSend,
+          originalMessage: message,
+          datePrefixApplied: isNewSession,
+          metaPromptApplied: META_PROMPT.length > 0,
+          claudeMdLoaded,
+          claudeMdText: claudeMdSnapshot.text,
+          metaPromptText: META_PROMPT,
+          metaAgentInboxText,
+        }),
       injections: {
         datePrefixApplied: isNewSession,
         metaPromptApplied: META_PROMPT.length > 0,
@@ -984,10 +1003,19 @@ export class ClaudeSession {
       elapsedMs: Math.max(0, completedAt.getTime() - turnStartedAt.getTime()),
       status: turnStatus,
       response: turnResponse,
-      error: turnError,
-      usage,
-    });
-  }
+        error: turnError,
+        usage,
+      });
+
+      if (turnStatus === "completed" && metaAgentInboxItemIds.length > 0) {
+        acknowledgeMetaAgentInboxItems({
+          itemIds: metaAgentInboxItemIds,
+          driver: "claude",
+          turnId: turnEntry.id,
+          sessionId: turnEntry.sessionId,
+        });
+      }
+    }
   }
 
   /**

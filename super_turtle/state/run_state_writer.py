@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from super_turtle.state.conductor_state import ConductorStateStore
+
 DEFAULT_HANDOFF_NOTE = "This summary is refreshed by supervision flows."
 
 
@@ -138,14 +140,18 @@ class RunStateWriter:
         return content
 
 
-def _load_payload(raw_payload: str | None) -> dict[str, Any] | None:
+def _load_json_object(raw_payload: str | None, *, arg_name: str) -> dict[str, Any] | None:
     if raw_payload is None:
         return None
 
     loaded = json.loads(raw_payload)
     if not isinstance(loaded, dict):
-        raise ValueError("--payload-json must decode to a JSON object")
+        raise ValueError(f"{arg_name} must decode to a JSON object")
     return loaded
+
+
+def _load_payload(raw_payload: str | None) -> dict[str, Any] | None:
+    return _load_json_object(raw_payload, arg_name="--payload-json")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -198,6 +204,129 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Override timestamp string (defaults to current UTC).",
     )
 
+    worker_parser = subparsers.add_parser(
+        "put-worker",
+        help="Write canonical worker state under workers/<name>.json.",
+    )
+    worker_parser.add_argument("--worker-name", required=True, help="Worker name.")
+    worker_parser.add_argument(
+        "--lifecycle-state",
+        required=True,
+        help="Canonical worker lifecycle state.",
+    )
+    worker_parser.add_argument(
+        "--updated-by",
+        required=True,
+        help="Subsystem writing this state record.",
+    )
+    worker_parser.add_argument("--run-id", default=None, help="Optional run id.")
+    worker_parser.add_argument("--workspace", default=None, help="Workspace path.")
+    worker_parser.add_argument("--loop-type", default=None, help="Loop type.")
+    worker_parser.add_argument("--pid", type=int, default=None, help="Optional PID.")
+    worker_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=None,
+        help="Worker timeout in seconds.",
+    )
+    worker_parser.add_argument("--cron-job-id", default=None, help="Recurring cron job id.")
+    worker_parser.add_argument("--current-task", default=None, help="Current task summary.")
+    worker_parser.add_argument("--stop-reason", default=None, help="Optional stop reason.")
+    worker_parser.add_argument(
+        "--completion-requested-at",
+        default=None,
+        help="Completion request timestamp.",
+    )
+    worker_parser.add_argument(
+        "--terminal-at",
+        default=None,
+        help="Terminal-state timestamp.",
+    )
+    worker_parser.add_argument("--last-event-id", default=None, help="Last event id.")
+    worker_parser.add_argument("--last-event-at", default=None, help="Last event timestamp.")
+    worker_parser.add_argument(
+        "--checkpoint-json",
+        default=None,
+        help="Optional checkpoint JSON object.",
+    )
+    worker_parser.add_argument(
+        "--metadata-json",
+        default=None,
+        help="Optional metadata JSON object.",
+    )
+    worker_parser.add_argument("--created-at", default=None, help="Creation timestamp.")
+    worker_parser.add_argument("--updated-at", default=None, help="Update timestamp.")
+
+    event_parser = subparsers.add_parser(
+        "append-conductor-event",
+        help="Append a canonical worker event to events.jsonl.",
+    )
+    event_parser.add_argument("--worker-name", required=True, help="Worker name.")
+    event_parser.add_argument("--event-type", required=True, help="Canonical event type.")
+    event_parser.add_argument(
+        "--emitted-by",
+        required=True,
+        help="Subsystem that emitted the event.",
+    )
+    event_parser.add_argument("--run-id", default=None, help="Optional run id.")
+    event_parser.add_argument(
+        "--lifecycle-state",
+        default=None,
+        help="Optional lifecycle state snapshot.",
+    )
+    event_parser.add_argument(
+        "--payload-json",
+        default=None,
+        help="Optional event payload JSON object.",
+    )
+    event_parser.add_argument("--event-id", default=None, help="Optional explicit event id.")
+    event_parser.add_argument("--timestamp", default=None, help="Optional event timestamp.")
+    event_parser.add_argument(
+        "--idempotency-key",
+        default=None,
+        help="Optional idempotency key.",
+    )
+
+    wakeup_parser = subparsers.add_parser(
+        "enqueue-wakeup",
+        help="Write a durable wake-up record under wakeups/<id>.json.",
+    )
+    wakeup_parser.add_argument("--worker-name", required=True, help="Worker name.")
+    wakeup_parser.add_argument(
+        "--category",
+        required=True,
+        help="Wake-up delivery category.",
+    )
+    wakeup_parser.add_argument(
+        "--summary",
+        required=True,
+        help="Short wake-up summary.",
+    )
+    wakeup_parser.add_argument(
+        "--reason-event-id",
+        default=None,
+        help="Event id that triggered this wake-up.",
+    )
+    wakeup_parser.add_argument("--run-id", default=None, help="Optional run id.")
+    wakeup_parser.add_argument("--wakeup-id", default=None, help="Optional explicit wake-up id.")
+    wakeup_parser.add_argument(
+        "--delivery-state",
+        default="pending",
+        help="Initial delivery state.",
+    )
+    wakeup_parser.add_argument(
+        "--payload-json",
+        default=None,
+        help="Optional wake-up payload JSON object.",
+    )
+    wakeup_parser.add_argument(
+        "--metadata-json",
+        default=None,
+        help="Optional wake-up metadata JSON object.",
+    )
+    wakeup_parser.add_argument("--created-at", default=None, help="Creation timestamp.")
+    wakeup_parser.add_argument("--updated-at", default=None, help="Update timestamp.")
+
     return parser
 
 
@@ -225,6 +354,111 @@ def main(argv: Sequence[str] | None = None) -> int:
             updated_at=args.updated_at,
         )
         print(str(writer.handoff_md_file))
+        return 0
+
+    conductor = ConductorStateStore(args.state_dir)
+
+    if args.command == "put-worker":
+        checkpoint = _load_json_object(
+            args.checkpoint_json, arg_name="--checkpoint-json"
+        )
+        metadata = _load_json_object(args.metadata_json, arg_name="--metadata-json")
+        existing = conductor.load_worker_state(args.worker_name) or {}
+        state = conductor.make_worker_state(
+            worker_name=args.worker_name,
+            lifecycle_state=args.lifecycle_state,
+            updated_by=args.updated_by,
+            run_id=args.run_id if args.run_id is not None else existing.get("run_id"),
+            workspace=(
+                args.workspace if args.workspace is not None else existing.get("workspace")
+            ),
+            loop_type=(
+                args.loop_type if args.loop_type is not None else existing.get("loop_type")
+            ),
+            pid=args.pid if args.pid is not None else existing.get("pid"),
+            timeout_seconds=(
+                args.timeout_seconds
+                if args.timeout_seconds is not None
+                else existing.get("timeout_seconds")
+            ),
+            cron_job_id=(
+                args.cron_job_id
+                if args.cron_job_id is not None
+                else existing.get("cron_job_id")
+            ),
+            current_task=(
+                args.current_task
+                if args.current_task is not None
+                else existing.get("current_task")
+            ),
+            stop_reason=(
+                args.stop_reason
+                if args.stop_reason is not None
+                else existing.get("stop_reason")
+            ),
+            completion_requested_at=(
+                args.completion_requested_at
+                if args.completion_requested_at is not None
+                else existing.get("completion_requested_at")
+            ),
+            terminal_at=(
+                args.terminal_at
+                if args.terminal_at is not None
+                else existing.get("terminal_at")
+            ),
+            last_event_id=(
+                args.last_event_id
+                if args.last_event_id is not None
+                else existing.get("last_event_id")
+            ),
+            last_event_at=(
+                args.last_event_at
+                if args.last_event_at is not None
+                else existing.get("last_event_at")
+            ),
+            checkpoint=checkpoint if checkpoint is not None else existing.get("checkpoint"),
+            metadata=metadata if metadata is not None else existing.get("metadata"),
+            created_at=args.created_at if args.created_at is not None else existing.get("created_at"),
+            updated_at=args.updated_at,
+        )
+        written = conductor.write_worker_state(state)
+        print(json.dumps(written, sort_keys=True))
+        return 0
+
+    if args.command == "append-conductor-event":
+        payload = _load_payload(args.payload_json)
+        entry = conductor.append_event(
+            worker_name=args.worker_name,
+            event_type=args.event_type,
+            emitted_by=args.emitted_by,
+            run_id=args.run_id,
+            lifecycle_state=args.lifecycle_state,
+            payload=payload,
+            event_id=args.event_id,
+            timestamp=args.timestamp,
+            idempotency_key=args.idempotency_key,
+        )
+        print(json.dumps(entry, sort_keys=True))
+        return 0
+
+    if args.command == "enqueue-wakeup":
+        payload = _load_payload(args.payload_json)
+        metadata = _load_json_object(args.metadata_json, arg_name="--metadata-json")
+        wakeup = conductor.make_wakeup(
+            worker_name=args.worker_name,
+            category=args.category,
+            summary=args.summary,
+            reason_event_id=args.reason_event_id,
+            run_id=args.run_id,
+            wakeup_id=args.wakeup_id,
+            delivery_state=args.delivery_state,
+            payload=payload,
+            metadata=metadata,
+            created_at=args.created_at,
+            updated_at=args.updated_at,
+        )
+        written = conductor.write_wakeup(wakeup)
+        print(json.dumps(written, sort_keys=True))
         return 0
 
     raise ValueError(f"Unsupported command: {args.command}")

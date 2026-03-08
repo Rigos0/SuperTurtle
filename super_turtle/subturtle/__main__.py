@@ -28,6 +28,7 @@ import time
 from pathlib import Path
 
 from .subturtle_loop import Claude, Codex
+from super_turtle.state.conductor_state import ConductorStateStore
 
 # Package root (super_turtle/), used for resolving skills directory
 _SUPER_TURTLE_DIR = os.environ.get(
@@ -332,6 +333,248 @@ RETRY_DELAY = 10  # seconds to wait after an agent crash before retrying
 STOP_DIRECTIVE = "## Loop Control\nSTOP"
 
 
+def _utc_now_iso() -> str:
+    return (
+        datetime.datetime.now(datetime.timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def _run_state_dir(project_dir: Path) -> Path:
+    return project_dir / ".superturtle" / "state"
+
+
+def _extract_current_task(state_file: Path) -> str | None:
+    try:
+        text = state_file.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    lines = text.splitlines()
+    in_current = False
+    for line in lines:
+        stripped = line.strip()
+        if not in_current:
+            if stripped.lower() == "# current task":
+                in_current = True
+            continue
+
+        if stripped.startswith("#"):
+            break
+
+        cleaned = re.sub(r"\s*<-\s*current\s*$", "", stripped).strip()
+        if cleaned:
+            return cleaned
+    return None
+
+
+def _record_completion_pending(state_dir: Path, name: str, project_dir: Path) -> None:
+    state_file = state_dir / "CLAUDE.md"
+    store = ConductorStateStore(_run_state_dir(project_dir))
+    existing = store.load_worker_state(name) or {}
+    completion_requested_at = _utc_now_iso()
+
+    event = store.append_event(
+        worker_name=name,
+        event_type="worker.completion_requested",
+        emitted_by="subturtle",
+        run_id=existing.get("run_id"),
+        lifecycle_state="completion_pending",
+        payload={"kind": "self_stop", "stop_directive": True},
+    )
+
+    state = store.make_worker_state(
+        worker_name=name,
+        lifecycle_state="completion_pending",
+        updated_by="subturtle",
+        run_id=existing.get("run_id"),
+        workspace=existing.get("workspace") or str(state_dir),
+        loop_type=existing.get("loop_type"),
+        pid=existing.get("pid"),
+        timeout_seconds=existing.get("timeout_seconds"),
+        cron_job_id=existing.get("cron_job_id"),
+        current_task=_extract_current_task(state_file) or existing.get("current_task"),
+        stop_reason="completed",
+        completion_requested_at=completion_requested_at,
+        terminal_at=existing.get("terminal_at"),
+        created_at=existing.get("created_at"),
+        last_event_id=event["id"],
+        last_event_at=event["timestamp"],
+        checkpoint=existing.get("checkpoint")
+        if isinstance(existing.get("checkpoint"), dict)
+        else None,
+        metadata=existing.get("metadata")
+        if isinstance(existing.get("metadata"), dict)
+        else None,
+    )
+    store.write_worker_state(state)
+
+    wakeup = store.make_wakeup(
+        worker_name=name,
+        category="notable",
+        summary=f"SubTurtle {name} completed and needs reconciliation.",
+        reason_event_id=event["id"],
+        run_id=existing.get("run_id"),
+        payload={"kind": "completion_requested"},
+    )
+    store.write_wakeup(wakeup)
+
+
+def _git_head_sha(project_dir: Path) -> str | None:
+    try:
+        sha = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=project_dir,
+            text=True,
+        ).strip()
+    except (subprocess.CalledProcessError, OSError):
+        return None
+    return sha or None
+
+
+def _record_checkpoint(
+    state_dir: Path,
+    name: str,
+    project_dir: Path,
+    loop_type: str,
+    iteration: int,
+) -> None:
+    state_file = state_dir / "CLAUDE.md"
+    store = ConductorStateStore(_run_state_dir(project_dir))
+
+    try:
+        existing = store.load_worker_state(name) or {}
+        current_task = _extract_current_task(state_file) or existing.get("current_task")
+        head_sha = _git_head_sha(project_dir)
+        checkpoint = {
+            "recorded_at": _utc_now_iso(),
+            "iteration": iteration,
+            "loop_type": existing.get("loop_type") or loop_type,
+        }
+        if head_sha:
+            checkpoint["head_sha"] = head_sha
+        if current_task:
+            checkpoint["current_task"] = current_task
+
+        event = store.append_event(
+            worker_name=name,
+            event_type="worker.checkpoint",
+            emitted_by="subturtle",
+            run_id=existing.get("run_id"),
+            lifecycle_state="running",
+            payload={"kind": "iteration_complete", **checkpoint},
+        )
+
+        state = store.make_worker_state(
+            worker_name=name,
+            lifecycle_state="running",
+            updated_by="subturtle",
+            run_id=existing.get("run_id"),
+            workspace=existing.get("workspace") or str(state_dir),
+            loop_type=existing.get("loop_type") or loop_type,
+            pid=existing.get("pid"),
+            timeout_seconds=existing.get("timeout_seconds"),
+            cron_job_id=existing.get("cron_job_id"),
+            current_task=current_task,
+            stop_reason=existing.get("stop_reason"),
+            completion_requested_at=existing.get("completion_requested_at"),
+            terminal_at=existing.get("terminal_at"),
+            created_at=existing.get("created_at"),
+            last_event_id=event["id"],
+            last_event_at=event["timestamp"],
+            checkpoint=checkpoint,
+            metadata=existing.get("metadata")
+            if isinstance(existing.get("metadata"), dict)
+            else None,
+        )
+        store.write_worker_state(state)
+    except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as error:
+        print(
+            f"[subturtle:{name}] WARNING: failed to record checkpoint: {error}",
+            file=sys.stderr,
+        )
+
+
+def _record_fatal_error(
+    state_dir: Path,
+    name: str,
+    project_dir: Path,
+    loop_type: str,
+    error: Exception,
+) -> None:
+    state_file = state_dir / "CLAUDE.md"
+    store = ConductorStateStore(_run_state_dir(project_dir))
+
+    try:
+        existing = store.load_worker_state(name) or {}
+        current_task = _extract_current_task(state_file) or existing.get("current_task")
+        error_payload = {
+            "kind": "fatal_error",
+            "error_type": type(error).__name__,
+            "message": str(error),
+        }
+
+        event = store.append_event(
+            worker_name=name,
+            event_type="worker.fatal_error",
+            emitted_by="subturtle",
+            run_id=existing.get("run_id"),
+            lifecycle_state="failure_pending",
+            payload=error_payload,
+        )
+
+        metadata = (
+            dict(existing.get("metadata"))
+            if isinstance(existing.get("metadata"), dict)
+            else {}
+        )
+        metadata["last_error"] = {
+            **error_payload,
+            "recorded_at": event["timestamp"],
+        }
+
+        state = store.make_worker_state(
+            worker_name=name,
+            lifecycle_state="failure_pending",
+            updated_by="subturtle",
+            run_id=existing.get("run_id"),
+            workspace=existing.get("workspace") or str(state_dir),
+            loop_type=existing.get("loop_type") or loop_type,
+            pid=existing.get("pid"),
+            timeout_seconds=existing.get("timeout_seconds"),
+            cron_job_id=existing.get("cron_job_id"),
+            current_task=current_task,
+            stop_reason="fatal_error",
+            completion_requested_at=existing.get("completion_requested_at"),
+            terminal_at=existing.get("terminal_at"),
+            created_at=existing.get("created_at"),
+            last_event_id=event["id"],
+            last_event_at=event["timestamp"],
+            checkpoint=existing.get("checkpoint")
+            if isinstance(existing.get("checkpoint"), dict)
+            else None,
+            metadata=metadata,
+        )
+        store.write_worker_state(state)
+
+        wakeup = store.make_wakeup(
+            worker_name=name,
+            category="critical",
+            summary=f"SubTurtle {name} hit a fatal error and needs reconciliation.",
+            reason_event_id=event["id"],
+            run_id=existing.get("run_id"),
+            payload=error_payload,
+        )
+        store.write_wakeup(wakeup)
+    except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as record_error:
+        print(
+            f"[subturtle:{name}] WARNING: failed to record fatal error state: {record_error}",
+            file=sys.stderr,
+        )
+
+
 def _should_stop(state_file: Path, name: str) -> bool:
     """Return True when the SubTurtle wrote the STOP directive to its state file."""
     try:
@@ -445,6 +688,7 @@ def run_slow_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
             codex.execute(prompts["executor"].format(plan=plan))
 
             claude.execute(prompts["reviewer"].format(plan=plan))
+            _record_checkpoint(state_dir, name, Path.cwd(), "slow", iteration)
         except (subprocess.CalledProcessError, OSError) as e:
             _log_retry(name, e)
 
@@ -454,7 +698,7 @@ def run_slow_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
 
     if stopped_by_directive:
         if iteration > 0:
-            _write_completion_notification(state_dir, name, Path.cwd())
+            _record_completion_pending(state_dir, name, Path.cwd())
         _archive_workspace(state_dir, name)
 
 
@@ -485,6 +729,7 @@ def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
         print(f"[subturtle:{name}] === yolo iteration {iteration} ===")
         try:
             claude.execute(prompt)
+            _record_checkpoint(state_dir, name, Path.cwd(), "yolo", iteration)
         except (subprocess.CalledProcessError, OSError) as e:
             _log_retry(name, e)
 
@@ -494,7 +739,7 @@ def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
 
     if stopped_by_directive:
         if iteration > 0:
-            _write_completion_notification(state_dir, name, Path.cwd())
+            _record_completion_pending(state_dir, name, Path.cwd())
         _archive_workspace(state_dir, name)
 
 
@@ -525,6 +770,7 @@ def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = N
         print(f"[subturtle:{name}] === yolo-codex iteration {iteration} ===")
         try:
             codex.execute(prompt)
+            _record_checkpoint(state_dir, name, Path.cwd(), "yolo-codex", iteration)
         except (subprocess.CalledProcessError, OSError) as e:
             _log_retry(name, e)
 
@@ -534,7 +780,7 @@ def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = N
 
     if stopped_by_directive:
         if iteration > 0:
-            _write_completion_notification(state_dir, name, Path.cwd())
+            _record_completion_pending(state_dir, name, Path.cwd())
         _archive_workspace(state_dir, name)
 
 
@@ -567,6 +813,9 @@ def run_yolo_codex_spark_loop(
         print(f"[subturtle:{name}] === yolo-codex-spark iteration {iteration} ===")
         try:
             codex.execute(prompt)
+            _record_checkpoint(
+                state_dir, name, Path.cwd(), "yolo-codex-spark", iteration
+            )
         except (subprocess.CalledProcessError, OSError) as e:
             _log_retry(name, e)
 
@@ -576,7 +825,7 @@ def run_yolo_codex_spark_loop(
 
     if stopped_by_directive:
         if iteration > 0:
-            _write_completion_notification(state_dir, name, Path.cwd())
+            _record_completion_pending(state_dir, name, Path.cwd())
         _archive_workspace(state_dir, name)
 
 
@@ -603,7 +852,11 @@ def run_loop(state_dir: Path, name: str, loop_type: str = "slow", skills: list[s
             file=sys.stderr,
         )
         sys.exit(1)
-    fn(state_dir, name, skills)
+    try:
+        fn(state_dir, name, skills)
+    except Exception as error:
+        _record_fatal_error(state_dir, name, Path.cwd(), loop_type, error)
+        raise
 
 
 def main() -> None:

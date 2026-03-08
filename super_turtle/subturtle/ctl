@@ -22,6 +22,9 @@ if [[ ! -x "$PYTHON" ]]; then
   PYTHON="python3"
 fi
 
+# Ensure super_turtle package is importable for state helpers and inline Python.
+export PYTHONPATH="${SUPER_TURTLE_DIR%/*}${PYTHONPATH:+:$PYTHONPATH}"
+
 usage() {
   echo "Usage: ./super_turtle/subturtle/ctl <command> [name] [options]"
   echo ""
@@ -118,6 +121,240 @@ append_run_event() {
   fi
 }
 
+utc_now_iso() {
+  date -u '+%Y-%m-%dT%H:%M:%SZ'
+}
+
+current_task_from_state_file() {
+  local state_file="$1"
+  [[ -f "$state_file" ]] || return 0
+
+  awk '
+    /^# Current task$/ { in_current=1; next }
+    in_current && /^# / { exit }
+    in_current {
+      line = $0
+      sub(/[[:space:]]*<- current[[:space:]]*$/, "", line)
+      if (line ~ /[^[:space:]]/) {
+        print line
+        exit
+      }
+    }
+  ' "$state_file"
+}
+
+current_task_for_subturtle() {
+  local name="$1"
+  current_task_from_state_file "$(workspace_dir "$name")/CLAUDE.md"
+}
+
+LAST_CONDUCTOR_EVENT_ID=""
+LAST_CONDUCTOR_EVENT_TIMESTAMP=""
+
+append_conductor_event() {
+  local name="$1"
+  local event_type="$2"
+  local emitted_by="$3"
+  local lifecycle_state="${4:-}"
+  local payload_json="${5:-}"
+  local event_json=""
+
+  LAST_CONDUCTOR_EVENT_ID=""
+  LAST_CONDUCTOR_EVENT_TIMESTAMP=""
+
+  RUN_ID=""
+  read_meta "$name" || true
+  if [[ -z "${RUN_ID:-}" ]]; then
+    RUN_ID="$("$PYTHON" - "$RUN_STATE_DIR" "$name" <<'PY' 2>/dev/null || true
+import sys
+from super_turtle.state.conductor_state import ConductorStateStore
+
+store = ConductorStateStore(sys.argv[1])
+state = store.load_worker_state(sys.argv[2]) or {}
+print(state.get("run_id") or "")
+PY
+)"
+  fi
+
+  local -a writer_cmd=(
+    "$PYTHON"
+    "$RUN_STATE_WRITER"
+    --state-dir
+    "$RUN_STATE_DIR"
+    append-conductor-event
+    --worker-name
+    "$name"
+    --event-type
+    "$event_type"
+    --emitted-by
+    "$emitted_by"
+  )
+
+  if [[ -n "${RUN_ID:-}" ]]; then
+    writer_cmd+=(--run-id "$RUN_ID")
+  fi
+  if [[ -n "$lifecycle_state" ]]; then
+    writer_cmd+=(--lifecycle-state "$lifecycle_state")
+  fi
+  if [[ -n "$payload_json" ]]; then
+    writer_cmd+=(--payload-json "$payload_json")
+  fi
+
+  if ! event_json="$("${writer_cmd[@]}" 2>/dev/null)"; then
+    echo "[subturtle:${name}] WARNING: failed to append conductor event '${event_type}'" >&2
+    return 1
+  fi
+
+  LAST_CONDUCTOR_EVENT_ID="$(printf '%s' "$event_json" | "$PYTHON" -c 'import json, sys; print(json.load(sys.stdin).get("id", ""))' 2>/dev/null || true)"
+  LAST_CONDUCTOR_EVENT_TIMESTAMP="$(printf '%s' "$event_json" | "$PYTHON" -c 'import json, sys; print(json.load(sys.stdin).get("timestamp", ""))' 2>/dev/null || true)"
+  return 0
+}
+
+write_conductor_worker_state() {
+  local name="$1"
+  local lifecycle_state="$2"
+  local updated_by="$3"
+  local stop_reason="${4:-}"
+  local completion_requested_at="${5:-}"
+  local terminal_at="${6:-}"
+  local last_event_id="${7:-${LAST_CONDUCTOR_EVENT_ID:-}}"
+  local last_event_at="${8:-${LAST_CONDUCTOR_EVENT_TIMESTAMP:-}}"
+  local ws
+  ws="$(workspace_dir "$name")"
+  if [[ "$lifecycle_state" == "archived" ]]; then
+    local archive_ws="${SUBTURTLES_DIR}/.archive/${name}"
+    if [[ -d "$archive_ws" ]]; then
+      ws="$archive_ws"
+    fi
+  fi
+
+  local current_task=""
+  if [[ -f "${ws}/CLAUDE.md" ]]; then
+    current_task="$(current_task_from_state_file "${ws}/CLAUDE.md")"
+  fi
+
+  RUN_ID=""
+  TIMEOUT_SECONDS=""
+  LOOP_TYPE=""
+  CRON_JOB_ID=""
+  read_meta "$name" || true
+
+  local pid=""
+  if is_running "$name"; then
+    pid="$(read_pid "$name")"
+  fi
+
+  local -a writer_cmd=(
+    "$PYTHON"
+    "$RUN_STATE_WRITER"
+    --state-dir
+    "$RUN_STATE_DIR"
+    put-worker
+    --worker-name
+    "$name"
+    --lifecycle-state
+    "$lifecycle_state"
+    --updated-by
+    "$updated_by"
+    --workspace
+    "$ws"
+  )
+
+  if [[ -n "${RUN_ID:-}" ]]; then
+    writer_cmd+=(--run-id "$RUN_ID")
+  fi
+  if [[ -n "${LOOP_TYPE:-}" ]]; then
+    writer_cmd+=(--loop-type "$LOOP_TYPE")
+  fi
+  if [[ -n "${pid:-}" ]]; then
+    writer_cmd+=(--pid "$pid")
+  fi
+  if [[ -n "${TIMEOUT_SECONDS:-}" ]]; then
+    writer_cmd+=(--timeout-seconds "$TIMEOUT_SECONDS")
+  fi
+  if [[ -n "${CRON_JOB_ID:-}" ]]; then
+    writer_cmd+=(--cron-job-id "$CRON_JOB_ID")
+  fi
+  if [[ -n "$current_task" ]]; then
+    writer_cmd+=(--current-task "$current_task")
+  fi
+  if [[ -n "$stop_reason" ]]; then
+    writer_cmd+=(--stop-reason "$stop_reason")
+  fi
+  if [[ -n "$completion_requested_at" ]]; then
+    writer_cmd+=(--completion-requested-at "$completion_requested_at")
+  fi
+  if [[ -n "$terminal_at" ]]; then
+    writer_cmd+=(--terminal-at "$terminal_at")
+  fi
+  if [[ -n "$last_event_id" ]]; then
+    writer_cmd+=(--last-event-id "$last_event_id")
+  fi
+  if [[ -n "$last_event_at" ]]; then
+    writer_cmd+=(--last-event-at "$last_event_at")
+  fi
+
+  if ! "${writer_cmd[@]}" >/dev/null 2>&1; then
+    echo "[subturtle:${name}] WARNING: failed to write conductor worker state '${lifecycle_state}'" >&2
+    return 1
+  fi
+}
+
+enqueue_conductor_wakeup() {
+  local name="$1"
+  local category="$2"
+  local summary="$3"
+  local reason_event_id="${4:-}"
+  local payload_json="${5:-}"
+  local metadata_json="${6:-}"
+
+  RUN_ID=""
+  read_meta "$name" || true
+  if [[ -z "${RUN_ID:-}" ]]; then
+    RUN_ID="$("$PYTHON" - "$RUN_STATE_DIR" "$name" <<'PY' 2>/dev/null || true
+import sys
+from super_turtle.state.conductor_state import ConductorStateStore
+
+store = ConductorStateStore(sys.argv[1])
+state = store.load_worker_state(sys.argv[2]) or {}
+print(state.get("run_id") or "")
+PY
+)"
+  fi
+
+  local -a writer_cmd=(
+    "$PYTHON"
+    "$RUN_STATE_WRITER"
+    --state-dir
+    "$RUN_STATE_DIR"
+    enqueue-wakeup
+    --worker-name
+    "$name"
+    --category
+    "$category"
+    --summary
+    "$summary"
+  )
+
+  if [[ -n "${RUN_ID:-}" ]]; then
+    writer_cmd+=(--run-id "$RUN_ID")
+  fi
+  if [[ -n "$reason_event_id" ]]; then
+    writer_cmd+=(--reason-event-id "$reason_event_id")
+  fi
+  if [[ -n "$payload_json" ]]; then
+    writer_cmd+=(--payload-json "$payload_json")
+  fi
+  if [[ -n "$metadata_json" ]]; then
+    writer_cmd+=(--metadata-json "$metadata_json")
+  fi
+
+  if ! "${writer_cmd[@]}" >/dev/null 2>&1; then
+    echo "[subturtle:${name}] WARNING: failed to enqueue wakeup '${category}'" >&2
+    return 1
+  fi
+}
+
 # --- Duration helpers ---
 
 # Parse a human duration string (30m, 1h, 2h, 4h) into seconds.
@@ -171,6 +408,7 @@ read_meta() {
   local mf
   mf="$(meta_file "$1")"
   if [[ -f "$mf" ]]; then
+    RUN_ID="$(grep -m1 '^RUN_ID=' "$mf" 2>/dev/null | cut -d= -f2-)" || true
     SPAWNED_AT="$(grep -m1 '^SPAWNED_AT=' "$mf" 2>/dev/null | cut -d= -f2-)" || true
     TIMEOUT_SECONDS="$(grep -m1 '^TIMEOUT_SECONDS=' "$mf" 2>/dev/null | cut -d= -f2-)" || true
     WATCHDOG_PID="$(grep -m1 '^WATCHDOG_PID=' "$mf" 2>/dev/null | cut -d= -f2-)" || true
@@ -541,9 +779,11 @@ print(f'[subturtle:{name}] spawned as {loop_type} (PID {proc.pid})')
   turtle_pid="$(cat "$pf")"
 
   # Write metadata (spawn time + timeout + skills)
-  local spawned_at
+  local spawned_at run_id
   spawned_at="$(date +%s)"
+  run_id="run-${spawned_at}-${RANDOM}"
   cat > "$mf" <<METAEOF
+RUN_ID=${run_id}
 SPAWNED_AT=${spawned_at}
 TIMEOUT_SECONDS=${timeout_secs}
 LOOP_TYPE=${loop_type}
@@ -556,7 +796,17 @@ METAEOF
   (
     sleep "$timeout_secs"
     if kill -0 "$turtle_pid" 2>/dev/null; then
+      local timed_out_at
+      timed_out_at="$(utc_now_iso)"
       echo "[subturtle:${name}] TIMEOUT ($(format_duration "$timeout_secs")) — sending SIGTERM to PID ${turtle_pid}" >> "$lf"
+      append_conductor_event "$name" "worker.timed_out" "watchdog" "timed_out" || true
+      write_conductor_worker_state "$name" "timed_out" "watchdog" "timed_out" "" "$timed_out_at" || true
+      enqueue_conductor_wakeup \
+        "$name" \
+        "critical" \
+        "SubTurtle ${name} timed out." \
+        "${LAST_CONDUCTOR_EVENT_ID:-}" \
+        '{"kind":"timeout"}' || true
       kill "$turtle_pid" 2>/dev/null || true
       sleep 5
       if kill -0 "$turtle_pid" 2>/dev/null; then
@@ -575,6 +825,8 @@ METAEOF
 
   echo "[subturtle:${name}] watchdog armed (${timeout_str}, PID ${watchdog_pid})"
   append_run_event "$name" "spawn" "running"
+  append_conductor_event "$name" "worker.started" "supervisor" "running" || true
+  write_conductor_worker_state "$name" "running" "supervisor" || true
 }
 
 build_orchestrator_prompt() {
@@ -887,6 +1139,7 @@ do_spawn() {
   echo "CRON_JOB_ID=${cron_job_id}" >> "$(meta_file "$name")"
 
   echo "[subturtle:${name}] cron registered (${cron_job_id}, every ${cron_interval}, mode: ${cron_mode})"
+  write_conductor_worker_state "$name" "running" "supervisor" || true
   echo ""
   do_list
 }
@@ -895,6 +1148,12 @@ do_stop() {
   local name="${1:-default}"
   local ws
   ws="$(workspace_dir "$name")"
+  if [[ -d "$ws" || -f "$(meta_file "$name")" || -f "$(pid_file "$name")" ]]; then
+    local stop_requested_at
+    stop_requested_at="$(utc_now_iso)"
+    append_conductor_event "$name" "worker.stop_requested" "supervisor" "stop_pending" || true
+    write_conductor_worker_state "$name" "stop_pending" "supervisor" "stop_requested" "" "$stop_requested_at" || true
+  fi
 
   # Remove recurring supervision cron before stopping the process.
   CRON_JOB_ID=""
@@ -913,11 +1172,15 @@ do_stop() {
   fi
 
   if ! is_running "$name"; then
+    local stopped_at
+    stopped_at="$(utc_now_iso)"
     echo "[subturtle:${name}] not running"
-    rm -f "$(pid_file "$name")" "$(meta_file "$name")"
     if [[ -d "$ws" ]]; then
       append_run_event "$name" "stop" "not_running"
     fi
+    append_conductor_event "$name" "worker.stopped" "supervisor" "stopped" '{"reason":"not_running"}' || true
+    write_conductor_worker_state "$name" "stopped" "supervisor" "not_running" "" "$stopped_at" || true
+    rm -f "$(pid_file "$name")"
     do_archive "$name"
     exit 0
   fi
@@ -931,20 +1194,28 @@ do_stop() {
   local i
   for i in $(seq 1 10); do
     if ! kill -0 "$pid" 2>/dev/null; then
+      local stopped_at
+      stopped_at="$(utc_now_iso)"
       echo "[subturtle:${name}] stopped"
-      rm -f "$(pid_file "$name")" "$(meta_file "$name")"
       append_run_event "$name" "stop" "stopped"
+      append_conductor_event "$name" "worker.stopped" "supervisor" "stopped" '{"reason":"stopped"}' || true
+      write_conductor_worker_state "$name" "stopped" "supervisor" "stopped" "" "$stopped_at" || true
+      rm -f "$(pid_file "$name")"
       do_archive "$name"
       return
     fi
     sleep 1
   done
 
+  local stopped_at
+  stopped_at="$(utc_now_iso)"
   echo "[subturtle:${name}] sending SIGKILL..."
   kill -9 "$pid" 2>/dev/null || true
-  rm -f "$(pid_file "$name")" "$(meta_file "$name")"
   echo "[subturtle:${name}] killed"
   append_run_event "$name" "stop" "killed"
+  append_conductor_event "$name" "worker.stopped" "supervisor" "stopped" '{"reason":"killed"}' || true
+  write_conductor_worker_state "$name" "stopped" "supervisor" "killed" "" "$stopped_at" || true
+  rm -f "$(pid_file "$name")"
   do_archive "$name"
 }
 
@@ -1032,7 +1303,11 @@ do_archive() {
   rm -rf "$archive_ws"
   mv "$ws" "$archive_ws"
 
+  local archived_at
+  archived_at="$(utc_now_iso)"
   echo "[subturtle:${name}] archived to ${archive_ws}"
+  append_conductor_event "$name" "worker.archived" "supervisor" "archived" || true
+  write_conductor_worker_state "$name" "archived" "supervisor" "" "" "$archived_at" || true
 }
 
 do_gc() {

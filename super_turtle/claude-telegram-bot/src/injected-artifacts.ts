@@ -8,6 +8,7 @@ export type InjectedArtifactId =
   | "meta-prompt"
   | "codex-bootstrap-prompt"
   | "date-prefix"
+  | "meta-agent-inbox"
   | "cron-scheduled"
   | "background-snapshot";
 
@@ -57,6 +58,7 @@ export function buildInjectedArtifacts(params: {
   metaPromptText: string;
   metaPromptArtifactId?: InjectedArtifactId;
   metaPromptLabel?: string;
+  metaAgentInboxText?: string;
 }): InjectedArtifact[] {
   const artifacts: InjectedArtifact[] = [];
 
@@ -86,6 +88,16 @@ export function buildInjectedArtifacts(params: {
       label: "Date/time prefix",
       order: 30,
       text: extractDatePrefix(params.effectivePrompt),
+      applied: true,
+    });
+  }
+
+  if ((params.metaAgentInboxText || "").trim().length > 0) {
+    artifacts.push({
+      id: "meta-agent-inbox",
+      label: "Meta-agent inbox",
+      order: 35,
+      text: params.metaAgentInboxText || "",
       applied: true,
     });
   }
