@@ -72,7 +72,7 @@ Loop types:
 
 SuperTurtle includes a local dashboard for operational visibility. It is enabled by default when you run `superturtle start`. On startup, the bot prints a local URL like `http://localhost:46xxx/dashboard`, with the exact port derived per bot instance so multiple bots on the same machine do not collide.
 
-If you set `DASHBOARD_AUTH_TOKEN`, open the same URL with `?token=...` appended. If you want to disable the dashboard entirely, set `DASHBOARD_ENABLED=false`.
+Open the dashboard using the startup URL the bot prints. For normal local use, you do not need any extra dashboard settings. If you want to disable the dashboard entirely, set `DASHBOARD_ENABLED=false`.
 
 The dashboard shows active sessions, SubTurtle lanes, queued work, current jobs, and the latest conductor-driven worker state in one place.
 

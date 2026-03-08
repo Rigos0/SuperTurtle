@@ -3361,6 +3361,9 @@ export function startDashboardServer(): void {
   }
 
   const publicDashboardUrl = `${DASHBOARD_PUBLIC_BASE_URL}/dashboard`;
+  const openDashboardUrl = DASHBOARD_AUTH_TOKEN
+    ? `${publicDashboardUrl}?token=${encodeURIComponent(DASHBOARD_AUTH_TOKEN)}`
+    : publicDashboardUrl;
 
   if (!DASHBOARD_AUTH_TOKEN) {
     dashboardLog.info(
@@ -3368,9 +3371,10 @@ export function startDashboardServer(): void {
         bindHost: DASHBOARD_BIND_ADDR,
         port: DASHBOARD_PORT,
         publicUrl: publicDashboardUrl,
+        openUrl: openDashboardUrl,
         authEnabled: false,
       },
-      `Starting dashboard on ${publicDashboardUrl}`
+      `Starting dashboard on ${openDashboardUrl}`
     );
   } else {
     dashboardLog.info(
@@ -3378,9 +3382,10 @@ export function startDashboardServer(): void {
         bindHost: DASHBOARD_BIND_ADDR,
         port: DASHBOARD_PORT,
         publicUrl: publicDashboardUrl,
+        openUrl: openDashboardUrl,
         authEnabled: true,
       },
-      `Starting dashboard on ${publicDashboardUrl}?token=<redacted>`
+      `Starting dashboard on ${openDashboardUrl}`
     );
   }
 
