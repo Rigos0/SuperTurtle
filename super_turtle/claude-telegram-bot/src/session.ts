@@ -229,9 +229,9 @@ function loadPrefs(): Partial<UserPrefs> {
   }
 }
 
-function savePrefs(prefs: UserPrefs): void {
+async function savePrefs(prefs: UserPrefs): Promise<void> {
   try {
-    Bun.write(PREFS_FILE, JSON.stringify(prefs, null, 2));
+    await Bun.write(PREFS_FILE, JSON.stringify(prefs, null, 2));
   } catch (error) {
     claudeLog.warn({ err: error }, "Failed to save preferences");
   }
@@ -297,19 +297,19 @@ export class ClaudeSession {
   get model(): string { return this._model; }
   set model(value: string) {
     this._model = value;
-    savePrefs({ model: this._model, effort: this._effort, activeDriver: this._activeDriver });
+    void savePrefs({ model: this._model, effort: this._effort, activeDriver: this._activeDriver });
   }
 
   get effort(): EffortLevel { return this._effort; }
   set effort(value: EffortLevel) {
     this._effort = value;
-    savePrefs({ model: this._model, effort: this._effort, activeDriver: this._activeDriver });
+    void savePrefs({ model: this._model, effort: this._effort, activeDriver: this._activeDriver });
   }
 
   get activeDriver(): "claude" | "codex" { return this._activeDriver; }
   set activeDriver(value: "claude" | "codex") {
     this._activeDriver = value;
-    savePrefs({ model: this._model, effort: this._effort, activeDriver: this._activeDriver });
+    void savePrefs({ model: this._model, effort: this._effort, activeDriver: this._activeDriver });
     claudeLog.info({ driver: value }, `Switched to ${value} driver`);
   }
 
@@ -338,7 +338,7 @@ export class ClaudeSession {
 
     this._activeDriver = resolvedDriver;
     if (resolvedDriver !== preferredDriver) {
-      savePrefs({
+      void savePrefs({
         model: this._model,
         effort: this._effort,
         activeDriver: this._activeDriver,
@@ -678,7 +678,7 @@ export class ClaudeSession {
           if (!this.sessionId && event.session_id) {
             this.sessionId = event.session_id;
             claudeLog.info({ sessionId: this.sessionId }, `GOT session_id: ${this.sessionId!.slice(0, 8)}...`);
-            this.saveSession();
+            await this.saveSession();
           }
 
           // Handle different message types
@@ -995,7 +995,7 @@ export class ClaudeSession {
       this.pushRecentMessage("assistant", responseText);
     }
     // Persist the rolling buffer after each assistant response so /resume previews are fresh.
-    this.saveSession();
+    await this.saveSession();
     turnResponse = responseText || "No response from Claude.";
     return turnResponse;
   } catch (error) {
@@ -1075,7 +1075,7 @@ export class ClaudeSession {
   async kill(): Promise<void> {
     // Persist the linked session before clearing so /resume remains stable
     // across driver switches and explicit resets.
-    this.saveSession();
+    await this.saveSession();
     this.sessionId = null;
     this.lastActivity = null;
     this.conversationTitle = null;
@@ -1087,7 +1087,7 @@ export class ClaudeSession {
    * Save session to disk for resume after restart.
    * Saves to multi-session history format.
    */
-  saveSession(): void {
+  async saveSession(): Promise<void> {
     if (!this.sessionId) return;
 
     try {
@@ -1130,7 +1130,7 @@ export class ClaudeSession {
       history.sessions = history.sessions.slice(0, MAX_SESSIONS);
 
       // Save
-      Bun.write(SESSION_FILE, JSON.stringify(history, null, 2));
+      await Bun.write(SESSION_FILE, JSON.stringify(history, null, 2));
       claudeLog.info({ sessionFile: SESSION_FILE, sessionId: this.sessionId }, `Session saved to ${SESSION_FILE}`);
     } catch (error) {
       claudeLog.warn({ err: error }, "Failed to save session");
@@ -1206,7 +1206,7 @@ export class ClaudeSession {
       this.lastMessage = lastUser?.text || null;
       this.lastAssistantMessage = lastAssistant?.text || null;
     }
-    this.saveSession();
+    void this.saveSession();
 
     claudeLog.info(
       `Resumed session ${sessionData.session_id.slice(0, 8)}... - "${sessionData.title}"`

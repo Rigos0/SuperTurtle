@@ -64,9 +64,9 @@ function loadCodexPrefs(): CodexPrefs {
   }
 }
 
-function saveCodexPrefs(prefs: CodexPrefs): void {
+async function saveCodexPrefs(prefs: CodexPrefs): Promise<void> {
   try {
-    Bun.write(CODEX_PREFS_FILE, JSON.stringify(prefs, null, 2));
+    await Bun.write(CODEX_PREFS_FILE, JSON.stringify(prefs, null, 2));
   } catch (error) {
     codexLog.warn({ err: error }, "Failed to save Codex preferences");
   }
@@ -922,7 +922,7 @@ export class CodexSession {
   get model(): string { return this._model; }
   set model(value: string) {
     this._model = value;
-    saveCodexPrefs({
+    void saveCodexPrefs({
       threadId: this.threadId || undefined,
       model: this._model,
       reasoningEffort: this._reasoningEffort,
@@ -933,7 +933,7 @@ export class CodexSession {
   get reasoningEffort(): CodexEffortLevel { return this._reasoningEffort; }
   set reasoningEffort(value: CodexEffortLevel) {
     this._reasoningEffort = value;
-    saveCodexPrefs({
+    void saveCodexPrefs({
       threadId: this.threadId || undefined,
       model: this._model,
       reasoningEffort: this._reasoningEffort,
@@ -1069,13 +1069,13 @@ export class CodexSession {
       );
 
       // Save thread ID for persistence
-      saveCodexPrefs({
+      await saveCodexPrefs({
         threadId: this.threadId || undefined,
         createdAt: new Date().toISOString(),
         model: threadModel,
         reasoningEffort: threadEffort,
       });
-      this.upsertTrackedSession("Active Codex session");
+      await this.upsertTrackedSession("Active Codex session");
     } catch (error) {
       codexLog.error({ err: error }, "Error starting Codex thread");
       this.lastError = String(error).slice(0, 100);
@@ -1113,7 +1113,7 @@ export class CodexSession {
       this.systemPromptPrepended = true; // Resumed thread already contains its earlier bootstrap turn
 
       codexLog.info({ sessionId: threadId }, `Resumed Codex thread: ${threadId.slice(0, 8)}...`);
-      this.upsertTrackedSession();
+      await this.upsertTrackedSession();
     } catch (error) {
       codexLog.error({ err: error }, "Error resuming Codex thread");
       this.lastError = String(error).slice(0, 100);
@@ -1316,13 +1316,13 @@ ${messageToSend}`;
         if ((event.type === "thread.started" || event.type === "thread_started") && event.thread_id) {
           if (this.threadId !== event.thread_id) {
             this.threadId = event.thread_id;
-            saveCodexPrefs({
+            await saveCodexPrefs({
               threadId: this.threadId,
               createdAt: new Date().toISOString(),
               model: turnModel,
               reasoningEffort: turnEffort,
             });
-            this.upsertTrackedSession("Active Codex session");
+            await this.upsertTrackedSession("Active Codex session");
             codexLog.info(
               { sessionId: this.threadId },
               `Captured Codex thread ID from stream: ${this.threadId.slice(0, 8)}...`
@@ -1525,7 +1525,7 @@ ${messageToSend}`;
       }
       // Save session for resumption later (after updating rolling buffer).
       const title = userMessage.length > 50 ? userMessage.slice(0, 47) + "..." : userMessage;
-      this.saveSession(title);
+      await this.saveSession(title);
       turnResponse = combinedResponse || "No response from Codex.";
       return turnResponse;
     } catch (error) {
@@ -1649,7 +1649,7 @@ ${messageToSend}`;
     };
   }
 
-  private upsertTrackedSession(titleOverride?: string): void {
+  private async upsertTrackedSession(titleOverride?: string): Promise<void> {
     if (!this.threadId) return;
 
     try {
@@ -1668,7 +1668,7 @@ ${messageToSend}`;
       }
 
       history.sessions = history.sessions.slice(0, MAX_CODEX_SESSIONS);
-      Bun.write(CODEX_SESSION_FILE, JSON.stringify(history, null, 2));
+      await Bun.write(CODEX_SESSION_FILE, JSON.stringify(history, null, 2));
       codexLog.info({ sessionId: this.threadId }, `Codex session saved: ${this.threadId!.slice(0, 8)}...`);
     } catch (error) {
       codexLog.warn({ err: error }, "Failed to save Codex session");
@@ -1678,8 +1678,8 @@ ${messageToSend}`;
   /**
    * Save current thread to multi-session history.
    */
-  saveSession(title?: string): void {
-    this.upsertTrackedSession(title);
+  saveSession(title?: string): Promise<void> {
+    return this.upsertTrackedSession(title);
   }
 
   /**
@@ -1790,7 +1790,7 @@ ${messageToSend}`;
         this.lastAssistantMessage = lastAssistant?.text || null;
       }
       this.lastActivity = new Date();
-      this.saveSession(sessionData.title);
+      await this.saveSession(sessionData.title);
       codexLog.info(
         `Resumed Codex session ${sessionData.session_id.slice(0, 8)}... - "${sessionData.title}"`
       );
@@ -1818,13 +1818,13 @@ ${messageToSend}`;
   async kill(): Promise<void> {
     // Persist the linked thread before clearing so /resume remains stable
     // across driver switches and explicit resets.
-    this.saveSession();
+    await this.saveSession();
     this.thread = null;
     this.threadId = null;
     this.systemPromptPrepended = false;
 
     // Clear thread linkage but keep user model preferences.
-    saveCodexPrefs({
+    await saveCodexPrefs({
       model: this._model,
       reasoningEffort: this._reasoningEffort,
       createdAt: new Date().toISOString(),
