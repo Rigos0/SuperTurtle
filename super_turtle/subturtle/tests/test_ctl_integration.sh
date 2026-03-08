@@ -1353,7 +1353,7 @@ test_spawn_rejects_removed_cron_mode_flag() {
 
   write_valid_state_file "$state_path" "spawn rejects removed cron mode flag"
 
-  if run_and_capture "$out_file" "$err_file" "$CTL" spawn "$name" --type yolo-codex --timeout 2m --cron-mode orchestrator --cron-interval 20m --state-file "$state_path"; then
+  if run_and_capture "$out_file" "$err_file" "$CTL" spawn "$name" --type yolo-codex --timeout 2m --cron-mode silent --cron-interval 20m --state-file "$state_path"; then
     fail "spawn unexpectedly accepted --cron-mode for ${name}"
     return 1
   fi

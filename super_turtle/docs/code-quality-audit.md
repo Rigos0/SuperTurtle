@@ -311,7 +311,7 @@ if (pdfResult.status === 127) {
 - ✅ `cron-jobs.json` — Scheduled job storage
 
 ### Python Files (Subturtle Loop)
-- ✅ `super_turtle/subturtle/__main__.py` — Loop orchestrator
+- ✅ `super_turtle/subturtle/__main__.py` — Loop runner
 - ✅ `super_turtle/subturtle/subturtle_loop/__main__.py` — Loop CLI
 - ✅ `super_turtle/subturtle/subturtle_loop/agents.py` — Agent classes
 

@@ -273,11 +273,11 @@ Important split:
 - Completion, fatal failure, and timeout wake-ups are delivered directly by the bot from durable state and should not rely on silent cron inference.
 - Those lifecycle events also land in a durable meta-agent inbox so the next interactive turn can update planning state without faking a chat message into the session history.
 - Default silent SubTurtle supervision no longer wakes you as a chat turn; the bot runs deterministic milestone/stuck policy directly against canonical worker state and then routes any resulting notable updates through Telegram plus the durable inbox.
-- Orchestrator cron is still the mode that wakes you to reason across the roadmap and make planning decisions.
+- Roadmap-level planning now happens in normal interactive turns or explicit worker follow-ups instead of a separate cron mode.
 
 **Silent-first default:**
 - New `ctl spawn` cron jobs are marked `silent: true`.
-- New `ctl spawn` cron jobs also carry structured worker metadata: `job_kind=subturtle_supervision`, `worker_name=<name>`, and `supervision_mode=<silent|orchestrator>`.
+- New `ctl spawn` cron jobs also carry structured worker metadata: `job_kind=subturtle_supervision`, `worker_name=<name>`, and `supervision_mode=<silent>`.
 - In default `silent` mode, structured SubTurtle supervision is handled by the conductor instead of by a model prompt.
 - Legacy cron jobs without a `silent` field are treated as non-silent (backward compatible behavior).
 

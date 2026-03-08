@@ -127,7 +127,7 @@ export async function handleCodexQuota(ctx: Context): Promise<void> {
 
 ### 2. Meta Agent Loop Selection
 
-**Location:** `super_turtle/meta/claude-meta` (or future Python orchestrator)
+**Location:** `super_turtle/meta/claude-meta` (or a future Python supervision helper)
 
 ```bash
 # Before spawning SubTurtle with yolo-codex type:

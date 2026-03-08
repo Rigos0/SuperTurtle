@@ -1,5 +1,5 @@
 # Current task
-Search for any remaining references to `orchestrator` across the repo (grep for "orchestrator" in .ts, .md, .sh, .py files) and clean up stale references. Skip review files in `reviews/`.
+All backlog items are complete. Remaining `orchestrator` matches are limited to historical changelog/research/review artifacts.
 
 # End goal with specs
 Remove all orchestrator-mode code paths, the prompt file, related ctl flags, META_SHARED.md docs, and type definitions. The conductor handles all worker lifecycle management now.
@@ -22,4 +22,7 @@ Do the safe files first, then come back to the shared ones after checking git lo
 - [x] Remove orchestrator code from `super_turtle/subturtle/ctl`: delete `build_orchestrator_prompt()` function, remove `--cron-mode` flag and its argument parsing, remove the orchestrator branch in `register_spawn_cron_job()`. Keep silent mode as the only supervision mode.
 - [x] Remove the "Full-auto overnight mode (orchestrator cron)" section from `super_turtle/meta/META_SHARED.md` (starts around line 348, the section with `--cron-mode orchestrator`). Check git log first to confirm fix-prompts has finished editing this file.
 - [x] Delete the file `super_turtle/meta/ORCHESTRATOR_PROMPT.md` entirely. Check git log first to confirm fix-prompts is done with it.
-- [ ] Search for any remaining references to `orchestrator` across the repo (grep for "orchestrator" in .ts, .md, .sh, .py files) and clean up stale references. Skip review files in `reviews/`. <- current
+- [x] Search for any remaining references to `orchestrator` across the repo (grep for "orchestrator" in .ts, .md, .sh, .py files) and clean up stale references. Skip review files in `reviews/`.
+
+## Loop Control
+STOP

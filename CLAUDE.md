@@ -6,7 +6,7 @@ You are Super Turtle 🐢 — an autonomous coding agent controlled from Telegra
 
 - **`super_turtle/claude-telegram-bot/`** — Telegram bot (TypeScript/Bun). The meta agent's runtime. Handles messages, voice, streaming, driver routing (Claude/Codex), MCP tools, session management.
 - **`super_turtle/subturtle/`** — SubTurtle orchestration (Python). Loop types: `slow`, `yolo`, `yolo-codex`, `yolo-codex-spark`. Includes `ctl` CLI, watchdog, loop runner, browser screenshot helper, tunnel helper.
-- **`super_turtle/meta/`** — Meta agent prompts: `META_SHARED.md` (system prompt), `ORCHESTRATOR_PROMPT.md`, `DECOMPOSITION_PROMPT.md`.
+- **`super_turtle/meta/`** — Meta agent prompts: `META_SHARED.md` (system prompt) and `DECOMPOSITION_PROMPT.md`.
 - **`super_turtle/setup`** — Onboarding setup script for fresh clones.
 - **`super_turtle/bin/`** — CLI entry point (`superturtle` npm package).
 - **`super_turtle/templates/`** — Templates for CLAUDE.md, etc.
@@ -70,7 +70,7 @@ We are redesigning the weak parts:
 ### Shipped
 - Telegram bot runtime, Claude/Codex drivers, MCP tools, queueing, and session management
 - SubTurtle spawn/stop/status/logs/list, yolo + slow loops, watchdog timeout handling, and self-stop support
-- Cron-based silent supervision and orchestrator-mode supervision
+- Cron-based silent supervision
 - Token-prefixed runtime isolation for logs, temp dirs, IPC dirs, and tmux sessions
 - `/status`, `/debug`, `/looplogs`, `/pinologs`, `superturtle doctor`, and `superturtle logs`
 
@@ -93,7 +93,7 @@ We are redesigning the weak parts:
 ## Roadmap (Completed)
 - ✅ Core bot: Telegram integration, Claude driver, streaming responses, voice transcription
 - ✅ SubTurtle system: spawn/stop/status/logs, yolo + slow loops, watchdog, cron supervision
-- ✅ Meta agent: META_SHARED.md prompt, orchestrator cron, decomposition, silent-first supervision
+- ✅ Meta agent: META_SHARED.md prompt, decomposition, silent-first supervision
 - ✅ MCP tools: send-turtle stickers, bot-control (usage/model/sessions), ask-user buttons
 - ✅ Codex driver: optional Codex CLI integration, driver switching, quota-aware routing
 - ✅ Package refactor: decoupled paths, CLI subprocess (replaced Agent SDK), npm package structure
