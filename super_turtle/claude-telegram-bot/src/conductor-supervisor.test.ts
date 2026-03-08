@@ -3,6 +3,11 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "os";
 import { dirname, join } from "path";
 import {
+  acknowledgeMetaAgentInboxItems,
+  buildMetaAgentInboxPrompt,
+  listPendingMetaAgentInboxItems,
+} from "./conductor-inbox";
+import {
   parseCompletedBacklogItems,
   processSilentSubturtleSupervision,
   processPendingConductorWakeups,
@@ -241,6 +246,155 @@ Recover from a bad crash <- current
     expect(events).toContain('"event_type":"worker.failed"');
     expect(events).toContain('"event_type":"worker.inbox_enqueued"');
     expect(events).toContain('"event_type":"worker.notification_sent"');
+  });
+
+  it("preserves multi-worker inbox delivery across recovery until an interactive turn acknowledges it", async () => {
+    const baseDir = makeStateDir();
+    const stateDir = join(baseDir, ".superturtle", "state");
+    const archivedWorkspace = join(baseDir, ".subturtles", ".archive", "worker-finished");
+    const failedWorkspace = join(baseDir, ".subturtles", "worker-crashed");
+    mkdirSync(join(stateDir, "workers"), { recursive: true });
+    mkdirSync(join(stateDir, "wakeups"), { recursive: true });
+    mkdirSync(archivedWorkspace, { recursive: true });
+    mkdirSync(failedWorkspace, { recursive: true });
+
+    writeFileSync(
+      join(archivedWorkspace, "CLAUDE.md"),
+      `# Current task
+
+Ship worker one
+
+# Backlog
+- [x] Finish worker one
+`,
+      "utf-8"
+    );
+    writeFileSync(
+      join(failedWorkspace, "CLAUDE.md"),
+      `# Current task
+
+Recover worker two
+`,
+      "utf-8"
+    );
+
+    writeJson(join(stateDir, "workers", "worker-finished.json"), {
+      kind: "worker_state",
+      schema_version: 1,
+      worker_name: "worker-finished",
+      run_id: "run-finished",
+      lifecycle_state: "archived",
+      workspace: archivedWorkspace,
+      cron_job_id: "cron-finished",
+      current_task: "Ship worker one",
+      metadata: {},
+    });
+    writeJson(join(stateDir, "workers", "worker-crashed.json"), {
+      kind: "worker_state",
+      schema_version: 1,
+      worker_name: "worker-crashed",
+      run_id: "run-crashed",
+      lifecycle_state: "failure_pending",
+      workspace: failedWorkspace,
+      cron_job_id: "cron-crashed",
+      current_task: "Recover worker two",
+      metadata: {},
+    });
+    writeJson(join(stateDir, "wakeups", "wake-finished.json"), {
+      kind: "wakeup",
+      schema_version: 1,
+      id: "wake-finished",
+      worker_name: "worker-finished",
+      run_id: "run-finished",
+      category: "notable",
+      delivery_state: "pending",
+      summary: "worker finished",
+      created_at: "2026-03-08T00:00:00Z",
+      updated_at: "2026-03-08T00:00:00Z",
+      delivery: { attempts: 0 },
+      payload: { kind: "completion_requested" },
+      metadata: {},
+    });
+    writeJson(join(stateDir, "wakeups", "wake-crashed.json"), {
+      kind: "wakeup",
+      schema_version: 1,
+      id: "wake-crashed",
+      worker_name: "worker-crashed",
+      run_id: "run-crashed",
+      category: "critical",
+      delivery_state: "pending",
+      summary: "worker crashed",
+      created_at: "2026-03-08T00:05:00Z",
+      updated_at: "2026-03-08T00:05:00Z",
+      delivery: { attempts: 0 },
+      payload: { kind: "fatal_error", message: "boom again" },
+      metadata: {},
+    });
+
+    const jobs = [{ id: "cron-finished" }, { id: "cron-crashed" }];
+    const sentMessages: string[] = [];
+
+    const result = await processPendingConductorWakeups({
+      stateDir,
+      defaultChatId: 123,
+      listJobs: () => [...jobs],
+      removeJob: (id) => {
+        const index = jobs.findIndex((job) => job.id === id);
+        if (index === -1) return false;
+        jobs.splice(index, 1);
+        return true;
+      },
+      sendMessage: async (_chatId, text) => {
+        sentMessages.push(text);
+      },
+      isWorkerRunning: () => false,
+      nowIso: (() => {
+        const timestamps = [
+          "2026-03-08T01:00:00Z",
+          "2026-03-08T01:00:01Z",
+        ];
+        let index = 0;
+        return () => timestamps[Math.min(index++, timestamps.length - 1)]!;
+      })(),
+    });
+
+    expect(result.sent).toBe(2);
+    expect(sentMessages).toHaveLength(2);
+    expect(sentMessages[0]).toContain("🎉 Finished: worker-finished");
+    expect(sentMessages[1]).toContain("❌ SubTurtle worker-crashed failed.");
+    expect(jobs).toHaveLength(0);
+
+    const pendingInbox = listPendingMetaAgentInboxItems({ stateDir, chatId: 123 });
+    expect(pendingInbox.map((item) => item.id)).toEqual([
+      "inbox_wake-finished",
+      "inbox_wake-crashed",
+    ]);
+    expect(pendingInbox.map((item) => item.worker_name)).toEqual([
+      "worker-finished",
+      "worker-crashed",
+    ]);
+
+    const prompt = buildMetaAgentInboxPrompt(pendingInbox);
+    expect(prompt).toContain("[notable] SubTurtle worker-finished completed");
+    expect(prompt).toContain("[critical] SubTurtle worker-crashed failed");
+
+    const acknowledged = acknowledgeMetaAgentInboxItems({
+      stateDir,
+      itemIds: pendingInbox.map((item) => item.id),
+      driver: "claude",
+      turnId: "turn-recovery-1",
+      sessionId: "session-recovery-1",
+      acknowledgedAt: "2026-03-08T01:10:00Z",
+    });
+
+    expect(acknowledged).toHaveLength(2);
+    expect(listPendingMetaAgentInboxItems({ stateDir, chatId: 123 })).toEqual([]);
+
+    const acknowledgedCrashed = JSON.parse(
+      readFileSync(join(stateDir, "inbox", "inbox_wake-crashed.json"), "utf-8")
+    );
+    expect(acknowledgedCrashed.delivery_state).toBe("acknowledged");
+    expect(acknowledgedCrashed.delivery.acknowledged_by_turn_id).toBe("turn-recovery-1");
   });
 });
 
