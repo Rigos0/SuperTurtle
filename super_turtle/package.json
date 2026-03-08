@@ -50,7 +50,6 @@
     "subturtle/claude-md-guard/*.sh",
     "subturtle/claude-md-guard/config.sh",
     "subturtle/claude-md-guard/README.md",
-    "subturtle/subturtle_loop/__main__.py",
     "subturtle/subturtle_loop/agents.py",
     "state/*.py",
     "templates/",
