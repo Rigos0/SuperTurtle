@@ -24,4 +24,13 @@ describe("convertMarkdownToHtml", () => {
     expect(html).toContain("<i>important</i>");
     expect(html).toContain("<i>very clear</i>");
   });
+
+  it("only strips leading markdown headers from blockquotes", () => {
+    const input = "> ## Release notes https://example.com/docs#install #updates";
+    const html = convertMarkdownToHtml(input);
+
+    expect(html).toContain(
+      "<blockquote>Release notes https://example.com/docs#install #updates</blockquote>"
+    );
+  });
 });

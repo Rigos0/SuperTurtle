@@ -107,8 +107,8 @@ function convertBlockquotes(text: string): string {
       if (line === "&gt;") {
         blockquoteLines.push("");
       } else {
-        // Remove '&gt; ' and strip # from hashtags (Telegram mobile bug workaround)
-        const content = line.slice(5).replace(/#/g, "");
+        // Remove '&gt; ' and strip only leading markdown header markers.
+        const content = line.slice(5).replace(/^#+\s*/, "");
         blockquoteLines.push(content);
       }
       inBlockquote = true;
