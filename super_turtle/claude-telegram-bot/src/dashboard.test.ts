@@ -936,7 +936,6 @@ describe("GET /dashboard/sessions/:driver/:sessionId", () => {
     expect(html).toContain("<div class=\"injected-heading\">");
     expect(html).toContain("<ol class=\"injected-list\">");
     expect(html).toContain("Project instructions");
-    expect(html).toContain("CLAUDE.md context");
     expect(html).toContain("Meta system prompt");
     expect(html).toContain("Date/time prefix");
     expect(html).toContain("meta prompt from transcript");

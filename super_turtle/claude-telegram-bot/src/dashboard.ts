@@ -1521,10 +1521,13 @@ function renderSessionDetailHtml(
             : artifact.id === "background-snapshot"
               ? 50
               : 999;
+    const order = typeof artifact.order === "number" && Number.isFinite(artifact.order)
+      ? artifact.order
+      : fallbackOrder;
     const normalized: InjectedArtifactView = {
       id: artifact.id,
       label: artifact.label,
-      order: Number.isFinite(artifact.order) ? artifact.order : fallbackOrder,
+      order,
       exactText: artifact.text || "",
       preview: buildPreview(artifact.text || ""),
     };
