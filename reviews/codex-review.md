@@ -43,3 +43,20 @@
    - File: `super_turtle/subturtle/ctl:879-952`, `super_turtle/subturtle/ctl:961-991`, `super_turtle/subturtle/ctl:1030-1063`
    - Issue: spawn, stop, and reschedule each load `.superturtle/cron-jobs.json`, mutate it in memory, and write the whole file back without locking. The same store is also updated by the bot runtime, so concurrent operations can lose jobs, resurrect deleted entries, or clobber interval changes.
    - Fix: funnel cron writes through one helper that takes an exclusive lock and commits updates atomically.
+
+## Meta prompt sweep: `super_turtle/meta/`
+
+1. High: orchestrator mode can schedule duplicate roadmap drivers on every successful cycle
+   - File: `super_turtle/meta/ORCHESTRATOR_PROMPT.md:59-67`, `super_turtle/meta/META_SHARED.md:357-371`, `super_turtle/subturtle/ctl:865-953`
+   - Issue: `ctl spawn --cron-mode orchestrator` already registers a recurring `subturtle_supervision` cron job with the full orchestrator prompt, but the prompt docs still instruct each wake-up to append a new one-shot follow-up job. If the agent follows that guidance, every healthy cycle adds another orchestrator runner and you end up with overlapping stop/spawn decisions against the same roadmap.
+   - Fix: make orchestrator scheduling single-sourced by removing self-scheduling from the prompt, or switch the runtime to true one-shot orchestrator jobs instead of recurring registration.
+
+2. High: orchestrator progress/stuck checks use repo-global git history instead of worker-local state
+   - File: `super_turtle/meta/ORCHESTRATOR_PROMPT.md:13-17`, `super_turtle/meta/ORCHESTRATOR_PROMPT.md:34-38`
+   - Issue: the prompt tells the orchestrator to run `git log --oneline -10` for each worker and treat an unchanged log as evidence that that worker is stuck. All SubTurtles share one repo history, so commits from any worker mutate that signal for every worker and can hide a genuinely stalled SubTurtle or make progress attribution incorrect.
+   - Fix: base progressing/stuck decisions on per-worker conductor data such as checkpoint signatures, completed backlog counts, and latest worker events.
+
+3. Medium: meta prompts still tell agents to hand-edit the shared cron JSON
+   - File: `super_turtle/meta/META_SHARED.md:47-53`, `super_turtle/meta/META_SHARED.md:119`, `super_turtle/meta/META_SHARED.md:487-503`, `super_turtle/meta/ORCHESTRATOR_PROMPT.md:59-65`, `super_turtle/claude-telegram-bot/src/session.ts:72-94`, `super_turtle/claude-telegram-bot/src/cron.ts:150-199`
+   - Issue: the shared prompt says direct edits to `.superturtle/cron-jobs.json` are allowed, later says not to edit it during spawn, and its scheduling sections still describe manual JSON append/remove flows. That bypasses the available `CronCreate`/`CronDelete`/`CronList` tool surface and adds more unsynchronized writers to the same file the bot and `ctl` already mutate.
+   - Fix: remove manual cron-file editing instructions from the prompts, route scheduling through the cron tools or one helper path, and reserve raw JSON edits for recovery/debug-only cases.
