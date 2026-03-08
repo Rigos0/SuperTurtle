@@ -24,7 +24,7 @@ import {
 import { session, type ClaudeSession } from "../session";
 import { codexSession, type CodexSession } from "../codex-session";
 import { bot } from "../bot";
-import { PINO_LOG_PATH, streamLog } from "../logger";
+import { streamLog } from "../logger";
 import {
   clamp,
   readPinoLogLines,
