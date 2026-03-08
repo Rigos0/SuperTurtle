@@ -211,6 +211,8 @@ def _resolve_state_ref(state_dir: Path, name: str) -> tuple[Path, str]:
 # ---------------------------------------------------------------------------
 
 RETRY_DELAY = 10  # seconds to wait after an agent crash before retrying
+MAX_CONSECUTIVE_FAILURES = 5
+MAX_FAILURES_MESSAGE = "max consecutive failures reached"
 STOP_DIRECTIVE = "## Loop Control\nSTOP"
 
 
@@ -390,12 +392,13 @@ def _record_checkpoint(
         )
 
 
-def _record_fatal_error(
+def _record_failure_pending(
     state_dir: Path,
     name: str,
     project_dir: Path,
     loop_type: str,
-    error: Exception,
+    message: str,
+    error_type: str = "ConsecutiveAgentFailure",
 ) -> None:
     state_file = state_dir / "CLAUDE.md"
     store = ConductorStateStore(_run_state_dir(project_dir))
@@ -405,8 +408,8 @@ def _record_fatal_error(
         current_task = _extract_current_task(state_file) or existing.get("current_task")
         error_payload = {
             "kind": "fatal_error",
-            "error_type": type(error).__name__,
-            "message": str(error),
+            "error_type": error_type,
+            "message": message,
         }
 
         event = store.append_event(
@@ -469,6 +472,23 @@ def _record_fatal_error(
         )
 
 
+def _record_fatal_error(
+    state_dir: Path,
+    name: str,
+    project_dir: Path,
+    loop_type: str,
+    error: Exception,
+) -> None:
+    _record_failure_pending(
+        state_dir,
+        name,
+        project_dir,
+        loop_type,
+        str(error),
+        error_type=type(error).__name__,
+    )
+
+
 def _should_stop(state_file: Path, name: str) -> bool:
     """Return True when the SubTurtle wrote the STOP directive to its state file."""
     try:
@@ -499,18 +519,49 @@ def _require_cli(name: str, cli_name: str) -> None:
     sys.exit(1)
 
 
+def _agent_error_detail(error: subprocess.CalledProcessError | OSError) -> str:
+    if isinstance(error, subprocess.CalledProcessError):
+        return f"exit {error.returncode}"
+    return f"{type(error).__name__}: {error}"
+
+
 def _log_retry(name: str, error: subprocess.CalledProcessError | OSError) -> None:
     """Log a transient failure and sleep before retrying."""
-    if isinstance(error, subprocess.CalledProcessError):
-        detail = f"exit {error.returncode}"
-    else:
-        detail = f"{type(error).__name__}: {error}"
-
     print(
-        f"[subturtle:{name}] agent failed ({detail}), retrying in {RETRY_DELAY}s...",
+        f"[subturtle:{name}] agent failed ({_agent_error_detail(error)}), retrying in {RETRY_DELAY}s...",
         file=sys.stderr,
     )
     time.sleep(RETRY_DELAY)
+
+
+def _handle_agent_failure(
+    state_dir: Path,
+    name: str,
+    project_dir: Path,
+    loop_type: str,
+    error: subprocess.CalledProcessError | OSError,
+    consecutive_failures: int,
+) -> tuple[int, bool]:
+    consecutive_failures += 1
+    if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+        print(
+            (
+                f"[subturtle:{name}] FATAL: reached {consecutive_failures} consecutive "
+                f"agent failures ({_agent_error_detail(error)}); stopping loop"
+            ),
+            file=sys.stderr,
+        )
+        _record_failure_pending(
+            state_dir,
+            name,
+            project_dir,
+            loop_type,
+            MAX_FAILURES_MESSAGE,
+        )
+        return consecutive_failures, True
+
+    _log_retry(name, error)
+    return consecutive_failures, False
 
 
 def _archive_workspace(state_dir: Path, name: str) -> None:
@@ -562,7 +613,9 @@ def run_slow_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
     add_dirs = [_SKILLS_DIR] if skills else []
     claude = Claude(add_dirs=add_dirs)
     codex = Codex(add_dirs=add_dirs)
+    project_dir = Path.cwd()
     iteration = 0
+    consecutive_failures = 0
     stopped_by_directive = False
 
     while True:
@@ -582,9 +635,19 @@ def run_slow_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
             codex.execute(prompts["executor"].format(plan=plan))
 
             claude.execute(prompts["reviewer"].format(plan=plan))
-            _record_checkpoint(state_dir, name, Path.cwd(), "slow", iteration)
+            _record_checkpoint(state_dir, name, project_dir, "slow", iteration)
+            consecutive_failures = 0
         except (subprocess.CalledProcessError, OSError) as e:
-            _log_retry(name, e)
+            consecutive_failures, should_stop = _handle_agent_failure(
+                state_dir,
+                name,
+                project_dir,
+                "slow",
+                e,
+                consecutive_failures,
+            )
+            if should_stop:
+                break
 
         if _should_stop(state_file, name):
             stopped_by_directive = True
@@ -592,7 +655,7 @@ def run_slow_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
 
     if stopped_by_directive:
         if iteration > 0:
-            _record_completion_pending(state_dir, name, Path.cwd())
+            _record_completion_pending(state_dir, name, project_dir)
         _archive_workspace(state_dir, name)
 
 
@@ -612,7 +675,9 @@ def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
 
     add_dirs = [_SKILLS_DIR] if skills else []
     claude = Claude(add_dirs=add_dirs)
+    project_dir = Path.cwd()
     iteration = 0
+    consecutive_failures = 0
     stopped_by_directive = False
 
     while True:
@@ -623,9 +688,19 @@ def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
         print(f"[subturtle:{name}] === yolo iteration {iteration} ===")
         try:
             claude.execute(prompt)
-            _record_checkpoint(state_dir, name, Path.cwd(), "yolo", iteration)
+            _record_checkpoint(state_dir, name, project_dir, "yolo", iteration)
+            consecutive_failures = 0
         except (subprocess.CalledProcessError, OSError) as e:
-            _log_retry(name, e)
+            consecutive_failures, should_stop = _handle_agent_failure(
+                state_dir,
+                name,
+                project_dir,
+                "yolo",
+                e,
+                consecutive_failures,
+            )
+            if should_stop:
+                break
 
         if _should_stop(state_file, name):
             stopped_by_directive = True
@@ -633,7 +708,7 @@ def run_yolo_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
 
     if stopped_by_directive:
         if iteration > 0:
-            _record_completion_pending(state_dir, name, Path.cwd())
+            _record_completion_pending(state_dir, name, project_dir)
         _archive_workspace(state_dir, name)
 
 
@@ -653,7 +728,9 @@ def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = N
 
     add_dirs = [_SKILLS_DIR] if skills else []
     codex = Codex(add_dirs=add_dirs)
+    project_dir = Path.cwd()
     iteration = 0
+    consecutive_failures = 0
     stopped_by_directive = False
 
     while True:
@@ -664,9 +741,19 @@ def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = N
         print(f"[subturtle:{name}] === yolo-codex iteration {iteration} ===")
         try:
             codex.execute(prompt)
-            _record_checkpoint(state_dir, name, Path.cwd(), "yolo-codex", iteration)
+            _record_checkpoint(state_dir, name, project_dir, "yolo-codex", iteration)
+            consecutive_failures = 0
         except (subprocess.CalledProcessError, OSError) as e:
-            _log_retry(name, e)
+            consecutive_failures, should_stop = _handle_agent_failure(
+                state_dir,
+                name,
+                project_dir,
+                "yolo-codex",
+                e,
+                consecutive_failures,
+            )
+            if should_stop:
+                break
 
         if _should_stop(state_file, name):
             stopped_by_directive = True
@@ -674,7 +761,7 @@ def run_yolo_codex_loop(state_dir: Path, name: str, skills: list[str] | None = N
 
     if stopped_by_directive:
         if iteration > 0:
-            _record_completion_pending(state_dir, name, Path.cwd())
+            _record_completion_pending(state_dir, name, project_dir)
         _archive_workspace(state_dir, name)
 
 
@@ -696,7 +783,9 @@ def run_yolo_codex_spark_loop(
 
     add_dirs = [_SKILLS_DIR] if skills else []
     codex = Codex(add_dirs=add_dirs, model="gpt-5.3-codex-spark")
+    project_dir = Path.cwd()
     iteration = 0
+    consecutive_failures = 0
     stopped_by_directive = False
 
     while True:
@@ -708,10 +797,20 @@ def run_yolo_codex_spark_loop(
         try:
             codex.execute(prompt)
             _record_checkpoint(
-                state_dir, name, Path.cwd(), "yolo-codex-spark", iteration
+                state_dir, name, project_dir, "yolo-codex-spark", iteration
             )
+            consecutive_failures = 0
         except (subprocess.CalledProcessError, OSError) as e:
-            _log_retry(name, e)
+            consecutive_failures, should_stop = _handle_agent_failure(
+                state_dir,
+                name,
+                project_dir,
+                "yolo-codex-spark",
+                e,
+                consecutive_failures,
+            )
+            if should_stop:
+                break
 
         if _should_stop(state_file, name):
             stopped_by_directive = True
@@ -719,7 +818,7 @@ def run_yolo_codex_spark_loop(
 
     if stopped_by_directive:
         if iteration > 0:
-            _record_completion_pending(state_dir, name, Path.cwd())
+            _record_completion_pending(state_dir, name, project_dir)
         _archive_workspace(state_dir, name)
 
 

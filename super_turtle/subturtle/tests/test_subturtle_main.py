@@ -58,6 +58,110 @@ def test_run_yolo_loop_retries_on_oserror(monkeypatch, tmp_path, capsys) -> None
     assert "retrying in" in capsys.readouterr().err
 
 
+def test_run_yolo_loop_marks_failure_pending_after_max_consecutive_failures(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    state_dir = tmp_path / ".subturtles" / "worker-max-failures"
+    state_dir.mkdir(parents=True)
+    (state_dir / "CLAUDE.md").write_text(
+        "# Current task\n\nRecover from repeated agent failures <- current\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(subturtle_main, "_require_cli", lambda _name, _cli: None)
+    monkeypatch.setattr(subturtle_main.time, "sleep", lambda _delay: None)
+
+    attempts = {"count": 0}
+
+    class BrokenClaude:
+        def execute(self, _prompt: str) -> str:
+            attempts["count"] += 1
+            raise OSError("launch failed")
+
+    monkeypatch.setattr(subturtle_main, "Claude", lambda **_kwargs: BrokenClaude())
+
+    store = ConductorStateStore(tmp_path / ".superturtle" / "state")
+    initial = store.make_worker_state(
+        worker_name="worker-max-failures",
+        lifecycle_state="running",
+        updated_by="supervisor",
+        run_id="run-max-failures",
+        workspace=str(state_dir),
+        loop_type="yolo",
+        current_task="Recover from repeated agent failures",
+    )
+    store.write_worker_state(initial)
+
+    subturtle_main.run_yolo_loop(state_dir, "worker-max-failures")
+
+    assert attempts["count"] == subturtle_main.MAX_CONSECUTIVE_FAILURES
+
+    worker_state = store.load_worker_state("worker-max-failures")
+    assert worker_state is not None
+    assert worker_state["lifecycle_state"] == "failure_pending"
+    assert worker_state["stop_reason"] == "fatal_error"
+    assert worker_state["metadata"]["last_error"]["message"] == subturtle_main.MAX_FAILURES_MESSAGE
+    assert worker_state["metadata"]["last_error"]["error_type"] == "ConsecutiveAgentFailure"
+
+    events = store.paths.events_jsonl_file.read_text(encoding="utf-8")
+    assert "worker.fatal_error" in events
+    assert subturtle_main.MAX_FAILURES_MESSAGE in events
+
+    wakeups = store.list_wakeups()
+    assert len(wakeups) == 1
+    assert wakeups[0]["payload"]["kind"] == "fatal_error"
+    assert wakeups[0]["payload"]["message"] == subturtle_main.MAX_FAILURES_MESSAGE
+
+    assert "FATAL: reached 5 consecutive agent failures" in capsys.readouterr().err
+
+
+def test_run_yolo_loop_resets_failure_counter_after_success(monkeypatch, tmp_path) -> None:
+    _write_state_file(tmp_path)
+    monkeypatch.setattr(subturtle_main, "_require_cli", lambda _name, _cli: None)
+    monkeypatch.setattr(subturtle_main.time, "sleep", lambda _delay: None)
+
+    outcomes = [OSError("launch failed")] * 4 + [None] + [OSError("launch failed")] * 5
+    attempts = {"count": 0}
+    checkpoint_iterations = []
+    failure_records = []
+
+    class SequencedClaude:
+        def execute(self, _prompt: str) -> str:
+            index = attempts["count"]
+            attempts["count"] += 1
+            outcome = outcomes[index]
+            if isinstance(outcome, Exception):
+                raise outcome
+            return "ok"
+
+    def fake_record_checkpoint(
+        _state_dir, _name, _project_dir, _loop_type: str, iteration: int
+    ) -> None:
+        checkpoint_iterations.append(iteration)
+
+    def fake_record_failure_pending(
+        _state_dir,
+        _name,
+        _project_dir,
+        _loop_type: str,
+        message: str,
+        error_type: str = "ConsecutiveAgentFailure",
+    ) -> None:
+        failure_records.append((message, error_type))
+
+    monkeypatch.setattr(subturtle_main, "Claude", lambda **_kwargs: SequencedClaude())
+    monkeypatch.setattr(subturtle_main, "_record_checkpoint", fake_record_checkpoint)
+    monkeypatch.setattr(subturtle_main, "_record_failure_pending", fake_record_failure_pending)
+
+    subturtle_main.run_yolo_loop(tmp_path, "default")
+
+    assert attempts["count"] == 10
+    assert checkpoint_iterations == [5]
+    assert failure_records == [
+        (subturtle_main.MAX_FAILURES_MESSAGE, "ConsecutiveAgentFailure")
+    ]
+
+
 def test_archive_workspace_uses_ctl_stop_and_preserves_meta(monkeypatch, tmp_path) -> None:
     pid_file = tmp_path / "subturtle.pid"
     meta_file = tmp_path / "subturtle.meta"
