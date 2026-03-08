@@ -7,6 +7,8 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-08
+
 ### Added
 - `superturtle doctor`: one-command observability snapshot (bot tmux state, SubTurtles, cron summary, log health, recent loop failures)
 - `superturtle logs`: tail namespaced loop/pino/audit logs with optional pino pretty-printing
