@@ -501,8 +501,14 @@ bot.catch((err) => {
  */
 const startCronTimer = () => {
   const BOT_MESSAGE_ONLY_PREFIX = "BOT_MESSAGE_ONLY:";
+  let cronTickInFlight = false;
 
   setInterval(async () => {
+    if (cronTickInFlight) {
+      cronLog.info("[cron] skipped overlapping timer tick because the previous tick is still running");
+      return;
+    }
+    cronTickInFlight = true;
     try {
       await runConductorMaintenancePass();
 
@@ -801,6 +807,8 @@ const startCronTimer = () => {
       await drainPreparedSnapshotsWhenIdle();
     } catch (error) {
       cronLog.error({ err: error }, "Cron timer loop error");
+    } finally {
+      cronTickInFlight = false;
     }
   }, 10000); // 10 seconds
 };
