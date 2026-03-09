@@ -1,5 +1,5 @@
 # Current task
-Extract route handlers/table wiring into routes module while preserving patterns. <- current
+Update imports/exports in `dashboard.ts` to thin entrypoint and remove dead code. <- current
 
 # End goal with specs
 - Dashboard server code is organized into cohesive modules under `super_turtle/claude-telegram-bot/src/dashboard/`.
@@ -24,7 +24,7 @@ Extract route handlers/table wiring into routes module while preserving patterns
 - [x] Create `src/dashboard/` module layout and move low-risk shared helper functions first
 - [x] Extract dashboard overview/conductor/current-jobs data builders into dedicated module(s)
 - [x] Extract HTML rendering for dashboard + detail pages into renderer module(s)
-- [ ] Extract route handlers/table wiring into routes module while preserving patterns <- current
-- [ ] Update imports/exports in `dashboard.ts` to thin entrypoint and remove dead code
+- [x] Extract route handlers/table wiring into routes module while preserving patterns
+- [ ] Update imports/exports in `dashboard.ts` to thin entrypoint and remove dead code <- current
 - [ ] Run dashboard-focused tests and fix regressions introduced by extraction
 - [ ] Do a final pass for naming consistency and module-level comments where needed
