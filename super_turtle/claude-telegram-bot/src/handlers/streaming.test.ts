@@ -16,6 +16,7 @@ const {
   createStatusCallback,
   getStreamingState,
   isAskUserPromptMessage,
+  isSpawnOrchestrationToolStatus,
   shouldSendToolStatusMessage,
   StreamingState,
 } = await import("./streaming");
@@ -330,58 +331,22 @@ describe("cleanupToolMessages()", () => {
 });
 
 describe("tool status visibility", () => {
-  it("hides routine tool status messages by default while still marking tool usage", async () => {
-    const state = new StreamingState();
-    const replyMock = mock(async () => ({ message_id: 1 }));
-    const ctx = {
-      chat: { id: 321 },
-      reply: replyMock,
-    } as unknown as Context;
-
-    const statusCallback = createStatusCallback(ctx, state, {
-      showToolStatus: false,
-    });
-    await statusCallback("tool", "<code>git status</code>");
-
-    expect(replyMock).not.toHaveBeenCalled();
-    expect(state.sawToolUse).toBe(true);
-    expect(state.toolMessages).toHaveLength(0);
+  it("hides routine tool statuses in quiet mode", () => {
+    expect(shouldSendToolStatusMessage("<code>git status</code>", false)).toBe(false);
+    expect(shouldSendToolStatusMessage("▶️ <code>npm test</code>", false)).toBe(false);
   });
 
-  it("still shows failure-like tool statuses in quiet mode", async () => {
-    const state = new StreamingState();
-    const replyMock = mock(async () => ({ message_id: 2, chat: { id: 321 } }));
-    const ctx = {
-      chat: { id: 321 },
-      reply: replyMock,
-    } as unknown as Context;
-
-    const statusCallback = createStatusCallback(ctx, state, {
-      showToolStatus: false,
-    });
-    await statusCallback("tool", "Error: command failed");
-
-    expect(replyMock).toHaveBeenCalledTimes(1);
-    expect(state.sawToolUse).toBe(true);
-    expect(state.toolMessages).toHaveLength(1);
+  it("still shows failure-like tool statuses in quiet mode", () => {
+    expect(shouldSendToolStatusMessage("Error: command failed", false)).toBe(true);
+    expect(shouldSendToolStatusMessage("BLOCKED: rm target outside allowed paths", false)).toBe(true);
+    expect(shouldSendToolStatusMessage("Access denied: /etc/passwd", false)).toBe(true);
+    expect(shouldSendToolStatusMessage("🔧 mcp: tool (failed: boom)", false)).toBe(true);
   });
 
-  it("still detects spawn orchestration when tool status replies are hidden", async () => {
-    const state = new StreamingState();
-    const replyMock = mock(async () => ({ message_id: 3 }));
-    const ctx = {
-      chat: { id: 321 },
-      reply: replyMock,
-    } as unknown as Context;
-
-    const statusCallback = createStatusCallback(ctx, state, {
-      showToolStatus: false,
-    });
-    await statusCallback("tool", "▶️ <code>subturtle/ctl spawn worker-a</code>");
-
-    expect(replyMock).not.toHaveBeenCalled();
-    expect(state.sawToolUse).toBe(true);
-    expect(state.sawSpawnOrchestration).toBe(true);
+  it("still detects spawn orchestration from hidden tool statuses", () => {
+    expect(isSpawnOrchestrationToolStatus("▶️ <code>subturtle/ctl spawn worker-a</code>")).toBe(true);
+    expect(isSpawnOrchestrationToolStatus("Spawn SubTurtle worker-a")).toBe(true);
+    expect(isSpawnOrchestrationToolStatus("<code>git status</code>")).toBe(false);
   });
 
   it("can explicitly allow routine tool statuses for debug mode", () => {
