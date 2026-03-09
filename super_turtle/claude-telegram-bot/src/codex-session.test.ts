@@ -37,6 +37,8 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanupCodexFiles();
+  delete process.env.DEFAULT_CODEX_MODEL;
+  delete process.env.DEFAULT_CODEX_EFFORT;
   if (typeof originalHome === "string") {
     process.env.HOME = originalHome;
   } else {
@@ -46,6 +48,20 @@ afterEach(() => {
 });
 
 describe("CodexSession", () => {
+  it("uses configured Codex defaults when no saved prefs exist", async () => {
+    process.env.DEFAULT_CODEX_MODEL = "gpt-5.3-codex-spark";
+    process.env.DEFAULT_CODEX_EFFORT = "low";
+
+    const { CodexSession } = await loadCodexSessionModule("env-defaults");
+    const codex = new CodexSession();
+
+    expect(codex.model).toBe("gpt-5.3-codex-spark");
+    expect(codex.reasoningEffort).toBe("low");
+
+    delete process.env.DEFAULT_CODEX_MODEL;
+    delete process.env.DEFAULT_CODEX_EFFORT;
+  });
+
   it("parses Codex transcripts into conversation history and injection evidence", async () => {
     const { parseCodexTranscript } = await loadCodexSessionModule("parse-transcript");
     const transcript = [
@@ -301,6 +317,29 @@ describe("CodexSession", () => {
     expect(savedSessions.sessions[0]).toMatchObject({
       session_id: "resume-thread-999",
     });
+  });
+
+  it("keeps saved Codex prefs authoritative over env defaults", async () => {
+    process.env.DEFAULT_CODEX_MODEL = "gpt-5.3-codex-spark";
+    process.env.DEFAULT_CODEX_EFFORT = "low";
+
+    writeFileSync(
+      CODEX_PREFS_FILE,
+      JSON.stringify({
+        threadId: "saved-thread-id",
+        model: "gpt-5.2-codex",
+        reasoningEffort: "high",
+      })
+    );
+
+    const { CodexSession } = await loadCodexSessionModule("saved-prefs-win");
+    const codex = new CodexSession();
+
+    expect(codex.model).toBe("gpt-5.2-codex");
+    expect(codex.reasoningEffort).toBe("high");
+
+    delete process.env.DEFAULT_CODEX_MODEL;
+    delete process.env.DEFAULT_CODEX_EFFORT;
   });
 
   it("returns a formatted initialization error when SDK initialization fails", async () => {

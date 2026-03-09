@@ -7,7 +7,7 @@ import { $ } from "bun";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
-const PORT = Number(process.env.DASHBOARD_PORT) || 7777;
+const PORT = 7777;
 const REPO_ROOT = resolve(import.meta.dir, "../..");
 const CTL = resolve(REPO_ROOT, "super_turtle/subturtle/ctl");
 const CRON_FILE = resolve(REPO_ROOT, ".superturtle/cron-jobs.json");

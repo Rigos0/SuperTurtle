@@ -535,6 +535,7 @@ function start() {
       k.startsWith("THINKING_") ||
       k.startsWith("TRANSCRIPTION_") ||
       k.startsWith("TURTLE_") ||
+      k.startsWith("DEFAULT_") ||
       k === "ALLOWED_PATHS" ||
       k === "LOG_LEVEL"
     );

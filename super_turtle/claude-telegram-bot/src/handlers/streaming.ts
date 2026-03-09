@@ -20,6 +20,7 @@ import {
   CODEX_USER_ENABLED,
   RESTART_FILE,
   IPC_DIR,
+  SHOW_TOOL_STATUS,
 } from "../config";
 import { session, type ClaudeSession } from "../session";
 import { codexSession, type CodexSession } from "../codex-session";
@@ -787,12 +788,33 @@ function decodeBasicHtmlEntities(text: string): string {
     .replace(/&quot;/g, '"');
 }
 
-export function isSpawnOrchestrationToolStatus(content: string): boolean {
-  const normalized = decodeBasicHtmlEntities(content)
+function normalizeToolStatus(content: string): string {
+  return decodeBasicHtmlEntities(content)
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
+}
+
+export function shouldSendToolStatusMessage(
+  content: string,
+  showToolStatus: boolean = SHOW_TOOL_STATUS
+): boolean {
+  if (showToolStatus) {
+    return true;
+  }
+
+  const normalized = normalizeToolStatus(content);
+  return (
+    normalized.startsWith("blocked:") ||
+    normalized.startsWith("access denied:") ||
+    normalized.startsWith("error:") ||
+    normalized.includes("failed:")
+  );
+}
+
+export function isSpawnOrchestrationToolStatus(content: string): boolean {
+  const normalized = normalizeToolStatus(content);
 
   if (!normalized.includes("spawn")) {
     return false;
@@ -890,6 +912,9 @@ export function createStatusCallback(
         state.sawToolUse = true;
         if (isSpawnOrchestrationToolStatus(content)) {
           state.sawSpawnOrchestration = true;
+        }
+        if (!shouldSendToolStatusMessage(content)) {
+          return;
         }
         // Tool status content is pre-formatted HTML (from formatToolStatus
         // or formatCodexToolStatus) — do NOT double-escape.

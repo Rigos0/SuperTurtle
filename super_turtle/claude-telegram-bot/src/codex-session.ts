@@ -11,6 +11,8 @@ import {
   WORKING_DIR,
   BOT_DIR,
   CODEX_META_BOOTSTRAP_PROMPT,
+  DEFAULT_CODEX_EFFORT,
+  DEFAULT_CODEX_MODEL,
   MCP_SERVERS,
   META_CODEX_APPROVAL_POLICY,
   META_CODEX_NETWORK_ACCESS,
@@ -918,8 +920,8 @@ export class CodexSession {
   constructor() {
     // Load preferences
     const prefs = loadCodexPrefs();
-    this._model = prefs.model || "gpt-5.3-codex";
-    this._reasoningEffort = (prefs.reasoningEffort as CodexEffortLevel) || "medium";
+    this._model = prefs.model || DEFAULT_CODEX_MODEL;
+    this._reasoningEffort = (prefs.reasoningEffort as CodexEffortLevel) || DEFAULT_CODEX_EFFORT;
 
     if (prefs.threadId) {
       this.threadId = prefs.threadId;

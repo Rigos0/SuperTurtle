@@ -45,6 +45,10 @@ type ResumeProbePayload = {
   replies: ReplyRecord[];
 };
 
+type ModelPickerProbePayload = {
+  replies: ReplyRecord[];
+};
+
 function mockContext(messageText: string): {
   ctx: {
     from: { id: number };
@@ -219,6 +223,54 @@ function runSwitchNoArgInIsolatedProcess(codexEnabled: boolean): ReplyRecord[] {
   expect(jsonEnd).toBeGreaterThanOrEqual(jsonStart);
   const jsonText = combinedOutput.slice(jsonStart, jsonEnd + 1);
   return JSON.parse(jsonText) as ReplyRecord[];
+}
+
+function runModelPickerProbeInIsolatedProcess(opts: {
+  activeDriver: "claude" | "codex";
+  defaultClaudeEffort?: string;
+  defaultCodexEffort?: string;
+}): ModelPickerProbePayload {
+  const projectRoot = resolve(import.meta.dir, "../..");
+  const marker = "__MODEL_PICKER_PROBE__=";
+  const endMarker = "__MODEL_PICKER_PROBE_END__";
+  const script = `
+    const { rmSync } = await import("fs");
+    rmSync("/tmp/claude-telegram-test-token-prefs.json", { force: true });
+    rmSync("/tmp/codex-telegram-test-token-prefs.json", { force: true });
+    process.env.TELEGRAM_BOT_TOKEN = "test-token";
+    process.env.TELEGRAM_ALLOWED_USERS = "123";
+    process.env.CLAUDE_WORKING_DIR = process.cwd();
+    process.env.CODEX_ENABLED = "true";
+    process.env.CODEX_CLI_AVAILABLE_OVERRIDE = "true";
+    ${opts.defaultClaudeEffort ? `process.env.DEFAULT_CLAUDE_EFFORT = ${JSON.stringify(opts.defaultClaudeEffort)};` : ""}
+    ${opts.defaultCodexEffort ? `process.env.DEFAULT_CODEX_EFFORT = ${JSON.stringify(opts.defaultCodexEffort)};` : ""}
+    console.log = () => {};
+    console.warn = () => {};
+    console.error = () => {};
+    const { handleModel } = await import("./src/handlers/commands.ts");
+    const { session } = await import("./src/session.ts");
+    const { codexSession } = await import("./src/codex-session.ts");
+    session.activeDriver = ${JSON.stringify(opts.activeDriver)};
+    const replies = [];
+    const ctx = {
+      from: { id: 123 },
+      message: { text: "/model" },
+      reply: async (text, extra) => {
+        replies.push({ text, extra });
+      },
+    };
+    await handleModel(ctx);
+    process.stdout.write(${JSON.stringify(marker)} + JSON.stringify({ replies }) + ${JSON.stringify(endMarker)});
+  `;
+  const proc = Bun.spawnSync(["bun", "-e", script], { cwd: projectRoot });
+  expect(proc.exitCode).toBe(0);
+  const combinedOutput = `${proc.stdout.toString()}\n${proc.stderr.toString()}`;
+  const markerIndex = combinedOutput.indexOf(marker);
+  expect(markerIndex).toBeGreaterThanOrEqual(0);
+  const endMarkerIndex = combinedOutput.indexOf(endMarker, markerIndex + marker.length);
+  expect(endMarkerIndex).toBeGreaterThanOrEqual(0);
+  const payloadText = combinedOutput.slice(markerIndex + marker.length, endMarkerIndex).trim();
+  return JSON.parse(payloadText) as ModelPickerProbePayload;
 }
 
 function runSwitchCommandProbeInIsolatedProcess(opts: {
@@ -882,6 +934,26 @@ describe("handlers with mock Context", () => {
     expect(callbackData).toContain("effort:low");
     expect(callbackData).toContain("effort:medium");
     expect(callbackData).toContain("effort:high");
+  });
+
+  it("handleModel shows configured default effort labels for Claude and Codex", () => {
+    const claudeResult = runModelPickerProbeInIsolatedProcess({
+      activeDriver: "claude",
+      defaultClaudeEffort: "medium",
+    });
+    expect(claudeResult.replies[0]?.text).toContain("<b>Effort:</b> Medium (default)");
+
+    const claudeButtons = getInlineKeyboard(claudeResult.replies[0]!);
+    expect(claudeButtons.flat().some((button) => button.text?.includes("Medium (default)"))).toBe(true);
+
+    const codexResult = runModelPickerProbeInIsolatedProcess({
+      activeDriver: "codex",
+      defaultCodexEffort: "low",
+    });
+    expect(codexResult.replies[0]?.text).toContain("<b>Reasoning Effort:</b> low");
+
+    const codexButtons = getInlineKeyboard(codexResult.replies[0]!);
+    expect(codexButtons.flat().some((button) => button.text?.includes("Low (default)"))).toBe(true);
   });
 
   it("handleResume sorts mixed Claude and Codex sessions globally by saved time", () => {

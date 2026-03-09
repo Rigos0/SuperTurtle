@@ -13,6 +13,8 @@ import {
   CLAUDE_CLI_AVAILABLE,
   CLAUDE_CLI_PATH,
   CODEX_AVAILABLE,
+  DEFAULT_CLAUDE_EFFORT,
+  DEFAULT_CLAUDE_MODEL,
   MCP_SERVERS,
   META_PROMPT,
   SESSION_FILE,
@@ -22,6 +24,7 @@ import {
   IPC_DIR,
   WORKING_DIR,
 } from "./config";
+import type { ClaudeEffortLevel } from "./config";
 import { formatToolStatus } from "./formatting";
 import {
   checkPendingAskUserRequests,
@@ -265,12 +268,12 @@ const TOOL_ACTIVE_STALL_TIMEOUT_MS = (() => {
 })();
 
 // Model configuration
-export type EffortLevel = "low" | "medium" | "high";
+export type EffortLevel = ClaudeEffortLevel;
 
 export const EFFORT_DISPLAY: Record<EffortLevel, string> = {
-  low: "Low",
-  medium: "Medium",
-  high: "High (default)",
+  low: `Low${DEFAULT_CLAUDE_EFFORT === "low" ? " (default)" : ""}`,
+  medium: `Medium${DEFAULT_CLAUDE_EFFORT === "medium" ? " (default)" : ""}`,
+  high: `High${DEFAULT_CLAUDE_EFFORT === "high" ? " (default)" : ""}`,
 };
 
 const PREFS_FILE = `/tmp/claude-telegram-${TOKEN_PREFIX}-prefs.json`;
@@ -376,8 +379,8 @@ export class ClaudeSession {
 
   constructor() {
     const prefs = loadPrefs();
-    this._model = prefs.model || "claude-opus-4-6";
-    this._effort = prefs.effort || "high";
+    this._model = prefs.model || DEFAULT_CLAUDE_MODEL;
+    this._effort = prefs.effort || DEFAULT_CLAUDE_EFFORT;
 
     const preferredDriver = prefs.activeDriver || "claude";
     let resolvedDriver: "claude" | "codex" = preferredDriver;

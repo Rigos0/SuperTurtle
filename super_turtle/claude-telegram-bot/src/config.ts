@@ -73,6 +73,77 @@ export const SUPER_TURTLE_DIR = process.env.SUPER_TURTLE_DIR
 
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
+export type ClaudeEffortLevel = "low" | "medium" | "high";
+export type CodexEffortLevel = "minimal" | "low" | "medium" | "high" | "xhigh";
+
+const DEFAULT_CLAUDE_MODEL_FALLBACK = "claude-opus-4-6";
+const DEFAULT_CLAUDE_EFFORT_FALLBACK: ClaudeEffortLevel = "high";
+const DEFAULT_CODEX_MODEL_FALLBACK = "gpt-5.3-codex";
+const DEFAULT_CODEX_EFFORT_FALLBACK: CodexEffortLevel = "medium";
+
+const VALID_CLAUDE_MODELS = new Set([
+  "claude-opus-4-6",
+  "claude-sonnet-4-6",
+  "claude-haiku-4-5-20251001",
+]);
+const VALID_CLAUDE_EFFORTS = new Set<ClaudeEffortLevel>(["low", "medium", "high"]);
+const VALID_CODEX_MODELS = new Set([
+  "gpt-5.3-codex",
+  "gpt-5.3-codex-spark",
+]);
+const VALID_CODEX_EFFORTS = new Set<CodexEffortLevel>([
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+]);
+
+function parseDefaultModel(
+  envKey: string,
+  fallback: string,
+  allowed: Set<string>
+): string {
+  const value = process.env[envKey]?.trim();
+  if (!value) return fallback;
+  if (allowed.has(value)) return value;
+  configLog.warn(`Invalid ${envKey}="${value}". Falling back to "${fallback}".`);
+  return fallback;
+}
+
+function parseDefaultEffort<T extends string>(
+  envKey: string,
+  fallback: T,
+  allowed: Set<T>
+): T {
+  const value = process.env[envKey]?.trim().toLowerCase();
+  if (!value) return fallback;
+  if (allowed.has(value as T)) return value as T;
+  configLog.warn(`Invalid ${envKey}="${value}". Falling back to "${fallback}".`);
+  return fallback;
+}
+
+export const DEFAULT_CLAUDE_MODEL = parseDefaultModel(
+  "DEFAULT_CLAUDE_MODEL",
+  DEFAULT_CLAUDE_MODEL_FALLBACK,
+  VALID_CLAUDE_MODELS
+);
+export const DEFAULT_CLAUDE_EFFORT = parseDefaultEffort(
+  "DEFAULT_CLAUDE_EFFORT",
+  DEFAULT_CLAUDE_EFFORT_FALLBACK,
+  VALID_CLAUDE_EFFORTS
+);
+export const DEFAULT_CODEX_MODEL = parseDefaultModel(
+  "DEFAULT_CODEX_MODEL",
+  DEFAULT_CODEX_MODEL_FALLBACK,
+  VALID_CODEX_MODELS
+);
+export const DEFAULT_CODEX_EFFORT = parseDefaultEffort(
+  "DEFAULT_CODEX_EFFORT",
+  DEFAULT_CODEX_EFFORT_FALLBACK,
+  VALID_CODEX_EFFORTS
+);
+
 // Derived paths — package code vs user runtime data
 export const CTL_PATH = `${SUPER_TURTLE_DIR}/subturtle/ctl`;
 export const BOT_DIR = `${SUPER_TURTLE_DIR}/claude-telegram-bot`;
@@ -90,6 +161,17 @@ function parseOptionalBool(raw: string | undefined): boolean | null {
   if (value === "true") return true;
   if (value === "false") return false;
   return null;
+}
+
+function parseBooleanEnv(envKey: string, fallback: boolean): boolean {
+  const parsed = parseOptionalBool(process.env[envKey]);
+  if (parsed !== null) return parsed;
+  if (process.env[envKey] !== undefined) {
+    configLog.warn(
+      `Invalid ${envKey}="${process.env[envKey]}". Falling back to "${String(fallback)}".`
+    );
+  }
+  return fallback;
 }
 
 function parseCodexSandboxMode(raw: string | undefined): CodexSandboxMode {
@@ -350,34 +432,15 @@ function computeDefaultDashboardPort(seed: string): number {
   return 46000 + (stablePortHash(seed) % 1000);
 }
 
-function buildDashboardPublicBaseUrl(host: string, port: number): string {
-  try {
-    const url = new URL(host);
-    if (!url.port) {
-      url.port = String(port);
-    }
-    return url.toString().replace(/\/$/, "");
-  } catch {
-    const trimmedHost = host.replace(/\/+$/, "");
-    return /:\d+$/.test(trimmedHost) ? trimmedHost : `${trimmedHost}:${port}`;
-  }
-}
-
 const defaultDashboardPort = computeDefaultDashboardPort(TOKEN_PREFIX);
-const rawDashboardPort = Number(process.env.DASHBOARD_PORT || String(defaultDashboardPort));
 export const DASHBOARD_ENABLED = (
   process.env.DASHBOARD_ENABLED || "true"
 ).toLowerCase() === "true";
-export const DASHBOARD_PORT = Number.isFinite(rawDashboardPort) && rawDashboardPort > 0
-  ? rawDashboardPort
-  : defaultDashboardPort;
-export const DASHBOARD_BIND_ADDR = process.env.DASHBOARD_BIND_ADDR || "127.0.0.1";
+export const DASHBOARD_PORT = defaultDashboardPort;
+export const DASHBOARD_BIND_ADDR = "127.0.0.1";
 export const DASHBOARD_AUTH_TOKEN = process.env.DASHBOARD_AUTH_TOKEN || "";
-export const DASHBOARD_HOST = process.env.DASHBOARD_HOST || "http://localhost";
-export const DASHBOARD_PUBLIC_BASE_URL = buildDashboardPublicBaseUrl(
-  DASHBOARD_HOST,
-  DASHBOARD_PORT
-);
+export const DASHBOARD_PUBLIC_BASE_URL = `http://localhost:${DASHBOARD_PORT}`;
+export const SHOW_TOOL_STATUS = parseBooleanEnv("SHOW_TOOL_STATUS", false);
 
 // ============== Audit Logging ==============
 

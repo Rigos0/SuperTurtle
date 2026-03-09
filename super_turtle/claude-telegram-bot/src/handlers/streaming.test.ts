@@ -16,6 +16,7 @@ const {
   createStatusCallback,
   getStreamingState,
   isAskUserPromptMessage,
+  shouldSendToolStatusMessage,
   StreamingState,
 } = await import("./streaming");
 const { PINO_LOG_PATH } = await import("../logger");
@@ -325,6 +326,61 @@ describe("cleanupToolMessages()", () => {
 
     expect(deleteMessageMock).toHaveBeenCalledTimes(1);
     expect(state.toolMessages.length).toBe(0);
+  });
+});
+
+describe("tool status visibility", () => {
+  it("hides routine tool status messages by default while still marking tool usage", async () => {
+    const state = new StreamingState();
+    const replyMock = mock(async () => ({ message_id: 1 }));
+    const ctx = {
+      chat: { id: 321 },
+      reply: replyMock,
+    } as unknown as Context;
+
+    const statusCallback = createStatusCallback(ctx, state);
+    await statusCallback("tool", "<code>git status</code>");
+
+    expect(replyMock).not.toHaveBeenCalled();
+    expect(state.sawToolUse).toBe(true);
+    expect(state.toolMessages).toHaveLength(0);
+  });
+
+  it("still shows failure-like tool statuses in quiet mode", async () => {
+    const state = new StreamingState();
+    const replyMock = mock(async () => ({ message_id: 2, chat: { id: 321 } }));
+    const ctx = {
+      chat: { id: 321 },
+      reply: replyMock,
+    } as unknown as Context;
+
+    const statusCallback = createStatusCallback(ctx, state);
+    await statusCallback("tool", "Error: command failed");
+
+    expect(replyMock).toHaveBeenCalledTimes(1);
+    expect(state.sawToolUse).toBe(true);
+    expect(state.toolMessages).toHaveLength(1);
+  });
+
+  it("still detects spawn orchestration when tool status replies are hidden", async () => {
+    const state = new StreamingState();
+    const replyMock = mock(async () => ({ message_id: 3 }));
+    const ctx = {
+      chat: { id: 321 },
+      reply: replyMock,
+    } as unknown as Context;
+
+    const statusCallback = createStatusCallback(ctx, state);
+    await statusCallback("tool", "▶️ <code>subturtle/ctl spawn worker-a</code>");
+
+    expect(replyMock).not.toHaveBeenCalled();
+    expect(state.sawToolUse).toBe(true);
+    expect(state.sawSpawnOrchestration).toBe(true);
+  });
+
+  it("can explicitly allow routine tool statuses for debug mode", () => {
+    expect(shouldSendToolStatusMessage("<code>git status</code>", true)).toBe(true);
+    expect(shouldSendToolStatusMessage("<code>git status</code>", false)).toBe(false);
   });
 });
 

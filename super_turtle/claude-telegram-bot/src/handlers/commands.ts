@@ -20,6 +20,7 @@ import {
   CTL_PATH,
   BOT_DIR,
   TOKEN_PREFIX,
+  DEFAULT_CODEX_EFFORT,
   getCodexUnavailableReason,
 } from "../config";
 import { getContextReport } from "../context-command";
@@ -680,11 +681,11 @@ async function handleCodexModel(ctx: Context): Promise<void> {
 
   // Reasoning effort buttons for Codex
   const effortLevels: Array<[string, string]> = [
-    ["minimal", "Minimal"],
-    ["low", "Low"],
-    ["medium", "Medium (default)"],
-    ["high", "High"],
-    ["xhigh", "X-High (deepest)"],
+    ["minimal", `Minimal${DEFAULT_CODEX_EFFORT === "minimal" ? " (default)" : ""}`],
+    ["low", `Low${DEFAULT_CODEX_EFFORT === "low" ? " (default)" : ""}`],
+    ["medium", `Medium${DEFAULT_CODEX_EFFORT === "medium" ? " (default)" : ""}`],
+    ["high", `High${DEFAULT_CODEX_EFFORT === "high" ? " (default)" : ""}`],
+    ["xhigh", `X-High (deepest)${DEFAULT_CODEX_EFFORT === "xhigh" ? " (default)" : ""}`],
   ];
 
   const effortButtons = [effortLevels.map(([level, label]) => ({

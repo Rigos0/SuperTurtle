@@ -13,8 +13,11 @@ type ConfigProbeOverrides = {
   metaCodexApprovalPolicy?: string | undefined;
   metaCodexNetworkAccess?: string | undefined;
   dashboardEnabled?: string | undefined;
-  dashboardPort?: string | undefined;
-  dashboardHost?: string | undefined;
+  showToolStatus?: string | undefined;
+  defaultClaudeModel?: string | undefined;
+  defaultClaudeEffort?: string | undefined;
+  defaultCodexModel?: string | undefined;
+  defaultCodexEffort?: string | undefined;
 };
 
 const configPath = resolve(import.meta.dir, "config.ts");
@@ -27,6 +30,11 @@ const MARKERS = {
   dashboardEnabled: "__DASHBOARD_ENABLED__=",
   dashboardPort: "__DASHBOARD_PORT__=",
   dashboardPublicBaseUrl: "__DASHBOARD_PUBLIC_BASE_URL__=",
+  showToolStatus: "__SHOW_TOOL_STATUS__=",
+  defaultClaudeModel: "__DEFAULT_CLAUDE_MODEL__=",
+  defaultClaudeEffort: "__DEFAULT_CLAUDE_EFFORT__=",
+  defaultCodexModel: "__DEFAULT_CODEX_MODEL__=",
+  defaultCodexEffort: "__DEFAULT_CODEX_EFFORT__=",
 } as const;
 
 async function probeConfig(overrides: ConfigProbeOverrides): Promise<ConfigProbeResult> {
@@ -50,8 +58,11 @@ async function probeConfig(overrides: ConfigProbeOverrides): Promise<ConfigProbe
   applyOverride("META_CODEX_APPROVAL_POLICY", overrides.metaCodexApprovalPolicy);
   applyOverride("META_CODEX_NETWORK_ACCESS", overrides.metaCodexNetworkAccess);
   applyOverride("DASHBOARD_ENABLED", overrides.dashboardEnabled);
-  applyOverride("DASHBOARD_PORT", overrides.dashboardPort);
-  applyOverride("DASHBOARD_HOST", overrides.dashboardHost);
+  applyOverride("SHOW_TOOL_STATUS", overrides.showToolStatus);
+  applyOverride("DEFAULT_CLAUDE_MODEL", overrides.defaultClaudeModel);
+  applyOverride("DEFAULT_CLAUDE_EFFORT", overrides.defaultClaudeEffort);
+  applyOverride("DEFAULT_CODEX_MODEL", overrides.defaultCodexModel);
+  applyOverride("DEFAULT_CODEX_EFFORT", overrides.defaultCodexEffort);
 
   const script = `
     const config = await import(${JSON.stringify(configPath)});
@@ -62,6 +73,11 @@ async function probeConfig(overrides: ConfigProbeOverrides): Promise<ConfigProbe
     console.log(${JSON.stringify(MARKERS.dashboardEnabled)} + String(config.DASHBOARD_ENABLED));
     console.log(${JSON.stringify(MARKERS.dashboardPort)} + String(config.DASHBOARD_PORT));
     console.log(${JSON.stringify(MARKERS.dashboardPublicBaseUrl)} + String(config.DASHBOARD_PUBLIC_BASE_URL));
+    console.log(${JSON.stringify(MARKERS.showToolStatus)} + String(config.SHOW_TOOL_STATUS));
+    console.log(${JSON.stringify(MARKERS.defaultClaudeModel)} + String(config.DEFAULT_CLAUDE_MODEL));
+    console.log(${JSON.stringify(MARKERS.defaultClaudeEffort)} + String(config.DEFAULT_CLAUDE_EFFORT));
+    console.log(${JSON.stringify(MARKERS.defaultCodexModel)} + String(config.DEFAULT_CODEX_MODEL));
+    console.log(${JSON.stringify(MARKERS.defaultCodexEffort)} + String(config.DEFAULT_CODEX_EFFORT));
   `;
 
   const proc = Bun.spawn({
@@ -116,6 +132,11 @@ describe("config defaults", () => {
     expect(extractMarker(result.stdout, MARKERS.dashboardPublicBaseUrl)).toBe(
       `http://localhost:${expectedDashboardPort("test-token")}`
     );
+    expect(extractMarker(result.stdout, MARKERS.showToolStatus)).toBe("false");
+    expect(extractMarker(result.stdout, MARKERS.defaultClaudeModel)).toBe("claude-opus-4-6");
+    expect(extractMarker(result.stdout, MARKERS.defaultClaudeEffort)).toBe("high");
+    expect(extractMarker(result.stdout, MARKERS.defaultCodexModel)).toBe("gpt-5.3-codex");
+    expect(extractMarker(result.stdout, MARKERS.defaultCodexEffort)).toBe("medium");
   });
 });
 
@@ -135,17 +156,6 @@ describe("config overrides", () => {
     expect(extractMarker(result.stdout, MARKERS.networkAccess)).toBe("false");
   });
 
-  it("accepts explicit dashboard port and host overrides", async () => {
-    const result = await probeConfig({
-      dashboardPort: "46888",
-      dashboardHost: "http://localhost",
-    });
-
-    expect(result.exitCode).toBe(0);
-    expect(extractMarker(result.stdout, MARKERS.dashboardPort)).toBe("46888");
-    expect(extractMarker(result.stdout, MARKERS.dashboardPublicBaseUrl)).toBe("http://localhost:46888");
-  });
-
   it("lets operators disable the dashboard explicitly", async () => {
     const result = await probeConfig({
       dashboardEnabled: "false",
@@ -153,6 +163,30 @@ describe("config overrides", () => {
 
     expect(result.exitCode).toBe(0);
     expect(extractMarker(result.stdout, MARKERS.dashboardEnabled)).toBe("false");
+  });
+
+  it("accepts explicit tool status visibility override", async () => {
+    const result = await probeConfig({
+      showToolStatus: "true",
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(extractMarker(result.stdout, MARKERS.showToolStatus)).toBe("true");
+  });
+
+  it("accepts explicit valid default model and effort overrides", async () => {
+    const result = await probeConfig({
+      defaultClaudeModel: "claude-sonnet-4-6",
+      defaultClaudeEffort: "medium",
+      defaultCodexModel: "gpt-5.3-codex-spark",
+      defaultCodexEffort: "low",
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(extractMarker(result.stdout, MARKERS.defaultClaudeModel)).toBe("claude-sonnet-4-6");
+    expect(extractMarker(result.stdout, MARKERS.defaultClaudeEffort)).toBe("medium");
+    expect(extractMarker(result.stdout, MARKERS.defaultCodexModel)).toBe("gpt-5.3-codex-spark");
+    expect(extractMarker(result.stdout, MARKERS.defaultCodexEffort)).toBe("low");
   });
 
   it("falls back to safe defaults for invalid policy values", async () => {
@@ -166,5 +200,20 @@ describe("config overrides", () => {
     expect(extractMarker(result.stdout, MARKERS.sandboxMode)).toBe("workspace-write");
     expect(extractMarker(result.stdout, MARKERS.approvalPolicy)).toBe("never");
     expect(extractMarker(result.stdout, MARKERS.networkAccess)).toBe("false");
+  });
+
+  it("falls back to built-in defaults for invalid default model and effort values", async () => {
+    const result = await probeConfig({
+      defaultClaudeModel: "claude-bad-model",
+      defaultClaudeEffort: "turbo",
+      defaultCodexModel: "gpt-bad-codex",
+      defaultCodexEffort: "ultra",
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(extractMarker(result.stdout, MARKERS.defaultClaudeModel)).toBe("claude-opus-4-6");
+    expect(extractMarker(result.stdout, MARKERS.defaultClaudeEffort)).toBe("high");
+    expect(extractMarker(result.stdout, MARKERS.defaultCodexModel)).toBe("gpt-5.3-codex");
+    expect(extractMarker(result.stdout, MARKERS.defaultCodexEffort)).toBe("medium");
   });
 });

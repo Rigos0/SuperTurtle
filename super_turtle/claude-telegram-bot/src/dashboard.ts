@@ -1,6 +1,6 @@
 import { existsSync, lstatSync, readFileSync, readlinkSync } from "fs";
 import { join, resolve } from "path";
-import { WORKING_DIR, CTL_PATH, DASHBOARD_ENABLED, DASHBOARD_AUTH_TOKEN, DASHBOARD_BIND_ADDR, DASHBOARD_PORT, DASHBOARD_PUBLIC_BASE_URL, META_PROMPT, SUPER_TURTLE_DIR, SUPERTURTLE_DATA_DIR } from "./config";
+import { WORKING_DIR, CTL_PATH, DASHBOARD_ENABLED, DASHBOARD_AUTH_TOKEN, DASHBOARD_PORT, DASHBOARD_PUBLIC_BASE_URL, META_PROMPT, SUPER_TURTLE_DIR, SUPERTURTLE_DATA_DIR } from "./config";
 import { getJobs } from "./cron";
 import {
   parseCtlListOutput,
@@ -3367,8 +3367,8 @@ export function startDashboardServer(): void {
 
   if (!DASHBOARD_AUTH_TOKEN) {
     dashboardLog.info(
-      {
-        bindHost: DASHBOARD_BIND_ADDR,
+        {
+        bindHost: "127.0.0.1",
         port: DASHBOARD_PORT,
         publicUrl: publicDashboardUrl,
         openUrl: openDashboardUrl,
@@ -3378,8 +3378,8 @@ export function startDashboardServer(): void {
     );
   } else {
     dashboardLog.info(
-      {
-        bindHost: DASHBOARD_BIND_ADDR,
+        {
+        bindHost: "127.0.0.1",
         port: DASHBOARD_PORT,
         publicUrl: publicDashboardUrl,
         openUrl: openDashboardUrl,
@@ -3391,7 +3391,7 @@ export function startDashboardServer(): void {
 
   Bun.serve({
     port: DASHBOARD_PORT,
-    hostname: DASHBOARD_BIND_ADDR,
+    hostname: "127.0.0.1",
     async fetch(req) {
       if (!isAuthorized(req)) return unauthorizedResponse();
 
