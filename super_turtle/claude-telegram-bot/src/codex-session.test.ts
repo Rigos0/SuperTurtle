@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
-import { join } from "path";
+import { join, resolve } from "path";
 
 process.env.TELEGRAM_BOT_TOKEN ||= "test-token";
 process.env.TELEGRAM_ALLOWED_USERS ||= "123";
@@ -15,9 +15,65 @@ const CODEX_SESSION_FILE = `/tmp/codex-telegram-${TOKEN_PREFIX}-session.json`;
 const originalHome = process.env.HOME;
 
 type CodexSessionModule = typeof import("./codex-session");
+const codexSessionPath = resolve(import.meta.dir, "codex-session.ts");
+const codexProbeMarker = "__CODEX_SESSION_DEFAULTS__=";
 
 async function loadCodexSessionModule(tag: string): Promise<CodexSessionModule> {
   return import(`./codex-session.ts?test=${tag}-${Date.now()}-${Math.random()}`);
+}
+
+async function probeCodexSession(envOverrides: Record<string, string | undefined>) {
+  const env: Record<string, string> = {
+    ...process.env,
+    TELEGRAM_BOT_TOKEN: "test-token",
+    TELEGRAM_ALLOWED_USERS: "123",
+    CLAUDE_WORKING_DIR: process.cwd(),
+    CODEX_ENABLED: "true",
+    CODEX_CLI_AVAILABLE_OVERRIDE: "true",
+  };
+
+  for (const [key, value] of Object.entries(envOverrides)) {
+    if (value === undefined) delete env[key];
+    else env[key] = value;
+  }
+
+  const script = `
+    const { rmSync, writeFileSync } = await import("fs");
+    const prefsFile = "/tmp/codex-telegram-test-token-prefs.json";
+    const sessionFile = "/tmp/codex-telegram-test-token-session.json";
+    rmSync(prefsFile, { force: true });
+    rmSync(sessionFile, { force: true });
+    ${envOverrides.CODEX_PREFS_JSON ? `writeFileSync(prefsFile, ${JSON.stringify(envOverrides.CODEX_PREFS_JSON)});` : ""}
+    const mod = await import(${JSON.stringify(codexSessionPath)} + "?probe=" + Date.now() + Math.random());
+    const codex = new mod.CodexSession();
+    console.log(${JSON.stringify(codexProbeMarker)} + JSON.stringify({
+      model: codex.model,
+      reasoningEffort: codex.reasoningEffort,
+    }));
+  `;
+
+  const proc = Bun.spawn({
+    cmd: ["bun", "--no-env-file", "-e", script],
+    env,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+
+  const payloadLine = stdout.split("\n").find((line) => line.startsWith(codexProbeMarker));
+  return {
+    exitCode,
+    stderr,
+    payload: payloadLine ? JSON.parse(payloadLine.slice(codexProbeMarker.length)) as {
+      model: string;
+      reasoningEffort: string;
+    } : null,
+  };
 }
 
 function cleanupCodexFiles(): void {
@@ -49,17 +105,15 @@ afterEach(() => {
 
 describe("CodexSession", () => {
   it("uses configured Codex defaults when no saved prefs exist", async () => {
-    process.env.DEFAULT_CODEX_MODEL = "gpt-5.3-codex-spark";
-    process.env.DEFAULT_CODEX_EFFORT = "low";
+    const result = await probeCodexSession({
+      DEFAULT_CODEX_MODEL: "gpt-5.3-codex-spark",
+      DEFAULT_CODEX_EFFORT: "low",
+      CODEX_PREFS_JSON: undefined,
+    });
 
-    const { CodexSession } = await loadCodexSessionModule("env-defaults");
-    const codex = new CodexSession();
-
-    expect(codex.model).toBe("gpt-5.3-codex-spark");
-    expect(codex.reasoningEffort).toBe("low");
-
-    delete process.env.DEFAULT_CODEX_MODEL;
-    delete process.env.DEFAULT_CODEX_EFFORT;
+    expect(result.exitCode).toBe(0);
+    expect(result.payload?.model).toBe("gpt-5.3-codex-spark");
+    expect(result.payload?.reasoningEffort).toBe("low");
   });
 
   it("parses Codex transcripts into conversation history and injection evidence", async () => {
@@ -320,26 +374,19 @@ describe("CodexSession", () => {
   });
 
   it("keeps saved Codex prefs authoritative over env defaults", async () => {
-    process.env.DEFAULT_CODEX_MODEL = "gpt-5.3-codex-spark";
-    process.env.DEFAULT_CODEX_EFFORT = "low";
-
-    writeFileSync(
-      CODEX_PREFS_FILE,
-      JSON.stringify({
+    const result = await probeCodexSession({
+      DEFAULT_CODEX_MODEL: "gpt-5.3-codex-spark",
+      DEFAULT_CODEX_EFFORT: "low",
+      CODEX_PREFS_JSON: JSON.stringify({
         threadId: "saved-thread-id",
         model: "gpt-5.2-codex",
         reasoningEffort: "high",
-      })
-    );
+      }),
+    });
 
-    const { CodexSession } = await loadCodexSessionModule("saved-prefs-win");
-    const codex = new CodexSession();
-
-    expect(codex.model).toBe("gpt-5.2-codex");
-    expect(codex.reasoningEffort).toBe("high");
-
-    delete process.env.DEFAULT_CODEX_MODEL;
-    delete process.env.DEFAULT_CODEX_EFFORT;
+    expect(result.exitCode).toBe(0);
+    expect(result.payload?.model).toBe("gpt-5.2-codex");
+    expect(result.payload?.reasoningEffort).toBe("high");
   });
 
   it("returns a formatted initialization error when SDK initialization fails", async () => {

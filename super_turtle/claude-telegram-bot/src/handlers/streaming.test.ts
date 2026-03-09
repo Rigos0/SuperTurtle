@@ -331,6 +331,7 @@ describe("cleanupToolMessages()", () => {
 
 describe("tool status visibility", () => {
   it("hides routine tool status messages by default while still marking tool usage", async () => {
+    process.env.SHOW_TOOL_STATUS = "false";
     const state = new StreamingState();
     const replyMock = mock(async () => ({ message_id: 1 }));
     const ctx = {
@@ -347,6 +348,7 @@ describe("tool status visibility", () => {
   });
 
   it("still shows failure-like tool statuses in quiet mode", async () => {
+    process.env.SHOW_TOOL_STATUS = "false";
     const state = new StreamingState();
     const replyMock = mock(async () => ({ message_id: 2, chat: { id: 321 } }));
     const ctx = {
@@ -363,6 +365,7 @@ describe("tool status visibility", () => {
   });
 
   it("still detects spawn orchestration when tool status replies are hidden", async () => {
+    process.env.SHOW_TOOL_STATUS = "false";
     const state = new StreamingState();
     const replyMock = mock(async () => ({ message_id: 3 }));
     const ctx = {
