@@ -1,5 +1,5 @@
 # Current task
-Extract state-file helper functions into a dedicated module with tests kept green. <- current
+Extract loop helper/orchestration utilities into module(s) with minimal API surface. <- current
 
 # End goal with specs
 - `subturtle/__main__.py` no longer contains all prompts, parsing, loop orchestration, and state helpers in one file.
@@ -22,8 +22,8 @@ Extract state-file helper functions into a dedicated module with tests kept gree
 
 # Backlog
 - [x] Create new Python modules for prompts and wire them from `__main__.py` first
-- [ ] Extract state-file helper functions into a dedicated module with tests kept green <- current
-- [ ] Extract loop helper/orchestration utilities into module(s) with minimal API surface
+- [x] Extract state-file helper functions into a dedicated module with tests kept green
+- [ ] Extract loop helper/orchestration utilities into module(s) with minimal API surface <- current
 - [ ] Reduce `__main__.py` to argument parsing and top-level control flow
 - [ ] Run `subturtle` Python tests and address refactor regressions
 - [ ] Clean imports/type hints/docstrings after extraction for readability

@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from super_turtle.subturtle import __main__ as subturtle_main
+from super_turtle.subturtle import statefile as subturtle_statefile
 from super_turtle.state.conductor_state import ConductorStateStore
 
 
@@ -202,6 +203,40 @@ def test_archive_workspace_uses_ctl_stop_and_preserves_meta(monkeypatch, tmp_pat
     assert called["kwargs"]["check"] is True
 
 
+def test_extract_current_task_ignores_current_marker(tmp_path) -> None:
+    state_file = tmp_path / "CLAUDE.md"
+    state_file.write_text(
+        "# Current task\n\nShip the feature <- current\n\n# Backlog\n",
+        encoding="utf-8",
+    )
+
+    assert subturtle_statefile.extract_current_task(state_file) == "Ship the feature"
+
+
+def test_resolve_state_ref_uses_relative_path_under_project_root(monkeypatch, tmp_path) -> None:
+    state_dir = tmp_path / ".subturtles" / "worker-1"
+    state_dir.mkdir(parents=True)
+    state_file = state_dir / "CLAUDE.md"
+    state_file.write_text("# Current task\n\nTest task\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    resolved_file, state_ref = subturtle_statefile.resolve_state_ref(state_dir, "worker-1")
+
+    assert resolved_file == state_file
+    assert state_ref == ".subturtles/worker-1/CLAUDE.md"
+
+
+def test_should_stop_detects_stop_directive(tmp_path, capsys) -> None:
+    state_file = tmp_path / "CLAUDE.md"
+    state_file.write_text(
+        "# Current task\n\nDone\n\n## Loop Control\nSTOP\n",
+        encoding="utf-8",
+    )
+
+    assert subturtle_statefile.should_stop(state_file, "worker-stop") is True
+    assert "STOP directive" in capsys.readouterr().out
+
+
 def test_record_completion_pending_writes_state_event_and_wakeup(tmp_path) -> None:
     state_dir = tmp_path / ".subturtles" / "worker-2"
     project_dir = tmp_path
@@ -223,7 +258,7 @@ def test_record_completion_pending_writes_state_event_and_wakeup(tmp_path) -> No
     )
     store.write_worker_state(initial)
 
-    subturtle_main._record_completion_pending(state_dir, "worker-2", project_dir)
+    subturtle_statefile.record_completion_pending(state_dir, "worker-2", project_dir)
 
     worker_state = store.load_worker_state("worker-2")
     assert worker_state is not None
@@ -261,9 +296,9 @@ def test_record_checkpoint_updates_worker_state_and_event(monkeypatch, tmp_path)
         current_task="Refine checkpoint handling",
     )
     store.write_worker_state(initial)
-    monkeypatch.setattr(subturtle_main, "_git_head_sha", lambda _project_dir: "abc123")
+    monkeypatch.setattr(subturtle_statefile, "git_head_sha", lambda _project_dir: "abc123")
 
-    subturtle_main._record_checkpoint(
+    subturtle_statefile.record_checkpoint(
         state_dir,
         "worker-3",
         project_dir,
