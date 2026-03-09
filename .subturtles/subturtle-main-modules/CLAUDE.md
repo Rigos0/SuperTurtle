@@ -1,5 +1,5 @@
 # Current task
-Reduce `__main__.py` to argument parsing and top-level control flow. <- current
+Run `subturtle` Python tests and address refactor regressions <- current
 
 # End goal with specs
 - `subturtle/__main__.py` no longer contains all prompts, parsing, loop orchestration, and state helpers in one file.
@@ -24,7 +24,7 @@ Reduce `__main__.py` to argument parsing and top-level control flow. <- current
 - [x] Create new Python modules for prompts and wire them from `__main__.py` first
 - [x] Extract state-file helper functions into a dedicated module with tests kept green
 - [x] Extract loop helper/orchestration utilities into module(s) with minimal API surface
-- [ ] Reduce `__main__.py` to argument parsing and top-level control flow <- current
-- [ ] Run `subturtle` Python tests and address refactor regressions
+- [x] Reduce `__main__.py` to argument parsing and top-level control flow
+- [ ] Run `subturtle` Python tests and address refactor regressions <- current
 - [ ] Clean imports/type hints/docstrings after extraction for readability
 - [ ] Confirm packaged and monorepo import paths both still work

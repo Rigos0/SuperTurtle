@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import argparse
+
 import pytest
 
 from super_turtle.subturtle import __main__ as subturtle_main
 from super_turtle.subturtle import loops as subturtle_loops
+from super_turtle.subturtle import prompts as subturtle_prompts
 from super_turtle.subturtle import statefile as subturtle_statefile
 from super_turtle.state.conductor_state import ConductorStateStore
 
@@ -13,7 +16,7 @@ def _write_state_file(tmp_path) -> None:
 
 
 def test_yolo_prompt_allows_rewriting_blocked_backlog_items() -> None:
-    prompt = subturtle_main.YOLO_PROMPT.format(state_file=".subturtles/demo/CLAUDE.md")
+    prompt = subturtle_prompts.YOLO_PROMPT.format(state_file=".subturtles/demo/CLAUDE.md")
 
     assert "If it is blocked, too vague, or not feasible with the current repo/context, rewrite the backlog" in prompt
     assert "move `<- current` to the next actionable item" in prompt
@@ -21,11 +24,44 @@ def test_yolo_prompt_allows_rewriting_blocked_backlog_items() -> None:
 
 
 def test_slow_loop_prompts_allow_blocked_item_replanning() -> None:
-    prompts = subturtle_main.build_prompts(".subturtles/demo/CLAUDE.md")
+    prompts = subturtle_prompts.build_prompts(".subturtles/demo/CLAUDE.md")
 
     assert "plan the smallest\n  actionable unblocker or backlog rewrite needed to restore forward progress" in prompts["planner"]
     assert "rewrite it\n     into concrete unblocker tasks" in prompts["groomer"]
     assert "Rewrite the backlog so the next iteration has a concrete unblocker" in prompts["reviewer"]
+
+
+def test_main_dispatches_to_run_loop(monkeypatch, tmp_path) -> None:
+    state_dir = tmp_path / ".subturtles" / "worker-cli"
+    state_dir.mkdir(parents=True)
+    called = {}
+
+    def fake_run_loop(*, state_dir, name, loop_type, skills) -> None:
+        called["state_dir"] = state_dir
+        called["name"] = name
+        called["loop_type"] = loop_type
+        called["skills"] = skills
+
+    monkeypatch.setattr(subturtle_main, "run_loop", fake_run_loop)
+    monkeypatch.setattr(
+        subturtle_main.argparse.ArgumentParser,
+        "parse_args",
+        lambda self: argparse.Namespace(
+            state_dir=str(state_dir),
+            name="worker-cli",
+            type="yolo-codex",
+            skills=["frontend", "qa"],
+        ),
+    )
+
+    subturtle_main.main()
+
+    assert called == {
+        "state_dir": state_dir.resolve(),
+        "name": "worker-cli",
+        "loop_type": "yolo-codex",
+        "skills": ["frontend", "qa"],
+    }
 
 
 def test_require_cli_exits_with_clear_error(monkeypatch, capsys) -> None:
