@@ -41,6 +41,7 @@ def resolve_state_ref(state_dir: Path, name: str) -> tuple[Path, str]:
 
 
 def utc_now_iso() -> str:
+    """Return the current UTC time in conductor-friendly ISO-8601 format."""
     return (
         datetime.datetime.now(datetime.timezone.utc)
         .replace(microsecond=0)
@@ -50,10 +51,12 @@ def utc_now_iso() -> str:
 
 
 def run_state_dir(project_dir: Path) -> Path:
+    """Return the canonical conductor state directory for a project."""
     return project_dir / ".superturtle" / "state"
 
 
 def extract_current_task(state_file: Path) -> str | None:
+    """Read the first non-empty line from the Current task section."""
     try:
         text = state_file.read_text(encoding="utf-8")
     except OSError:
@@ -78,6 +81,7 @@ def extract_current_task(state_file: Path) -> str | None:
 
 
 def refresh_handoff(project_dir: Path, name: str) -> None:
+    """Re-render handoff artifacts from canonical conductor state."""
     try:
         refresh_handoff_from_conductor(run_state_dir(project_dir))
     except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as error:
@@ -88,6 +92,7 @@ def refresh_handoff(project_dir: Path, name: str) -> None:
 
 
 def git_head_sha(project_dir: Path) -> str | None:
+    """Return the current git HEAD SHA for checkpoint metadata when available."""
     try:
         sha = subprocess.check_output(
             ["git", "rev-parse", "HEAD"],
@@ -100,6 +105,7 @@ def git_head_sha(project_dir: Path) -> str | None:
 
 
 def record_completion_pending(state_dir: Path, name: str, project_dir: Path) -> None:
+    """Persist a self-stop completion request and enqueue reconciliation."""
     state_file = state_dir / "CLAUDE.md"
     store = ConductorStateStore(run_state_dir(project_dir))
     existing = store.load_worker_state(name) or {}
@@ -159,6 +165,7 @@ def record_checkpoint(
     loop_type: str,
     iteration: int,
 ) -> None:
+    """Persist the latest successful iteration checkpoint for a worker."""
     state_file = state_dir / "CLAUDE.md"
     store = ConductorStateStore(run_state_dir(project_dir))
 
@@ -224,6 +231,7 @@ def record_failure_pending(
     message: str,
     error_type: str = "ConsecutiveAgentFailure",
 ) -> None:
+    """Persist a fatal worker error and enqueue a reconciliation wakeup."""
     state_file = state_dir / "CLAUDE.md"
     store = ConductorStateStore(run_state_dir(project_dir))
 
@@ -303,6 +311,7 @@ def record_fatal_error(
     loop_type: str,
     error: Exception,
 ) -> None:
+    """Record an unexpected loop exception as a fatal worker failure."""
     record_failure_pending(
         state_dir,
         name,

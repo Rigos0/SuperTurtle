@@ -25,6 +25,7 @@ STATS_SCRIPT = Path(__file__).resolve().parent / "claude-md-guard" / "stats.sh"
 RETRY_DELAY = 10  # seconds to wait after an agent crash before retrying
 MAX_CONSECUTIVE_FAILURES = 5
 MAX_FAILURES_MESSAGE = "max consecutive failures reached"
+LoopExecutor = Callable[[str], str]
 
 _record_checkpoint = statefile.record_checkpoint
 _record_completion_pending = statefile.record_completion_pending
@@ -47,6 +48,7 @@ def _require_cli(name: str, cli_name: str) -> None:
 
 
 def _agent_error_detail(error: subprocess.CalledProcessError | OSError) -> str:
+    """Return a compact description for a subprocess or launch failure."""
     if isinstance(error, subprocess.CalledProcessError):
         return f"exit {error.returncode}"
     return f"{type(error).__name__}: {error}"
@@ -69,6 +71,7 @@ def _handle_agent_failure(
     error: subprocess.CalledProcessError | OSError,
     consecutive_failures: int,
 ) -> tuple[int, bool]:
+    """Track consecutive failures and decide whether the loop must stop."""
     consecutive_failures += 1
     if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
         print(
@@ -123,6 +126,7 @@ def _archive_workspace(state_dir: Path, name: str) -> None:
 
 
 def _skill_dirs(skills: list[str]) -> list[str]:
+    """Return the shared skills directory only when skills were requested."""
     return [_SKILLS_DIR] if skills else []
 
 
@@ -132,6 +136,7 @@ def _log_loop_start(
     state_ref: str,
     skills: list[str],
 ) -> None:
+    """Emit a consistent startup banner for every loop variant."""
     print(f"[subturtle:{name}] 🐢 spawned ({loop_description})")
     print(f"[subturtle:{name}] state file: {state_ref}")
     if skills:
@@ -145,6 +150,7 @@ def _finalize_loop(
     iteration: int,
     stopped_by_directive: bool,
 ) -> None:
+    """Persist completion and archive the workspace after a self-stop."""
     if not stopped_by_directive:
         return
 
@@ -159,8 +165,9 @@ def _run_single_agent_loop(
     loop_type: str,
     loop_description: str,
     skills: list[str],
-    execute_iteration: Callable[[str], str],
+    execute_iteration: LoopExecutor,
 ) -> None:
+    """Run the shared retry/checkpoint loop used by single-agent variants."""
     state_file, state_ref = _resolve_state_ref(state_dir, name)
     prompt = prompts.YOLO_PROMPT.format(state_file=state_ref)
     project_dir = Path.cwd()

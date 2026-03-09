@@ -1,5 +1,5 @@
 # Current task
-Clean imports/type hints/docstrings after extraction <- current
+Confirm packaged and monorepo import paths both still work <- current
 
 # End goal with specs
 - `subturtle/__main__.py` no longer contains all prompts, parsing, loop orchestration, and state helpers in one file.
@@ -26,5 +26,5 @@ Clean imports/type hints/docstrings after extraction <- current
 - [x] Extract loop helper/orchestration utilities into module(s) with minimal API surface
 - [x] Reduce `__main__.py` to argument parsing and top-level control flow
 - [x] Run `subturtle` Python tests and address refactor regressions
-- [ ] Clean imports/type hints/docstrings after extraction for readability <- current
-- [ ] Confirm packaged and monorepo import paths both still work
+- [x] Clean imports/type hints/docstrings after extraction for readability
+- [ ] Confirm packaged and monorepo import paths both still work <- current

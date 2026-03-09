@@ -7,6 +7,7 @@ from .loops import LOOP_TYPES, run_loop
 
 
 def main() -> None:
+    """Parse CLI arguments and dispatch to the selected SubTurtle loop."""
     parser = argparse.ArgumentParser(description="SubTurtle autonomous coding loop")
     parser.add_argument(
         "--state-dir",

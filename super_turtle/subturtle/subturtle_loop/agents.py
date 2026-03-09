@@ -39,6 +39,7 @@ _ALLOWED_TOOLS_CACHE: dict[str, str] = {}
 
 
 def _fallback_allowed_tools() -> list[str]:
+    """Return the default Claude tool allowlist plus any environment overrides."""
     tools = list(CLAUDE_FALLBACK_ALLOWED_TOOLS)
     extra = os.environ.get("CLAUDE_ALLOWED_TOOLS_EXTRA", "")
     if extra:
@@ -47,6 +48,7 @@ def _fallback_allowed_tools() -> list[str]:
 
 
 def _parse_init_tools(output: str) -> list[str]:
+    """Extract the advertised Claude tool list from stream-json init output."""
     for line in output.splitlines():
         line = line.strip()
         if not line:
@@ -63,6 +65,7 @@ def _parse_init_tools(output: str) -> list[str]:
 
 
 def _allowed_tools_arg(cwd: Path) -> str:
+    """Resolve and cache the comma-separated Claude allowlist for a workspace."""
     cache_key = str(cwd)
     cached = _ALLOWED_TOOLS_CACHE.get(cache_key)
     if cached is not None:
