@@ -1,5 +1,5 @@
 # Current task
-Fix the module-loading regression behind Bun reporting `Export named 'getJobs' not found` from `src/cron.ts` in dashboard/command-related tests
+Investigate/fix the remaining unexpected `bun test` failures in `session.ask-user`, `session.conductor-inbox`, and `config` tests (current failures include missing `TELEGRAM_CHAT_ID`, resolved-vs-rejected mismatch after `claude exploded`, and Claude CLI ENOENT/timeouts)
 
 # End goal with specs
 Generalize the existing deferred queue from user-messages-only to a typed queue supporting both user messages and cron jobs. When a non-silent cron job fires and the driver is busy, it should be enqueued and drained when the driver becomes idle — just like user messages. User messages always drain before cron jobs. Recurring jobs coalesce by jobId (at most one queued occurrence). One-shot jobs each get their own slot. Typecheck must pass. All existing tests must still pass. New tests must cover the new behavior.
@@ -18,12 +18,12 @@ Generalize the existing deferred queue from user-messages-only to a typed queue 
 - [x] Add coalescing logic: recurring jobs coalesce by jobId (keep only the latest scheduledFor). One-shot jobs each get their own queue slot. Cap: 10 cron items per chat, separate from the 10 user message cap.
 - [x] Add tests: busy driver causes non-silent cron enqueue instead of skip, queued cron drains once driver idle, user messages drain before cron jobs, recurring jobs coalesce by jobId, one-shot jobs not lost on preemption
 - [x] Run `bun run --bun tsc --noEmit` in `super_turtle/claude-telegram-bot/` to verify typecheck
-- [ ] Fix Bun module-loading regression so dashboard/command-related tests stop failing with `Export named 'getJobs' not found` from `src/cron.ts` <- current
-- [ ] Investigate/fix the remaining unexpected `bun test` failures in `session.ask-user`, `session.conductor-inbox`, and `config` tests (current failures include missing `TELEGRAM_CHAT_ID`, resolved-vs-rejected mismatch after `claude exploded`, and Claude CLI ENOENT/timeouts)
+- [x] Fix Bun module-loading regression so dashboard/command-related tests stop failing with `Export named 'getJobs' not found` from `src/cron.ts`
+- [ ] Investigate/fix the remaining unexpected `bun test` failures in `session.ask-user`, `session.conductor-inbox`, and `config` tests (current failures include missing `TELEGRAM_CHAT_ID`, resolved-vs-rejected mismatch after `claude exploded`, and Claude CLI ENOENT/timeouts) <- current
 - [ ] Run `bun test` in `super_turtle/claude-telegram-bot/` to verify all tests pass (ignore pre-existing failures in driver-routing, stop handlers, pino logs — those are known)
 - Commit changes with a clear message
 
-Verification note (2026-03-10): `bun test` currently fails outside the known-ignore set. Reproduced failures include `src/session.ask-user.test.ts`, `src/session.conductor-inbox.test.ts`, `src/config.test.ts`, `src/handlers/switch-new-session.trace.test.ts`, and repeated module-load crashes in dashboard/command-related suites reporting `Export named 'getJobs' not found in module .../src/cron.ts`.
+Verification note (2026-03-10): `bun test` currently fails outside the known-ignore set. Reproduced failures include `src/session.ask-user.test.ts`, `src/session.conductor-inbox.test.ts`, `src/config.test.ts`, and `src/handlers/switch-new-session.trace.test.ts`. The repeated dashboard/command module-load crashes were fixed by preserving the real `./cron` module exports in `src/deferred-queue.drain.test.ts` instead of replacing the module with a partial mock.
 
 ## Design reference
 

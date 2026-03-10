@@ -39,6 +39,7 @@ beforeEach(async () => {
   const actualDriverRouting = await import(
     `./handlers/driver-routing.ts?actual=${actualImportSuffix}`
   );
+  const actualCron = await import(`./cron.ts?actual=${actualImportSuffix}`);
   const actualUtils = await import(`./utils.ts?actual=${actualImportSuffix}`);
   const actualStreaming = await import(
     `./handlers/streaming.ts?actual=${actualImportSuffix}`
@@ -82,6 +83,7 @@ beforeEach(async () => {
   }));
 
   mock.module("./cron", () => ({
+    ...actualCron,
     advanceRecurringJob: (jobId: string) => advanceRecurringJobMock(jobId),
     removeJob: (jobId: string) => removeJobMock(jobId),
   }));
