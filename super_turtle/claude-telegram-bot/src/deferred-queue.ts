@@ -1,5 +1,6 @@
 import type { Context } from "grammy";
 import type { CronJob, CronJobKind, CronSupervisionMode } from "./cron";
+import { executeNonSilentCronJob } from "./cron-execution";
 import { session } from "./session";
 import { auditLog, generateRequestId, startTypingIndicator } from "./utils";
 import { isAnyDriverRunning, runMessageWithActiveDriver } from "./handlers/driver-routing";
@@ -53,6 +54,10 @@ function toDeferredCronJob(chatId: number, job: DeferredCronJobInput): DeferredC
 
 function isDeferredMessage(item: DeferredQueueItem): item is DeferredMessage {
   return item.kind === "user_message";
+}
+
+function isDeferredCronJob(item: DeferredQueueItem): item is DeferredCronJob {
+  return item.kind === "cron_job";
 }
 
 export function makeDrainItemNotifier(
@@ -206,6 +211,28 @@ export function dequeueDeferredMessage(chatId: number): DeferredMessage | undefi
   return next;
 }
 
+function dequeueNextDeferredItem(chatId: number): DeferredQueueItem | undefined {
+  const queue = queues.get(chatId);
+  if (!queue || queue.length === 0) {
+    return undefined;
+  }
+
+  const nextIndex = queue.findIndex(isDeferredMessage);
+  const resolvedIndex = nextIndex === -1 ? 0 : nextIndex;
+  const next = queue[resolvedIndex];
+  if (!next) {
+    return undefined;
+  }
+
+  queue.splice(resolvedIndex, 1);
+  if (queue.length === 0) {
+    queues.delete(chatId);
+  } else {
+    queues.set(chatId, queue);
+  }
+  return next;
+}
+
 export function getDeferredQueueSize(chatId: number): number {
   return queues.get(chatId)?.length || 0;
 }
@@ -232,65 +259,121 @@ export async function drainDeferredQueue(
   drainingChats.add(chatId);
   try {
     while (!isAnyDriverRunning() && !drainSuppressedChats.has(chatId)) {
-      const next = dequeueDeferredMessage(chatId);
+      const next = dequeueNextDeferredItem(chatId);
       if (!next) {
         break;
       }
 
-      const stopProcessing = session.startProcessing();
-      const typing = startTypingIndicator(ctx);
-      session.typingController = typing;
-      const requestId = generateRequestId("queue");
+      if (isDeferredMessage(next)) {
+        const stopProcessing = session.startProcessing();
+        const typing = startTypingIndicator(ctx);
+        session.typingController = typing;
+        const requestId = generateRequestId("queue");
+
+        try {
+          eventLog.info({
+            event: "deferred_queue.processing_start",
+            requestId,
+            chatId,
+            userId: next.userId,
+            source: next.source,
+            queueRemaining: getDeferredQueueSize(chatId),
+          });
+          const state = new StreamingState();
+          const statusCallback = createStatusCallback(ctx, state);
+          try {
+            await onDrainItem?.(next);
+          } catch {
+            // Ignore notification failures
+          }
+          const response = await runMessageWithActiveDriver({
+            message: next.text,
+            source: next.source === "voice" ? "queue_voice" : "queue_text",
+            username: next.username,
+            userId: next.userId,
+            chatId: next.chatId,
+            ctx,
+            statusCallback,
+          });
+
+          await auditLog(
+            next.userId,
+            next.username,
+            next.source === "voice" ? "VOICE_QUEUED" : "TEXT_QUEUED",
+            next.text,
+            response,
+            { request_id: requestId, chat_id: chatId, source: next.source }
+          );
+          eventLog.info({
+            event: "deferred_queue.processing_done",
+            requestId,
+            chatId,
+            userId: next.userId,
+            source: next.source,
+            queueRemaining: getDeferredQueueSize(chatId),
+          });
+        } catch (error) {
+          eventLog.error({
+            event: "deferred_queue.processing_error",
+            requestId,
+            chatId,
+            userId: next.userId,
+            source: next.source,
+            error: String(error).slice(0, 200),
+          });
+          const message = String(error).toLowerCase();
+          if (!message.includes("abort") && !message.includes("cancel")) {
+            await ctx.reply(`❌ Error: ${String(error).slice(0, 200)}`);
+          }
+          break;
+        } finally {
+          stopProcessing();
+          typing.stop();
+          session.typingController = null;
+        }
+        continue;
+      }
+
+      if (!isDeferredCronJob(next)) {
+        continue;
+      }
+
+      const requestId = generateRequestId("queue-cron");
 
       try {
         eventLog.info({
-          event: "deferred_queue.processing_start",
+          event: "deferred_queue.cron_processing_start",
           requestId,
           chatId,
-          userId: next.userId,
-          source: next.source,
+          cronJobId: next.jobId,
+          cronJobType: next.jobType,
           queueRemaining: getDeferredQueueSize(chatId),
         });
-        const state = new StreamingState();
-        const statusCallback = createStatusCallback(ctx, state);
-        try {
-          await onDrainItem?.(next);
-        } catch {
-          // Ignore notification failures
-        }
-        const response = await runMessageWithActiveDriver({
-          message: next.text,
-          source: next.source === "voice" ? "queue_voice" : "queue_text",
-          username: next.username,
-          userId: next.userId,
-          chatId: next.chatId,
-          ctx,
-          statusCallback,
-        });
-
-        await auditLog(
-          next.userId,
-          next.username,
-          next.source === "voice" ? "VOICE_QUEUED" : "TEXT_QUEUED",
-          next.text,
-          response,
-          { request_id: requestId, chat_id: chatId, source: next.source }
+        await executeNonSilentCronJob(
+          {
+            id: next.jobId,
+            prompt: next.prompt,
+          },
+          {
+            chatId: next.chatId,
+            userId: next.chatId,
+          }
         );
         eventLog.info({
-          event: "deferred_queue.processing_done",
+          event: "deferred_queue.cron_processing_done",
           requestId,
           chatId,
-          userId: next.userId,
-          source: next.source,
+          cronJobId: next.jobId,
+          cronJobType: next.jobType,
           queueRemaining: getDeferredQueueSize(chatId),
         });
       } catch (error) {
         eventLog.error({
-          event: "deferred_queue.processing_error",
+          event: "deferred_queue.cron_processing_error",
           requestId,
           chatId,
-          userId: next.userId,
-          source: next.source,
+          cronJobId: next.jobId,
+          cronJobType: next.jobType,
           error: String(error).slice(0, 200),
         });
         const message = String(error).toLowerCase();
@@ -298,10 +381,6 @@ export async function drainDeferredQueue(
           await ctx.reply(`❌ Error: ${String(error).slice(0, 200)}`);
         }
         break;
-      } finally {
-        stopProcessing();
-        typing.stop();
-        session.typingController = null;
       }
     }
   } finally {

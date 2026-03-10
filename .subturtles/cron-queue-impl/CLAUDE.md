@@ -1,5 +1,5 @@
 # Current task
-Update drain loop in `src/deferred-queue.ts` so it handles both queued user messages and queued cron jobs, with user messages always draining before cron jobs.
+Update `src/index.ts` cron timer so busy non-silent cron jobs are enqueued with `enqueueDeferredCronJob()` instead of skipped, without removing/advancing the cron record at enqueue time.
 
 # End goal with specs
 Generalize the existing deferred queue from user-messages-only to a typed queue supporting both user messages and cron jobs. When a non-silent cron job fires and the driver is busy, it should be enqueued and drained when the driver becomes idle — just like user messages. User messages always drain before cron jobs. Recurring jobs coalesce by jobId (at most one queued occurrence). One-shot jobs each get their own slot. Typecheck must pass. All existing tests must still pass. New tests must cover the new behavior.
@@ -12,8 +12,8 @@ Generalize the existing deferred queue from user-messages-only to a typed queue 
 
 # Backlog
 - [x] Refactor `src/deferred-queue.ts`: add `DeferredCronJob` type alongside existing `DeferredMessage`, create discriminated union `DeferredQueueItem`, add `enqueueDeferredCronJob(chatId, job)` and `isCronJobQueued(chatId, jobId)` helpers
-- [ ] Update drain loop in `src/deferred-queue.ts`: `drainDeferredQueue` must handle both item kinds — user messages call `runMessageWithActiveDriver()` as today, cron items call the non-silent cron execution path. User items always drain before cron items. <- current
-- Update `src/index.ts` cron timer (lines ~520-530): when `isAnyDriverRunning()` is true for a non-silent cron job, call `enqueueDeferredCronJob()` instead of `continue`. Do NOT remove/advance the cron record at enqueue time — defer that to drain-time execution. Track queued jobIds in a local Set to avoid re-enqueueing the same due job on every tick.
+- [x] Update drain loop in `src/deferred-queue.ts`: `drainDeferredQueue` must handle both item kinds — user messages call `runMessageWithActiveDriver()` as today, cron items call the non-silent cron execution path. User items always drain before cron items.
+- [ ] Update `src/index.ts` cron timer (lines ~520-530): when `isAnyDriverRunning()` is true for a non-silent cron job, call `enqueueDeferredCronJob()` instead of `continue`. Do NOT remove/advance the cron record at enqueue time — defer that to drain-time execution. Track queued jobIds in a local Set to avoid re-enqueueing the same due job on every tick. <- current
 - Update `src/index.ts` cron timer idle path: after processing due jobs, call `drainDeferredQueue()` for queued cron items so they run even without a new user message arriving.
 - Add coalescing logic: recurring jobs coalesce by jobId (keep only the latest scheduledFor). One-shot jobs each get their own queue slot. Cap: 10 cron items per chat, separate from the 10 user message cap.
 - Add tests: busy driver causes non-silent cron enqueue instead of skip, queued cron drains once driver idle, user messages drain before cron jobs, recurring jobs coalesce by jobId, one-shot jobs not lost on preemption

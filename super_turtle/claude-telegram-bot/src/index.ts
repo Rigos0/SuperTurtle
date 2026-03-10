@@ -60,7 +60,7 @@ import {
   runMessageWithDriver,
   wasBackgroundRunPreempted,
 } from "./handlers/driver-routing";
-import { StreamingState, createSilentStatusCallback, createStatusCallback } from "./handlers/streaming";
+import { StreamingState, createSilentStatusCallback } from "./handlers/streaming";
 import { getSilentNotificationText } from "./silent-notifications";
 import type { DriverId } from "./drivers/types";
 import type { CronJob } from "./cron";
@@ -69,7 +69,7 @@ import {
   dequeuePreparedSnapshot,
   getPreparedSnapshotCount,
 } from "./cron-supervision-queue";
-import { buildCronScheduledPrompt } from "./cron-scheduled-prompt";
+import { executeNonSilentCronJob } from "./cron-execution";
 import { UpdateDedupeCache } from "./update-dedupe";
 import { startTurtleGreetings } from "./turtle-greetings";
 import {
@@ -719,63 +719,16 @@ const startCronTimer = () => {
               endBackgroundRun();
             }
           } else {
-            // Append instruction so the agent opens its reply with a scheduled notice.
-            // Guard against double-injecting when the prompt already contains it.
-            const injectedPrompt = buildCronScheduledPrompt(job.prompt);
-            const cronCtx = createCronContext(injectedPrompt);
-            beginBackgroundRun();
-            try {
-              if (wasBackgroundRunPreempted()) {
-                cronLog.info(
-                  { cronJobId: job.id, action: "cron_skip_pre_start" },
-                  `[cron:${job.id}] skipped before start due to user-priority preemption`
-                );
-                continue;
+            await executeNonSilentCronJob(
+              {
+                id: job.id,
+                prompt: job.prompt,
+              },
+              {
+                chatId: resolvedChatId,
+                userId: resolvedUserId,
               }
-              const primaryDriver: DriverId = session.activeDriver;
-              const fallbackDriver: DriverId = primaryDriver === "codex" ? "claude" : "codex";
-              const state = new StreamingState();
-              const statusCallback = createStatusCallback(cronCtx, state);
-
-              try {
-                await runMessageWithDriver(primaryDriver, {
-                  message: injectedPrompt,
-                  source: "cron_scheduled",
-                  username: "cron",
-                  userId: resolvedUserId,
-                  chatId: resolvedChatId,
-                  ctx: cronCtx,
-                  statusCallback,
-                });
-              } catch (error) {
-                if (!isLikelyQuotaOrLimitError(error)) {
-                  throw error;
-                }
-                await runMessageWithDriver(fallbackDriver, {
-                  message: injectedPrompt,
-                  source: "cron_scheduled",
-                  username: "cron",
-                  userId: resolvedUserId,
-                  chatId: resolvedChatId,
-                  ctx: cronCtx,
-                  statusCallback,
-                });
-              }
-            } catch (error) {
-              if (
-                wasBackgroundRunPreempted() &&
-                isLikelyCancellationError(error)
-              ) {
-                cronLog.info(
-                  { cronJobId: job.id, action: "cron_preempted" },
-                  `[cron:${job.id}] preempted by interactive update`
-                );
-                continue;
-              }
-              throw error;
-            } finally {
-              endBackgroundRun();
-            }
+            );
           }
         } catch (error) {
           // No retries — report failure and continue with future jobs

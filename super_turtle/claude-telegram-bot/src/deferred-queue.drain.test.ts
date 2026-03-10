@@ -6,6 +6,7 @@ type DeferredQueueModule = typeof import("./deferred-queue");
 
 let isAnyDriverRunningMock: ReturnType<typeof mock>;
 let runMessageWithActiveDriverMock: ReturnType<typeof mock>;
+let executeNonSilentCronJobMock: ReturnType<typeof mock>;
 let auditLogMock: ReturnType<typeof mock>;
 let startTypingIndicatorMock: ReturnType<typeof mock>;
 let createStatusCallbackMock: ReturnType<typeof mock>;
@@ -43,6 +44,7 @@ beforeEach(async () => {
 
   isAnyDriverRunningMock = mock(() => false);
   runMessageWithActiveDriverMock = mock(async () => "queued response");
+  executeNonSilentCronJobMock = mock(async () => {});
   auditLogMock = mock(async () => {});
   createStatusCallbackMock = mock(() => async () => {});
   startTypingIndicatorMock = mock(() => ({ stop: typingStopMock }));
@@ -68,6 +70,11 @@ beforeEach(async () => {
     StreamingState: class StreamingState {},
     createStatusCallback: (ctx: Context, state: unknown) =>
       createStatusCallbackMock(ctx, state),
+  }));
+
+  mock.module("./cron-execution", () => ({
+    executeNonSilentCronJob: (job: unknown, target: unknown) =>
+      executeNonSilentCronJobMock(job, target),
   }));
 });
 
@@ -336,6 +343,86 @@ describe("drainDeferredQueue", () => {
         chat_id: chatId,
         source: "text",
       })
+    );
+    expect(deferredQueue.getDeferredQueueSize(chatId)).toBe(0);
+  });
+
+  it("drains queued cron items after queued user messages", async () => {
+    const executionOrder: string[] = [];
+    runMessageWithActiveDriverMock = mock(async () => {
+      executionOrder.push("message");
+      return "queued response";
+    });
+    executeNonSilentCronJobMock = mock(async () => {
+      executionOrder.push("cron");
+    });
+
+    const deferredQueue = await loadDeferredQueueModule();
+    const { ctx } = makeCtx();
+    const chatId = 31006;
+
+    deferredQueue.enqueueDeferredCronJob(chatId, {
+      jobId: "cron-queued",
+      jobType: "one-shot",
+      prompt: "scheduled work",
+      silent: false,
+      scheduledFor: 5000,
+      enqueuedAt: 1000,
+    });
+    deferredQueue.enqueueDeferredMessage({
+      text: "user first",
+      userId: 12,
+      username: "priority-user",
+      chatId,
+      source: "text",
+      enqueuedAt: 2000,
+    });
+
+    await deferredQueue.drainDeferredQueue(ctx, chatId);
+
+    expect(executionOrder).toEqual(["message", "cron"]);
+    expect(runMessageWithActiveDriverMock).toHaveBeenCalledTimes(1);
+    expect(executeNonSilentCronJobMock).toHaveBeenCalledTimes(1);
+    expect(executeNonSilentCronJobMock).toHaveBeenCalledWith(
+      {
+        id: "cron-queued",
+        prompt: "scheduled work",
+      },
+      {
+        chatId,
+        userId: chatId,
+      }
+    );
+    expect(deferredQueue.getDeferredQueueSize(chatId)).toBe(0);
+  });
+
+  it("drains queued cron items when no user message is waiting", async () => {
+    const deferredQueue = await loadDeferredQueueModule();
+    const { ctx } = makeCtx();
+    const chatId = 31007;
+
+    deferredQueue.enqueueDeferredCronJob(chatId, {
+      jobId: "cron-only",
+      jobType: "recurring",
+      prompt: "cron only work",
+      silent: false,
+      scheduledFor: 6000,
+      enqueuedAt: 3000,
+    });
+
+    await deferredQueue.drainDeferredQueue(ctx, chatId);
+
+    expect(runMessageWithActiveDriverMock).not.toHaveBeenCalled();
+    expect(executeNonSilentCronJobMock).toHaveBeenCalledTimes(1);
+    expect(executeNonSilentCronJobMock).toHaveBeenCalledWith(
+      {
+        id: "cron-only",
+        prompt: "cron only work",
+      },
+      {
+        chatId,
+        userId: chatId,
+      }
     );
     expect(deferredQueue.getDeferredQueueSize(chatId)).toBe(0);
   });
