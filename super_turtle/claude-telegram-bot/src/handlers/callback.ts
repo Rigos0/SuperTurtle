@@ -217,11 +217,15 @@ export async function handleCallback(ctx: Context): Promise<void> {
     if (model) {
       const hadActiveSession = codexSession.isActive;
       codexSession.model = modelId;
+      const currentThreadId = codexSession.getThreadId();
 
-      // Codex model is thread-level. Start a fresh thread so selection applies immediately.
-      if (hadActiveSession) {
+      if (hadActiveSession && currentThreadId) {
         try {
-          await codexSession.startNewThread(codexSession.model, codexSession.reasoningEffort);
+          await codexSession.resumeThread(
+            currentThreadId,
+            codexSession.model,
+            codexSession.reasoningEffort
+          );
         } catch (error) {
           await ctx.answerCallbackQuery({ text: `Failed to apply model: ${String(error).slice(0, 50)}` });
           return;
@@ -231,7 +235,7 @@ export async function handleCallback(ctx: Context): Promise<void> {
       await ctx.editMessageText(`<b>Codex Model:</b> ${model.displayName}\n<b>Reasoning Effort:</b> ${codexSession.reasoningEffort}`, { parse_mode: "HTML" });
       await ctx.answerCallbackQuery({
         text: hadActiveSession
-          ? `Codex model set to ${model.displayName} (new thread)`
+          ? `Codex model updated for current convo`
           : `Codex model set to ${model.displayName}`,
       });
     } else {
@@ -252,11 +256,15 @@ export async function handleCallback(ctx: Context): Promise<void> {
     if (validEfforts.includes(effort)) {
       const hadActiveSession = codexSession.isActive;
       codexSession.reasoningEffort = effort;
+      const currentThreadId = codexSession.getThreadId();
 
-      // Reasoning effort is thread-level. Start a fresh thread so selection applies immediately.
-      if (hadActiveSession) {
+      if (hadActiveSession && currentThreadId) {
         try {
-          await codexSession.startNewThread(codexSession.model, codexSession.reasoningEffort);
+          await codexSession.resumeThread(
+            currentThreadId,
+            codexSession.model,
+            codexSession.reasoningEffort
+          );
         } catch (error) {
           await ctx.answerCallbackQuery({ text: `Failed to apply effort: ${String(error).slice(0, 50)}` });
           return;
@@ -270,7 +278,7 @@ export async function handleCallback(ctx: Context): Promise<void> {
       await ctx.editMessageText(`<b>Codex Model:</b> ${modelName}\n<b>Reasoning Effort:</b> ${effort}`, { parse_mode: "HTML" });
       await ctx.answerCallbackQuery({
         text: hadActiveSession
-          ? `Codex reasoning effort set to ${effort} (new thread)`
+          ? `Codex effort updated for current convo`
           : `Codex reasoning effort set to ${effort}`,
       });
     } else {

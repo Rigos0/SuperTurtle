@@ -179,12 +179,13 @@ describe("handleCallback Codex switching and controls", () => {
     expect(result.payload?.editTexts[0] || "").toContain("Switched to Codex");
   });
 
-  it("codex_model callback with active session starts fresh thread and edits message", async () => {
+  it("codex_model callback with active session preserves the current thread and only updates prefs", async () => {
     const result = await runCallbackProbe<{
       model: string;
       reasoningEffort: string;
       targetModel: string;
-      startNewThreadArgs: Array<[string, string]>;
+      threadId: string | null;
+      resumeThreadArgs: Array<[string, string, string]>;
       callbackAnswers: Array<{ text?: string }>;
       editTexts: string[];
     }>(`
@@ -197,14 +198,15 @@ describe("handleCallback Codex switching and controls", () => {
 
       codexSession.model = initialModel;
       codexSession.reasoningEffort = "medium";
+      codexSession.threadId = "codex-thread-model";
       Object.defineProperty(codexSession, "isActive", {
         configurable: true,
         get: () => true,
       });
 
-      const startNewThreadArgs = [];
-      codexSession.startNewThread = async (model, effort) => {
-        startNewThreadArgs.push([String(model), String(effort)]);
+      const resumeThreadArgs = [];
+      codexSession.resumeThread = async (threadId, model, effort) => {
+        resumeThreadArgs.push([String(threadId), String(model), String(effort)]);
       };
 
       const callbackAnswers = [];
@@ -227,7 +229,8 @@ describe("handleCallback Codex switching and controls", () => {
         model: codexSession.model,
         reasoningEffort: codexSession.reasoningEffort,
         targetModel,
-        startNewThreadArgs,
+        threadId: codexSession.getThreadId(),
+        resumeThreadArgs,
         callbackAnswers,
         editTexts,
       }));
@@ -236,18 +239,20 @@ describe("handleCallback Codex switching and controls", () => {
     expect(result.exitCode).toBe(0);
     expect(result.payload).not.toBeNull();
     expect(result.payload?.model).toBe(result.payload?.targetModel);
-    expect(result.payload?.startNewThreadArgs).toEqual([
-      [result.payload?.targetModel || "", "medium"],
+    expect(result.payload?.threadId).toBe("codex-thread-model");
+    expect(result.payload?.resumeThreadArgs).toEqual([
+      ["codex-thread-model", result.payload?.targetModel || "", "medium"],
     ]);
-    expect(result.payload?.callbackAnswers[0]?.text || "").toContain("(new thread)");
+    expect(result.payload?.callbackAnswers[0]?.text).toBe("Codex model updated for current convo");
     expect(result.payload?.editTexts[0] || "").toContain("<b>Codex Model:</b>");
   });
 
-  it("codex_effort callback with active session starts fresh thread and edits message", async () => {
+  it("codex_effort callback with active session preserves the current thread and only updates prefs", async () => {
     const result = await runCallbackProbe<{
       model: string;
       reasoningEffort: string;
-      startNewThreadArgs: Array<[string, string]>;
+      threadId: string | null;
+      resumeThreadArgs: Array<[string, string, string]>;
       callbackAnswers: Array<{ text?: string }>;
       editTexts: string[];
     }>(`
@@ -259,14 +264,15 @@ describe("handleCallback Codex switching and controls", () => {
 
       codexSession.model = modelValue;
       codexSession.reasoningEffort = "medium";
+      codexSession.threadId = "codex-thread-effort";
       Object.defineProperty(codexSession, "isActive", {
         configurable: true,
         get: () => true,
       });
 
-      const startNewThreadArgs = [];
-      codexSession.startNewThread = async (model, effort) => {
-        startNewThreadArgs.push([String(model), String(effort)]);
+      const resumeThreadArgs = [];
+      codexSession.resumeThread = async (threadId, model, effort) => {
+        resumeThreadArgs.push([String(threadId), String(model), String(effort)]);
       };
 
       const callbackAnswers = [];
@@ -288,7 +294,8 @@ describe("handleCallback Codex switching and controls", () => {
       console.log(marker + JSON.stringify({
         model: codexSession.model,
         reasoningEffort: codexSession.reasoningEffort,
-        startNewThreadArgs,
+        threadId: codexSession.getThreadId(),
+        resumeThreadArgs,
         callbackAnswers,
         editTexts,
       }));
@@ -297,11 +304,82 @@ describe("handleCallback Codex switching and controls", () => {
     expect(result.exitCode).toBe(0);
     expect(result.payload).not.toBeNull();
     expect(result.payload?.reasoningEffort).toBe("high");
-    expect(result.payload?.startNewThreadArgs).toEqual([
-      [result.payload?.model || "", "high"],
+    expect(result.payload?.threadId).toBe("codex-thread-effort");
+    expect(result.payload?.resumeThreadArgs).toEqual([
+      ["codex-thread-effort", result.payload?.model || "", "high"],
     ]);
-    expect(result.payload?.callbackAnswers[0]?.text || "").toContain("(new thread)");
+    expect(result.payload?.callbackAnswers[0]?.text).toBe("Codex effort updated for current convo");
     expect(result.payload?.editTexts[0] || "").toContain("Reasoning Effort:</b> high");
+  });
+
+  it("changing Codex model and effort from the same picker does not replace the linked thread", async () => {
+    const result = await runCallbackProbe<{
+      threadId: string | null;
+      model: string;
+      reasoningEffort: string;
+      resumeThreadArgs: Array<[string, string, string]>;
+      callbackAnswers: Array<{ text?: string }>;
+    }>(`
+      const { handleCallback } = await import(callbackPath);
+      const { codexSession, getAvailableCodexModelsLive } = await import(codexPath);
+
+      const models = await getAvailableCodexModelsLive();
+      const targetModel = models[0]?.value || "gpt-5.3-codex";
+
+      codexSession.model = targetModel;
+      codexSession.reasoningEffort = "medium";
+      codexSession.threadId = "codex-thread-stable";
+      Object.defineProperty(codexSession, "isActive", {
+        configurable: true,
+        get: () => true,
+      });
+
+      const resumeThreadArgs = [];
+      codexSession.resumeThread = async (threadId, model, effort) => {
+        resumeThreadArgs.push([String(threadId), String(model), String(effort)]);
+      };
+
+      const callbackAnswers = [];
+      const baseCtx = {
+        from: { id: 123, username: "tester" },
+        chat: { id: 123, type: "private" },
+        answerCallbackQuery: async (payload) => {
+          callbackAnswers.push(payload || {});
+        },
+        editMessageText: async () => {},
+      };
+
+      await handleCallback({
+        ...baseCtx,
+        callbackQuery: { data: "codex_model:" + targetModel },
+      });
+      await handleCallback({
+        ...baseCtx,
+        callbackQuery: { data: "codex_effort:xhigh" },
+      });
+
+      console.log(marker + JSON.stringify({
+        threadId: codexSession.getThreadId(),
+        model: codexSession.model,
+        reasoningEffort: codexSession.reasoningEffort,
+        resumeThreadArgs,
+        callbackAnswers,
+      }));
+    `);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.payload).not.toBeNull();
+    expect(result.payload?.threadId).toBe("codex-thread-stable");
+    expect(result.payload?.model).toBeTruthy();
+    expect(result.payload?.reasoningEffort).toBe("xhigh");
+    expect(result.payload?.resumeThreadArgs).toEqual([
+      ["codex-thread-stable", result.payload?.model || "", "medium"],
+      ["codex-thread-stable", result.payload?.model || "", "xhigh"],
+    ]);
+    expect(result.payload?.callbackAnswers.map((entry) => entry.text)).toEqual([
+      "Codex model updated for current convo",
+      "Codex effort updated for current convo",
+    ]);
   });
 });
 
