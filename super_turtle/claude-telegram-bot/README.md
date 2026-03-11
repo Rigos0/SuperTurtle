@@ -50,8 +50,7 @@ The setup wizard runs `superturtle init`, creates `.superturtle/.env`, and promp
 If you are only working on this bot module directly:
 
 ```bash
-cd super_turtle/claude-telegram-bot && bun install && cd ../..
-npx superturtle init   # creates .superturtle/.env, prompts for tokens
+npx superturtle init   # installs deps, creates .superturtle/.env, prompts for tokens
 npx superturtle start
 ```
 
