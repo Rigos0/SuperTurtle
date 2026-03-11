@@ -138,7 +138,8 @@ You should run Super Turtle in a sandboxed or dedicated environment (VM, contain
 git clone https://github.com/Rigos0/superturtle.git
 cd superturtle
 npx superturtle init          # installs deps, creates .superturtle/.env, prompts for tokens
-npx superturtle start
+cd super_turtle/claude-telegram-bot
+bun run start
 ```
 
 ## Star History

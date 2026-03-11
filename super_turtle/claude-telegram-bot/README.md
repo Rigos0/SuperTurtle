@@ -51,7 +51,7 @@ If you are only working on this bot module directly:
 
 ```bash
 npx superturtle init   # installs deps, creates .superturtle/.env, prompts for tokens
-npx superturtle start
+bun run start
 ```
 
 ### Prerequisites
