@@ -678,10 +678,6 @@ async function executeBotControlAction(
     }
 
     case "restart": {
-      const { resetAllDriverSessions } = await import("./commands");
-      // Stop any active work before restarting
-      await resetAllDriverSessions({ stopRunning: true });
-
       if (chatId) {
         try {
           const msg = await bot.api.sendMessage(chatId, "🔄 Restarting bot...");
@@ -698,6 +694,10 @@ async function executeBotControlAction(
         }
       }
 
+      // Do not stop the active turn here: when restart is triggered from an
+      // inline bot-control tool, that stop would abort the same turn that's
+      // handling the restart request and can leave the chat without a clean
+      // restart acknowledgement. Startup cleanup already resets stale work.
       setTimeout(() => {
         process.exit(0);
       }, 500);

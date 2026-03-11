@@ -25,6 +25,7 @@ describe("CodexDriver", () => {
       checkPendingAskUserRequests: async () => false,
       checkPendingBotControlRequests: async () => false,
       checkPendingPinoLogsRequests: async () => false,
+      checkPendingSendImageRequests: async () => false,
       checkPendingSendTurtleRequests: async () => false,
     }));
 
@@ -54,5 +55,47 @@ describe("CodexDriver", () => {
 
     expect(response).toBe("ok");
     expect(reasoningEfforts).toEqual([undefined]);
+  });
+
+  it("flushes pending send_image requests for Codex MCP tool calls", async () => {
+    const sendImageChecks: number[] = [];
+
+    mock.module("../handlers/streaming", () => ({
+      checkPendingAskUserRequests: async () => false,
+      checkPendingBotControlRequests: async () => false,
+      checkPendingPinoLogsRequests: async () => false,
+      checkPendingSendImageRequests: async (_ctx: Context, chatId: number) => {
+        sendImageChecks.push(chatId);
+        return true;
+      },
+      checkPendingSendTurtleRequests: async () => false,
+    }));
+
+    codexSession.sendMessage = (async (
+      _message,
+      _statusCallback,
+      _model,
+      _reasoning,
+      mcpCompletionCallback
+    ) => {
+      await mcpCompletionCallback?.("bot-control", "send_image");
+      return "ok";
+    }) as typeof codexSession.sendMessage;
+
+    const { CodexDriver } = await loadCodexDriverModule();
+    const driver = new CodexDriver();
+
+    const response = await driver.runMessage({
+      message: "send the screenshot",
+      source: "text",
+      username: "tester",
+      userId: 123,
+      chatId: 789,
+      ctx: {} as Context,
+      statusCallback: async () => {},
+    });
+
+    expect(response).toBe("ok");
+    expect(sendImageChecks).toContain(789);
   });
 });

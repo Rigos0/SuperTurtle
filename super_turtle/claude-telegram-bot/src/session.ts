@@ -204,8 +204,13 @@ function getClaudeAllowedTools(claudeBin: string): string[] {
   }
 }
 
-// Write MCP config to a temp JSON file for --mcp-config flag
-process.env.SUPERTURTLE_IPC_DIR = IPC_DIR;
+// Preserve an explicit IPC override so tests and isolated runtimes can direct
+// MCP request files somewhere other than the default token-scoped directory.
+const SESSION_IPC_DIR = (() => {
+  const override = process.env.SUPERTURTLE_IPC_DIR?.trim();
+  return override && override.length > 0 ? override : IPC_DIR;
+})();
+process.env.SUPERTURTLE_IPC_DIR = SESSION_IPC_DIR;
 const MCP_CONFIG_FILE = `/tmp/superturtle-${TOKEN_PREFIX}-mcp-config.json`;
 function writeMcpConfig(chatId?: number): void {
   if (Object.keys(MCP_SERVERS).length === 0) return;
@@ -218,7 +223,7 @@ function writeMcpConfig(chatId?: number): void {
 
       const env: Record<string, string> = {
         ...(config.env || {}),
-        SUPERTURTLE_IPC_DIR: IPC_DIR,
+        SUPERTURTLE_IPC_DIR: SESSION_IPC_DIR,
       };
       if (chatId !== undefined) {
         env.TELEGRAM_CHAT_ID = String(chatId);

@@ -17,6 +17,7 @@ export class CodexDriver implements ChatDriver {
       checkPendingAskUserRequests,
       checkPendingBotControlRequests,
       checkPendingPinoLogsRequests,
+      checkPendingSendImageRequests,
       checkPendingSendTurtleRequests,
     } = await import("../handlers/streaming");
 
@@ -77,6 +78,25 @@ export class CodexDriver implements ChatDriver {
         }
       }
 
+      if (normalizedTool === "send_image") {
+        codexLog.info(
+          { driver: this.id, tool: normalizedTool, chatId: input.chatId },
+          "Send-image tool completed, checking for pending requests"
+        );
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const imageSent = await checkPendingSendImageRequests(
+            input.ctx,
+            input.chatId
+          );
+          if (imageSent) break;
+          if (attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+        }
+      }
+
       // Detect bot-control tool and handle inline
       if (normalizedTool === "bot_control") {
         codexLog.info(
@@ -123,6 +143,7 @@ export class CodexDriver implements ChatDriver {
       while (keepPolling) {
         try {
           await checkPendingAskUserRequests(input.ctx, input.chatId);
+          await checkPendingSendImageRequests(input.ctx, input.chatId);
           await checkPendingSendTurtleRequests(input.ctx, input.chatId);
           await checkPendingBotControlRequests(codexSession, input.chatId);
           await checkPendingPinoLogsRequests(input.chatId);
@@ -161,6 +182,7 @@ export class CodexDriver implements ChatDriver {
     await wait(300);
     for (let attempt = 0; attempt < 3; attempt++) {
       await checkPendingAskUserRequests(input.ctx, input.chatId);
+      await checkPendingSendImageRequests(input.ctx, input.chatId);
       await checkPendingSendTurtleRequests(input.ctx, input.chatId);
       await checkPendingBotControlRequests(codexSession, input.chatId);
       await checkPendingPinoLogsRequests(input.chatId);

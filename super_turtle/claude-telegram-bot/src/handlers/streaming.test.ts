@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import { mkdirSync } from "fs";
+import { mkdirSync, rmSync } from "fs";
 import type { Context } from "grammy";
 
 process.env.TELEGRAM_BOT_TOKEN ||= "test-token";
@@ -167,6 +167,55 @@ describe("checkPendingAskUserRequests()", () => {
     const updated = JSON.parse(await Bun.file(requestFile).text());
     expect(updated.status).toBe("expired");
     expect(String(updated.error)).toContain("expired");
+  });
+});
+
+describe("checkPendingSendImageRequests()", () => {
+  it("respects a custom SUPERTURTLE_IPC_DIR override for pending image requests", async () => {
+    const customIpcDir = `/tmp/streaming-send-image-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const previousIpcDir = process.env.SUPERTURTLE_IPC_DIR;
+    mkdirSync(customIpcDir, { recursive: true });
+    process.env.SUPERTURTLE_IPC_DIR = customIpcDir;
+
+    try {
+      const { checkPendingSendImageRequests } = await loadFreshStreamingModule();
+      const requestId = `streaming-send-image-${Date.now()}`;
+      const requestFile = `${customIpcDir}/send-image-${requestId}.json`;
+      const imagePath = `${customIpcDir}/send-image-${requestId}.png`;
+
+      await Bun.write(imagePath, new Uint8Array([1, 2, 3, 4]));
+      await Bun.write(
+        requestFile,
+        JSON.stringify({
+          request_id: requestId,
+          source: imagePath,
+          caption: "Test image",
+          status: "pending",
+          chat_id: "123",
+          created_at: new Date().toISOString(),
+        })
+      );
+
+      const replyWithPhotoMock = mock(async () => ({ message_id: 1 }));
+      const replyMock = mock(async () => ({ message_id: 2 }));
+      const ctx = {
+        replyWithPhoto: replyWithPhotoMock,
+        reply: replyMock,
+      } as unknown as Context;
+
+      const handled = await checkPendingSendImageRequests(ctx, 123);
+
+      expect(handled).toBe(true);
+      expect(replyWithPhotoMock).toHaveBeenCalledTimes(1);
+      expect(replyMock).not.toHaveBeenCalled();
+
+      const updated = JSON.parse(await Bun.file(requestFile).text());
+      expect(updated.status).toBe("sent");
+      expect(typeof updated.sent_at).toBe("string");
+    } finally {
+      process.env.SUPERTURTLE_IPC_DIR = previousIpcDir || IPC_DIR;
+      rmSync(customIpcDir, { recursive: true, force: true });
+    }
   });
 });
 
