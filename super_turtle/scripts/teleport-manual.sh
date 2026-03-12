@@ -135,15 +135,94 @@ resolve_managed_target() {
   if ! output="$(
     cd "$REPO_ROOT"
     node - <<'NODE'
-const { fetchTeleportTarget, readSession } = require("./super_turtle/bin/cloud.js");
+const {
+  fetchCloudStatus,
+  fetchTeleportTarget,
+  persistSessionIfChanged,
+  readSession,
+  resumeManagedInstance,
+} = require("./super_turtle/bin/cloud.js");
+
+function readPositiveIntegerEnv(name, fallback) {
+  const rawValue = process.env[name];
+  if (typeof rawValue !== "string" || rawValue.trim() === "") {
+    return fallback;
+  }
+  if (!/^\d+$/.test(rawValue.trim())) {
+    throw new Error(`${name} must be a positive integer.`);
+  }
+  const parsed = Number(rawValue.trim());
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive integer.`);
+  }
+  return parsed;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 (async () => {
-  const session = readSession();
+  let session = readSession();
   if (!session) {
     throw new Error("Not logged in to hosted SuperTurtle. Run 'superturtle login' first.");
   }
-  const result = await fetchTeleportTarget(session);
-  process.stdout.write(JSON.stringify(result.data));
+  const timeoutMs = readPositiveIntegerEnv(
+    "SUPERTURTLE_TELEPORT_INSTANCE_READY_TIMEOUT_MS",
+    600000
+  );
+  const intervalMs = readPositiveIntegerEnv(
+    "SUPERTURTLE_TELEPORT_INSTANCE_READY_POLL_INTERVAL_MS",
+    5000
+  );
+  const deadline = Date.now() + timeoutMs;
+  let resumeRequested = false;
+
+  while (true) {
+    try {
+      const target = await fetchTeleportTarget(session);
+      session = persistSessionIfChanged(session, target.session);
+      process.stdout.write(JSON.stringify(target.data));
+      return;
+    } catch (error) {
+      if (error && typeof error === "object" && error.session) {
+        session = persistSessionIfChanged(session, error.session);
+      }
+      if (!error || typeof error !== "object" || error.status !== 409) {
+        throw error;
+      }
+      if (!["managed_instance_not_running", "managed_instance_unavailable"].includes(error.message)) {
+        throw error;
+      }
+    }
+
+    if (!resumeRequested) {
+      process.stderr.write("[teleport] managed instance is not ready; requesting resume\n");
+      const resumed = await resumeManagedInstance(session);
+      session = persistSessionIfChanged(session, resumed.session);
+      resumeRequested = true;
+    }
+
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Timed out waiting for the managed SuperTurtle VM to become ready after ${timeoutMs}ms.`
+      );
+    }
+
+    process.stderr.write("[teleport] waiting for managed instance to become ready\n");
+    while (Date.now() < deadline) {
+      const status = await fetchCloudStatus(session);
+      session = persistSessionIfChanged(session, status.session);
+      const instanceState = status?.data?.instance?.state || "unknown";
+      if (instanceState === "running") {
+        break;
+      }
+      if (["failed", "deleted", "deleting"].includes(instanceState)) {
+        throw new Error(`Managed instance entered unrecoverable state ${instanceState}.`);
+      }
+      await sleep(Math.min(intervalMs, Math.max(1, deadline - Date.now())));
+    }
+  }
 })().catch((error) => {
   process.stderr.write(String(error instanceof Error ? error.message : error) + "\n");
   process.exit(1);
