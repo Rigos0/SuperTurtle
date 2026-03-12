@@ -286,7 +286,21 @@ function hardenSessionFilePermissions(path) {
     return;
   }
 
-  fs.chmodSync(path, 0o600);
+  let fd;
+  try {
+    fd = openSessionFileForRead(path);
+    const stats = fs.fstatSync(fd);
+    if (!stats.isFile()) {
+      throw invalidSessionFile(path, "must be a regular file");
+    }
+    if ((stats.mode & 0o777) !== 0o600) {
+      fs.fchmodSync(fd, 0o600);
+    }
+  } finally {
+    if (fd != null) {
+      fs.closeSync(fd);
+    }
+  }
 }
 
 function fsyncDescriptor(fd, pathDescription) {
@@ -833,7 +847,6 @@ function writeSession(session, env = process.env) {
     fs.closeSync(tempFd);
     tempFd = null;
     fs.renameSync(tempPath, path);
-    fs.chmodSync(path, 0o600);
     fsyncPath(path, `hosted session file ${path}`);
     fsyncParentDirectory(path);
   } catch (error) {
