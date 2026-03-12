@@ -5,12 +5,15 @@ const {
   assertManagedInstanceTransition,
   assertProvisioningJobTransition,
   validateCliCloudStatusResponse,
+  validateCliTokenResponse,
   validateCliWhoAmIResponse,
 } = require("./cloud-control-plane-contract.js");
 
 const STATE_SCHEMA_VERSION = 1;
 const ACTIVE_ENTITLEMENT_STATES = new Set(["active", "trialing"]);
 const CONTROL_PLANE_WRITE_SCOPE = "cloud:write";
+const DEFAULT_SESSION_TTL_MS = 60 * 60 * 1000;
+const DEFAULT_REQUEST_BODY_MAX_BYTES = 16 * 1024;
 
 function createDefaultState() {
   return {
@@ -116,6 +119,12 @@ function createRuntime(options) {
       zone: options.zone || "us-central1-a",
       hostnameDomain: options.hostnameDomain || "managed.superturtle.internal",
     },
+    sessionTtlMs: Number.isFinite(options.sessionTtlMs) && options.sessionTtlMs > 0
+      ? options.sessionTtlMs
+      : DEFAULT_SESSION_TTL_MS,
+    requestBodyMaxBytes: Number.isInteger(options.requestBodyMaxBytes) && options.requestBodyMaxBytes > 0
+      ? options.requestBodyMaxBytes
+      : DEFAULT_REQUEST_BODY_MAX_BYTES,
   };
 }
 
@@ -133,6 +142,12 @@ function getUserSession(state, accessToken) {
 function getAuthenticatedSession(state, accessToken) {
   return state.sessions.find(
     (session) => session && session.access_token === accessToken && session.state === "active"
+  );
+}
+
+function getRefreshSession(state, refreshToken) {
+  return state.sessions.find(
+    (session) => session && session.refresh_token === refreshToken && session.state === "active"
   );
 }
 
@@ -258,6 +273,32 @@ function buildWhoAmIPayload(state, session) {
         }
       : null,
   });
+}
+
+function buildTokenPayload(state, session) {
+  const whoami = buildWhoAmIPayload(state, session);
+  const cloudStatus = buildCloudStatusPayload(state, getManagedInstance(state, session.user_id));
+  return validateCliTokenResponse({
+    access_token: session.access_token,
+    refresh_token: session.refresh_token || null,
+    expires_at: session.expires_at || null,
+    user: whoami.user,
+    workspace: whoami.workspace,
+    identities: whoami.identities,
+    session: whoami.session,
+    entitlement: whoami.entitlement,
+    instance: cloudStatus.instance,
+    provisioning_job: cloudStatus.provisioning_job,
+    audit_log: cloudStatus.audit_log,
+  });
+}
+
+function addDuration(timestamp, durationMs) {
+  const parsed = Date.parse(timestamp);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Cannot add a session duration to invalid timestamp ${JSON.stringify(timestamp)}.`);
+  }
+  return new Date(parsed + durationMs).toISOString();
 }
 
 function createManagedInstance(state, runtime, session) {
@@ -439,6 +480,36 @@ function requestCloudStatus(runtime, accessToken) {
   return { status: 200, data: buildCloudStatusPayload(state, getManagedInstance(state, session.user_id)) };
 }
 
+function requestSessionRefresh(runtime, refreshToken) {
+  const state = readState(runtime.statePath);
+  const session = getRefreshSession(state, refreshToken);
+  if (!session) {
+    return { status: 401, data: { error: "invalid_refresh_token" } };
+  }
+
+  const timestamp = runtime.now();
+  session.access_token = runtime.createId("access");
+  session.refresh_token = runtime.createId("refresh");
+  session.last_authenticated_at = timestamp;
+  session.expires_at = addDuration(timestamp, runtime.sessionTtlMs);
+
+  const identities = getIdentities(state, session.user_id);
+  for (const identity of identities) {
+    identity.last_used_at = timestamp;
+  }
+
+  appendAudit(state, runtime, {
+    actor_type: "user",
+    actor_id: session.user_id,
+    action: "session.refreshed",
+    target_type: "session",
+    target_id: session.id,
+    metadata: { surface: "cli_session_refresh" },
+  });
+  writeState(runtime.statePath, state);
+  return { status: 200, data: buildTokenPayload(state, session) };
+}
+
 async function runNextProvisioningJob(runtime) {
   const state = readState(runtime.statePath);
   const job = state.provisioning_jobs.find((candidate) => candidate && candidate.state === "queued");
@@ -596,11 +667,80 @@ async function handleHttpRequest(runtime, request) {
     };
   }
 
+  if (request.method === "POST" && request.url === "/v1/cli/session/refresh") {
+    let payload;
+    try {
+      payload = await readJsonRequestBody(request, runtime.requestBodyMaxBytes);
+    } catch (error) {
+      return {
+        status: error.status || 400,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        body: JSON.stringify({ error: error.code || "invalid_request" }),
+      };
+    }
+    const refreshToken =
+      payload && typeof payload === "object" && !Array.isArray(payload) ? payload.refresh_token : null;
+    if (typeof refreshToken !== "string" || refreshToken.length === 0) {
+      return {
+        status: 400,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        body: JSON.stringify({ error: "invalid_refresh_token" }),
+      };
+    }
+    const result = requestSessionRefresh(runtime, refreshToken);
+    return {
+      status: result.status,
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
+      body: JSON.stringify(result.data),
+    };
+  }
+
   return {
     status: 404,
     headers: { "content-type": "application/json", "cache-control": "no-store" },
     body: JSON.stringify({ error: "not_found" }),
   };
+}
+
+async function readJsonRequestBody(request, maxBytes) {
+  const contentType = request.headers?.["content-type"];
+  if (typeof contentType !== "string" || !/^application\/json(?:\s*;|$)/i.test(contentType)) {
+    const error = new Error("Expected application/json request body.");
+    error.status = 415;
+    error.code = "unsupported_media_type";
+    throw error;
+  }
+
+  let totalBytes = 0;
+  const chunks = [];
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buffer.byteLength;
+    if (totalBytes > maxBytes) {
+      const error = new Error(`Request body exceeded ${maxBytes} bytes.`);
+      error.status = 413;
+      error.code = "request_too_large";
+      throw error;
+    }
+    chunks.push(buffer);
+  }
+
+  const raw = Buffer.concat(chunks).toString("utf-8");
+  if (!raw.trim()) {
+    const error = new Error("Expected JSON request body.");
+    error.status = 400;
+    error.code = "invalid_json";
+    throw error;
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch (parseError) {
+    const error = new Error("Request body was not valid JSON.");
+    error.status = 400;
+    error.code = "invalid_json";
+    throw error;
+  }
 }
 
 function createNoopProvisioner() {
@@ -627,6 +767,7 @@ module.exports = {
   readState,
   requestCloudStatus,
   requestSession,
+  requestSessionRefresh,
   requestInstanceResume,
   runNextProvisioningJob,
   writeState,

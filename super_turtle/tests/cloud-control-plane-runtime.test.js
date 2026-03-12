@@ -12,6 +12,7 @@ const {
   readState,
   requestCloudStatus,
   requestSession,
+  requestSessionRefresh,
   requestInstanceResume,
   runNextProvisioningJob,
   writeState,
@@ -38,8 +39,10 @@ function createSeedState() {
     user_id: "user_123",
     state: "active",
     access_token: "access_123",
+    refresh_token: "refresh_123",
     scopes: [CONTROL_PLANE_WRITE_SCOPE],
     created_at: "2026-03-12T10:00:00Z",
+    expires_at: "2026-03-12T11:00:00Z",
   });
   state.entitlements.push({
     user_id: "user_123",
@@ -64,6 +67,16 @@ function createClock() {
     "2026-03-12T10:00:07Z",
     "2026-03-12T10:00:08Z",
     "2026-03-12T10:00:09Z",
+    "2026-03-12T10:00:10Z",
+    "2026-03-12T10:00:11Z",
+    "2026-03-12T10:00:12Z",
+    "2026-03-12T10:00:13Z",
+    "2026-03-12T10:00:14Z",
+    "2026-03-12T10:00:15Z",
+    "2026-03-12T10:00:16Z",
+    "2026-03-12T10:00:17Z",
+    "2026-03-12T10:00:18Z",
+    "2026-03-12T10:00:19Z",
   ];
   let index = 0;
   return () => values[Math.min(index++, values.length - 1)];
@@ -100,22 +113,42 @@ async function run() {
     "expected session lookups to be written to the durable audit log"
   );
 
-  const initialStatus = requestCloudStatus(runtime, "access_123");
+  const refreshed = requestSessionRefresh(runtime, "refresh_123");
+  assert.strictEqual(refreshed.status, 200);
+  assert.match(refreshed.data.access_token, /^access_/);
+  assert.match(refreshed.data.refresh_token, /^refresh_/);
+  assert.strictEqual(refreshed.data.session.id, "sess_123");
+  assert.strictEqual(refreshed.data.session.last_authenticated_at, "2026-03-12T10:00:02Z");
+  assert.strictEqual(refreshed.data.entitlement.state, "active");
+
+  const persistedAfterRefresh = readState(statePath);
+  assert.strictEqual(persistedAfterRefresh.sessions[0].access_token, refreshed.data.access_token);
+  assert.strictEqual(persistedAfterRefresh.sessions[0].refresh_token, refreshed.data.refresh_token);
+  assert.strictEqual(persistedAfterRefresh.sessions[0].expires_at, "2026-03-12T11:00:02.000Z");
+  assert.strictEqual(persistedAfterRefresh.sessions[0].last_authenticated_at, "2026-03-12T10:00:02Z");
+  assert.strictEqual(persistedAfterRefresh.identities[0].last_used_at, "2026-03-12T10:00:02Z");
+  assert.match(
+    JSON.stringify(persistedAfterRefresh.audit_log),
+    /session\.refreshed/,
+    "expected session refreshes to be written to the durable audit log"
+  );
+
+  const initialStatus = requestCloudStatus(runtime, refreshed.data.access_token);
   assert.strictEqual(initialStatus.status, 200);
   assert.strictEqual(initialStatus.data.instance, null);
   assert.strictEqual(initialStatus.data.provisioning_job, null);
   assert.deepStrictEqual(initialStatus.data.audit_log, []);
 
   const persistedAfterStatus = readState(statePath);
-  assert.strictEqual(persistedAfterStatus.sessions[0].last_authenticated_at, "2026-03-12T10:00:02Z");
-  assert.strictEqual(persistedAfterStatus.identities[0].last_used_at, "2026-03-12T10:00:02Z");
+  assert.strictEqual(persistedAfterStatus.sessions[0].last_authenticated_at, "2026-03-12T10:00:04Z");
+  assert.strictEqual(persistedAfterStatus.identities[0].last_used_at, "2026-03-12T10:00:04Z");
   assert.match(
     JSON.stringify(persistedAfterStatus.audit_log),
     /cloud_status\.lookup/,
     "expected cloud status lookups to be written to the durable audit log"
   );
 
-  const created = requestInstanceResume(runtime, "access_123");
+  const created = requestInstanceResume(runtime, refreshed.data.access_token);
   assert.strictEqual(created.status, 200);
   assert.strictEqual(created.data.instance.state, "provisioning");
   assert.strictEqual(created.data.provisioning_job.kind, "provision");
@@ -126,7 +159,7 @@ async function run() {
   assert.strictEqual(persistedAfterCreate.provisioning_jobs.length, 1);
   assert.strictEqual(persistedAfterCreate.managed_instances[0].state, "provisioning");
 
-  const deduped = requestInstanceResume(runtime, "access_123");
+  const deduped = requestInstanceResume(runtime, refreshed.data.access_token);
   assert.strictEqual(deduped.status, 200);
   assert.strictEqual(deduped.data.provisioning_job.id, created.data.provisioning_job.id);
   assert.match(
@@ -145,7 +178,7 @@ async function run() {
   assert.strictEqual(persistedAfterRun.managed_instances[0].state, "running");
   assert.strictEqual(persistedAfterRun.provisioning_jobs[0].state, "succeeded");
 
-  const runningStatus = requestCloudStatus(runtime, "access_123");
+  const runningStatus = requestCloudStatus(runtime, refreshed.data.access_token);
   assert.strictEqual(runningStatus.status, 200);
   assert.strictEqual(runningStatus.data.instance.id, created.data.instance.id);
   assert.strictEqual(runningStatus.data.instance.state, "running");
@@ -194,15 +227,37 @@ async function run() {
   assert.strictEqual(whoamiPayload.session.id, "sess_123");
   assert.strictEqual(whoamiPayload.identities[0].provider, "github");
 
+  const refreshResponse = await fetch(`http://127.0.0.1:${address.port}/v1/cli/session/refresh`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ refresh_token: "refresh_123" }),
+  });
+  assert.strictEqual(refreshResponse.status, 200);
+  const refreshPayload = await refreshResponse.json();
+  assert.match(refreshPayload.access_token, /^access_/);
+  assert.match(refreshPayload.refresh_token, /^refresh_/);
+  assert.strictEqual(refreshPayload.session.id, "sess_123");
+
   const cloudStatusResponse = await fetch(`http://127.0.0.1:${address.port}/v1/cli/cloud/status`, {
     headers: {
-      authorization: "Bearer access_123",
+      authorization: `Bearer ${refreshPayload.access_token}`,
     },
   });
   assert.strictEqual(cloudStatusResponse.status, 200);
   const cloudStatusPayload = await cloudStatusResponse.json();
   assert.strictEqual(cloudStatusPayload.instance.state, "provisioning");
   assert.strictEqual(cloudStatusPayload.provisioning_job.state, "queued");
+
+  const malformedRefreshResponse = await fetch(`http://127.0.0.1:${address.port}/v1/cli/session/refresh`, {
+    method: "POST",
+    headers: {
+      "content-type": "text/plain",
+    },
+    body: "refresh_123",
+  });
+  assert.strictEqual(malformedRefreshResponse.status, 415);
 
   server.close();
 }

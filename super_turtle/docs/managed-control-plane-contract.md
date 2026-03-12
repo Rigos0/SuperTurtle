@@ -4,6 +4,8 @@ This document defines the first production-shaped contract for the hosted manage
 
 ## CLI API surfaces
 
+- `POST /v1/cli/session/refresh`
+  Accepts a refresh token, rotates the hosted bearer credentials, updates durable session-auth timestamps, and returns bearer tokens plus optional identity, entitlement, instance, provisioning-job, and audit-log snapshots.
 - `POST /v1/cli/login/poll`
   Returns bearer tokens plus optional identity, entitlement, instance, provisioning-job, and audit-log snapshots.
 - `GET /v1/cli/session`
