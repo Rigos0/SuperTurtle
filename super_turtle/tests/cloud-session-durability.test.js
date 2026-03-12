@@ -59,6 +59,42 @@ try {
     );
   }
 
+  const nestedSessionPath = resolve(tmpDir, "fresh-config", "nested", "cloud-session.json");
+  const nestedSessionDir = dirname(nestedSessionPath);
+  const nestedSessionParentDir = dirname(nestedSessionDir);
+  fsyncTargets.length = 0;
+  writeSession(
+    {
+      access_token: "access-nested",
+      refresh_token: "refresh-nested",
+      control_plane: "https://api.superturtle.dev",
+    },
+    {
+      ...env,
+      SUPERTURTLE_CLOUD_SESSION_PATH: nestedSessionPath,
+    }
+  );
+
+  assert.ok(
+    fs.existsSync(nestedSessionPath),
+    "expected writeSession to create nested hosted session directories when needed"
+  );
+
+  if (process.platform !== "win32") {
+    assert.ok(
+      fsyncTargets.includes(tmpDir),
+      "expected writeSession to fsync the existing parent directory after creating the first missing session directory"
+    );
+    assert.ok(
+      fsyncTargets.includes(nestedSessionParentDir),
+      "expected writeSession to fsync the intermediate session directory after creating the nested session directory"
+    );
+    assert.ok(
+      fsyncTargets.includes(nestedSessionDir),
+      "expected writeSession to fsync the final session directory after creating it"
+    );
+  }
+
   fsyncTargets.length = 0;
   clearSession(env);
   assert.ok(!fs.existsSync(sessionPath), "expected clearSession to remove the hosted session file");

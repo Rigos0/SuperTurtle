@@ -195,6 +195,8 @@ function ensureSafeSessionDirectory(dirPath, options = {}) {
         return;
       }
       fs.mkdirSync(current);
+      fsyncParentDirectory(current);
+      fsyncPath(current, `directory ${current}`, { kind: "directory" });
       continue;
     }
     if (stats.isSymbolicLink()) {
