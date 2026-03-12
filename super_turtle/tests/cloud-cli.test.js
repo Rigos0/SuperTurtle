@@ -622,6 +622,40 @@ server.listen(0, "127.0.0.1", async () => {
     assert.ok(fs.lstatSync(sessionPath).isSymbolicLink(), "expected dangling symlink session path to remain untouched");
     fs.rmSync(sessionPath, { force: true });
 
+    const symlinkedConfigTargetDir = resolve(tmpDir, "cloud-config-target");
+    const symlinkedConfigDir = resolve(tmpDir, "cloud-config-link");
+    fs.mkdirSync(symlinkedConfigTargetDir);
+    fs.symlinkSync(symlinkedConfigTargetDir, symlinkedConfigDir);
+    const symlinkedDirSessionPath = resolve(symlinkedConfigDir, "cloud-session.json");
+    const symlinkedDirEnv = {
+      ...env,
+      SUPERTURTLE_CLOUD_SESSION_PATH: symlinkedDirSessionPath,
+    };
+
+    const symlinkedDirLogin = await runCli(["login", "--no-browser"], symlinkedDirEnv);
+    assert.strictEqual(symlinkedDirLogin.code, 1);
+    assert.match(symlinkedDirLogin.stderr, /Hosted session directory .* must not be a symlink/i);
+    assert.match(symlinkedDirLogin.stderr, /superturtle logout/i);
+    assert.ok(
+      !fs.existsSync(resolve(symlinkedConfigTargetDir, "cloud-session.json")),
+      "expected hosted login to refuse writing through a symlinked session directory"
+    );
+
+    fs.writeFileSync(
+      resolve(symlinkedConfigTargetDir, "cloud-session.json"),
+      `${JSON.stringify({
+        schema_version: 1,
+        access_token: "access-abc",
+        refresh_token: "refresh-ghi",
+        expires_at: "2999-03-12T10:00:00Z",
+        control_plane: baseUrl,
+      }, null, 2)}\n`
+    );
+    const symlinkedDirWhoami = await runCli(["whoami"], symlinkedDirEnv);
+    assert.strictEqual(symlinkedDirWhoami.code, 1);
+    assert.match(symlinkedDirWhoami.stderr, /Hosted session directory .* must not be a symlink/i);
+    assert.match(symlinkedDirWhoami.stderr, /superturtle logout/i);
+
     fs.mkdirSync(sessionPath);
     const directoryWhoami = await runCli(["whoami"], env);
     assert.strictEqual(directoryWhoami.code, 1);

@@ -1,6 +1,6 @@
 const fs = require("fs");
 const os = require("os");
-const { resolve, dirname } = require("path");
+const { resolve, dirname, parse, sep } = require("path");
 const { spawnSync } = require("child_process");
 
 const DEFAULT_CONTROL_PLANE = "https://api.superturtle.dev";
@@ -12,6 +12,12 @@ const CLOUD_SESSION_SCHEMA_VERSION = 1;
 function invalidSessionFile(path, message) {
   return new Error(
     `Hosted session file at ${path} ${message}. Run 'superturtle logout' and then 'superturtle login' again.`
+  );
+}
+
+function invalidSessionDirectory(path, message) {
+  return new Error(
+    `Hosted session directory at ${path} ${message}. Run 'superturtle logout' and then 'superturtle login' again.`
   );
 }
 
@@ -77,8 +83,30 @@ function getSessionControlPlaneBaseUrl(session, env = process.env) {
   return getControlPlaneBaseUrl(env);
 }
 
-function ensureParentDir(filePath) {
-  fs.mkdirSync(dirname(filePath), { recursive: true });
+function ensureSafeSessionDirectory(dirPath, options = {}) {
+  const resolvedDir = resolve(dirPath);
+  const { root } = parse(resolvedDir);
+  const relativePath = resolvedDir.slice(root.length);
+  const segments = relativePath ? relativePath.split(sep).filter(Boolean) : [];
+  let current = root;
+
+  for (const segment of segments) {
+    current = current ? resolve(current, segment) : segment;
+    const stats = lstatIfExists(current);
+    if (!stats) {
+      if (!options.create) {
+        return;
+      }
+      fs.mkdirSync(current);
+      continue;
+    }
+    if (stats.isSymbolicLink()) {
+      throw invalidSessionDirectory(current, "must not be a symlink");
+    }
+    if (!stats.isDirectory()) {
+      throw invalidSessionDirectory(current, "must be a directory");
+    }
+  }
 }
 
 function lstatIfExists(path) {
@@ -523,6 +551,7 @@ function validateStoredSession(session, path) {
 function readSession(env = process.env) {
   const path = getSessionPath(env);
   if (!lstatIfExists(path)) return null;
+  ensureSafeSessionDirectory(dirname(path));
   let raw;
   let stats;
   try {
@@ -584,7 +613,7 @@ function readSession(env = process.env) {
 
 function writeSession(session, env = process.env) {
   const path = getSessionPath(env);
-  ensureParentDir(path);
+  ensureSafeSessionDirectory(dirname(path), { create: true });
   if (lstatIfExists(path)) {
     ensureRegularSessionFile(path);
   }
