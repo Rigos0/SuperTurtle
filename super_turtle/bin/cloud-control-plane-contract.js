@@ -313,6 +313,16 @@ function validateCliCloudStatusResponse(payload) {
   };
 }
 
+function validateCliTeleportTargetResponse(payload) {
+  const response = validateObject(payload, "response");
+  return {
+    instance: validateManagedInstance(response.instance, "instance"),
+    ssh_target: validateDisplayField(response.ssh_target, "ssh_target"),
+    remote_root: validateDisplayField(response.remote_root, "remote_root"),
+    audit_log: validateAuditLog(response.audit_log, "audit_log"),
+  };
+}
+
 function validateCliTokenResponse(payload) {
   const response = validateObject(payload, "response");
   return {
@@ -367,6 +377,7 @@ module.exports = {
   assertProvisioningJobTransition,
   canTransition,
   validateCliCloudStatusResponse,
+  validateCliTeleportTargetResponse,
   validateCliTokenResponse,
   validateCliWhoAmIResponse,
 };

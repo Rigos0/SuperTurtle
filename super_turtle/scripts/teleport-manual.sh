@@ -4,6 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage: ./super_turtle/scripts/teleport-manual.sh <ssh_target> <remote_root> [options]
+       ./super_turtle/scripts/teleport-manual.sh --managed [options]
 
 Teleport the current Super Turtle repo to a remote Linux host and continue
 chatting with the same Telegram bot there.
@@ -16,6 +17,7 @@ Runbook:
   super_turtle/docs/MANUAL_TELEPORT_RUNBOOK.md
 
 Options:
+  --managed          Resolve the target VM from the hosted control plane
   --port <N>         SSH port
   --identity <PATH>  SSH identity file
   --dry-run          Run preflight, export, and rsync dry-run only
@@ -34,23 +36,19 @@ REMOTE_ROOT=""
 SSH_PORT=""
 SSH_IDENTITY=""
 DRY_RUN=0
+USE_MANAGED_TARGET=0
 
 if [[ $# -eq 1 && ( "$1" == "--help" || "$1" == "-h" ) ]]; then
   usage
   exit 0
 fi
 
-if [[ $# -lt 2 ]]; then
-  usage
-  exit 1
-fi
-
-SSH_TARGET="$1"
-REMOTE_ROOT="$2"
-shift 2
-
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --managed)
+      USE_MANAGED_TARGET=1
+      shift
+      ;;
     --port)
       SSH_PORT="${2:?missing value for --port}"
       shift 2
@@ -68,12 +66,37 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      echo "[teleport] Unknown option: $1" >&2
-      usage
-      exit 1
+      if [[ "$1" == --* ]]; then
+        echo "[teleport] Unknown option: $1" >&2
+        usage
+        exit 1
+      fi
+      if [[ -z "$SSH_TARGET" ]]; then
+        SSH_TARGET="$1"
+      elif [[ -z "$REMOTE_ROOT" ]]; then
+        REMOTE_ROOT="$1"
+      else
+        echo "[teleport] Unexpected argument: $1" >&2
+        usage
+        exit 1
+      fi
+      shift
       ;;
   esac
 done
+
+if [[ "$USE_MANAGED_TARGET" -eq 1 ]]; then
+  if [[ -n "$SSH_TARGET" || -n "$REMOTE_ROOT" ]]; then
+    echo "[teleport] Do not pass <ssh_target> or <remote_root> with --managed" >&2
+    usage
+    exit 1
+  fi
+else
+  if [[ -z "$SSH_TARGET" || -z "$REMOTE_ROOT" ]]; then
+    usage
+    exit 1
+  fi
+fi
 
 require_cmd() {
   local cmd="$1"
@@ -105,6 +128,47 @@ derive_tmux_session_name() {
 
 run_python() {
   python3 "$HELPER_PY" "$@"
+}
+
+resolve_managed_target() {
+  local output
+  if ! output="$(
+    cd "$REPO_ROOT"
+    node - <<'NODE'
+const { fetchTeleportTarget, readSession } = require("./super_turtle/bin/cloud.js");
+
+(async () => {
+  const session = readSession();
+  if (!session) {
+    throw new Error("Not logged in to hosted SuperTurtle. Run 'superturtle login' first.");
+  }
+  const result = await fetchTeleportTarget(session);
+  process.stdout.write(JSON.stringify(result.data));
+})().catch((error) => {
+  process.stderr.write(String(error instanceof Error ? error.message : error) + "\n");
+  process.exit(1);
+});
+NODE
+  )"; then
+    exit 1
+  fi
+
+  SSH_TARGET="$(python3 - "$output" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+print(payload["ssh_target"])
+PY
+)"
+  REMOTE_ROOT="$(python3 - "$output" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+print(payload["remote_root"])
+PY
+)"
 }
 
 read_json_field() {
@@ -142,6 +206,10 @@ if [[ -n "$SSH_IDENTITY" ]]; then
   SSH_ARGS+=("-i" "$SSH_IDENTITY")
 fi
 
+if [[ "$USE_MANAGED_TARGET" -eq 1 ]]; then
+  resolve_managed_target
+fi
+
 ssh_run() {
   local -a cmd=(ssh)
   if (( ${#SSH_ARGS[@]} > 0 )); then
@@ -157,6 +225,9 @@ local_preflight() {
   require_cmd rsync
   require_cmd bun
   require_cmd python3
+  if [[ "$USE_MANAGED_TARGET" -eq 1 ]]; then
+    require_cmd node
+  fi
 
   if [[ ! -f "$ENV_FILE" ]]; then
     echo "[teleport] Missing project env file: ${ENV_FILE}" >&2

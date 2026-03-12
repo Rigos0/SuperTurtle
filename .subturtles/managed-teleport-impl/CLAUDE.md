@@ -1,6 +1,6 @@
 # Current task
 
-Extend `/teleport` to resolve and use SuperTurtle-managed VM targets from the control plane.
+Extend `/teleport` to resolve and use SuperTurtle-managed VM targets from the control plane, starting with the hosted target-resolution path.
 
 # End goal with specs
 
@@ -41,6 +41,7 @@ Extend `/teleport` to resolve and use SuperTurtle-managed VM targets from the co
 - [x] Add Stripe checkout, subscriptions, webhook processing, and entitlement enforcement behind production-shaped adapters and verified webhook handling
   Progress: added a production-shaped Stripe adapter with HMAC-verified webhook signature checking, durable `subscriptions` and idempotent `billing_events` state in the control-plane runtime, a new `POST /v1/billing/stripe/webhook` ingestion surface, checkout-session customer/subscription mapping persistence, subscription-to-entitlement state sync that immediately feeds existing managed-hosting enforcement, a new authenticated `POST /v1/billing/stripe/checkout-session` surface backed by a production-shaped checkout adapter with durable checkout-session persistence for later webhook reconciliation, a new authenticated `POST /v1/billing/stripe/customer-portal-session` surface backed by the same adapter family for production-shaped Stripe billing-portal access using the durable Stripe customer linkage already stored in control-plane state, direct plus HTTP coverage in `super_turtle/tests/cloud-control-plane-runtime.test.js`, and hosted CLI billing entrypoints via `superturtle cloud checkout` plus `superturtle cloud portal` with fail-closed response validation and CLI coverage in `super_turtle/tests/cloud-cli.test.js`.
 - [ ] Extend `/teleport` to resolve and use SuperTurtle-managed VM targets from the control plane <- current
+  Progress: added a production-shaped `GET /v1/cli/teleport/target` control-plane surface with authenticated entitlement-aware managed-instance resolution, durable audit logging, shared contract/client validators, and `teleport-manual.sh --managed` so the existing teleport handoff flow can now resolve hosted SSH target plus managed project root from the linked cloud session instead of requiring operator-supplied SSH coordinates.
 - [ ] Add hosted Claude auth setup and validation flow with user-scoped credential boundaries
 - [ ] Add basic admin and support tooling for reprovision, suspend, instance inspection, and teleport audit
 - [ ] Add production telemetry for provisioning failures, login failures, teleport failures, and unhealthy VMs

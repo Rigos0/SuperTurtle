@@ -16,6 +16,7 @@ const {
   requestMachineHeartbeat,
   requestMachineRegister,
   requestInstanceReprovision,
+  requestTeleportTarget,
   requestLoginPoll,
   requestLoginStart,
   requestSession,
@@ -281,6 +282,20 @@ async function run() {
   assert.strictEqual(runningStatus.data.instance.state, "running");
   assert.strictEqual(runningStatus.data.provisioning_job.id, created.data.provisioning_job.id);
   assert.strictEqual(runningStatus.data.provisioning_job.state, "succeeded");
+
+  const teleportTarget = requestTeleportTarget(runtime, refreshed.data.access_token);
+  assert.strictEqual(teleportTarget.status, 200);
+  assert.strictEqual(
+    teleportTarget.data.ssh_target,
+    "superturtle@vm-registered.managed.superturtle.internal"
+  );
+  assert.strictEqual(teleportTarget.data.remote_root, "/srv/superturtle");
+  assert.strictEqual(teleportTarget.data.instance.id, created.data.instance.id);
+  assert.match(
+    JSON.stringify(readState(statePath).audit_log),
+    /teleport_target\.lookup/,
+    "expected teleport target lookups to be written to the durable audit log"
+  );
 
   const reprovisionRequested = requestInstanceReprovision(runtime, refreshed.data.access_token);
   assert.strictEqual(reprovisionRequested.status, 200);
@@ -621,6 +636,20 @@ async function run() {
   const machineHeartbeatPayload = await machineHeartbeatResponse.json();
   assert.strictEqual(machineHeartbeatPayload.ok, true);
   assert.strictEqual(machineHeartbeatPayload.health_status, "degraded");
+
+  const teleportTargetResponse = await fetch(`http://127.0.0.1:${address.port}/v1/cli/teleport/target`, {
+    headers: {
+      authorization: `Bearer ${refreshPayload.access_token}`,
+    },
+  });
+  assert.strictEqual(teleportTargetResponse.status, 200);
+  const teleportTargetPayload = await teleportTargetResponse.json();
+  assert.strictEqual(
+    teleportTargetPayload.ssh_target,
+    "superturtle@http-vm.managed.superturtle.internal"
+  );
+  assert.strictEqual(teleportTargetPayload.remote_root, "/srv/superturtle");
+  assert.strictEqual(teleportTargetPayload.instance.state, "running");
 
   const reprovisionResponse = await fetch(
     `http://127.0.0.1:${address.port}/v1/cli/cloud/instance/reprovision`,

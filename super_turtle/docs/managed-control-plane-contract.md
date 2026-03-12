@@ -16,6 +16,8 @@ This document defines the first production-shaped contract for the hosted manage
   Returns the signed-in user, linked OAuth identities, active hosted session metadata, and entitlement summary.
 - `GET /v1/cli/cloud/status`
   Returns the managed instance record, the latest provisioning job, and recent audit entries relevant to the hosted VM lifecycle.
+- `GET /v1/cli/teleport/target`
+  Returns the current managed VM's resolved SSH target plus the managed project root to use for the existing teleport handoff flow.
 - `POST /v1/cli/cloud/instance/resume`
   Enqueues or deduplicates a managed-instance resume/provisioning job and returns the updated instance, latest provisioning job, and recent audit entries.
 - `POST /v1/cli/cloud/instance/reprovision`

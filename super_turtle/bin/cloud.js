@@ -5,6 +5,7 @@ const { resolve, dirname, parse, sep } = require("path");
 const { spawnSync } = require("child_process");
 const {
   validateCliCloudStatusResponse,
+  validateCliTeleportTargetResponse,
   validateCliTokenResponse,
   validateCliWhoAmIResponse,
 } = require("./cloud-control-plane-contract.js");
@@ -600,6 +601,20 @@ function validateCloudStatusResponse(payload, context) {
     return {
       instance: response.instance,
       provisioning_job: response.provisioning_job,
+      audit_log: response.audit_log,
+    };
+  } catch (error) {
+    throw remapContractValidationError(error, context);
+  }
+}
+
+function validateTeleportTargetResponse(payload, context) {
+  try {
+    const response = validateCliTeleportTargetResponse(payload);
+    return {
+      instance: response.instance,
+      ssh_target: response.ssh_target,
+      remote_root: response.remote_root,
       audit_log: response.audit_log,
     };
   } catch (error) {
@@ -1479,6 +1494,14 @@ async function fetchCloudStatus(session, env = process.env) {
   };
 }
 
+async function fetchTeleportTarget(session, env = process.env) {
+  const result = await requestWithSession(session, env, "/v1/cli/teleport/target");
+  return {
+    ...result,
+    data: validateTeleportTargetResponse(result.data, "Hosted teleport target lookup"),
+  };
+}
+
 async function createStripeCheckoutSession(session, options = {}, env = process.env) {
   const result = await requestWithSession(session, env, "/v1/billing/stripe/checkout-session", {
     method: "POST",
@@ -1581,6 +1604,7 @@ module.exports = {
   DEFAULT_SESSION_FILE_MAX_BYTES,
   CLOUD_SESSION_SCHEMA_VERSION,
   fetchCloudStatus,
+  fetchTeleportTarget,
   fetchWhoAmI,
   getBrowserOpenTimeoutMs,
   getControlPlaneBaseUrl,
@@ -1604,6 +1628,7 @@ module.exports = {
   validateLoginStartResponse,
   validateWhoAmIResponse,
   validateCloudStatusResponse,
+  validateTeleportTargetResponse,
   validateStripeCheckoutSessionResponse,
   validateStripeCustomerPortalSessionResponse,
   writeSession,

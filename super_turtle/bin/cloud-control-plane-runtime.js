@@ -12,6 +12,7 @@ const {
   assertManagedInstanceTransition,
   assertProvisioningJobTransition,
   validateCliCloudStatusResponse,
+  validateCliTeleportTargetResponse,
   validateCliTokenResponse,
   validateCliWhoAmIResponse,
 } = require("./cloud-control-plane-contract.js");
@@ -144,6 +145,8 @@ function createRuntime(options) {
       zone: options.zone || "us-central1-a",
       hostnameDomain: options.hostnameDomain || "managed.superturtle.internal",
       publicOrigin: String(options.publicOrigin || "https://api.superturtle.dev").replace(/\/+$/, ""),
+      managedSshUser: options.managedSshUser || "superturtle",
+      managedProjectRoot: options.managedProjectRoot || "/srv/superturtle",
     },
     sessionTtlMs: Number.isFinite(options.sessionTtlMs) && options.sessionTtlMs > 0
       ? options.sessionTtlMs
@@ -301,6 +304,28 @@ function buildCloudStatusPayload(state, instance) {
         }
       : null,
     audit_log: instance ? getRecentAuditLog(state, instance.id) : [],
+  });
+}
+
+function buildTeleportTargetPayload(state, instance, config) {
+  return validateCliTeleportTargetResponse({
+    instance: instance
+      ? {
+          id: instance.id,
+          provider: instance.provider,
+          state: instance.state,
+          region: instance.region || null,
+          zone: instance.zone || null,
+          hostname: instance.hostname || null,
+          vm_name: instance.vm_name || null,
+          machine_token_id: instance.machine_token_id || null,
+          last_seen_at: instance.last_seen_at || null,
+          resume_requested_at: instance.resume_requested_at || null,
+        }
+      : null,
+    ssh_target: `${config.managedSshUser}@${instance.hostname}`,
+    remote_root: config.managedProjectRoot,
+    audit_log: getRecentAuditLog(state, instance.id),
   });
 }
 
@@ -817,6 +842,50 @@ function requestInstanceResume(runtime, accessToken) {
   writeState(runtime.statePath, state);
 
   return { status: 200, data: buildCloudStatusPayload(state, instance) };
+}
+
+function requestTeleportTarget(runtime, accessToken) {
+  const state = readState(runtime.statePath);
+  const session = getUserSession(state, accessToken);
+  if (!session) {
+    return { status: 401, data: { error: "invalid_session" } };
+  }
+
+  const entitlement = getEntitlement(state, session.user_id);
+  if (!entitlement || !ACTIVE_ENTITLEMENT_STATES.has(entitlement.state)) {
+    return { status: 403, data: { error: "managed_hosting_inactive" } };
+  }
+
+  const instance = getManagedInstance(state, session.user_id);
+  if (!instance) {
+    return { status: 409, data: { error: "managed_instance_unavailable" } };
+  }
+  if (instance.state !== "running") {
+    return { status: 409, data: { error: "managed_instance_not_running" } };
+  }
+  if (typeof instance.hostname !== "string" || instance.hostname.trim().length === 0) {
+    return { status: 409, data: { error: "managed_instance_missing_hostname" } };
+  }
+
+  const timestamp = runtime.now();
+  session.last_authenticated_at = timestamp;
+  for (const identity of getIdentities(state, session.user_id)) {
+    identity.last_used_at = timestamp;
+  }
+
+  appendAudit(state, runtime, {
+    actor_type: "user",
+    actor_id: session.user_id,
+    action: "teleport_target.lookup",
+    target_type: "managed_instance",
+    target_id: instance.id,
+    metadata: {
+      ssh_target: `${runtime.config.managedSshUser}@${instance.hostname}`,
+      remote_root: runtime.config.managedProjectRoot,
+    },
+  });
+  writeState(runtime.statePath, state);
+  return { status: 200, data: buildTeleportTargetPayload(state, instance, runtime.config) };
 }
 
 function requestInstanceReprovision(runtime, accessToken) {
@@ -1595,6 +1664,23 @@ async function handleHttpRequest(runtime, request) {
     };
   }
 
+  if (request.method === "GET" && request.url === "/v1/cli/teleport/target") {
+    const accessToken = extractBearerToken(request);
+    if (!accessToken) {
+      return {
+        status: 401,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        body: JSON.stringify({ error: "missing_bearer_token" }),
+      };
+    }
+    const result = requestTeleportTarget(runtime, accessToken);
+    return {
+      status: result.status,
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
+      body: JSON.stringify(result.data),
+    };
+  }
+
   if (request.method === "POST" && request.url === "/v1/cli/cloud/instance/resume") {
     const accessToken = extractBearerToken(request);
     if (!accessToken) {
@@ -1840,6 +1926,7 @@ module.exports = {
   requestSession,
   requestSessionRefresh,
   requestInstanceResume,
+  requestTeleportTarget,
   runNextProvisioningJob,
   writeState,
 };
