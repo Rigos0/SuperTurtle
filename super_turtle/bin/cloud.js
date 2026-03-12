@@ -156,6 +156,35 @@ function hardenSessionFilePermissions(path) {
   fs.chmodSync(path, 0o600);
 }
 
+function fsyncDescriptor(fd, pathDescription) {
+  try {
+    fs.fsyncSync(fd);
+  } catch (error) {
+    throw new Error(
+      `Failed to sync hosted session data for ${pathDescription}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+function fsyncPath(path, pathDescription) {
+  let fd;
+  try {
+    fd = fs.openSync(path, "r");
+    fsyncDescriptor(fd, pathDescription);
+  } finally {
+    if (fd != null) {
+      fs.closeSync(fd);
+    }
+  }
+}
+
+function fsyncParentDirectory(path) {
+  if (process.platform === "win32") {
+    return;
+  }
+  fsyncPath(dirname(path), `directory ${dirname(path)}`);
+}
+
 function isNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -647,10 +676,13 @@ function writeSession(session, env = process.env) {
 
   try {
     fs.writeFileSync(tempFd, serialized, { encoding: "utf-8" });
+    fsyncDescriptor(tempFd, `temporary hosted session file ${tempPath}`);
     fs.closeSync(tempFd);
     tempFd = null;
     fs.renameSync(tempPath, path);
     fs.chmodSync(path, 0o600);
+    fsyncPath(path, `hosted session file ${path}`);
+    fsyncParentDirectory(path);
   } catch (error) {
     if (tempFd != null) {
       fs.closeSync(tempFd);
