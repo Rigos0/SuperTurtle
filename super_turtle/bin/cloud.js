@@ -6,6 +6,7 @@ const { spawnSync } = require("child_process");
 const DEFAULT_CONTROL_PLANE = "https://api.superturtle.dev";
 const DEFAULT_POLL_INTERVAL_MS = 2000;
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
+const SESSION_EXPIRY_SKEW_MS = 30 * 1000;
 
 function getControlPlaneBaseUrl(env = process.env) {
   return String(env.SUPERTURTLE_CLOUD_URL || DEFAULT_CONTROL_PLANE).replace(/\/+$/, "");
@@ -19,6 +20,13 @@ function getSessionPath(env = process.env) {
     ? resolve(env.XDG_CONFIG_HOME)
     : resolve(os.homedir(), ".config");
   return resolve(configHome, "superturtle", "cloud-session.json");
+}
+
+function getSessionControlPlaneBaseUrl(session, env = process.env) {
+  if (session && typeof session.control_plane === "string" && session.control_plane.trim()) {
+    return session.control_plane.replace(/\/+$/, "");
+  }
+  return getControlPlaneBaseUrl(env);
 }
 
 function ensureParentDir(filePath) {
@@ -96,6 +104,28 @@ function getAuthHeaders(session) {
   };
 }
 
+function parseExpiry(value) {
+  if (typeof value !== "string" || !value) return null;
+  const expiresAt = Date.parse(value);
+  return Number.isFinite(expiresAt) ? expiresAt : null;
+}
+
+function isSessionExpired(session) {
+  const expiresAt = parseExpiry(session?.expires_at);
+  if (!expiresAt) return false;
+  return expiresAt <= Date.now() + SESSION_EXPIRY_SKEW_MS;
+}
+
+function normalizeSessionUpdate(nextSession, session, baseUrl) {
+  return {
+    ...session,
+    ...nextSession,
+    refresh_token: nextSession.refresh_token || session.refresh_token || null,
+    control_plane: baseUrl,
+    refreshed_at: new Date().toISOString(),
+  };
+}
+
 async function startLogin(options = {}, env = process.env) {
   const baseUrl = getControlPlaneBaseUrl(env);
   const payload = {
@@ -147,18 +177,59 @@ async function pollLogin(started, options = {}, env = process.env) {
   }
 }
 
-async function fetchWhoAmI(session, env = process.env) {
-  const baseUrl = getControlPlaneBaseUrl(env);
-  return requestJson(`${baseUrl}/v1/cli/session`, {
-    headers: getAuthHeaders(session),
+async function refreshSession(session, env = process.env) {
+  const baseUrl = getSessionControlPlaneBaseUrl(session, env);
+  if (!session?.refresh_token) {
+    const error = new Error("Hosted session expired and cannot be refreshed. Run 'superturtle login' again.");
+    error.code = "SESSION_REFRESH_REQUIRED";
+    throw error;
+  }
+
+  const refreshed = await requestJson(`${baseUrl}/v1/cli/session/refresh`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json",
+    },
+    body: JSON.stringify({ refresh_token: session.refresh_token }),
   });
+
+  return normalizeSessionUpdate(refreshed, session, baseUrl);
+}
+
+async function requestWithSession(session, env, path) {
+  const baseUrl = getSessionControlPlaneBaseUrl(session, env);
+  let activeSession = session;
+
+  if (isSessionExpired(activeSession)) {
+    activeSession = await refreshSession(activeSession, env);
+  }
+
+  const doRequest = async (currentSession) =>
+    requestJson(`${baseUrl}${path}`, {
+      headers: getAuthHeaders(currentSession),
+    });
+
+  try {
+    const data = await doRequest(activeSession);
+    return { data, session: activeSession };
+  } catch (error) {
+    const status = error && typeof error === "object" ? error.status : undefined;
+    if (status !== 401 || !activeSession?.refresh_token) {
+      throw error;
+    }
+    activeSession = await refreshSession(activeSession, env);
+    const data = await doRequest(activeSession);
+    return { data, session: activeSession };
+  }
+}
+
+async function fetchWhoAmI(session, env = process.env) {
+  return requestWithSession(session, env, "/v1/cli/session");
 }
 
 async function fetchCloudStatus(session, env = process.env) {
-  const baseUrl = getControlPlaneBaseUrl(env);
-  return requestJson(`${baseUrl}/v1/cli/cloud/status`, {
-    headers: getAuthHeaders(session),
-  });
+  return requestWithSession(session, env, "/v1/cli/cloud/status");
 }
 
 module.exports = {
@@ -167,10 +238,13 @@ module.exports = {
   fetchCloudStatus,
   fetchWhoAmI,
   getControlPlaneBaseUrl,
+  getSessionControlPlaneBaseUrl,
   getSessionPath,
+  isSessionExpired,
   openBrowser,
   pollLogin,
   readSession,
+  refreshSession,
   startLogin,
   writeSession,
 };

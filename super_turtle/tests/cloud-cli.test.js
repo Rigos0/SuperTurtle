@@ -12,6 +12,7 @@ const tmpDir = fs.mkdtempSync(resolve(os.tmpdir(), "superturtle-cloud-cli-"));
 const sessionPath = resolve(tmpDir, "cloud-session.json");
 
 let pollCount = 0;
+let refreshCount = 0;
 
 function runCli(args, env) {
   return new Promise((resolveRun, rejectRun) => {
@@ -60,12 +61,23 @@ const server = http.createServer((req, res) => {
       }
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({
-        access_token: "access-abc",
+        access_token: "expired-access",
         refresh_token: "refresh-def",
-        expires_at: "2026-03-12T10:00:00Z",
+        expires_at: "2000-03-12T10:00:00Z",
         user: { id: "user_123", email: "user@example.com" },
         workspace: { slug: "acme" },
         instance: { id: "inst_123" },
+      }));
+      return;
+    }
+    if (req.method === "POST" && req.url === "/v1/cli/session/refresh") {
+      assert.strictEqual(body.refresh_token, "refresh-def");
+      refreshCount += 1;
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        access_token: "access-abc",
+        refresh_token: "refresh-ghi",
+        expires_at: "2999-03-12T10:00:00Z",
       }));
       return;
     }
@@ -110,6 +122,10 @@ server.listen(0, "127.0.0.1", async () => {
     SUPERTURTLE_CLOUD_URL: baseUrl,
     SUPERTURTLE_CLOUD_SESSION_PATH: sessionPath,
   };
+  const postLoginEnv = {
+    ...env,
+    SUPERTURTLE_CLOUD_URL: "http://127.0.0.1:1",
+  };
 
   try {
     const login = await runCli(["login", "--no-browser"], env);
@@ -117,13 +133,24 @@ server.listen(0, "127.0.0.1", async () => {
     assert.match(login.stdout, /Logged in\./);
     assert.ok(fs.existsSync(sessionPath), "expected cloud session file to exist");
 
-    const whoami = await runCli(["whoami"], env);
+    const savedSession = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
+    assert.strictEqual(savedSession.control_plane, baseUrl);
+    assert.strictEqual(savedSession.access_token, "expired-access");
+
+    const whoami = await runCli(["whoami"], postLoginEnv);
     assert.strictEqual(whoami.code, 0, whoami.stderr);
+    assert.match(whoami.stdout, new RegExp(`Control plane: ${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
     assert.match(whoami.stdout, /User: user@example.com/);
     assert.match(whoami.stdout, /Plan: managed/);
+    assert.strictEqual(refreshCount, 1, "expected whoami to refresh the expired session");
 
-    const status = await runCli(["cloud", "status"], env);
+    const refreshedSession = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
+    assert.strictEqual(refreshedSession.access_token, "access-abc");
+    assert.strictEqual(refreshedSession.refresh_token, "refresh-ghi");
+
+    const status = await runCli(["cloud", "status"], postLoginEnv);
     assert.strictEqual(status.code, 0, status.stderr);
+    assert.match(status.stdout, new RegExp(`Control plane: ${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
     assert.match(status.stdout, /State: provisioning/);
     assert.match(status.stdout, /Provisioning: running/);
 

@@ -21,6 +21,7 @@ const {
   fetchCloudStatus,
   fetchWhoAmI,
   getControlPlaneBaseUrl,
+  getSessionControlPlaneBaseUrl,
   getSessionPath,
   openBrowser,
   pollLogin,
@@ -874,14 +875,20 @@ async function login() {
 }
 
 async function whoami() {
-  const session = readSession();
+  let session = readSession();
   if (!session?.access_token) {
     console.error(`Not logged in. Run 'superturtle login'. Expected session file at ${getSessionPath()}`);
     process.exit(1);
   }
 
-  const identity = await fetchWhoAmI(session);
-  console.log(`Control plane: ${getControlPlaneBaseUrl()}`);
+  const result = await fetchWhoAmI(session);
+  const identity = result.data;
+  if (JSON.stringify(result.session) !== JSON.stringify(session)) {
+    writeSession(result.session);
+    session = result.session;
+  }
+
+  console.log(`Control plane: ${getSessionControlPlaneBaseUrl(session)}`);
   if (identity.user?.email) console.log(`User: ${identity.user.email}`);
   if (identity.user?.id) console.log(`User ID: ${identity.user.id}`);
   if (identity.workspace?.slug) console.log(`Workspace: ${identity.workspace.slug}`);
@@ -890,14 +897,20 @@ async function whoami() {
 }
 
 async function cloudStatus() {
-  const session = readSession();
+  let session = readSession();
   if (!session?.access_token) {
     console.error(`Not logged in. Run 'superturtle login'. Expected session file at ${getSessionPath()}`);
     process.exit(1);
   }
 
-  const status = await fetchCloudStatus(session);
-  console.log(`Control plane: ${getControlPlaneBaseUrl()}`);
+  const result = await fetchCloudStatus(session);
+  const status = result.data;
+  if (JSON.stringify(result.session) !== JSON.stringify(session)) {
+    writeSession(result.session);
+    session = result.session;
+  }
+
+  console.log(`Control plane: ${getSessionControlPlaneBaseUrl(session)}`);
   if (status.instance?.id) console.log(`Instance: ${status.instance.id}`);
   if (status.instance?.state) console.log(`State: ${status.instance.state}`);
   if (status.instance?.region) console.log(`Region: ${status.instance.region}`);
