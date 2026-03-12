@@ -46,6 +46,11 @@ function validateHttpUrl(value, fieldName, context, options = {}) {
   return parsed.toString();
 }
 
+function normalizeUrlOrigin(value, fieldName, context) {
+  const parsed = new URL(validateHttpUrl(value, fieldName, context));
+  return parsed.origin;
+}
+
 function getControlPlaneBaseUrl(env = process.env) {
   return validateHttpUrl(
     String(env.SUPERTURTLE_CLOUD_URL || DEFAULT_CONTROL_PLANE),
@@ -163,7 +168,7 @@ function validateTokenResponse(payload, context) {
   };
 }
 
-function validateLoginStartResponse(payload, context) {
+function validateLoginStartResponse(payload, context, controlPlaneBaseUrl = null) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error(`${context} returned an invalid response.`);
   }
@@ -182,6 +187,38 @@ function validateLoginStartResponse(payload, context) {
     throw new Error(
       `${context} did not include a valid verification_uri or verification_uri_complete.`
     );
+  }
+
+  if (controlPlaneBaseUrl) {
+    const expectedOrigin = normalizeUrlOrigin(
+      controlPlaneBaseUrl,
+      "control_plane",
+      "Configured hosted control plane"
+    );
+    if (verificationUri) {
+      const verificationOrigin = normalizeUrlOrigin(
+        verificationUri,
+        "verification_uri",
+        context
+      );
+      if (verificationOrigin !== expectedOrigin) {
+        throw new Error(
+          `${context} returned a verification_uri that does not match the configured control plane origin.`
+        );
+      }
+    }
+    if (verificationUriComplete) {
+      const verificationCompleteOrigin = normalizeUrlOrigin(
+        verificationUriComplete,
+        "verification_uri_complete",
+        context
+      );
+      if (verificationCompleteOrigin !== expectedOrigin) {
+        throw new Error(
+          `${context} returned a verification_uri_complete that does not match the configured control plane origin.`
+        );
+      }
+    }
   }
 
   let intervalMs = DEFAULT_POLL_INTERVAL_MS;
@@ -710,7 +747,7 @@ async function startLogin(options = {}, env = process.env) {
     },
     body: JSON.stringify(payload),
   });
-  return validateLoginStartResponse(started, "Hosted login start");
+  return validateLoginStartResponse(started, "Hosted login start", baseUrl);
 }
 
 async function pollLogin(started, options = {}, env = process.env) {

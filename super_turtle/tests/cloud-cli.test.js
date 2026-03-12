@@ -46,12 +46,13 @@ const server = http.createServer((req, res) => {
   req.on("end", () => {
     const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf-8")) : null;
     if (req.method === "POST" && req.url === "/v1/cli/login/start") {
+      const requestOrigin = `http://${req.headers.host}`;
       if (loginStartMode === "missing-device-code") {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({
           user_code: "USER-123",
-          verification_uri: "https://example.com/verify",
-          verification_uri_complete: "https://example.com/verify?code=USER-123",
+          verification_uri: `${requestOrigin}/verify`,
+          verification_uri_complete: `${requestOrigin}/verify?code=USER-123`,
           interval_ms: 10,
         }));
         return;
@@ -70,8 +71,8 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({
           device_code: "dev-code-123",
           user_code: "USER-123",
-          verification_uri: "https://example.com/verify",
-          verification_uri_complete: "https://example.com/verify?code=USER-123",
+          verification_uri: `${requestOrigin}/verify`,
+          verification_uri_complete: `${requestOrigin}/verify?code=USER-123`,
           interval_ms: 0,
         }));
         return;
@@ -86,12 +87,23 @@ const server = http.createServer((req, res) => {
         }));
         return;
       }
+      if (loginStartMode === "invalid-verification-origin") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({
+          device_code: "dev-code-123",
+          user_code: "USER-123",
+          verification_uri: "https://example.com/verify",
+          verification_uri_complete: "https://example.com/verify?code=USER-123",
+          interval_ms: 10,
+        }));
+        return;
+      }
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({
         device_code: "dev-code-123",
         user_code: "USER-123",
-        verification_uri: "https://example.com/verify",
-        verification_uri_complete: "https://example.com/verify?code=USER-123",
+        verification_uri: `${requestOrigin}/verify`,
+        verification_uri_complete: `${requestOrigin}/verify?code=USER-123`,
         interval_ms: 10,
       }));
       return;
@@ -316,6 +328,18 @@ server.listen(0, "127.0.0.1", async () => {
     assert.ok(
       !fs.existsSync(sessionPath),
       "expected malformed login start with invalid verification URI to avoid writing a session file"
+    );
+
+    loginStartMode = "invalid-verification-origin";
+    const invalidLoginStartVerificationOrigin = await runCli(["login", "--no-browser"], env);
+    assert.strictEqual(invalidLoginStartVerificationOrigin.code, 1);
+    assert.match(
+      invalidLoginStartVerificationOrigin.stderr,
+      /Hosted login start returned a verification_uri that does not match the configured control plane origin/i
+    );
+    assert.ok(
+      !fs.existsSync(sessionPath),
+      "expected mismatched login verification origin to avoid writing a session file"
     );
 
     loginStartMode = "normal";
