@@ -168,6 +168,23 @@ server.listen(0, "127.0.0.1", async () => {
       updated_at: "2026-03-12T09:59:00Z",
     });
 
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({ ...statusSession, control_plane: "http://127.0.0.1:1" }, null, 2)}\n`
+    );
+
+    const cachedWhoami = await runCli(["whoami"], env);
+    assert.strictEqual(cachedWhoami.code, 0, cachedWhoami.stderr);
+    assert.match(cachedWhoami.stderr, /using cached identity snapshot/i);
+    assert.match(cachedWhoami.stdout, /User: user@example.com/);
+    assert.match(cachedWhoami.stdout, /Plan: managed/);
+
+    const cachedStatus = await runCli(["cloud", "status"], env);
+    assert.strictEqual(cachedStatus.code, 0, cachedStatus.stderr);
+    assert.match(cachedStatus.stderr, /using cached cloud status snapshot/i);
+    assert.match(cachedStatus.stdout, /Instance: inst_123/);
+    assert.match(cachedStatus.stdout, /Provisioning: running/);
+
     const logout = await runCli(["logout"], env);
     assert.strictEqual(logout.code, 0, logout.stderr);
     assert.ok(!fs.existsSync(sessionPath), "expected logout to remove session file");

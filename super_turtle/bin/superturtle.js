@@ -21,6 +21,8 @@ const {
   fetchCloudStatus,
   fetchWhoAmI,
   getControlPlaneBaseUrl,
+  hasCachedSnapshot,
+  isRetryableCloudError,
   getSessionControlPlaneBaseUrl,
   getSessionPath,
   mergeSessionSnapshot,
@@ -882,16 +884,31 @@ async function whoami() {
     process.exit(1);
   }
 
-  const result = await fetchWhoAmI(session);
-  const identity = result.data;
-  const mergedSession = mergeSessionSnapshot(
-    result.session,
-    identity,
-    getSessionControlPlaneBaseUrl(result.session)
-  );
-  if (JSON.stringify(mergedSession) !== JSON.stringify(session)) {
-    writeSession(mergedSession);
-    session = mergedSession;
+  let identity = null;
+  try {
+    const result = await fetchWhoAmI(session);
+    identity = result.data;
+    const mergedSession = mergeSessionSnapshot(
+      result.session,
+      identity,
+      getSessionControlPlaneBaseUrl(result.session)
+    );
+    if (JSON.stringify(mergedSession) !== JSON.stringify(session)) {
+      writeSession(mergedSession);
+      session = mergedSession;
+    }
+  } catch (error) {
+    if (!isRetryableCloudError(error) || !hasCachedSnapshot(session, ["user", "workspace", "entitlement"])) {
+      throw error;
+    }
+    identity = {
+      user: session.user || null,
+      workspace: session.workspace || null,
+      entitlement: session.entitlement || null,
+    };
+    console.error(
+      `Control plane unreachable; using cached identity snapshot from ${session.last_sync_at || session.created_at || "unknown time"}.`
+    );
   }
 
   console.log(`Control plane: ${getSessionControlPlaneBaseUrl(session)}`);
@@ -909,16 +926,30 @@ async function cloudStatus() {
     process.exit(1);
   }
 
-  const result = await fetchCloudStatus(session);
-  const status = result.data;
-  const mergedSession = mergeSessionSnapshot(
-    result.session,
-    status,
-    getSessionControlPlaneBaseUrl(result.session)
-  );
-  if (JSON.stringify(mergedSession) !== JSON.stringify(session)) {
-    writeSession(mergedSession);
-    session = mergedSession;
+  let status = null;
+  try {
+    const result = await fetchCloudStatus(session);
+    status = result.data;
+    const mergedSession = mergeSessionSnapshot(
+      result.session,
+      status,
+      getSessionControlPlaneBaseUrl(result.session)
+    );
+    if (JSON.stringify(mergedSession) !== JSON.stringify(session)) {
+      writeSession(mergedSession);
+      session = mergedSession;
+    }
+  } catch (error) {
+    if (!isRetryableCloudError(error) || !hasCachedSnapshot(session, ["instance", "provisioning_job"])) {
+      throw error;
+    }
+    status = {
+      instance: session.instance || null,
+      provisioning_job: session.provisioning_job || null,
+    };
+    console.error(
+      `Control plane unreachable; using cached cloud status snapshot from ${session.last_sync_at || session.created_at || "unknown time"}.`
+    );
   }
 
   console.log(`Control plane: ${getSessionControlPlaneBaseUrl(session)}`);

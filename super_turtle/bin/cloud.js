@@ -154,6 +154,44 @@ function mergeSessionSnapshot(session, snapshot, baseUrl = null) {
   return nextSession;
 }
 
+function hasCachedSnapshot(session, keys) {
+  if (!session || typeof session !== "object") return false;
+  return keys.some((key) => Object.prototype.hasOwnProperty.call(session, key) && session[key] != null);
+}
+
+function isRetryableCloudError(error) {
+  if (!error || typeof error !== "object") return false;
+  if (typeof error.status === "number") return false;
+  if (error.name === "AbortError") return true;
+
+  const code = typeof error.code === "string" ? error.code : "";
+  if (code) {
+    return [
+      "ECONNREFUSED",
+      "ECONNRESET",
+      "EHOSTUNREACH",
+      "ENETUNREACH",
+      "ETIMEDOUT",
+    ].includes(code);
+  }
+
+  const causeCode =
+    error.cause && typeof error.cause === "object" && typeof error.cause.code === "string"
+      ? error.cause.code
+      : "";
+  if (causeCode) {
+    return [
+      "ECONNREFUSED",
+      "ECONNRESET",
+      "EHOSTUNREACH",
+      "ENETUNREACH",
+      "ETIMEDOUT",
+    ].includes(causeCode);
+  }
+
+  return /fetch failed|network error|timed out|timeout/i.test(error.message || "");
+}
+
 async function startLogin(options = {}, env = process.env) {
   const baseUrl = getControlPlaneBaseUrl(env);
   const payload = {
@@ -274,6 +312,8 @@ module.exports = {
   readSession,
   refreshSession,
   mergeSessionSnapshot,
+  hasCachedSnapshot,
   startLogin,
+  isRetryableCloudError,
   writeSession,
 };
