@@ -194,7 +194,7 @@ function ensureSafeSessionDirectory(dirPath, options = {}) {
       if (!options.create) {
         return;
       }
-      fs.mkdirSync(current);
+      fs.mkdirSync(current, { mode: 0o700 });
       fsyncParentDirectory(current);
       fsyncPath(current, `directory ${current}`, { kind: "directory" });
       continue;

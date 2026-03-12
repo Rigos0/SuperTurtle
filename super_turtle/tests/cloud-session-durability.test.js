@@ -81,6 +81,16 @@ try {
   );
 
   if (process.platform !== "win32") {
+    assert.strictEqual(
+      fs.statSync(nestedSessionParentDir).mode & 0o777,
+      0o700,
+      "expected writeSession to create intermediate hosted session directories with 0700 permissions"
+    );
+    assert.strictEqual(
+      fs.statSync(nestedSessionDir).mode & 0o777,
+      0o700,
+      "expected writeSession to create final hosted session directories with 0700 permissions"
+    );
     assert.ok(
       fsyncTargets.includes(tmpDir),
       "expected writeSession to fsync the existing parent directory after creating the first missing session directory"
