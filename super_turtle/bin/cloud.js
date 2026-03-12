@@ -250,6 +250,27 @@ function openSessionFileForRead(path) {
   }
 }
 
+function readBoundedFileText(fd, path, maxBytes) {
+  const chunks = [];
+  const chunkSize = Math.min(64 * 1024, Math.max(1024, maxBytes));
+  let totalBytes = 0;
+
+  for (;;) {
+    const buffer = Buffer.allocUnsafe(chunkSize);
+    const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, null);
+    if (bytesRead === 0) {
+      break;
+    }
+    totalBytes += bytesRead;
+    if (totalBytes > maxBytes) {
+      throw invalidSessionFile(path, `exceeds the configured size limit of ${maxBytes} bytes`);
+    }
+    chunks.push(buffer.subarray(0, bytesRead));
+  }
+
+  return Buffer.concat(chunks).toString("utf-8");
+}
+
 function hardenSessionFilePermissions(path) {
   if (process.platform === "win32") {
     return;
@@ -708,7 +729,7 @@ function readSession(env = process.env) {
     if (stats.size > maxBytes) {
       throw invalidSessionFile(path, `exceeds the configured size limit of ${maxBytes} bytes`);
     }
-    raw = fs.readFileSync(fd, "utf-8");
+    raw = readBoundedFileText(fd, path, maxBytes);
   } catch (error) {
     if (error instanceof Error && /^Hosted session file at .* must be a regular file\./.test(error.message)) {
       throw error;
