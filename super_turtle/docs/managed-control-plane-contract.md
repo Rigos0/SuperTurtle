@@ -4,6 +4,8 @@ This document defines the first production-shaped contract for the hosted manage
 
 ## CLI API surfaces
 
+- `POST /v1/billing/stripe/checkout-session`
+  Authenticated by the hosted CLI/site bearer session. Creates a Stripe Checkout session for the managed-hosting plan, persists the checkout-session to user/subscription linkage durably for later webhook reconciliation, and returns the hosted Stripe checkout URL.
 - `POST /v1/cli/session/refresh`
   Accepts a refresh token, rotates the hosted bearer credentials, updates durable session-auth timestamps, and returns bearer tokens plus optional identity, entitlement, instance, provisioning-job, and audit-log snapshots.
 - `POST /v1/cli/login/poll`

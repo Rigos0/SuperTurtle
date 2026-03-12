@@ -21,6 +21,7 @@ const {
   requestSession,
   requestSessionRefresh,
   requestInstanceResume,
+  requestStripeCheckoutSession,
   requestStripeWebhook,
   runNextProvisioningJob,
   writeState,
@@ -326,6 +327,66 @@ async function run() {
   assert.strictEqual(forbidden.status, 403);
   assert.deepStrictEqual(readState(forbiddenPath).managed_instances, []);
 
+  const checkoutPath = resolve(tmpDir, "checkout-state.json");
+  const checkoutState = createSeedState();
+  checkoutState.entitlements[0].state = "inactive";
+  writeState(checkoutPath, checkoutState);
+  const checkoutRuntime = createRuntime({
+    statePath: checkoutPath,
+    now: createClock(),
+    stripe: {
+      billingAdapter: {
+        async createCheckoutSession({ userId, plan, customerId }) {
+          assert.strictEqual(userId, "user_123");
+          assert.strictEqual(plan, "managed");
+          assert.strictEqual(customerId, null);
+          return {
+            id: "cs_created_123",
+            url: "https://checkout.stripe.test/session/cs_created_123",
+            customerId: "cus_checkout_123",
+            subscriptionId: null,
+          };
+        },
+      },
+    },
+  });
+  const checkoutCreated = await requestStripeCheckoutSession(checkoutRuntime, "access_123", {
+    plan: "managed",
+  });
+  assert.strictEqual(checkoutCreated.status, 200);
+  assert.strictEqual(checkoutCreated.data.checkout_session_id, "cs_created_123");
+  assert.strictEqual(checkoutCreated.data.customer_id, "cus_checkout_123");
+  assert.match(checkoutCreated.data.checkout_url, /^https:\/\/checkout\.stripe\.test\//);
+  const checkoutPersisted = readState(checkoutPath);
+  assert.strictEqual(checkoutPersisted.subscriptions.length, 1);
+  assert.strictEqual(checkoutPersisted.subscriptions[0].checkout_session_id, "cs_created_123");
+  assert.strictEqual(checkoutPersisted.subscriptions[0].provider_customer_id, "cus_checkout_123");
+  assert.strictEqual(checkoutPersisted.subscriptions[0].state, "inactive");
+  assert.match(
+    JSON.stringify(checkoutPersisted.audit_log),
+    /billing\.checkout_session_created/,
+    "expected checkout-session creation to be written to the durable audit log"
+  );
+
+  const checkoutActiveDenied = await requestStripeCheckoutSession(
+    createRuntime({
+      statePath,
+      now: createClock(),
+      stripe: {
+        billingAdapter: {
+          async createCheckoutSession() {
+            throw new Error("should not be called for already-active entitlements");
+          },
+        },
+      },
+    }),
+    refreshed.data.access_token,
+    {
+      plan: "managed",
+    }
+  );
+  assert.strictEqual(checkoutActiveDenied.status, 409);
+
   const checkoutEventPayload = JSON.stringify({
     id: "evt_checkout_123",
     type: "checkout.session.completed",
@@ -595,6 +656,50 @@ async function run() {
   assert.strictEqual(malformedRefreshResponse.status, 415);
 
   server.close();
+
+  const httpCheckoutPath = resolve(tmpDir, "http-checkout-state.json");
+  const httpCheckoutState = createSeedState();
+  httpCheckoutState.entitlements[0].state = "inactive";
+  writeState(httpCheckoutPath, httpCheckoutState);
+  const httpCheckoutRuntime = createRuntime({
+    statePath: httpCheckoutPath,
+    now: createClock(),
+    stripe: {
+      billingAdapter: {
+        async createCheckoutSession() {
+          return {
+            id: "cs_http_checkout_123",
+            url: "https://checkout.stripe.test/session/cs_http_checkout_123",
+            customerId: "cus_http_checkout_123",
+            subscriptionId: null,
+          };
+        },
+      },
+    },
+  });
+  const checkoutServer = http.createServer(async (req, res) => {
+    const response = await handleHttpRequest(httpCheckoutRuntime, req);
+    res.writeHead(response.status, response.headers);
+    res.end(response.body);
+  });
+  await new Promise((resolveListen) => checkoutServer.listen(0, "127.0.0.1", resolveListen));
+  const checkoutAddress = checkoutServer.address();
+  const httpCheckoutResponse = await fetch(
+    `http://127.0.0.1:${checkoutAddress.port}/v1/billing/stripe/checkout-session`,
+    {
+      method: "POST",
+      headers: {
+        authorization: "Bearer access_123",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ plan: "managed" }),
+    }
+  );
+  assert.strictEqual(httpCheckoutResponse.status, 200);
+  const httpCheckoutPayload = await httpCheckoutResponse.json();
+  assert.strictEqual(httpCheckoutPayload.checkout_session_id, "cs_http_checkout_123");
+  assert.strictEqual(readState(httpCheckoutPath).subscriptions[0].checkout_session_id, "cs_http_checkout_123");
+  checkoutServer.close();
 }
 
 run().catch((error) => {

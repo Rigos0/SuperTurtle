@@ -2,6 +2,7 @@ const fs = require("fs");
 const { dirname, resolve } = require("path");
 const { createGcpProvisioner } = require("./cloud-gcp-provisioner.js");
 const {
+  createStripeBillingAdapter,
   normalizeStripeWebhookEvent,
   parseStripeWebhookEvent,
   verifyStripeWebhookSignature,
@@ -135,6 +136,7 @@ function createRuntime(options) {
         options.stripe && typeof options.stripe.webhookSecret === "string"
           ? options.stripe.webhookSecret
           : "",
+      billingAdapter: createConfiguredStripeBillingAdapter(options),
     },
     config: {
       provider: "gcp",
@@ -414,6 +416,14 @@ function normalizeRequestedScopes(scopes) {
 
 function isStripeWebhookConfigured(runtime) {
   return Boolean(runtime.stripe && typeof runtime.stripe.webhookSecret === "string" && runtime.stripe.webhookSecret);
+}
+
+function isStripeCheckoutConfigured(runtime) {
+  return Boolean(
+    runtime.stripe &&
+      runtime.stripe.billingAdapter &&
+      typeof runtime.stripe.billingAdapter.createCheckoutSession === "function"
+  );
 }
 
 function recordBillingEvent(state, runtime, event) {
@@ -956,6 +966,96 @@ function requestStripeWebhook(runtime, signatureHeader, rawBody) {
   };
 }
 
+async function requestStripeCheckoutSession(runtime, accessToken, payload = {}) {
+  if (!isStripeCheckoutConfigured(runtime)) {
+    return { status: 503, data: { error: "stripe_checkout_not_configured" } };
+  }
+
+  const state = readState(runtime.statePath);
+  const session = getUserSession(state, accessToken);
+  if (!session) {
+    return { status: 401, data: { error: "invalid_session" } };
+  }
+
+  const entitlement = getEntitlement(state, session.user_id);
+  if (entitlement && ACTIVE_ENTITLEMENT_STATES.has(entitlement.state)) {
+    return { status: 409, data: { error: "managed_hosting_already_active" } };
+  }
+
+  const requestPayload = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+  const plan =
+    typeof requestPayload.plan === "string" && requestPayload.plan.trim().length > 0
+      ? requestPayload.plan.trim()
+      : "managed";
+  const existingSubscription =
+    state.subscriptions
+      .filter((subscription) => subscription && subscription.user_id === session.user_id)
+      .sort((left, right) =>
+        String(right.updated_at || right.created_at || "").localeCompare(String(left.updated_at || left.created_at || ""))
+      )[0] || null;
+  const user = getUser(state, session.user_id);
+  if (!user) {
+    throw new Error(`Session ${session.id} references missing user ${session.user_id}.`);
+  }
+
+  let checkout;
+  try {
+    checkout = await runtime.stripe.billingAdapter.createCheckoutSession({
+      userId: session.user_id,
+      plan,
+      customerId: existingSubscription?.provider_customer_id || null,
+      metadata: {
+        session_id: session.id,
+        user_email: user.email || "",
+      },
+    });
+  } catch (error) {
+    return {
+      status: 502,
+      data: { error: error && typeof error.code === "string" ? error.code : "stripe_checkout_failed" },
+    };
+  }
+
+  const subscriptionRecord = upsertSubscriptionRecord(state, runtime, {
+    userId: session.user_id,
+    customerId: checkout.customerId || existingSubscription?.provider_customer_id || null,
+    subscriptionId: checkout.subscriptionId || existingSubscription?.provider_subscription_id || null,
+    checkoutSessionId: checkout.id,
+    plan,
+    eventId: existingSubscription?.latest_event_id || null,
+    eventType: "checkout.session.created",
+  });
+  if (!subscriptionRecord.state) {
+    subscriptionRecord.state = "inactive";
+  }
+
+  appendAudit(state, runtime, {
+    actor_type: "user",
+    actor_id: session.user_id,
+    action: "billing.checkout_session_created",
+    target_type: "user",
+    target_id: session.user_id,
+    metadata: {
+      checkout_session_id: checkout.id,
+      customer_id: subscriptionRecord.provider_customer_id || null,
+      subscription_id: subscriptionRecord.provider_subscription_id || null,
+      plan,
+    },
+  });
+  writeState(runtime.statePath, state);
+
+  return {
+    status: 200,
+    data: {
+      checkout_session_id: checkout.id,
+      checkout_url: checkout.url,
+      customer_id: subscriptionRecord.provider_customer_id || null,
+      subscription_id: subscriptionRecord.provider_subscription_id || null,
+      plan,
+    },
+  };
+}
+
 function requestLoginStart(runtime, payload = {}) {
   const state = readState(runtime.statePath);
   const requestPayload =
@@ -1283,6 +1383,33 @@ function extractBearerToken(request) {
 }
 
 async function handleHttpRequest(runtime, request) {
+  if (request.method === "POST" && request.url === "/v1/billing/stripe/checkout-session") {
+    let payload;
+    try {
+      payload = await readJsonRequestBody(request, runtime.requestBodyMaxBytes);
+    } catch (error) {
+      return {
+        status: error.status || 400,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        body: JSON.stringify({ error: error.code || "invalid_request" }),
+      };
+    }
+    const accessToken = extractBearerToken(request);
+    if (!accessToken) {
+      return {
+        status: 401,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        body: JSON.stringify({ error: "missing_bearer_token" }),
+      };
+    }
+    const result = await requestStripeCheckoutSession(runtime, accessToken, payload);
+    return {
+      status: result.status,
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
+      body: JSON.stringify(result.data),
+    };
+  }
+
   if (request.method === "POST" && request.url === "/v1/billing/stripe/webhook") {
     let rawBody;
     try {
@@ -1579,12 +1706,38 @@ function createConfiguredProvisioner(options) {
   return createNoopProvisioner();
 }
 
+function createConfiguredStripeBillingAdapter(options) {
+  const stripeOptions = options && options.stripe && typeof options.stripe === "object" ? options.stripe : null;
+  if (
+    stripeOptions &&
+    stripeOptions.billingAdapter &&
+    typeof stripeOptions.billingAdapter.createCheckoutSession === "function"
+  ) {
+    return stripeOptions.billingAdapter;
+  }
+  if (
+    stripeOptions &&
+    typeof stripeOptions.secretKey === "string" &&
+    stripeOptions.secretKey.trim().length > 0 &&
+    typeof stripeOptions.priceId === "string" &&
+    stripeOptions.priceId.trim().length > 0 &&
+    typeof stripeOptions.successUrl === "string" &&
+    stripeOptions.successUrl.trim().length > 0 &&
+    typeof stripeOptions.cancelUrl === "string" &&
+    stripeOptions.cancelUrl.trim().length > 0
+  ) {
+    return createStripeBillingAdapter(stripeOptions);
+  }
+  return null;
+}
+
 module.exports = {
   CONTROL_PLANE_WRITE_SCOPE,
   STATE_SCHEMA_VERSION,
   completeLoginRequest,
   createDefaultState,
   createConfiguredProvisioner,
+  createConfiguredStripeBillingAdapter,
   createNoopProvisioner,
   createRuntime,
   handleHttpRequest,
@@ -1593,6 +1746,7 @@ module.exports = {
   requestMachineHeartbeat,
   requestMachineRegister,
   requestInstanceReprovision,
+  requestStripeCheckoutSession,
   requestStripeWebhook,
   requestLoginPoll,
   requestLoginStart,

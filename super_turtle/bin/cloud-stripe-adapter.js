@@ -1,4 +1,6 @@
 const crypto = require("crypto");
+const http = require("http");
+const https = require("https");
 
 const DEFAULT_SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 
@@ -143,6 +145,162 @@ function toIsoTimestamp(seconds) {
   return new Date(seconds * 1000).toISOString();
 }
 
+function validateReturnUrl(value, fieldName) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    fail(`Stripe checkout ${fieldName} is required.`, "invalid_checkout_config");
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    fail(`Stripe checkout ${fieldName} must be a valid URL.`, "invalid_checkout_config");
+  }
+
+  if ((parsed.protocol !== "https:" && parsed.protocol !== "http:") || parsed.username || parsed.password) {
+    fail(`Stripe checkout ${fieldName} must be an http or https URL without embedded credentials.`, "invalid_checkout_config");
+  }
+
+  return parsed.toString();
+}
+
+function validateCheckoutSessionResponse(response) {
+  if (!response || typeof response !== "object" || Array.isArray(response)) {
+    fail("Stripe checkout adapter returned an invalid response.", "invalid_checkout_response");
+  }
+  if (typeof response.id !== "string" || response.id.trim().length === 0) {
+    fail("Stripe checkout adapter response is missing id.", "invalid_checkout_response");
+  }
+  if (typeof response.url !== "string" || response.url.trim().length === 0) {
+    fail("Stripe checkout adapter response is missing url.", "invalid_checkout_response");
+  }
+
+  return {
+    id: response.id.trim(),
+    url: response.url.trim(),
+    customerId:
+      typeof response.customerId === "string" && response.customerId.trim().length > 0
+        ? response.customerId.trim()
+        : null,
+    subscriptionId:
+      typeof response.subscriptionId === "string" && response.subscriptionId.trim().length > 0
+        ? response.subscriptionId.trim()
+        : null,
+  };
+}
+
+function encodeStripeForm(data) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(data)) {
+    if (value == null) {
+      continue;
+    }
+    params.append(key, String(value));
+  }
+  return params.toString();
+}
+
+function createStripeBillingAdapter(options = {}) {
+  const secretKey = typeof options.secretKey === "string" ? options.secretKey.trim() : "";
+  const priceId = typeof options.priceId === "string" ? options.priceId.trim() : "";
+  const apiBaseUrl =
+    typeof options.apiBaseUrl === "string" && options.apiBaseUrl.trim().length > 0
+      ? options.apiBaseUrl.trim().replace(/\/+$/, "")
+      : "https://api.stripe.com";
+  const mode = typeof options.mode === "string" && options.mode.trim().length > 0 ? options.mode.trim() : "subscription";
+  const successUrl = validateReturnUrl(options.successUrl, "successUrl");
+  const cancelUrl = validateReturnUrl(options.cancelUrl, "cancelUrl");
+
+  if (!secretKey) {
+    fail("Stripe secret key is not configured.", "missing_api_key");
+  }
+  if (!priceId) {
+    fail("Stripe managed plan price id is not configured.", "missing_price_id");
+  }
+
+  return {
+    async createCheckoutSession({ userId, plan, customerId, metadata = {} }) {
+      if (typeof userId !== "string" || userId.trim().length === 0) {
+        fail("Stripe checkout requires a userId.", "invalid_checkout_request");
+      }
+
+      const requestBody = encodeStripeForm({
+        mode,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        "line_items[0][quantity]": 1,
+        "line_items[0][price]": priceId,
+        "metadata[user_id]": userId.trim(),
+        "metadata[plan]": normalizePlan(plan),
+        "subscription_data[metadata][user_id]": userId.trim(),
+        "subscription_data[metadata][plan]": normalizePlan(plan),
+        customer: customerId || undefined,
+        "client_reference_id": userId.trim(),
+        ...Object.fromEntries(
+          Object.entries(metadata)
+            .filter(([key, value]) => typeof key === "string" && key.trim().length > 0 && value != null)
+            .map(([key, value]) => [`metadata[${key}]`, String(value)])
+        ),
+      });
+
+      const target = new URL(`${apiBaseUrl}/v1/checkout/sessions`);
+      const requestImpl = target.protocol === "http:" ? http : https;
+      const response = await new Promise((resolvePromise, rejectPromise) => {
+        const request = requestImpl.request(
+          {
+            protocol: target.protocol,
+            hostname: target.hostname,
+            port: target.port || undefined,
+            path: `${target.pathname}${target.search}`,
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${secretKey}`,
+              "content-type": "application/x-www-form-urlencoded",
+              "content-length": Buffer.byteLength(requestBody),
+            },
+          },
+          (res) => {
+            const chunks = [];
+            res.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+            res.on("end", () => {
+              const body = Buffer.concat(chunks).toString("utf-8");
+              if (res.statusCode !== 200) {
+                const error = new Error(`Stripe checkout session creation failed with status ${res.statusCode}.`);
+                error.code = "stripe_checkout_failed";
+                error.statusCode = res.statusCode;
+                error.responseBody = body;
+                rejectPromise(error);
+                return;
+              }
+
+              let parsed;
+              try {
+                parsed = JSON.parse(body);
+              } catch {
+                const error = new Error("Stripe checkout session creation returned invalid JSON.");
+                error.code = "stripe_checkout_failed";
+                rejectPromise(error);
+                return;
+              }
+              resolvePromise(parsed);
+            });
+          }
+        );
+        request.on("error", rejectPromise);
+        request.write(requestBody);
+        request.end();
+      });
+
+      return validateCheckoutSessionResponse({
+        id: response.id,
+        url: response.url,
+        customerId: response.customer,
+        subscriptionId: response.subscription,
+      });
+    },
+  };
+}
+
 function normalizeStripeWebhookEvent(event) {
   const object = event.data.object;
   if (event.type === "checkout.session.completed") {
@@ -191,7 +349,9 @@ function normalizeStripeWebhookEvent(event) {
 }
 
 module.exports = {
+  createStripeBillingAdapter,
   normalizeStripeWebhookEvent,
   parseStripeWebhookEvent,
+  validateCheckoutSessionResponse,
   verifyStripeWebhookSignature,
 };
