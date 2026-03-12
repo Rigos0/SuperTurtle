@@ -590,6 +590,32 @@ server.listen(0, "127.0.0.1", async () => {
     assert.match(corruptWhoami.stderr, /Hosted session file .* invalid JSON/i);
     assert.match(corruptWhoami.stderr, /superturtle logout/i);
 
+    const symlinkTargetPath = resolve(tmpDir, "cloud-session-target.json");
+    fs.writeFileSync(
+      symlinkTargetPath,
+      `${JSON.stringify({
+        schema_version: 1,
+        access_token: "access-abc",
+        refresh_token: "refresh-ghi",
+        expires_at: "2999-03-12T10:00:00Z",
+        control_plane: baseUrl,
+      }, null, 2)}\n`
+    );
+    fs.rmSync(sessionPath, { force: true });
+    fs.symlinkSync(symlinkTargetPath, sessionPath);
+    const symlinkWhoami = await runCli(["whoami"], env);
+    assert.strictEqual(symlinkWhoami.code, 1);
+    assert.match(symlinkWhoami.stderr, /Hosted session file .* must be a regular file/i);
+    assert.match(symlinkWhoami.stderr, /superturtle logout/i);
+    fs.rmSync(sessionPath, { force: true });
+
+    fs.mkdirSync(sessionPath);
+    const directoryWhoami = await runCli(["whoami"], env);
+    assert.strictEqual(directoryWhoami.code, 1);
+    assert.match(directoryWhoami.stderr, /Hosted session file .* must be a regular file/i);
+    assert.match(directoryWhoami.stderr, /superturtle logout/i);
+    fs.rmSync(sessionPath, { recursive: true, force: true });
+
     fs.writeFileSync(
       sessionPath,
       `${JSON.stringify({

@@ -81,12 +81,29 @@ function ensureParentDir(filePath) {
   fs.mkdirSync(dirname(filePath), { recursive: true });
 }
 
+function ensureRegularSessionFile(path) {
+  let stats;
+  try {
+    stats = fs.lstatSync(path);
+  } catch (error) {
+    throw new Error(
+      `Failed to inspect hosted session file at ${path}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+
+  if (!stats.isFile()) {
+    throw invalidSessionFile(path, "must be a regular file");
+  }
+
+  return stats;
+}
+
 function hardenSessionFilePermissions(path) {
   if (process.platform === "win32" || !fs.existsSync(path)) {
     return;
   }
 
-  const currentMode = fs.statSync(path).mode & 0o777;
+  const currentMode = ensureRegularSessionFile(path).mode & 0o777;
   if (currentMode === 0o600) {
     return;
   }
@@ -493,9 +510,12 @@ function readSession(env = process.env) {
   let raw;
   let stats;
   try {
+    stats = ensureRegularSessionFile(path);
     raw = fs.readFileSync(path, "utf-8");
-    stats = fs.statSync(path);
   } catch (error) {
+    if (error instanceof Error && /^Hosted session file at .* must be a regular file\./.test(error.message)) {
+      throw error;
+    }
     throw new Error(
       `Failed to read hosted session file at ${path}: ${error instanceof Error ? error.message : String(error)}`
     );
@@ -549,6 +569,9 @@ function readSession(env = process.env) {
 function writeSession(session, env = process.env) {
   const path = getSessionPath(env);
   ensureParentDir(path);
+  if (fs.existsSync(path)) {
+    ensureRegularSessionFile(path);
+  }
   const normalized = {
     schema_version: CLOUD_SESSION_SCHEMA_VERSION,
     ...session,
