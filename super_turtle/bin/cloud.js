@@ -13,6 +13,7 @@ const DEFAULT_RESPONSE_MAX_BYTES = 256 * 1024;
 const DEFAULT_SESSION_FILE_MAX_BYTES = 256 * 1024;
 const MAX_OPAQUE_TOKEN_BYTES = 4096;
 const MAX_USER_CODE_BYTES = 256;
+const MAX_DISPLAY_FIELD_BYTES = 1024;
 const SESSION_EXPIRY_SKEW_MS = 30 * 1000;
 const CLOUD_SESSION_SCHEMA_VERSION = 1;
 
@@ -433,6 +434,16 @@ function isDisplayCodeString(value) {
   );
 }
 
+function isDisplayFieldString(value) {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.trim() === value &&
+    Buffer.byteLength(value, "utf-8") <= MAX_DISPLAY_FIELD_BYTES &&
+    !/[\x00-\x1F\x7F]/.test(value)
+  );
+}
+
 function validateTimestamp(value, fieldName, context) {
   if (value == null) {
     return null;
@@ -593,13 +604,17 @@ function validateWhoAmIResponse(payload, context) {
 
   const user = validateOptionalObject(payload.user, "user", context);
   if (user) {
-    if (Object.prototype.hasOwnProperty.call(user, "id") && user.id != null && !isNonEmptyString(user.id)) {
+    if (
+      Object.prototype.hasOwnProperty.call(user, "id") &&
+      user.id != null &&
+      !isDisplayFieldString(user.id)
+    ) {
       throw new Error(`${context} returned an invalid user.id.`);
     }
     if (
       Object.prototype.hasOwnProperty.call(user, "email") &&
       user.email != null &&
-      !isNonEmptyString(user.email)
+      !isDisplayFieldString(user.email)
     ) {
       throw new Error(`${context} returned an invalid user.email.`);
     }
@@ -610,7 +625,7 @@ function validateWhoAmIResponse(payload, context) {
     workspace &&
     Object.prototype.hasOwnProperty.call(workspace, "slug") &&
     workspace.slug != null &&
-    !isNonEmptyString(workspace.slug)
+    !isDisplayFieldString(workspace.slug)
   ) {
     throw new Error(`${context} returned an invalid workspace.slug.`);
   }
@@ -620,14 +635,14 @@ function validateWhoAmIResponse(payload, context) {
     if (
       Object.prototype.hasOwnProperty.call(entitlement, "plan") &&
       entitlement.plan != null &&
-      !isNonEmptyString(entitlement.plan)
+      !isDisplayFieldString(entitlement.plan)
     ) {
       throw new Error(`${context} returned an invalid entitlement.plan.`);
     }
     if (
       Object.prototype.hasOwnProperty.call(entitlement, "state") &&
       entitlement.state != null &&
-      !isNonEmptyString(entitlement.state)
+      !isDisplayFieldString(entitlement.state)
     ) {
       throw new Error(`${context} returned an invalid entitlement.state.`);
     }
@@ -650,28 +665,28 @@ function validateCloudStatusResponse(payload, context) {
     if (
       Object.prototype.hasOwnProperty.call(instance, "id") &&
       instance.id != null &&
-      !isNonEmptyString(instance.id)
+      !isDisplayFieldString(instance.id)
     ) {
       throw new Error(`${context} returned an invalid instance.id.`);
     }
     if (
       Object.prototype.hasOwnProperty.call(instance, "state") &&
       instance.state != null &&
-      !isNonEmptyString(instance.state)
+      !isDisplayFieldString(instance.state)
     ) {
       throw new Error(`${context} returned an invalid instance.state.`);
     }
     if (
       Object.prototype.hasOwnProperty.call(instance, "region") &&
       instance.region != null &&
-      !isNonEmptyString(instance.region)
+      !isDisplayFieldString(instance.region)
     ) {
       throw new Error(`${context} returned an invalid instance.region.`);
     }
     if (
       Object.prototype.hasOwnProperty.call(instance, "hostname") &&
       instance.hostname != null &&
-      !isNonEmptyString(instance.hostname)
+      !isDisplayFieldString(instance.hostname)
     ) {
       throw new Error(`${context} returned an invalid instance.hostname.`);
     }
@@ -686,7 +701,7 @@ function validateCloudStatusResponse(payload, context) {
     if (
       Object.prototype.hasOwnProperty.call(provisioningJob, "state") &&
       provisioningJob.state != null &&
-      !isNonEmptyString(provisioningJob.state)
+      !isDisplayFieldString(provisioningJob.state)
     ) {
       throw new Error(`${context} returned an invalid provisioning_job.state.`);
     }
