@@ -609,6 +609,19 @@ server.listen(0, "127.0.0.1", async () => {
     assert.match(symlinkWhoami.stderr, /superturtle logout/i);
     fs.rmSync(sessionPath, { force: true });
 
+    const danglingSymlinkTargetPath = resolve(tmpDir, "cloud-session-dangling-target.json");
+    fs.symlinkSync(danglingSymlinkTargetPath, sessionPath);
+    const danglingSymlinkWhoami = await runCli(["whoami"], env);
+    assert.strictEqual(danglingSymlinkWhoami.code, 1);
+    assert.match(danglingSymlinkWhoami.stderr, /Hosted session file .* must be a regular file/i);
+    assert.match(danglingSymlinkWhoami.stderr, /superturtle logout/i);
+    const danglingSymlinkLogin = await runCli(["login", "--no-browser"], env);
+    assert.strictEqual(danglingSymlinkLogin.code, 1);
+    assert.match(danglingSymlinkLogin.stderr, /Hosted session file .* must be a regular file/i);
+    assert.match(danglingSymlinkLogin.stderr, /superturtle logout/i);
+    assert.ok(fs.lstatSync(sessionPath).isSymbolicLink(), "expected dangling symlink session path to remain untouched");
+    fs.rmSync(sessionPath, { force: true });
+
     fs.mkdirSync(sessionPath);
     const directoryWhoami = await runCli(["whoami"], env);
     assert.strictEqual(directoryWhoami.code, 1);

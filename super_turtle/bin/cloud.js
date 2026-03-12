@@ -81,6 +81,17 @@ function ensureParentDir(filePath) {
   fs.mkdirSync(dirname(filePath), { recursive: true });
 }
 
+function lstatIfExists(path) {
+  try {
+    return fs.lstatSync(path);
+  } catch (error) {
+    if (error && typeof error === "object" && error.code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+}
+
 function ensureRegularSessionFile(path) {
   let stats;
   try {
@@ -99,7 +110,12 @@ function ensureRegularSessionFile(path) {
 }
 
 function hardenSessionFilePermissions(path) {
-  if (process.platform === "win32" || !fs.existsSync(path)) {
+  if (process.platform === "win32") {
+    return;
+  }
+
+  const existing = lstatIfExists(path);
+  if (!existing) {
     return;
   }
 
@@ -506,7 +522,7 @@ function validateStoredSession(session, path) {
 
 function readSession(env = process.env) {
   const path = getSessionPath(env);
-  if (!fs.existsSync(path)) return null;
+  if (!lstatIfExists(path)) return null;
   let raw;
   let stats;
   try {
@@ -569,7 +585,7 @@ function readSession(env = process.env) {
 function writeSession(session, env = process.env) {
   const path = getSessionPath(env);
   ensureParentDir(path);
-  if (fs.existsSync(path)) {
+  if (lstatIfExists(path)) {
     ensureRegularSessionFile(path);
   }
   const normalized = {
@@ -594,7 +610,7 @@ function persistSessionIfChanged(previousSession, nextSession, env = process.env
 
 function clearSession(env = process.env) {
   const path = getSessionPath(env);
-  if (fs.existsSync(path)) fs.unlinkSync(path);
+  if (lstatIfExists(path)) fs.unlinkSync(path);
   return path;
 }
 
