@@ -238,6 +238,159 @@ async function testManagedTeleportWaitsForResume(tmpDir) {
   }
 }
 
+async function testManagedTeleportRetriesTransientStatusFailure(tmpDir) {
+  const { fakeBinDir, sshLogPath, rsyncLogPath, sessionPath } = createBaseEnvironment(tmpDir);
+
+  let resumeCalls = 0;
+  let statusCalls = 0;
+  let targetCalls = 0;
+
+  const server = http.createServer((req, res) => {
+    const authorize = req.headers.authorization;
+    assert.strictEqual(authorize, "Bearer access-abc");
+
+    if (req.method === "GET" && req.url === "/v1/cli/teleport/target") {
+      targetCalls += 1;
+      res.writeHead(targetCalls >= 2 ? 200 : 409, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify(
+          targetCalls >= 2
+            ? {
+                instance: {
+                  id: "inst_retry",
+                  provider: "gcp",
+                  state: "running",
+                  region: "us-central1",
+                  zone: "us-central1-b",
+                  hostname: "vm-retry.managed.superturtle.internal",
+                  vm_name: "vm-retry",
+                  machine_token_id: "machine-token-retry",
+                  last_seen_at: "2026-03-12T10:00:00Z",
+                  resume_requested_at: "2026-03-12T09:58:00Z",
+                },
+                ssh_target: "superturtle@vm-retry.managed.superturtle.internal",
+                remote_root: "/srv/superturtle",
+                audit_log: [],
+              }
+            : { error: "managed_instance_not_running" }
+        )
+      );
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/v1/cli/cloud/instance/resume") {
+      resumeCalls += 1;
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          instance: {
+            id: "inst_retry",
+            provider: "gcp",
+            state: "provisioning",
+            region: "us-central1",
+            zone: "us-central1-b",
+            hostname: null,
+            vm_name: "vm-retry",
+            machine_token_id: null,
+            last_seen_at: null,
+            resume_requested_at: "2026-03-12T09:58:00Z",
+          },
+          provisioning_job: {
+            id: "job_retry",
+            kind: "resume",
+            state: "queued",
+            attempt: 1,
+            created_at: "2026-03-12T09:58:00Z",
+            started_at: null,
+            updated_at: "2026-03-12T09:58:00Z",
+            completed_at: null,
+            error_code: null,
+            error_message: null,
+          },
+          audit_log: [],
+        })
+      );
+      return;
+    }
+
+    if (req.method === "GET" && req.url === "/v1/cli/cloud/status") {
+      statusCalls += 1;
+      if (statusCalls === 1) {
+        res.writeHead(503, {
+          "content-type": "application/json",
+          "retry-after": "0",
+        });
+        res.end(JSON.stringify({ error: "control_plane_temporarily_unavailable" }));
+        return;
+      }
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          instance: {
+            id: "inst_retry",
+            provider: "gcp",
+            state: statusCalls >= 3 ? "running" : "provisioning",
+            region: "us-central1",
+            zone: "us-central1-b",
+            hostname: statusCalls >= 3 ? "vm-retry.managed.superturtle.internal" : null,
+            vm_name: "vm-retry",
+            machine_token_id: statusCalls >= 3 ? "machine-token-retry" : null,
+            last_seen_at: statusCalls >= 3 ? "2026-03-12T10:00:00Z" : null,
+            resume_requested_at: "2026-03-12T09:58:00Z",
+          },
+          provisioning_job: {
+            id: "job_retry",
+            kind: "resume",
+            state: statusCalls >= 3 ? "succeeded" : "running",
+            attempt: 1,
+            created_at: "2026-03-12T09:58:00Z",
+            started_at: "2026-03-12T09:58:10Z",
+            updated_at: "2026-03-12T09:58:20Z",
+            completed_at: statusCalls >= 3 ? "2026-03-12T09:58:30Z" : null,
+            error_code: null,
+            error_message: null,
+          },
+          audit_log: [],
+        })
+      );
+      return;
+    }
+
+    res.writeHead(404, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: "not_found" }));
+  });
+
+  await new Promise((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  pointSessionAtBaseUrl(sessionPath, `http://127.0.0.1:${address.port}`);
+
+  try {
+    const result = await runScript({
+      ...process.env,
+      PATH: `${fakeBinDir}:${process.env.PATH}`,
+      SUPERTURTLE_CLOUD_SESSION_PATH: sessionPath,
+      SUPERTURTLE_TELEPORT_INSTANCE_READY_TIMEOUT_MS: "5000",
+      SUPERTURTLE_TELEPORT_INSTANCE_READY_POLL_INTERVAL_MS: "10",
+    });
+
+    assert.strictEqual(result.code, 0, result.stderr);
+    assert.match(
+      result.stderr,
+      /transient control-plane error during managed instance status polling; retrying: status 503, control_plane_temporarily_unavailable/
+    );
+    assert.match(result.stdout, /\[teleport\] ssh target: superturtle@vm-retry\.managed\.superturtle\.internal/);
+    assert.match(result.stdout, /\[teleport\] dry-run complete/);
+    assert.strictEqual(resumeCalls, 1);
+    assert.strictEqual(targetCalls, 2);
+    assert.ok(statusCalls >= 3, `expected status polling retries but saw ${statusCalls}`);
+    assert.match(fs.readFileSync(sshLogPath, "utf-8"), /superturtle@vm-retry\.managed\.superturtle\.internal/);
+    assert.match(fs.readFileSync(rsyncLogPath, "utf-8"), /superturtle@vm-retry\.managed\.superturtle\.internal:\/srv\/superturtle\//);
+  } finally {
+    server.close();
+  }
+}
+
 async function testManagedTeleportSurfacesProvisioningFailure(tmpDir) {
   const { fakeBinDir, sessionPath } = createBaseEnvironment(tmpDir);
 
@@ -358,6 +511,7 @@ async function main() {
   const tmpDir = fs.mkdtempSync(resolve(os.tmpdir(), "superturtle-teleport-managed-"));
   try {
     await testManagedTeleportWaitsForResume(resolve(tmpDir, "resume"));
+    await testManagedTeleportRetriesTransientStatusFailure(resolve(tmpDir, "retry-status"));
     await testManagedTeleportSurfacesProvisioningFailure(resolve(tmpDir, "failure"));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });

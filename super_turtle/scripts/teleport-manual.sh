@@ -138,6 +138,7 @@ resolve_managed_target() {
 const {
   fetchCloudStatus,
   fetchTeleportTarget,
+  isRetryableCloudError,
   persistSessionIfChanged,
   readSession,
   resumeManagedInstance,
@@ -160,6 +161,35 @@ function readPositiveIntegerEnv(name, fallback) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function formatCloudErrorContext(error) {
+  const details = [];
+  if (error && typeof error === "object") {
+    if (Number.isFinite(error.status)) {
+      details.push(`status ${error.status}`);
+    }
+    if (typeof error.code === "string" && error.code.length > 0) {
+      details.push(`code ${error.code}`);
+    }
+    if (Number.isFinite(error.retryAfterMs) && error.retryAfterMs > 0) {
+      details.push(`retry-after ${error.retryAfterMs}ms`);
+    }
+  }
+
+  const message = error instanceof Error ? error.message : String(error || "");
+  if (message) {
+    details.push(message);
+  }
+  return details.join(", ") || "unknown error";
+}
+
+function isTransientControlPlaneError(error) {
+  if (isRetryableCloudError(error)) {
+    return true;
+  }
+  const status = error && typeof error === "object" ? error.status : undefined;
+  return status === 429 || status === 502 || status === 503 || status === 504;
 }
 
 function formatProvisioningContext(status) {
@@ -195,6 +225,26 @@ function formatProvisioningContext(status) {
   const deadline = Date.now() + timeoutMs;
   let resumeRequested = false;
   let lastProvisioningContext = "instance state unknown";
+  const waitForRetryWindow = async (phase, error) => {
+    if (!isTransientControlPlaneError(error)) {
+      return false;
+    }
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) {
+      return false;
+    }
+    const retryAfterMs =
+      error && typeof error === "object" && Number.isFinite(error.retryAfterMs)
+        ? error.retryAfterMs
+        : 0;
+    const errorContext = formatCloudErrorContext(error);
+    lastProvisioningContext = `${phase} transient error, ${errorContext}`;
+    process.stderr.write(
+      `[teleport] transient control-plane error during ${phase}; retrying: ${errorContext}\n`
+    );
+    await sleep(Math.min(remainingMs, Math.max(intervalMs, retryAfterMs, 1)));
+    return true;
+  };
 
   while (true) {
     try {
@@ -207,6 +257,9 @@ function formatProvisioningContext(status) {
         session = persistSessionIfChanged(session, error.session);
       }
       if (!error || typeof error !== "object" || error.status !== 409) {
+        if (await waitForRetryWindow("managed target lookup", error)) {
+          continue;
+        }
         throw error;
       }
       if (!["managed_instance_not_running", "managed_instance_unavailable"].includes(error.message)) {
@@ -216,9 +269,19 @@ function formatProvisioningContext(status) {
 
     if (!resumeRequested) {
       process.stderr.write("[teleport] managed instance is not ready; requesting resume\n");
-      const resumed = await resumeManagedInstance(session);
-      session = persistSessionIfChanged(session, resumed.session);
-      resumeRequested = true;
+      try {
+        const resumed = await resumeManagedInstance(session);
+        session = persistSessionIfChanged(session, resumed.session);
+        resumeRequested = true;
+      } catch (error) {
+        if (error && typeof error === "object" && error.session) {
+          session = persistSessionIfChanged(session, error.session);
+        }
+        if (await waitForRetryWindow("managed instance resume", error)) {
+          continue;
+        }
+        throw error;
+      }
     }
 
     if (Date.now() >= deadline) {
@@ -229,7 +292,18 @@ function formatProvisioningContext(status) {
 
     process.stderr.write("[teleport] waiting for managed instance to become ready\n");
     while (Date.now() < deadline) {
-      const status = await fetchCloudStatus(session);
+      let status;
+      try {
+        status = await fetchCloudStatus(session);
+      } catch (error) {
+        if (error && typeof error === "object" && error.session) {
+          session = persistSessionIfChanged(session, error.session);
+        }
+        if (await waitForRetryWindow("managed instance status polling", error)) {
+          continue;
+        }
+        throw error;
+      }
       session = persistSessionIfChanged(session, status.session);
       const instanceState = status?.data?.instance?.state || "unknown";
       lastProvisioningContext = formatProvisioningContext(status);
