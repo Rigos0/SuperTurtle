@@ -9,6 +9,8 @@ const DEFAULT_POLL_INTERVAL_MS = 2000;
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 15 * 1000;
 const DEFAULT_BROWSER_OPEN_TIMEOUT_MS = 5 * 1000;
+const DEFAULT_RESPONSE_MAX_BYTES = 256 * 1024;
+const DEFAULT_SESSION_FILE_MAX_BYTES = 256 * 1024;
 const SESSION_EXPIRY_SKEW_MS = 30 * 1000;
 const CLOUD_SESSION_SCHEMA_VERSION = 1;
 
@@ -95,6 +97,34 @@ function getBrowserOpenTimeoutMs(env = process.env) {
   }
 
   return timeoutMs;
+}
+
+function getResponseMaxBytes(env = process.env) {
+  const configured = env.SUPERTURTLE_CLOUD_RESPONSE_MAX_BYTES;
+  if (configured == null || configured === "") {
+    return DEFAULT_RESPONSE_MAX_BYTES;
+  }
+
+  const maxBytes = Number(configured);
+  if (!Number.isInteger(maxBytes) || maxBytes <= 0) {
+    throw new Error("Configured hosted control plane response size limit must be a positive integer number of bytes.");
+  }
+
+  return maxBytes;
+}
+
+function getSessionFileMaxBytes(env = process.env) {
+  const configured = env.SUPERTURTLE_CLOUD_SESSION_MAX_BYTES;
+  if (configured == null || configured === "") {
+    return DEFAULT_SESSION_FILE_MAX_BYTES;
+  }
+
+  const maxBytes = Number(configured);
+  if (!Number.isInteger(maxBytes) || maxBytes <= 0) {
+    throw new Error("Configured hosted session file size limit must be a positive integer number of bytes.");
+  }
+
+  return maxBytes;
 }
 
 function getSessionPath(env = process.env) {
@@ -616,6 +646,10 @@ function readSession(env = process.env) {
   let stats;
   try {
     stats = ensureRegularSessionFile(path);
+    const maxBytes = getSessionFileMaxBytes(env);
+    if (stats.size > maxBytes) {
+      throw invalidSessionFile(path, `exceeds the configured size limit of ${maxBytes} bytes`);
+    }
     raw = fs.readFileSync(path, "utf-8");
   } catch (error) {
     if (error instanceof Error && /^Hosted session file at .* must be a regular file\./.test(error.message)) {
@@ -752,6 +786,7 @@ function invalidateSession(env = process.env, message = "is no longer valid") {
 
 async function requestJson(url, options = {}, env = process.env) {
   const timeoutMs = getRequestTimeoutMs(env);
+  const maxBytes = getResponseMaxBytes(env);
   const controller = new AbortController();
   const timeout = setTimeout(() => {
     controller.abort(new Error(`Request to ${url} timed out after ${timeoutMs}ms.`));
@@ -762,7 +797,15 @@ async function requestJson(url, options = {}, env = process.env) {
       ...options,
       signal: controller.signal,
     });
-    const text = await response.text();
+    const contentLength = response.headers.get("content-length");
+    if (isNonEmptyString(contentLength)) {
+      const parsedLength = Number(contentLength);
+      if (Number.isFinite(parsedLength) && parsedLength > maxBytes) {
+        throw new Error(`Response from ${url} exceeded configured size limit of ${maxBytes} bytes.`);
+      }
+    }
+
+    const text = await readResponseText(response, url, maxBytes);
     let data = null;
     if (text) {
       try {
@@ -795,6 +838,43 @@ async function requestJson(url, options = {}, env = process.env) {
     throw error;
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+async function readResponseText(response, url, maxBytes) {
+  if (!response.body || typeof response.body.getReader !== "function") {
+    const text = await response.text();
+    if (Buffer.byteLength(text, "utf-8") > maxBytes) {
+      throw new Error(`Response from ${url} exceeded configured size limit of ${maxBytes} bytes.`);
+    }
+    return text;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  const chunks = [];
+  let totalBytes = 0;
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        throw new Error(`Response from ${url} exceeded configured size limit of ${maxBytes} bytes.`);
+      }
+      chunks.push(decoder.decode(value, { stream: true }));
+    }
+    chunks.push(decoder.decode());
+    return chunks.join("");
+  } finally {
+    if (totalBytes > maxBytes) {
+      try {
+        await reader.cancel();
+      } catch {}
+    }
   }
 }
 
@@ -1114,12 +1194,16 @@ module.exports = {
   DEFAULT_CONTROL_PLANE,
   DEFAULT_BROWSER_OPEN_TIMEOUT_MS,
   DEFAULT_REQUEST_TIMEOUT_MS,
+  DEFAULT_RESPONSE_MAX_BYTES,
+  DEFAULT_SESSION_FILE_MAX_BYTES,
   CLOUD_SESSION_SCHEMA_VERSION,
   fetchCloudStatus,
   fetchWhoAmI,
   getBrowserOpenTimeoutMs,
   getControlPlaneBaseUrl,
   getRequestTimeoutMs,
+  getResponseMaxBytes,
+  getSessionFileMaxBytes,
   getSessionControlPlaneBaseUrl,
   getSessionPath,
   isSessionExpired,

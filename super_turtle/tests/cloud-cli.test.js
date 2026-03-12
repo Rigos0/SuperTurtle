@@ -105,6 +105,18 @@ const server = http.createServer((req, res) => {
         }));
         return;
       }
+      if (loginStartMode === "oversized-response") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({
+          device_code: "dev-code-123",
+          user_code: "USER-123",
+          verification_uri: `${requestOrigin}/verify`,
+          verification_uri_complete: `${requestOrigin}/verify?code=USER-123`,
+          interval_ms: 10,
+          padding: "x".repeat(4096),
+        }));
+        return;
+      }
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({
         device_code: "dev-code-123",
@@ -227,6 +239,16 @@ const server = http.createServer((req, res) => {
           user: { id: "user_123", email: 42 },
           workspace: { slug: "acme" },
           entitlement: { plan: "managed", state: "active" },
+        }));
+        return;
+      }
+      if (sessionMode === "oversized-response") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({
+          user: { id: "user_123", email: "user@example.com" },
+          workspace: { slug: "acme" },
+          entitlement: { plan: "managed", state: "active" },
+          padding: "x".repeat(4096),
         }));
         return;
       }
@@ -362,6 +384,22 @@ server.listen(0, "127.0.0.1", async () => {
       !fs.existsSync(sessionPath),
       "expected mismatched login verification origin to avoid writing a session file"
     );
+
+    loginStartMode = "oversized-response";
+    const oversizedLoginStart = await runCli(
+      ["login", "--no-browser"],
+      {
+        ...env,
+        SUPERTURTLE_CLOUD_RESPONSE_MAX_BYTES: "512",
+      }
+    );
+    assert.strictEqual(oversizedLoginStart.code, 1);
+    assert.match(oversizedLoginStart.stderr, /exceeded configured size limit of 512 bytes/i);
+    assert.ok(
+      !fs.existsSync(sessionPath),
+      "expected oversized login-start responses to avoid writing a session file"
+    );
+    loginStartMode = "normal";
 
     loginStartMode = "normal";
     loginPollMode = "missing-access-token";
@@ -675,6 +713,31 @@ server.listen(0, "127.0.0.1", async () => {
     fs.writeFileSync(
       sessionPath,
       `${JSON.stringify({
+        access_token: "access-abc",
+        refresh_token: "refresh-ghi",
+        expires_at: "2999-03-12T10:00:00Z",
+        control_plane: baseUrl,
+        user: { id: "user_123", email: "user@example.com" },
+        padding: "x".repeat(4096),
+      }, null, 2)}\n`
+    );
+    const oversizedStoredSessionWhoami = await runCli(
+      ["whoami"],
+      {
+        ...env,
+        SUPERTURTLE_CLOUD_SESSION_MAX_BYTES: "512",
+      }
+    );
+    assert.strictEqual(oversizedStoredSessionWhoami.code, 1);
+    assert.match(
+      oversizedStoredSessionWhoami.stderr,
+      /Hosted session file .* exceeds the configured size limit of 512 bytes/i
+    );
+    assert.match(oversizedStoredSessionWhoami.stderr, /superturtle logout/i);
+
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({
         ...migratedLegacyStatusSession,
         schema_version: 99,
       }, null, 2)}\n`
@@ -962,6 +1025,33 @@ server.listen(0, "127.0.0.1", async () => {
     assert.match(malformedWhoami.stderr, /Hosted session lookup returned an invalid user.email/i);
     const malformedWhoamiSession = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
     assert.deepStrictEqual(malformedWhoamiSession.user, {
+      id: "user_123",
+      email: "user@example.com",
+    });
+    sessionMode = "normal";
+
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({
+        access_token: "access-abc",
+        refresh_token: "refresh-ghi",
+        expires_at: "2999-03-12T10:00:00Z",
+        control_plane: baseUrl,
+        user: { id: "user_123", email: "user@example.com" },
+      }, null, 2)}\n`
+    );
+    sessionMode = "oversized-response";
+    const oversizedWhoami = await runCli(
+      ["whoami"],
+      {
+        ...env,
+        SUPERTURTLE_CLOUD_RESPONSE_MAX_BYTES: "512",
+      }
+    );
+    assert.strictEqual(oversizedWhoami.code, 1);
+    assert.match(oversizedWhoami.stderr, /exceeded configured size limit of 512 bytes/i);
+    const oversizedWhoamiSession = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
+    assert.deepStrictEqual(oversizedWhoamiSession.user, {
       id: "user_123",
       email: "user@example.com",
     });
