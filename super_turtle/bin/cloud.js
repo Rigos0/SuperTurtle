@@ -40,12 +40,69 @@ function ensureParentDir(filePath) {
   fs.mkdirSync(dirname(filePath), { recursive: true });
 }
 
+function isNonEmptyString(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function normalizeStoredSession(session, env = process.env, fallbackTimestamp = null) {
+  if (!session || typeof session !== "object" || Array.isArray(session)) {
+    return session;
+  }
+
+  const normalized = {
+    ...session,
+    schema_version: CLOUD_SESSION_SCHEMA_VERSION,
+  };
+
+  if (!isNonEmptyString(normalized.control_plane)) {
+    normalized.control_plane = getControlPlaneBaseUrl(env);
+  } else {
+    normalized.control_plane = normalized.control_plane.replace(/\/+$/, "");
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(normalized, "refresh_token")) {
+    normalized.refresh_token = null;
+  }
+
+  const normalizedCreatedAt = isNonEmptyString(normalized.created_at)
+    ? normalized.created_at
+    : fallbackTimestamp;
+  if (normalizedCreatedAt) {
+    normalized.created_at = normalizedCreatedAt;
+  }
+
+  const normalizedLastSyncAt = isNonEmptyString(normalized.last_sync_at)
+    ? normalized.last_sync_at
+    : normalizedCreatedAt;
+  if (normalizedLastSyncAt) {
+    normalized.last_sync_at = normalizedLastSyncAt;
+  }
+
+  if (
+    !isNonEmptyString(normalized.identity_sync_at) &&
+    (normalized.user || normalized.workspace || normalized.entitlement)
+  ) {
+    normalized.identity_sync_at = normalizedLastSyncAt || normalizedCreatedAt || null;
+  }
+
+  if (
+    !isNonEmptyString(normalized.cloud_status_sync_at) &&
+    (normalized.instance || normalized.provisioning_job)
+  ) {
+    normalized.cloud_status_sync_at = normalizedLastSyncAt || normalizedCreatedAt || null;
+  }
+
+  return normalized;
+}
+
 function readSession(env = process.env) {
   const path = getSessionPath(env);
   if (!fs.existsSync(path)) return null;
   let raw;
+  let stats;
   try {
     raw = fs.readFileSync(path, "utf-8");
+    stats = fs.statSync(path);
   } catch (error) {
     throw new Error(
       `Failed to read hosted session file at ${path}: ${error instanceof Error ? error.message : String(error)}`
@@ -63,26 +120,25 @@ function readSession(env = process.env) {
     throw invalidSessionFile(path, "is invalid");
   }
 
-  if (!Object.prototype.hasOwnProperty.call(parsed, "schema_version")) {
-    const normalized = {
-      schema_version: CLOUD_SESSION_SCHEMA_VERSION,
-      ...parsed,
-    };
+  const fallbackTimestamp =
+    stats && Number.isFinite(stats.mtimeMs) ? new Date(stats.mtimeMs).toISOString() : null;
+
+  const normalized = normalizeStoredSession(parsed, env, fallbackTimestamp);
+  if (JSON.stringify(parsed) !== JSON.stringify(normalized)) {
     writeSession(normalized, env);
-    return normalized;
   }
 
-  if (!Number.isInteger(parsed.schema_version) || parsed.schema_version <= 0) {
+  if (!Number.isInteger(normalized.schema_version) || normalized.schema_version <= 0) {
     throw invalidSessionFile(path, "has an invalid schema_version");
   }
 
-  if (parsed.schema_version > CLOUD_SESSION_SCHEMA_VERSION) {
+  if (normalized.schema_version > CLOUD_SESSION_SCHEMA_VERSION) {
     throw new Error(
-      `Hosted session file at ${path} uses schema_version ${parsed.schema_version}, but this CLI supports up to ${CLOUD_SESSION_SCHEMA_VERSION}. Upgrade SuperTurtle or run 'superturtle logout' and then 'superturtle login' again.`
+      `Hosted session file at ${path} uses schema_version ${normalized.schema_version}, but this CLI supports up to ${CLOUD_SESSION_SCHEMA_VERSION}. Upgrade SuperTurtle or run 'superturtle logout' and then 'superturtle login' again.`
     );
   }
 
-  return parsed;
+  return normalized;
 }
 
 function writeSession(session, env = process.env) {

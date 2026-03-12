@@ -270,12 +270,49 @@ server.listen(0, "127.0.0.1", async () => {
     const migratedLegacySession = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
     assert.strictEqual(migratedLegacySession.schema_version, 1);
     assert.strictEqual(migratedLegacySession.control_plane, baseUrl);
+    assert.strictEqual(migratedLegacySession.refresh_token, "refresh-ghi");
+    assert.ok(migratedLegacySession.created_at, "expected legacy session migration to backfill created_at");
+    assert.ok(migratedLegacySession.last_sync_at, "expected legacy session migration to backfill last_sync_at");
+    assert.ok(
+      migratedLegacySession.identity_sync_at,
+      "expected legacy session migration to backfill identity_sync_at when cached identity exists"
+    );
     sessionMode = "normal";
 
     fs.writeFileSync(
       sessionPath,
       `${JSON.stringify({
-        ...migratedLegacySession,
+        access_token: "access-abc",
+        refresh_token: "refresh-ghi",
+        expires_at: "2999-03-12T10:00:00Z",
+        instance: {
+          id: "inst_123",
+          state: "running",
+        },
+        provisioning_job: {
+          state: "succeeded",
+          updated_at: "2026-03-12T10:10:00Z",
+        },
+      }, null, 2)}\n`
+    );
+    statusMode = "network-fail";
+
+    const legacyStatus = await runCli(["cloud", "status"], env);
+    assert.strictEqual(legacyStatus.code, 0, legacyStatus.stderr);
+    assert.match(legacyStatus.stderr, /using cached cloud status snapshot/i);
+    const migratedLegacyStatusSession = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
+    assert.strictEqual(migratedLegacyStatusSession.schema_version, 1);
+    assert.strictEqual(migratedLegacyStatusSession.control_plane, baseUrl);
+    assert.ok(
+      migratedLegacyStatusSession.cloud_status_sync_at,
+      "expected legacy session migration to backfill cloud_status_sync_at when cached status exists"
+    );
+    statusMode = "normal";
+
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({
+        ...migratedLegacyStatusSession,
         schema_version: 99,
       }, null, 2)}\n`
     );
