@@ -18,6 +18,9 @@ let loginPollMode = "normal";
 let refreshMode = "normal";
 let sessionMode = "normal";
 let statusMode = "normal";
+let loginPollDelayMs = 0;
+let sessionDelayMs = 0;
+let statusDelayMs = 0;
 
 function runCli(args, env) {
   return new Promise((resolveRun, rejectRun) => {
@@ -40,10 +43,14 @@ function runCli(args, env) {
   });
 }
 
+function delay(ms) {
+  return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
+}
+
 const server = http.createServer((req, res) => {
   const chunks = [];
   req.on("data", (chunk) => chunks.push(chunk));
-  req.on("end", () => {
+  req.on("end", async () => {
     const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf-8")) : null;
     if (req.method === "POST" && req.url === "/v1/cli/login/start") {
       const requestOrigin = `http://${req.headers.host}`;
@@ -111,6 +118,9 @@ const server = http.createServer((req, res) => {
     if (req.method === "POST" && req.url === "/v1/cli/login/poll") {
       assert.strictEqual(body.device_code, "dev-code-123");
       pollCount += 1;
+      if (loginPollDelayMs > 0) {
+        await delay(loginPollDelayMs);
+      }
       if (pollCount === 1) {
         res.writeHead(428, { "content-type": "application/json" });
         res.end(JSON.stringify({ error: "authorization pending" }));
@@ -194,6 +204,9 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === "GET" && req.url === "/v1/cli/session") {
       assert.strictEqual(req.headers.authorization, "Bearer access-abc");
+      if (sessionDelayMs > 0) {
+        await delay(sessionDelayMs);
+      }
       if (sessionMode === "network-fail") {
         req.socket.destroy();
         return;
@@ -227,6 +240,9 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === "GET" && req.url === "/v1/cli/cloud/status") {
       assert.strictEqual(req.headers.authorization, "Bearer access-abc");
+      if (statusDelayMs > 0) {
+        await delay(statusDelayMs);
+      }
       if (statusMode === "network-fail") {
         req.socket.destroy();
         return;
@@ -379,6 +395,21 @@ server.listen(0, "127.0.0.1", async () => {
     loginPollMode = "normal";
     pollCount = 0;
 
+    loginPollDelayMs = 50;
+    pollCount = 0;
+    const timedOutLogin = await runCli(
+      ["login", "--no-browser"],
+      {
+        ...env,
+        SUPERTURTLE_CLOUD_TIMEOUT_MS: "10",
+      }
+    );
+    assert.strictEqual(timedOutLogin.code, 1);
+    assert.match(timedOutLogin.stderr, /timed out after 10ms/i);
+    assert.ok(!fs.existsSync(sessionPath), "expected timed out login polling to avoid writing a session file");
+    loginPollDelayMs = 0;
+    pollCount = 0;
+
     const invalidConfiguredControlPlaneLogin = await runCli(
       ["login", "--no-browser"],
       {
@@ -507,6 +538,19 @@ server.listen(0, "127.0.0.1", async () => {
     assert.match(cachedWhoamiFromHttp503.stdout, /Plan: managed/);
     sessionMode = "normal";
 
+    sessionDelayMs = 50;
+    const cachedWhoamiFromTimeout = await runCli(
+      ["whoami"],
+      {
+        ...env,
+        SUPERTURTLE_CLOUD_TIMEOUT_MS: "10",
+      }
+    );
+    assert.strictEqual(cachedWhoamiFromTimeout.code, 0, cachedWhoamiFromTimeout.stderr);
+    assert.match(cachedWhoamiFromTimeout.stderr, /using cached identity snapshot/i);
+    assert.match(cachedWhoamiFromTimeout.stdout, /User: user@example.com/);
+    sessionDelayMs = 0;
+
     const cachedStatus = await runCli(["cloud", "status"], env);
     assert.strictEqual(cachedStatus.code, 0, cachedStatus.stderr);
     assert.match(cachedStatus.stderr, /using cached cloud status snapshot/i);
@@ -520,6 +564,19 @@ server.listen(0, "127.0.0.1", async () => {
     assert.match(cachedStatusFromHttp503.stdout, /Instance: inst_123/);
     assert.match(cachedStatusFromHttp503.stdout, /Provisioning: running/);
     statusMode = "normal";
+
+    statusDelayMs = 50;
+    const cachedStatusFromTimeout = await runCli(
+      ["cloud", "status"],
+      {
+        ...env,
+        SUPERTURTLE_CLOUD_TIMEOUT_MS: "10",
+      }
+    );
+    assert.strictEqual(cachedStatusFromTimeout.code, 0, cachedStatusFromTimeout.stderr);
+    assert.match(cachedStatusFromTimeout.stderr, /using cached cloud status snapshot/i);
+    assert.match(cachedStatusFromTimeout.stdout, /Instance: inst_123/);
+    statusDelayMs = 0;
 
     fs.writeFileSync(
       sessionPath,

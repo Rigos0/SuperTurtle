@@ -7,6 +7,7 @@ const { spawnSync } = require("child_process");
 const DEFAULT_CONTROL_PLANE = "https://api.superturtle.dev";
 const DEFAULT_POLL_INTERVAL_MS = 2000;
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 15 * 1000;
 const SESSION_EXPIRY_SKEW_MS = 30 * 1000;
 const CLOUD_SESSION_SCHEMA_VERSION = 1;
 
@@ -65,6 +66,20 @@ function getControlPlaneBaseUrl(env = process.env) {
     "Configured hosted control plane",
     { disallowSearch: true, disallowHash: true, disallowPath: true }
   ).replace(/\/+$/, "");
+}
+
+function getRequestTimeoutMs(env = process.env) {
+  const configured = env.SUPERTURTLE_CLOUD_TIMEOUT_MS;
+  if (configured == null || configured === "") {
+    return DEFAULT_REQUEST_TIMEOUT_MS;
+  }
+
+  const timeoutMs = Number(configured);
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new Error("Configured hosted control plane timeout must be a positive number of milliseconds.");
+  }
+
+  return timeoutMs;
 }
 
 function getSessionPath(env = process.env) {
@@ -720,29 +735,52 @@ function invalidateSession(env = process.env, message = "is no longer valid") {
   return error;
 }
 
-async function requestJson(url, options = {}) {
-  const response = await fetch(url, options);
-  const text = await response.text();
-  let data = null;
-  if (text) {
-    try {
-      data = JSON.parse(text);
-    } catch (error) {
-      throw new Error(`Invalid JSON from ${url}: ${error instanceof Error ? error.message : String(error)}`);
+async function requestJson(url, options = {}, env = process.env) {
+  const timeoutMs = getRequestTimeoutMs(env);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort(new Error(`Request to ${url} timed out after ${timeoutMs}ms.`));
+  }, timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    let data = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch (error) {
+        throw new Error(`Invalid JSON from ${url}: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
-  }
-  if (!response.ok) {
-    const message =
-      data && typeof data.error === "string"
-        ? data.error
-        : `Request failed with ${response.status} ${response.statusText}`;
-    const error = new Error(message);
-    error.status = response.status;
-    error.payload = data;
-    error.retryAfterMs = getRetryAfterMs(response.headers.get("retry-after"));
+    if (!response.ok) {
+      const message =
+        data && typeof data.error === "string"
+          ? data.error
+          : `Request failed with ${response.status} ${response.statusText}`;
+      const error = new Error(message);
+      error.status = response.status;
+      error.payload = data;
+      error.retryAfterMs = getRetryAfterMs(response.headers.get("retry-after"));
+      throw error;
+    }
+    return data;
+  } catch (error) {
+    if (controller.signal.aborted) {
+      const timeoutError =
+        controller.signal.reason instanceof Error
+          ? controller.signal.reason
+          : new Error(`Request to ${url} timed out after ${timeoutMs}ms.`);
+      timeoutError.name = "AbortError";
+      throw timeoutError;
+    }
     throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return data;
 }
 
 function sleep(ms) {
@@ -901,7 +939,7 @@ async function startLogin(options = {}, env = process.env) {
       accept: "application/json",
     },
     body: JSON.stringify(payload),
-  });
+  }, env);
   return validateLoginStartResponse(started, "Hosted login start", baseUrl);
 }
 
@@ -927,7 +965,7 @@ async function pollLogin(started, options = {}, env = process.env) {
           accept: "application/json",
         },
         body: JSON.stringify({ device_code: started.device_code }),
-      });
+      }, env);
       return validateTokenResponse(completed, "Hosted login completion");
     } catch (error) {
       const status = error && typeof error === "object" ? error.status : undefined;
@@ -979,7 +1017,7 @@ async function refreshSession(session, env = process.env) {
         accept: "application/json",
       },
       body: JSON.stringify({ refresh_token: session.refresh_token }),
-    });
+    }, env);
   } catch (error) {
     const status = error && typeof error === "object" ? error.status : undefined;
     if (status === 401 || status === 403) {
@@ -1004,7 +1042,7 @@ async function requestWithSession(session, env, path) {
   const doRequest = async (currentSession) =>
     requestJson(`${baseUrl}${path}`, {
       headers: getAuthHeaders(currentSession),
-    });
+    }, env);
 
   try {
     const data = await doRequest(activeSession);
@@ -1055,10 +1093,12 @@ async function fetchCloudStatus(session, env = process.env) {
 module.exports = {
   clearSession,
   DEFAULT_CONTROL_PLANE,
+  DEFAULT_REQUEST_TIMEOUT_MS,
   CLOUD_SESSION_SCHEMA_VERSION,
   fetchCloudStatus,
   fetchWhoAmI,
   getControlPlaneBaseUrl,
+  getRequestTimeoutMs,
   getSessionControlPlaneBaseUrl,
   getSessionPath,
   isSessionExpired,

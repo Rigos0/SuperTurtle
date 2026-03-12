@@ -9,6 +9,9 @@ const scheduledSleeps = [];
 let pollRequests = 0;
 
 global.setTimeout = function patchedSetTimeout(callback, delay, ...args) {
+  if (delay > 5000) {
+    return originalSetTimeout(callback, delay, ...args);
+  }
   scheduledSleeps.push(delay);
   callback(...args);
   return 0;
