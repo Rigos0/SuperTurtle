@@ -51,8 +51,11 @@ function normalizeStoredSession(session, env = process.env, fallbackTimestamp = 
 
   const normalized = {
     ...session,
-    schema_version: CLOUD_SESSION_SCHEMA_VERSION,
   };
+
+  if (!Object.prototype.hasOwnProperty.call(normalized, "schema_version")) {
+    normalized.schema_version = CLOUD_SESSION_SCHEMA_VERSION;
+  }
 
   if (!isNonEmptyString(normalized.control_plane)) {
     normalized.control_plane = getControlPlaneBaseUrl(env);
@@ -124,9 +127,6 @@ function readSession(env = process.env) {
     stats && Number.isFinite(stats.mtimeMs) ? new Date(stats.mtimeMs).toISOString() : null;
 
   const normalized = normalizeStoredSession(parsed, env, fallbackTimestamp);
-  if (JSON.stringify(parsed) !== JSON.stringify(normalized)) {
-    writeSession(normalized, env);
-  }
 
   if (!Number.isInteger(normalized.schema_version) || normalized.schema_version <= 0) {
     throw invalidSessionFile(path, "has an invalid schema_version");
@@ -136,6 +136,10 @@ function readSession(env = process.env) {
     throw new Error(
       `Hosted session file at ${path} uses schema_version ${normalized.schema_version}, but this CLI supports up to ${CLOUD_SESSION_SCHEMA_VERSION}. Upgrade SuperTurtle or run 'superturtle logout' and then 'superturtle login' again.`
     );
+  }
+
+  if (JSON.stringify(parsed) !== JSON.stringify(normalized)) {
+    writeSession(normalized, env);
   }
 
   return normalized;

@@ -321,6 +321,12 @@ server.listen(0, "127.0.0.1", async () => {
     assert.strictEqual(futureWhoami.code, 1);
     assert.match(futureWhoami.stderr, /uses schema_version 99/i);
     assert.match(futureWhoami.stderr, /Upgrade SuperTurtle|superturtle logout/i);
+    const futureSession = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
+    assert.strictEqual(
+      futureSession.schema_version,
+      99,
+      "expected unsupported future session files to remain untouched"
+    );
 
     fs.writeFileSync(sessionPath, "{not-json\n");
     const corruptWhoami = await runCli(["whoami"], env);
