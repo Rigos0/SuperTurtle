@@ -873,6 +873,9 @@ async function login() {
     provisioning_job: completed.provisioning_job || null,
     control_plane: getControlPlaneBaseUrl(),
     created_at: createdAt,
+    identity_sync_at:
+      completed.user || completed.workspace || completed.entitlement ? createdAt : null,
+    cloud_status_sync_at: completed.instance || completed.provisioning_job ? createdAt : null,
     last_sync_at: createdAt,
   };
   const path = writeSession(session);
@@ -912,7 +915,7 @@ async function whoami() {
       entitlement: session.entitlement || null,
     };
     console.error(
-      `Control plane unreachable; using cached identity snapshot from ${session.last_sync_at || session.created_at || "unknown time"}.`
+      `Control plane unreachable; using cached identity snapshot from ${session.identity_sync_at || session.last_sync_at || session.created_at || "unknown time"}.`
     );
   }
 
@@ -953,7 +956,7 @@ async function cloudStatus() {
       provisioning_job: session.provisioning_job || null,
     };
     console.error(
-      `Control plane unreachable; using cached cloud status snapshot from ${session.last_sync_at || session.created_at || "unknown time"}.`
+      `Control plane unreachable; using cached cloud status snapshot from ${session.cloud_status_sync_at || session.last_sync_at || session.created_at || "unknown time"}.`
     );
   }
 

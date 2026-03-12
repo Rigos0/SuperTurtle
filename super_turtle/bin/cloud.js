@@ -186,25 +186,31 @@ function normalizeSessionUpdate(nextSession, session, baseUrl) {
 }
 
 function mergeSessionSnapshot(session, snapshot, baseUrl = null) {
+  const syncedAt = new Date().toISOString();
   const nextSession = {
     ...session,
-    last_sync_at: new Date().toISOString(),
+    last_sync_at: syncedAt,
   };
 
   if (snapshot && Object.prototype.hasOwnProperty.call(snapshot, "user")) {
     nextSession.user = snapshot.user || null;
+    nextSession.identity_sync_at = syncedAt;
   }
   if (snapshot && Object.prototype.hasOwnProperty.call(snapshot, "workspace")) {
     nextSession.workspace = snapshot.workspace || null;
+    nextSession.identity_sync_at = syncedAt;
   }
   if (snapshot && Object.prototype.hasOwnProperty.call(snapshot, "entitlement")) {
     nextSession.entitlement = snapshot.entitlement || null;
+    nextSession.identity_sync_at = syncedAt;
   }
   if (snapshot && Object.prototype.hasOwnProperty.call(snapshot, "instance")) {
     nextSession.instance = snapshot.instance || null;
+    nextSession.cloud_status_sync_at = syncedAt;
   }
   if (snapshot && Object.prototype.hasOwnProperty.call(snapshot, "provisioning_job")) {
     nextSession.provisioning_job = snapshot.provisioning_job || null;
+    nextSession.cloud_status_sync_at = syncedAt;
   }
   if (baseUrl) {
     nextSession.control_plane = baseUrl;

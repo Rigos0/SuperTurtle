@@ -157,6 +157,8 @@ server.listen(0, "127.0.0.1", async () => {
       state: "queued",
       updated_at: "2026-03-12T09:58:00Z",
     });
+    assert.ok(savedSession.identity_sync_at, "expected login to persist an initial identity sync timestamp");
+    assert.ok(savedSession.cloud_status_sync_at, "expected login to persist an initial cloud status sync timestamp");
     assert.ok(savedSession.last_sync_at, "expected login to persist an initial sync timestamp");
     const mode = fs.statSync(sessionPath).mode & 0o777;
     assert.strictEqual(mode, 0o600);
@@ -192,6 +194,7 @@ server.listen(0, "127.0.0.1", async () => {
     assert.strictEqual(refreshedSession.refresh_token, "refresh-ghi");
     assert.deepStrictEqual(refreshedSession.entitlement, { plan: "managed", state: "active" });
     assert.deepStrictEqual(refreshedSession.workspace, { slug: "acme" });
+    assert.ok(refreshedSession.identity_sync_at, "expected identity fetch to persist identity_sync_at");
 
     const status = await runCli(["cloud", "status"], postLoginEnv);
     assert.strictEqual(status.code, 0, status.stderr);
@@ -210,6 +213,7 @@ server.listen(0, "127.0.0.1", async () => {
       state: "running",
       updated_at: "2026-03-12T09:59:00Z",
     });
+    assert.ok(statusSession.cloud_status_sync_at, "expected cloud status fetch to persist cloud_status_sync_at");
 
     fs.writeFileSync(
       sessionPath,
