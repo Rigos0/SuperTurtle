@@ -1101,10 +1101,26 @@ function openBrowser(url, env = process.env) {
   return false;
 }
 
+function getNoStoreHeaders() {
+  return {
+    "cache-control": "no-store",
+    pragma: "no-cache",
+  };
+}
+
+function getJsonRequestHeaders() {
+  return {
+    "content-type": "application/json",
+    accept: "application/json",
+    ...getNoStoreHeaders(),
+  };
+}
+
 function getAuthHeaders(session) {
   return {
     authorization: `Bearer ${session.access_token}`,
     accept: "application/json",
+    ...getNoStoreHeaders(),
   };
 }
 
@@ -1213,10 +1229,7 @@ async function startLogin(options = {}, env = process.env) {
   };
   const started = await requestJson(`${baseUrl}/v1/cli/login/start`, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      accept: "application/json",
-    },
+    headers: getJsonRequestHeaders(),
     body: JSON.stringify(payload),
   }, env);
   return validateLoginStartResponse(started, "Hosted login start", baseUrl);
@@ -1244,10 +1257,7 @@ async function pollLogin(started, options = {}, env = process.env) {
     try {
       const completed = await requestJson(`${baseUrl}/v1/cli/login/poll`, {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          accept: "application/json",
-        },
+        headers: getJsonRequestHeaders(),
         body: JSON.stringify({ device_code: started.device_code }),
       }, env);
       return validateTokenResponse(completed, "Hosted login completion");
@@ -1296,10 +1306,7 @@ async function refreshSession(session, env = process.env) {
   try {
     refreshed = await requestJson(`${baseUrl}/v1/cli/session/refresh`, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        accept: "application/json",
-      },
+      headers: getJsonRequestHeaders(),
       body: JSON.stringify({ refresh_token: session.refresh_token }),
     }, env);
   } catch (error) {
