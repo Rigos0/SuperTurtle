@@ -59,3 +59,11 @@ This document defines the first production-shaped contract for the hosted manage
   Retry semantics: `failed -> queued`, `canceled -> queued`
 
 These rules are implemented in [cloud-control-plane-contract.js](/home/azureuser/agentic/super_turtle/bin/cloud-control-plane-contract.js) and covered by [cloud-control-plane-contract.test.js](/home/azureuser/agentic/super_turtle/tests/cloud-control-plane-contract.test.js).
+
+## GCP provisioner adapter
+
+- The control-plane runtime now supports a concrete GCP provisioner adapter via `createGcpProvisioner(...)` in [cloud-gcp-provisioner.js](/home/azureuser/agentic/super_turtle/bin/cloud-gcp-provisioner.js).
+- `createRuntime(...)` will select that adapter when `options.gcp.projectId` is configured; otherwise it keeps the existing noop provisioner for local tests and offline harnesses.
+- `provision` creates a VM with managed labels, bootstrap metadata, and a startup script that registers the machine token back to `/v1/machine/register` and installs a systemd timer that posts `/v1/machine/heartbeat`.
+- `resume` starts the existing VM when `instance.vm_name` is already known.
+- `reprovision` deletes the existing VM, rotates the machine credential, and creates a fresh VM with the same logical instance identity.

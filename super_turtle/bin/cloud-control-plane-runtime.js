@@ -1,5 +1,6 @@
 const fs = require("fs");
 const { dirname, resolve } = require("path");
+const { createGcpProvisioner } = require("./cloud-gcp-provisioner.js");
 
 const {
   assertManagedInstanceTransition,
@@ -119,7 +120,7 @@ function createRuntime(options) {
     statePath: resolve(options.statePath),
     now: options.now || defaultNow,
     createId: options.createId || randomId,
-    provisioner: options.provisioner || createNoopProvisioner(),
+    provisioner: options.provisioner || createConfiguredProvisioner(options),
     config: {
       provider: "gcp",
       region: options.region || "us-central1",
@@ -964,6 +965,7 @@ async function runNextProvisioningJob(runtime) {
       instance,
       state,
       config: runtime.config,
+      createId: runtime.createId,
     });
 
     assertProvisioningJobTransition(job.state, "succeeded");
@@ -1299,11 +1301,23 @@ function createNoopProvisioner() {
   };
 }
 
+function createConfiguredProvisioner(options) {
+  const gcpOptions = options && options.gcp && typeof options.gcp === "object" ? options.gcp : null;
+  if (gcpOptions && typeof gcpOptions.projectId === "string" && gcpOptions.projectId.trim().length > 0) {
+    return createGcpProvisioner({
+      ...gcpOptions,
+      hostnameDomain: gcpOptions.hostnameDomain || options.hostnameDomain,
+    });
+  }
+  return createNoopProvisioner();
+}
+
 module.exports = {
   CONTROL_PLANE_WRITE_SCOPE,
   STATE_SCHEMA_VERSION,
   completeLoginRequest,
   createDefaultState,
+  createConfiguredProvisioner,
   createNoopProvisioner,
   createRuntime,
   handleHttpRequest,
