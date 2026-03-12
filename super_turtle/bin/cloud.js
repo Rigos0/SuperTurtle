@@ -959,6 +959,16 @@ function isJsonContentType(value) {
   return normalized === "application/json" || normalized.endsWith("+json");
 }
 
+async function cancelResponseBody(response) {
+  if (!response?.body || typeof response.body.cancel !== "function") {
+    return;
+  }
+
+  try {
+    await response.body.cancel();
+  } catch {}
+}
+
 async function requestJson(url, options = {}, env = process.env) {
   const timeoutMs = getRequestTimeoutMs(env);
   const maxBytes = getResponseMaxBytes(env);
@@ -975,6 +985,7 @@ async function requestJson(url, options = {}, env = process.env) {
     });
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get("location");
+      await cancelResponseBody(response);
       const error = new Error(
         `Control plane request to ${url} was redirected${location ? ` to ${location}` : ""}, but redirects are not allowed.`
       );
@@ -986,12 +997,14 @@ async function requestJson(url, options = {}, env = process.env) {
     if (isNonEmptyString(contentLength)) {
       const parsedLength = Number(contentLength);
       if (Number.isFinite(parsedLength) && parsedLength > maxBytes) {
+        await cancelResponseBody(response);
         throw new Error(`Response from ${url} exceeded configured size limit of ${maxBytes} bytes.`);
       }
     }
 
     const contentType = response.headers.get("content-type");
     if (!isJsonContentType(contentType)) {
+      await cancelResponseBody(response);
       const error = new Error(
         `Response from ${url} returned unsupported content-type ${contentType || "(missing)"}. Expected application/json.`
       );
