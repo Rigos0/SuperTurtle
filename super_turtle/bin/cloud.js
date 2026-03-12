@@ -189,6 +189,16 @@ function clearSession(env = process.env) {
   return path;
 }
 
+function invalidateSession(env = process.env, message = "is no longer valid") {
+  const path = clearSession(env);
+  const error = new Error(
+    `Hosted session ${message}. Removed local cloud session at ${path}. Run 'superturtle login' again.`
+  );
+  error.code = "SESSION_REAUTH_REQUIRED";
+  error.sessionCleared = true;
+  return error;
+}
+
 async function requestJson(url, options = {}) {
   const response = await fetch(url, options);
   const text = await response.text();
@@ -395,14 +405,23 @@ async function refreshSession(session, env = process.env) {
     throw error;
   }
 
-  const refreshed = await requestJson(`${baseUrl}/v1/cli/session/refresh`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      accept: "application/json",
-    },
-    body: JSON.stringify({ refresh_token: session.refresh_token }),
-  });
+  let refreshed;
+  try {
+    refreshed = await requestJson(`${baseUrl}/v1/cli/session/refresh`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+    });
+  } catch (error) {
+    const status = error && typeof error === "object" ? error.status : undefined;
+    if (status === 401 || status === 403) {
+      throw invalidateSession(env, "was rejected by the control plane");
+    }
+    throw error;
+  }
 
   return normalizeSessionUpdate(refreshed, session, baseUrl);
 }
@@ -427,6 +446,9 @@ async function requestWithSession(session, env, path) {
     return { data, session: activeSession };
   } catch (error) {
     const status = error && typeof error === "object" ? error.status : undefined;
+    if (status === 401 && !activeSession?.refresh_token) {
+      throw invalidateSession(env, "expired and cannot be refreshed");
+    }
     if (status !== 401 || !activeSession?.refresh_token) {
       if (sessionChanged && error && typeof error === "object") {
         error.session = activeSession;
@@ -435,7 +457,16 @@ async function requestWithSession(session, env, path) {
     }
     activeSession = await refreshSession(activeSession, env);
     sessionChanged = true;
-    const data = await doRequest(activeSession);
+    let data;
+    try {
+      data = await doRequest(activeSession);
+    } catch (error) {
+      const retryStatus = error && typeof error === "object" ? error.status : undefined;
+      if (retryStatus === 401) {
+        throw invalidateSession(env, "was rejected after refresh");
+      }
+      throw error;
+    }
     return { data, session: activeSession };
   }
 }
@@ -464,6 +495,7 @@ module.exports = {
   refreshSession,
   mergeSessionSnapshot,
   hasCachedSnapshot,
+  invalidateSession,
   startLogin,
   isRetryableCloudError,
   persistSessionIfChanged,

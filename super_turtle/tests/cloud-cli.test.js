@@ -13,6 +13,7 @@ const sessionPath = resolve(tmpDir, "cloud-session.json");
 
 let pollCount = 0;
 let refreshCount = 0;
+let refreshMode = "normal";
 let sessionMode = "normal";
 let statusMode = "normal";
 
@@ -79,6 +80,11 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === "POST" && req.url === "/v1/cli/session/refresh") {
       assert.strictEqual(body.refresh_token, "refresh-def");
+      if (refreshMode === "http-401") {
+        res.writeHead(401, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "refresh token revoked" }));
+        return;
+      }
       refreshCount += 1;
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({
@@ -97,6 +103,11 @@ const server = http.createServer((req, res) => {
       if (sessionMode === "http-503") {
         res.writeHead(503, { "content-type": "application/json" });
         res.end(JSON.stringify({ error: "service unavailable" }));
+        return;
+      }
+      if (sessionMode === "http-401") {
+        res.writeHead(401, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "unauthorized" }));
         return;
       }
       res.writeHead(200, { "content-type": "application/json" });
@@ -361,6 +372,42 @@ server.listen(0, "127.0.0.1", async () => {
     assert.strictEqual(corruptWhoami.code, 1);
     assert.match(corruptWhoami.stderr, /Hosted session file .* invalid JSON/i);
     assert.match(corruptWhoami.stderr, /superturtle logout/i);
+
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({
+        access_token: "expired-access",
+        refresh_token: "refresh-def",
+        expires_at: "2000-03-12T10:00:00Z",
+        control_plane: baseUrl,
+      }, null, 2)}\n`
+    );
+    refreshMode = "http-401";
+    const revokedRefreshWhoami = await runCli(["whoami"], env);
+    assert.strictEqual(revokedRefreshWhoami.code, 1);
+    assert.match(revokedRefreshWhoami.stderr, /Hosted session .* rejected by the control plane/i);
+    assert.match(revokedRefreshWhoami.stderr, /Removed local cloud session/i);
+    assert.match(revokedRefreshWhoami.stderr, /superturtle login/i);
+    assert.ok(!fs.existsSync(sessionPath), "expected revoked refresh token to clear the local session");
+    refreshMode = "normal";
+
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({
+        access_token: "access-abc",
+        refresh_token: null,
+        expires_at: "2999-03-12T10:00:00Z",
+        control_plane: baseUrl,
+      }, null, 2)}\n`
+    );
+    sessionMode = "http-401";
+    const unauthorizedWhoami = await runCli(["whoami"], env);
+    assert.strictEqual(unauthorizedWhoami.code, 1);
+    assert.match(unauthorizedWhoami.stderr, /Hosted session expired and cannot be refreshed/i);
+    assert.match(unauthorizedWhoami.stderr, /Removed local cloud session/i);
+    assert.match(unauthorizedWhoami.stderr, /superturtle login/i);
+    assert.ok(!fs.existsSync(sessionPath), "expected unauthorized session to clear the local session");
+    sessionMode = "normal";
 
     const logout = await runCli(["logout"], env);
     assert.strictEqual(logout.code, 0, logout.stderr);
