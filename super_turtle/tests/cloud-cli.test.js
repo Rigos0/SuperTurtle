@@ -1256,6 +1256,21 @@ server.listen(0, "127.0.0.1", async () => {
       `${JSON.stringify({
         schema_version: 1,
         access_token: "access-abc",
+        refresh_token: "refresh-ghi\u2603",
+        expires_at: "2999-03-12T10:00:00Z",
+        control_plane: baseUrl,
+      }, null, 2)}\n`
+    );
+    const invalidStoredRefreshTokenWhoami = await runCli(["whoami"], env);
+    assert.strictEqual(invalidStoredRefreshTokenWhoami.code, 1);
+    assert.match(invalidStoredRefreshTokenWhoami.stderr, /Hosted session file .* invalid refresh_token/i);
+    assert.match(invalidStoredRefreshTokenWhoami.stderr, /superturtle logout/i);
+
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({
+        schema_version: 1,
+        access_token: "access-abc",
         refresh_token: "refresh-ghi",
         expires_at: "2999-03-12T10:00:00Z",
         control_plane: "javascript:alert('owned')",

@@ -413,7 +413,7 @@ function isNonEmptyString(value) {
 }
 
 function isOpaqueTokenString(value) {
-  return typeof value === "string" && value.length > 0 && value.trim() === value && !/\s/.test(value);
+  return typeof value === "string" && /^[\x21-\x7E]+$/.test(value);
 }
 
 function validateTimestamp(value, fieldName, context) {

@@ -114,7 +114,7 @@ function assertCredentiallessRequest(request, context) {
       () =>
         pollLogin(
           {
-            device_code: "device-123\nmalicious",
+            device_code: "device-123\u0000malicious",
             verification_uri: "https://api.superturtle.dev/verify",
             interval_ms: 10,
           },
@@ -157,7 +157,7 @@ function assertCredentiallessRequest(request, context) {
         refreshSession(
           {
             access_token: "access-abc",
-            refresh_token: "refresh-def\r\nX-Injected: true",
+            refresh_token: "refresh-def\u2603",
             control_plane: "https://api.superturtle.dev",
           },
           env
@@ -168,7 +168,7 @@ function assertCredentiallessRequest(request, context) {
       () =>
         fetchCloudStatus(
           {
-            access_token: "access-abc\tmalicious",
+            access_token: "access-abc\u0000malicious",
             control_plane: "https://api.superturtle.dev",
           },
           env
