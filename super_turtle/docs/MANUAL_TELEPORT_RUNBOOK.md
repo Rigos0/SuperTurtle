@@ -160,11 +160,25 @@ Expected result:
 
 ## Start The Remote Bot Again Later
 
-If you want to bring the same teleported instance back up on the cloud host later:
+If you want to bring the same teleported instance back up on the cloud host later without changing its checkout:
+
+```bash
+ssh <user>@<host> 'cd /home/<user>/project && bun super_turtle/bin/superturtle.js start'
+```
+
+If you want to refresh the remote checkout from GitHub first and the branch is clean and fast-forwardable:
 
 ```bash
 ssh <user>@<host> 'cd /home/<user>/project && git pull --ff-only && bun super_turtle/bin/superturtle.js start'
 ```
+
+If `git pull --ff-only` fails, inspect the remote branch state first:
+
+```bash
+ssh <user>@<host> 'cd /home/<user>/project && git status --short --branch'
+```
+
+That usually means the remote checkout has local commits or local changes that need to be pushed, stashed, or otherwise reconciled before a fast-forward pull is possible.
 
 Verify:
 

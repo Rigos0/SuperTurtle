@@ -80,12 +80,19 @@ MCP servers defined in `mcp-config.ts`.
 ssh <user>@<host> 'cd /home/<user>/project && bun super_turtle/bin/superturtle.js stop'
 ```
 
-- Start a remote instance again later with:
+- Restart the same stopped remote checkout with:
+
+```bash
+ssh <user>@<host> 'cd /home/<user>/project && bun super_turtle/bin/superturtle.js start'
+```
+
+- Refresh from GitHub first only if the remote branch is clean and fast-forwardable:
 
 ```bash
 ssh <user>@<host> 'cd /home/<user>/project && git pull --ff-only && bun super_turtle/bin/superturtle.js start'
 ```
 
+- If that fast-forward pull fails, inspect `git status --short --branch` on the remote host before changing anything
 - Reverse teleport back to local is not automated; the current operator flow is stop remote, pull the committed work locally, and start the local bot normally
 
 ## Patterns
