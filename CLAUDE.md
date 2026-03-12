@@ -50,122 +50,173 @@ git checkout dev && git merge main
 ---
 
 ## Current task
-Dashboard redesign: surface conductor state (worker lifecycle, wakeups, inbox) in the dashboard, fix layout issues, and make it a proper operational tool aligned with the new durable state model.
-
-## SubTurtle orchestration redesign scope
-
-We are keeping the good parts:
-- SubTurtle execution loops are good
-- Self-stopping via `## Loop Control` + `STOP` is good
-- Workspace isolation, watchdogs, logs, and token-prefixed runtime isolation are good
-
-We are redesigning the weak parts:
-- handoff state and long-run memory
-- silent check-ins and wake-up semantics
-- completion/stuck/error reporting back to the meta agent
-- supervisor ownership of orchestration decisions
-- restart/recovery behavior when the bot or meta session dies mid-run
+Managed teleport: turn the current manual teleport flow into a production-ready hosted product, prioritizing `superturtle` browser OAuth login and immediate managed VM provisioning after login, with Stripe/GCP integrated behind real production interfaces rather than demo-only glue.
 
 ## Current system baseline
 
 ### Shipped
 - Telegram bot runtime, Claude/Codex drivers, MCP tools, queueing, and session management
-- SubTurtle spawn/stop/status/logs/list, yolo + slow loops, watchdog timeout handling, and self-stop support
-- Cron-based silent supervision
+- Current manual teleport path in `super_turtle/scripts/teleport-manual.sh`
+- Teleport handoff/import helpers in `super_turtle/state/teleport_handoff.py`
+- Manual teleport runbook in `super_turtle/docs/MANUAL_TELEPORT_RUNBOOK.md`
 - Token-prefixed runtime isolation for logs, temp dirs, IPC dirs, and tmux sessions
-- `/status`, `/debug`, `/looplogs`, `/pinologs`, `superturtle doctor`, and `superturtle logs`
+- Existing operator ergonomics: `/status`, `/debug`, `/looplogs`, `superturtle status`, `superturtle logs`
 
 ### Known gaps
-- Core conductor correctness is now much stronger, but the automated coverage needs to stay organized around real user pathways instead of scattered unit-level behaviors
-- We still need explicit matrix coverage for some cross-surface paths, especially real switch-command/manual Telegram validation while multiple workers are already running
-- `handoff.md` and `runs.jsonl` still exist for compatibility, so they must stay strictly derived from canonical conductor state
-- `subturtle.meta` still carries some spawn/runtime metadata; worker lifecycle truth now lives in the conductor store and those paths need continued convergence
-- Historical archived worker records from pre-fix runs may still carry stale fields until manually repaired
+- No hosted account model yet
+- No GitHub/Google user auth for a managed product
+- No Stripe subscription or entitlement enforcement
+- No GCP control plane or managed VM provisioning
+- No hosted CLI login/link flow
+- `/teleport` still targets operator-managed SSH hosts, not SuperTurtle-managed infrastructure
+- Hosted Claude/Codex credential setup policy is still undefined
 
 ## End goal with specs
-- Every SubTurtle has explicit durable lifecycle state that can be reconstructed after any bot restart
-- Every important worker transition is persisted exactly once in a machine-readable event log
-- The supervisor can reconcile all workers from disk without depending on chat history, silent cron text, or model memory
-- The meta agent can be busy, restarted, or switched between Claude/Codex while worker events continue to land safely
-- Notifications to the human are derived from persisted state transitions, not inferred ad hoc from silent-check prompts
-- Self-stop remains first-class: workers still decide when they are done, but completion is consumed by a deterministic conductor flow
-- Multi-instance isolation remains intact: token/project-scoped runtime resources must not interfere across dev/prod or separate projects
+- A user can sign in on the site with GitHub or Google
+- A user can pay for managed hosting with Stripe
+- A paid user gets one managed Linux VM on our GCP infrastructure
+- A local SuperTurtle install can link to the hosted account with a cloud login flow
+- `/teleport` can target the managed VM without manual SSH host setup
+- Teleport preserves the existing semantic handoff model and same Telegram bot identity
+- The control plane tracks users, subscriptions, managed instances, cloud links, and teleport sessions
+- Hosted provider credentials remain user-scoped and are never shared between users
+- The hosted product has basic audit logging, entitlement enforcement, and operational status
+
+## Managed user flow
+- User signs in on the site with GitHub or Google
+- User chooses the managed hosting plan and pays via Stripe
+- Control plane provisions exactly one SuperTurtle-managed Linux VM for that paid account
+- User links a local `superturtle` install to the hosted account through a browser or device login flow
+- User runs `/teleport` from the existing Telegram bot identity
+- Bot resolves the user’s managed VM via the control plane and performs the existing semantic teleport handoff onto that managed machine
+
+## Recommended MVP architecture
+- **Marketing/site app**: landing page, auth, billing entrypoint, account settings, instance status
+- **Control plane API + database**: users, auth identities, subscriptions, entitlements, managed instances, CLI links, teleport sessions, audit log
+- **Billing integration**: Stripe checkout, customer portal, webhook processing, subscription state sync
+- **Provisioner**: GCP project/region-scoped VM creation, bootstrap, health checks, suspend/reprovision hooks
+- **Managed VM runtime**: one Linux VM per paid account, running SuperTurtle in hosted mode with user-scoped provider credentials
+- **CLI cloud link flow**: `superturtle login` / `whoami` / cloud status backed by short-lived auth tokens and device or browser login
+- **Teleport resolution layer**: `/teleport` resolves managed target metadata from the control plane instead of operator-maintained SSH config
+
+## Execution phases
+- **Phase 0 — product contract**: lock v1 scope, billing semantics, credential policy, support posture, and Codex beta boundary
+- **Phase 1 — auth and identity foundation**: choose stack/repo boundaries, define schema, build site OAuth, CLI browser login, token/session model, and audit logging
+- **Phase 2 — provisioning control plane**: create managed-instance state machine, provisioning jobs, machine registration, health reporting, and reprovision path
+- **Phase 3 — billing and entitlements**: Stripe checkout, subscriptions, webhooks, entitlement enforcement, and suspended-state behavior without weakening the auth/provisioning design
+- **Phase 4 — managed teleport**: resolve hosted VM target from control plane and reuse the current semantic handoff path
+- **Phase 5 — provider setup and operations**: hosted Claude setup/validation, Codex beta decision, admin tooling, telemetry, support workflows, and production hardening
+
+## Production priorities
+- The first production-critical path is `superturtle login`: local CLI opens the browser, user completes OAuth on the hosted site, the CLI receives a device/browser completion signal, and the control plane issues a user-bound cloud session
+- The second production-critical path is post-login provisioning: once a user is authenticated and entitled, the control plane can create or resume exactly one managed VM and report durable provisioning state back to the CLI and site
+- Billing matters for launch, but auth/session integrity and provisioning correctness come first because they define the contract every later paid flow depends on
+- Every interface must be production-shaped now: typed APIs, durable state transitions, idempotent jobs, webhook signature verification, and auditable operator actions
+
+## Overnight implementation plan
+- **Worker 1 — `cloud-auth` (Codex)**: define the hosted auth architecture, CLI browser login flow, token/session model, callback semantics, and required `superturtle` commands
+- **Worker 2 — `cloud-schema` (Codex)**: define the control-plane schema and API surface for users, identities, sessions, entitlements, managed instances, provisioning jobs, and audit log
+- **Worker 3 — `cloud-provisioning` (Codex)**: design the managed-instance lifecycle, GCP provisioner contract, bootstrap/registration flow, and idempotent reprovision/suspend behavior
+- **Worker 4 — `cloud-billing` (Codex)**: define Stripe subscription lifecycle, entitlement transitions, webhook handling, and how billing gates provisioning without coupling core auth too tightly to Stripe
+- **Worker 5 — `teleport-integration` (Codex)**: map how `/teleport` resolves managed targets from the control plane and how existing handoff/import code is reused without weakening current semantics
+- Supervisor wakeups should run on Thursday, March 12, 2026 UTC every 30 minutes for all workers, with an additional 90-minute milestone wakeup that forces cross-worker dependency review
+- First wakeup pass should check for contract drift between auth, schema, and provisioning; second pass should check that CLI login and provisioning state machines still compose cleanly; later passes should push unfinished work toward concrete docs, interfaces, and implementation-ready tickets
+- If any worker gets blocked by missing real Stripe/GCP credentials, that worker must switch to production-interface design, test harnesses, stub adapters, and explicit cutover checklists instead of stalling
+- If the auth worker finishes first, it becomes the integration lead and reviews all other worker outputs against the `login -> entitlement -> provision -> status -> teleport` path
+
+## SubTurtle spawn strategy
+- Before any spawn, the main agent writes a canonical `.subturtles/<name>/CLAUDE.md` for each worker using the required state contract: `# Current task`, `# End goal with specs`, `# Roadmap (Completed)`, `# Roadmap (Upcoming)`, and `# Backlog`
+- Each worker state file should keep exactly one open backlog item marked `<- current`, and that item should match the worker’s overnight scope
+- Spawn all five workers immediately to maximize overnight parallelism, but make `cloud-auth`, `cloud-schema`, and `cloud-provisioning` the contract owners the main agent reconciles first
+- Default loop type should be `yolo-codex`; default timeout should be `7h`; recurring supervision should be `30m`
+- Spawn commands should use repo-native `ctl spawn` so the workspace, validation, process metadata, and recurring silent supervision job are created atomically
+
+```bash
+./super_turtle/subturtle/ctl spawn cloud-auth --type yolo-codex --timeout 7h --cron-interval 30m --state-file .subturtles/cloud-auth/CLAUDE.md
+./super_turtle/subturtle/ctl spawn cloud-schema --type yolo-codex --timeout 7h --cron-interval 30m --state-file .subturtles/cloud-schema/CLAUDE.md
+./super_turtle/subturtle/ctl spawn cloud-provisioning --type yolo-codex --timeout 7h --cron-interval 30m --state-file .subturtles/cloud-provisioning/CLAUDE.md
+./super_turtle/subturtle/ctl spawn cloud-billing --type yolo-codex --timeout 7h --cron-interval 30m --state-file .subturtles/cloud-billing/CLAUDE.md
+./super_turtle/subturtle/ctl spawn teleport-integration --type yolo-codex --timeout 7h --cron-interval 30m --state-file .subturtles/teleport-integration/CLAUDE.md
+```
+
+- `ctl spawn` already auto-registers one recurring `subturtle_supervision` cron job per worker in `.superturtle/cron-jobs.json`; these jobs are silent and should remain the low-level worker health/milestone mechanism
+- If one worker proves noisier or more dependency-sensitive than the others, the main agent should adjust only that worker with `./super_turtle/subturtle/ctl reschedule-cron <name> <interval>` instead of changing the whole fleet
+
+## Main-agent cron wakeup plan
+- Worker supervision cron is not enough on its own because it checks each worker independently; the main agent still needs scheduled synthesis turns that reconcile cross-worker contracts and reprioritize work
+- Main-agent wakeups should be scheduled as one-shot generic cron jobs, not recurring jobs, so each wakeup has a specific purpose and does not drift into duplicate review loops
+- These wakeups should be non-silent so they run through the main driver as `cron_scheduled` work; if the driver is busy, the bot already defers them until idle instead of losing them
+- Use the repo-native cron store via Bun and `addJob(...)` from `super_turtle/claude-telegram-bot/src/cron.ts`; do not hand-edit `.superturtle/cron-jobs.json` unless the cron module is unavailable
+
+```bash
+bun --eval 'import { addJob } from "./super_turtle/claude-telegram-bot/src/cron.ts"; addJob(process.argv[1], "one-shot", Number(process.argv[2]), undefined, false, { job_kind: "generic" });' \
+  "Review all managed-teleport workers. Check .superturtle/state/handoff.md, each worker CLAUDE.md, and recent commits. Reconcile auth, schema, and provisioning contracts. If drift exists, update the relevant worker state files and reschedule or stop/restart workers as needed. Respond with concrete orchestration actions only." \
+  2700000
+```
+
+- Wakeup 1 at `+45m`: contract review across `cloud-auth`, `cloud-schema`, and `cloud-provisioning`; correct interface drift early
+- Wakeup 2 at `+90m`: login-to-provision path review; ensure CLI OAuth completion, entitlement gate, and instance state machine compose cleanly
+- Wakeup 3 at `+150m`: implementation-shape review; convert open design output into implementation-ready tasks, APIs, and file targets
+- Wakeup 4 at `+240m`: dependency and risk sweep; stop or retask any worker that is stuck, redundant, or blocked by missing provider credentials
+- Wakeup 5 at `+360m`: morning handoff preparation; collect what is production-ready, what still needs real Stripe/GCP cutover, and what should be the next interactive coding session
+- Optional final notification can be a one-shot `BOT_MESSAGE_ONLY:` cron if a human-facing morning summary must be sent even without a synthesis run, but the default plan is to let the main agent synthesize first
+- Every main-agent wakeup should read conductor state first, not rely on memory: `.superturtle/state/handoff.md`, `.superturtle/state/workers/`, pending wakeups, worker `CLAUDE.md`, and `ctl status`
 
 ## Roadmap (Completed)
-- ✅ Core bot: Telegram integration, Claude driver, streaming responses, voice transcription
-- ✅ SubTurtle system: spawn/stop/status/logs, yolo + slow loops, watchdog, cron supervision
-- ✅ Meta agent: META_SHARED.md prompt, decomposition, silent-first supervision
-- ✅ MCP tools: send-turtle stickers, bot-control (usage/model/sessions), ask-user buttons
-- ✅ Codex driver: optional Codex CLI integration, driver switching, quota-aware routing
-- ✅ Package refactor: decoupled paths, CLI subprocess (replaced Agent SDK), npm package structure
-- ✅ Auth & security: user allowlist, rate limiting, audit logging
-- ✅ Deferred queue: voice message queuing when driver is busy, dedup, drain-on-complete
-- ✅ Tunnel support: cloudflared helper for frontend preview links
-- ✅ Screenshot support: Playwright-based browser screenshots for visual QA
-- ✅ Stop behavior: unified stop across text/voice/button, deferred queue clearing, `/stop` command
-- ✅ Multi-instance isolation: TOKEN_PREFIX namespacing for all `/tmp` files, MCP IPC directory, logs, tmux sessions
-- ✅ Current worker execution model: isolated workspaces, `CLAUDE.md` state files, commit-per-iteration yolo/slow loops, and self-stop directives
+- ✅ Core bot runtime: Telegram integration, streaming, Claude/Codex routing, MCP tools
+- ✅ Existing local operator model: CLI setup, queueing, logs, dashboard, stop/status flows
+- ✅ Manual teleport v1: handoff bundle export/import, remote Linux cutover, semantic continuity
+- ✅ Multi-instance runtime isolation: token-prefixed temp files, IPC, logs, and tmux sessions
+- ✅ Current teleport docs: README section plus manual teleport runbook
+- ✅ Initial Codex stream-disconnect hardening for cloud-hosted instability
 
 ## Roadmap (Upcoming)
-- Dashboard redesign: conductor state visibility, layout fixes, operational polish
-- Build out and maintain the core 15-path conductor contract across single-worker, multi-worker, and cross-driver/model user flows
-- Add the remaining restart/manual validation coverage after the core live-user paths are locked down
+- Lock the managed teleport v1 product contract and hosted credential policy
+- Build hosted site auth plus production-grade `superturtle login`
+- Build managed VM provisioning, machine registration, and cloud status surfaces
+- Add Stripe entitlement enforcement without compromising auth/provisioning contracts
+- Add managed `/teleport` target resolution
+- Add hosted provider setup flow and basic operator/admin tooling
 
 ## Backlog
-- [x] Define orchestration v2 ownership boundaries, lifecycle states, event types, and invariants
-- [x] Design the minimal durable data model: worker state file, global event log, and derived/rendered views
-- [x] Implement structured worker lifecycle persistence in `subturtle/ctl` and the Python loop
-- [x] Emit deterministic worker-side facts for checkpoints, completion requests, timeouts, stops, archives, and fatal-error handoff
-- [x] Emit reconciled `worker.completed`, `worker.failed`, cleanup, and delivery transitions from supervisor logic
-- [x] Expand the supervisor reconciliation path so silent cron milestone/stuck checks consume structured state instead of prompt inference
-- [x] Design and implement meta-agent wake-up/inbox semantics for background worker events during active user conversations
-- [x] Rework silent cron jobs to become reconciliation/notification triggers instead of the primary source of orchestration truth
-- [x] Re-render `handoff.md`, dashboard state, and operator summaries from structured state
-- [x] Replace prompt-mediated silent milestone/stuck judgment with deterministic supervisor policy
-- [x] Reset worker state cleanly when a reused SubTurtle name starts a new run
-- [x] Persist `worker.cron_removed` and clear `cron_job_id` on the stop path, not only in supervisor reconciliation
-- [x] Render archived completed/failed workers in `handoff.md` recent updates using canonical terminal outcome
-- [x] Add end-to-end tests for restart recovery, stale cron cleanup, mid-chat completion delivery, reused worker names, and multi-worker orchestration
-- [ ] Fix dashboard favicon, title, and layout (Cron+Jobs side by side, Queue below) <- done by meta agent
-- [ ] Add `/api/conductor` endpoint for worker states, wakeups, inbox <- current (SubTurtle: dashboard-v2)
-- [ ] Add conductor types to `dashboard-types.ts`
-- [ ] Enhance race lanes with conductor lifecycle state badges
-- [ ] Add Conductor panel to main dashboard grid
-- [ ] Add conductor header badge and auto-hide empty Queue panel
-- [ ] Add event timeline to SubTurtle detail page
-- [ ] Typecheck and commit
-- [ ] Lock the conductor behind a 15-path core-flow matrix that matches real user behavior
-- [ ] Fill any remaining matrix gaps, especially true switch-command/manual Telegram validation with multiple live SubTurtles
-- [ ] Add conductor state retention/gc so `.superturtle/state/` does not grow forever: prune old sent wakeups, acknowledged inbox items, stale archived worker records, and rotate/archive `events.jsonl`
+- [ ] Write the production-ready hosted auth + provisioning PRD, including CLI browser OAuth and post-login VM lifecycle <- current
+- [ ] Decide billing semantics: always-on VM vs suspend-on-idle
+- [ ] Define control-plane schema for users, subscriptions, managed instances, cloud links, and teleport sessions
+- [ ] Choose site/control-plane stack and repo boundaries
+- [ ] Design `superturtle login` browser OAuth flow, callback contract, session storage, and `whoami` semantics
+- [ ] Define managed-instance provisioning state machine and idempotent job model
+- [ ] Build site auth with GitHub + Google
+- [ ] Add Stripe checkout, subscriptions, and webhook processing
+- [ ] Add entitlement checks for paid vs unpaid vs suspended users
+- [ ] Create initial GCP Terraform for one managed Linux VM per paid account
+- [ ] Build VM bootstrap and machine registration back to control plane
+- [ ] Add `superturtle login` hosted-account flow
+- [ ] Add `superturtle cloud status` / `superturtle whoami`
+- [ ] Extend `/teleport` to resolve a managed target VM from the control plane
+- [ ] Add hosted Claude auth setup and validation flow
+- [ ] Decide whether hosted Codex support ships in v1 or beta
+- [ ] Add basic admin/support tooling for reprovision, suspend, and teleport audit
+- [ ] Add production telemetry for provisioning failures, teleport failures, and unhealthy VMs
 
 ## Notes
-- Multi-instance audit: `docs/audits/multi-instance-isolation.md`
-- Conductor v2 design reference: `super_turtle/docs/long-run-state-tracking.md`
-- Structured conductor state is now live under `.superturtle/state/events.jsonl`, `.superturtle/state/workers/`, `.superturtle/state/wakeups/`, and `.superturtle/state/inbox/`
-- Current runtime producers: `subturtle/ctl` emits start/stop/archive/timeout lifecycle facts, and the Python loop emits checkpoint facts plus `completion_pending` / `failure_pending` handoff facts
-- Current runtime consumer: the bot timer now drains pending conductor wakeups directly, emits reconciliation events, removes stale cron jobs, and sends Telegram notifications without routing those lifecycle updates through the meta-agent conversation thread
-- Legacy completion cron handoff has been removed from the SubTurtle self-stop path; completion delivery now rides the canonical wakeup queue
-- Silent SubTurtle supervision now runs deterministic supervisor policy over canonical worker state, backlog completion, and checkpoint signatures; milestone/stuck wakeups flow through the same inbox and Telegram delivery path as lifecycle wakeups without terminal cleanup side effects
-- The bot timer now recreates missing `completion_requested` / `fatal_error` / `timeout` wakeups from canonical worker state before delivery, and stale recurring SubTurtle cron cleanup is persisted as a conductor event instead of existing only as an inline warning
-- The bot now runs the same conductor maintenance pass on startup and on each timer tick, so recovered wakeups and stale recurring-cron cleanup no longer wait for the first scheduled interval after a reboot
-- Startup conductor maintenance now also requeues wakeups stranded in `processing`, so an interrupted completion/failure/milestone notification is replayable after a bot restart instead of being lost indefinitely
-- The bot cron timer is now single-flight and only starts after boot-time maintenance finishes, so recovery work runs before recurring ticks and a slow maintenance/delivery pass cannot overlap the next 10-second conductor cycle
-- `ctl spawn` now registers structured supervision cron jobs with `job_kind=subturtle_supervision`, `worker_name`, and `supervision_mode`, and the bot prefers those fields over prompt regex parsing
-- `handoff.md` is now refreshed from canonical worker state plus pending wakeups, and dashboard lanes prefer conductor worker fields for live SubTurtles
-- Reconciled lifecycle wakeups now also create durable meta-agent inbox items; the next successful interactive Claude/Codex turn injects them as non-chat background context and acknowledges them after the turn completes
-- `handoff.md` now surfaces both `pending` and `processing` wakeups so in-flight recovery state stays visible to the operator instead of disappearing from the rendered summary
-- Current conductor coverage now includes recreated pending-wakeup recovery, `processing` wakeup replay on startup, stale recurring-cron cleanup, startup maintenance idempotency, multi-worker inbox recovery, and driver-level interactive acknowledgment tests for both Claude and Codex session paths
-- Live `book-writer` validation confirmed the end-to-end completion path works, but also surfaced three follow-ups: stale supervisor metadata survives reused worker names, stop-path cron removal is not always persisted canonically, and archived completions are missing from `handoff.md` recent updates
-- `put-worker` now resets checkpoint/metadata/terminal residue when a reused worker name starts a new `run_id`, `ctl stop` now persists `worker.cron_removed` and clears stale cron metadata, and `handoff.md` recent updates now render archived completed/failed workers by canonical resolved terminal outcome
-- Wakeup recovery, stale-cron gating, and pending delivery are now `run_id`-aware, so an old completion/failure wakeup from a previous run with the same worker name no longer mutates or blocks the current run
-- `conductor-core-flow.test.ts` now covers the happy path end-to-end (`baseline -> milestone -> completion -> inbox ack`), a parallel three-worker path (`milestone + completion + failure`), and the timeout terminal path
-- Claude and Codex inbox tests now also cover model changes while background worker events are pending, so the next interactive turn still injects and acknowledges those durable updates under the selected driver/model
-- The 15-path user-flow matrix now lives in `super_turtle/docs/long-run-state-tracking.md`; use it as the checklist for future conductor changes
-- Conductor storage retention is not implemented yet: workspaces already have `ctl gc`, but `.superturtle/state/` currently keeps historical worker records, wakeups, inbox items, and the append-only event log until we add explicit conductor gc/compaction
-- `MAIN_PROVIDER=claude|codex` is now supported as the startup default provider for the Telegram meta-agent; effective precedence is saved last-used provider > `MAIN_PROVIDER` > `claude`, so restarts preserve the user's last switch and `MAIN_PROVIDER=codex` still requires `CODEX_ENABLED=true` plus a working local Codex CLI
-- The actual docs repo lives in the sibling path `../turtlesite/`; edit `../turtlesite/docs/` for published docs, and treat `super_turtle/docs/` here as internal project documentation unless a task explicitly says otherwise
-- TOKEN_PREFIX lives in `src/token-prefix.ts` (standalone leaf module, no circular deps)
-- MCP IPC files are isolated in `/tmp/superturtle-{tokenPrefix}/`, passed to MCP servers via `SUPERTURTLE_IPC_DIR`
-- The bot is the meta agent; system prompt injection still lives in `super_turtle/claude-telegram-bot/src/config.ts`
-- The redesign should preserve the existing good operator ergonomics: `ctl list`, `ctl status`, worker logs, `/debug`, `/status`, dashboard views, and preview URLs
-- Dashboard layout fixes (favicon, title, Cron+Jobs side by side) applied directly by meta agent; conductor state integration delegated to SubTurtle `dashboard-v2` (yolo-codex)
+- Managed teleport should target only SuperTurtle-managed Linux VMs in v1
+- Recommended hosted account model: GitHub/Google OAuth on the site plus a CLI browser/device login flow
+- Recommended pricing shape: monthly subscription, one user, one managed VM, one bot
+- Highest-risk product question: hosted provider credential policy, especially Claude auth on the managed VM
+- Recommended v1 launch posture: Claude-first hosted support, Codex explicitly beta
+- Recommended infra posture: one GCP project, one primary region, one VM template/image, one VM per paid account
+- Existing manual teleport implementation remains the baseline cutover path to reuse
+- Current manual teleport preserves semantic continuity, not exact provider-native thread continuity
+- The actual docs repo lives in sibling path `../turtlesite/`; edit `../turtlesite/docs/` for public docs when we are ready to publish managed teleport docs
+
+## Skippable limitations
+- There are currently no live production GCP or Stripe accounts attached to this workspace, so early implementation must use production-shaped provider interfaces, test-mode billing flows, provisioning adapters, and explicit cutover checklists instead of blocking on missing accounts
+- Development is running in a sandbox environment, so browser OAuth callbacks, webhook delivery, and cloud provisioning must be designed to work with local/test harnesses first and then promote cleanly to real infrastructure
+- These are skippable implementation limitations, not product-scope limitations: they should never justify demo-grade contracts, fake persistence, or one-off flows we would later need to replace
+- Any code that depends on real cloud or billing credentials should ship behind clear adapter boundaries, feature flags, and health/status reporting so the production path remains auditable once credentials exist
+
+## Open decisions
+- Hosted credential policy for Claude on managed VMs, including setup UX, storage model, and support boundaries
+- Whether v1 billing is always-on monthly infrastructure or suspend-on-idle with resume semantics
+- Whether hosted Codex support launches in v1 or remains explicit beta behind separate validation
+- Final repo boundary choice for site/control plane versus bot/runtime code

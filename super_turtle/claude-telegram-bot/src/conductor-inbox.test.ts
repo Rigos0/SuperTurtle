@@ -190,4 +190,58 @@ describe("conductor inbox", () => {
     expect(shouldInjectMetaAgentInbox("cron_silent")).toBe(false);
     expect(shouldInjectMetaAgentInbox("background_snapshot")).toBe(false);
   });
+
+  it("skips pending inbox items from a worker's previous run", () => {
+    const baseDir = makeTempDir();
+    const stateDir = join(baseDir, ".superturtle", "state");
+
+    writeJson(join(stateDir, "workers", "worker-a.json"), {
+      kind: "worker_state",
+      schema_version: 1,
+      worker_name: "worker-a",
+      run_id: "run-new",
+      lifecycle_state: "running",
+    });
+    writeJson(join(stateDir, "inbox", "old-run.json"), {
+      kind: "meta_agent_inbox_item",
+      schema_version: 1,
+      id: "old-run",
+      chat_id: 123,
+      worker_name: "worker-a",
+      run_id: "run-old",
+      priority: "notable",
+      category: "worker_stuck",
+      title: "Old worker stuck",
+      text: "Ignore old run",
+      delivery_state: "pending",
+      created_at: "2026-03-08T11:59:00Z",
+      updated_at: "2026-03-08T11:59:00Z",
+      delivery: {},
+      metadata: {},
+    });
+    writeJson(join(stateDir, "inbox", "new-run.json"), {
+      kind: "meta_agent_inbox_item",
+      schema_version: 1,
+      id: "new-run",
+      chat_id: 123,
+      worker_name: "worker-a",
+      run_id: "run-new",
+      priority: "notable",
+      category: "milestone_reached",
+      title: "New worker milestone",
+      text: "Keep this",
+      delivery_state: "pending",
+      created_at: "2026-03-08T12:00:00Z",
+      updated_at: "2026-03-08T12:00:00Z",
+      delivery: {},
+      metadata: {},
+    });
+
+    const items = listPendingMetaAgentInboxItems({
+      stateDir,
+      chatId: 123,
+    });
+
+    expect(items.map((item) => item.id)).toEqual(["new-run"]);
+  });
 });

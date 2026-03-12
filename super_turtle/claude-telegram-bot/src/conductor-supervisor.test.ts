@@ -998,16 +998,26 @@ Diagnose no-progress worker
     });
     const second = await processSilentSubturtleSupervision({
       ...commonOptions,
-      nowIso: () => "2026-03-08T02:00:00Z",
+      nowIso: () => "2026-03-08T01:10:00Z",
     });
     const third = await processSilentSubturtleSupervision({
       ...commonOptions,
-      nowIso: () => "2026-03-08T03:00:00Z",
+      nowIso: () => "2026-03-08T01:31:00Z",
+    });
+    const fourth = await processSilentSubturtleSupervision({
+      ...commonOptions,
+      nowIso: () => "2026-03-08T01:50:00Z",
+    });
+    const fifth = await processSilentSubturtleSupervision({
+      ...commonOptions,
+      nowIso: () => "2026-03-08T02:32:00Z",
     });
 
     expect(first.createdWakeups).toBe(0);
     expect(second.createdWakeups).toBe(0);
     expect(third.createdWakeups).toBe(1);
+    expect(fourth.createdWakeups).toBe(0);
+    expect(fifth.createdWakeups).toBe(0);
     expect(third.sent).toBe(1);
     expect(sentMessages.at(-1)).toContain("⚠️ SubTurtle worker-stuck looks stuck.");
     expect(jobs).toHaveLength(1);
@@ -1024,7 +1034,7 @@ Diagnose no-progress worker
     );
     expect(inboxItem.category).toBe("worker_stuck");
     expect(inboxItem.title).toContain("worker-stuck stuck");
-    expect(inboxItem.text).toContain("No meaningful progress across 2 silent checks.");
+    expect(inboxItem.text).toContain("No meaningful progress for 31 minutes across 2 supervision checks.");
 
     const events = readFileSync(join(stateDir, "events.jsonl"), "utf-8");
     expect(events).toContain('"event_type":"worker.stuck_detected"');

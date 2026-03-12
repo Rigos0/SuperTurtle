@@ -399,7 +399,7 @@ prompt = (
     f"inspect `.subturtles/{name}/CLAUDE.md`, and review `git log --oneline -10`.\n"
     "Rules: Do NOT message the user unless one of these conditions is met:\n"
     f"- 🎉 SubTurtle completed all backlog items -> stop SubTurtle {name} and report what shipped\n"
-    f"- ⚠️ SubTurtle appears stuck (no meaningful progress across 2+ checks) -> stop it, diagnose, and report\n"
+    f"- ⚠️ SubTurtle appears stuck (no meaningful progress for 30+ minutes across repeated supervision checks) -> stop it, diagnose, and report\n"
     "- ❌ SubTurtle errored, crashed, or is otherwise broken -> report the error clearly\n"
     "- 🚀 New milestone reached (significant backlog progress) -> send one brief update\n"
     "If SubTurtle is progressing normally without notable events, respond with only: [SILENT]"

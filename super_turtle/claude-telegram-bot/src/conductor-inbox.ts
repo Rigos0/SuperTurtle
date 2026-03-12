@@ -111,6 +111,15 @@ function inboxPath(stateDir: string, itemId: string): string {
   return join(statePaths(stateDir).inboxDir, `${itemId}.json`);
 }
 
+function readWorkerRunId(stateDir: string, workerName: string): string | null {
+  const worker = readJsonObject<{ run_id?: string | null }>(
+    join(stateDir, "workers", `${workerName}.json`)
+  );
+  return typeof worker?.run_id === "string" && worker.run_id.trim().length > 0
+    ? worker.run_id.trim()
+    : null;
+}
+
 function normalizeState(value: string | null | undefined): string {
   const normalized = value?.trim() || "pending";
   return META_AGENT_INBOX_STATES.has(normalized) ? normalized : "pending";
@@ -170,6 +179,7 @@ export function listPendingMetaAgentInboxItems(
   const stateDir = options.stateDir || join(SUPERTURTLE_DATA_DIR, "state");
   const { inboxDir } = statePaths(stateDir);
   if (!existsSync(inboxDir)) return [];
+  const workerRunIdCache = new Map<string, string | null>();
 
   return readdirSync(inboxDir)
     .filter((name) => name.endsWith(".json"))
@@ -177,6 +187,15 @@ export function listPendingMetaAgentInboxItems(
     .filter((item): item is MetaAgentInboxItemRecord => {
       if (!item) return false;
       if (normalizeState(item.delivery_state) !== "pending") return false;
+      if (item.worker_name && item.run_id) {
+        if (!workerRunIdCache.has(item.worker_name)) {
+          workerRunIdCache.set(item.worker_name, readWorkerRunId(stateDir, item.worker_name));
+        }
+        const currentRunId = workerRunIdCache.get(item.worker_name) || null;
+        if (currentRunId && currentRunId !== item.run_id) {
+          return false;
+        }
+      }
       if (typeof options.chatId !== "number" || !Number.isFinite(options.chatId)) {
         return true;
       }

@@ -12,6 +12,9 @@ import { spawnSync } from "bun";
 import { ALLOWED_USERS, CTL_PATH, SUPERTURTLE_DATA_DIR, WORKING_DIR } from "./config";
 import { ensureMetaAgentInboxItem } from "./conductor-inbox";
 
+const STUCK_WAKEUP_MIN_QUIET_MS = 30 * 60 * 1000;
+const STUCK_WAKEUP_MIN_REPEAT_MS = 60 * 60 * 1000;
+
 export interface WorkerStateRecord {
   kind?: string;
   schema_version?: number;
@@ -147,6 +150,20 @@ const TERMINAL_LIFECYCLE_STATES = new Set(["completed", "failed", "timed_out", "
 
 function utcNowIso(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+function elapsedMsSince(timestamp: string | null | undefined, nowIso: string): number | null {
+  if (typeof timestamp !== "string" || timestamp.trim().length === 0) return null;
+  const thenMs = Date.parse(timestamp);
+  const nowMs = Date.parse(nowIso);
+  if (!Number.isFinite(thenMs) || !Number.isFinite(nowMs)) return null;
+  return Math.max(0, nowMs - thenMs);
+}
+
+function formatDurationMinutes(ms: number | null): string | null {
+  if (ms === null || !Number.isFinite(ms)) return null;
+  const minutes = Math.max(1, Math.round(ms / 60000));
+  return `${minutes} minute${minutes === 1 ? "" : "s"}`;
 }
 
 function newRecordId(prefix: string): string {
@@ -465,11 +482,18 @@ function buildNotificationText(
   if (payloadKind === "worker_stuck") {
     const stalledChecks =
       typeof wakeup.payload?.stalled_checks === "number" ? wakeup.payload.stalled_checks : null;
+    const quietMs =
+      typeof wakeup.payload?.quiet_ms === "number" ? wakeup.payload.quiet_ms : null;
     const lastProgressAt =
       typeof wakeup.payload?.last_progress_at === "string" ? wakeup.payload.last_progress_at.trim() : "";
     const lines = [`⚠️ SubTurtle ${workerName} looks stuck.`];
     if (currentTask) lines.push(`Task: ${currentTask}`);
-    if (stalledChecks !== null) {
+    const quietText = formatDurationMinutes(quietMs);
+    if (quietText && stalledChecks !== null) {
+      lines.push(`No meaningful progress for ${quietText} across ${stalledChecks} supervision checks.`);
+    } else if (quietText) {
+      lines.push(`No meaningful progress for ${quietText}.`);
+    } else if (stalledChecks !== null) {
       lines.push(`No meaningful progress across ${stalledChecks} supervision checks.`);
     }
     if (lastProgressAt) lines.push(`Last progress: ${lastProgressAt}`);
@@ -556,8 +580,15 @@ function buildMetaAgentInboxText(
   } else if (payloadKind === "worker_stuck") {
     const stalledChecks =
       typeof wakeup.payload?.stalled_checks === "number" ? wakeup.payload.stalled_checks : null;
-    if (stalledChecks !== null) {
-      lines.push(`No meaningful progress across ${stalledChecks} silent checks.`);
+    const quietMs =
+      typeof wakeup.payload?.quiet_ms === "number" ? wakeup.payload.quiet_ms : null;
+    const quietText = formatDurationMinutes(quietMs);
+    if (quietText && stalledChecks !== null) {
+      lines.push(`No meaningful progress for ${quietText} across ${stalledChecks} supervision checks.`);
+    } else if (quietText) {
+      lines.push(`No meaningful progress for ${quietText}.`);
+    } else if (stalledChecks !== null) {
+      lines.push(`No meaningful progress across ${stalledChecks} supervision checks.`);
     } else {
       lines.push("Worker appears stuck.");
     }
@@ -1013,6 +1044,7 @@ export async function processSilentSubturtleSupervision(
   const previousProgressSignature = stringMetadataValue(supervisor, "last_progress_signature");
   const previousNotifiedBacklogDone = numericMetadataValue(supervisor, "last_notified_backlog_done");
   const lastProgressAt = stringMetadataValue(supervisor, "last_progress_at");
+  const lastStuckAt = stringMetadataValue(supervisor, "last_stuck_at");
   const progressObserved = !hasBaseline || previousProgressSignature !== progressSignature;
   const stalledChecks = progressObserved ? 0 : numericMetadataValue(supervisor, "stalled_check_count") + 1;
 
@@ -1103,8 +1135,13 @@ export async function processSilentSubturtleSupervision(
     createdWakeups += 1;
   }
 
+  const quietMs = elapsedMsSince(lastProgressAt, now);
+  const stuckCooldownMs = elapsedMsSince(lastStuckAt, now);
   if (
     stalledChecks >= 2 &&
+    quietMs !== null &&
+    quietMs >= STUCK_WAKEUP_MIN_QUIET_MS &&
+    (stuckCooldownMs === null || stuckCooldownMs >= STUCK_WAKEUP_MIN_REPEAT_MS) &&
     stringMetadataValue(supervisorMetadata(workingState), "last_stuck_signature") !== progressSignature
   ) {
     const stuckEvent = appendWorkerEvent(
@@ -1116,6 +1153,7 @@ export async function processSilentSubturtleSupervision(
       {
         stalled_checks: stalledChecks,
         last_progress_at: lastProgressAt,
+        quiet_ms: quietMs,
         progress_signature: progressSignature,
       },
       now
@@ -1135,6 +1173,7 @@ export async function processSilentSubturtleSupervision(
             kind: "worker_stuck",
             stalled_checks: stalledChecks,
             last_progress_at: lastProgressAt,
+            quiet_ms: quietMs,
             progress_signature: progressSignature,
           },
         }
