@@ -21,6 +21,7 @@ const {
   createStripeCheckoutSession,
   createStripeCustomerPortalSession,
   fetchCloudStatus,
+  fetchClaudeAuthStatus,
   fetchWhoAmI,
   getControlPlaneBaseUrl,
   hasCachedSnapshot,
@@ -33,6 +34,7 @@ const {
   persistSessionIfChanged,
   readSession,
   resumeManagedInstance,
+  setupClaudeAuth,
   startLogin,
   writeSession,
 } = require("./cloud");
@@ -845,6 +847,141 @@ function parseCloudArgs(args, parseOptions = {}) {
   return options;
 }
 
+function extractTokenFromCredentialPayload(raw) {
+  const trimmed = String(raw || "").trim();
+  if (!trimmed) return null;
+
+  const candidates = [];
+  try {
+    const parsed = JSON.parse(trimmed);
+    const visit = (value) => {
+      if (!value || typeof value !== "object") return;
+      if (Array.isArray(value)) {
+        for (const item of value) visit(item);
+        return;
+      }
+      for (const [key, child] of Object.entries(value)) {
+        if (
+          typeof child === "string" &&
+          ["accessToken", "access_token", "oauthAccessToken", "token"].includes(key)
+        ) {
+          candidates.push(child.trim());
+        } else {
+          visit(child);
+        }
+      }
+    };
+    visit(parsed);
+  } catch {
+    candidates.push(trimmed);
+  }
+
+  return candidates.find((candidate) => candidate.length > 0) || null;
+}
+
+function readClaudeAccessTokenFromFile(path) {
+  try {
+    if (!fs.existsSync(path)) return null;
+    return extractTokenFromCredentialPayload(fs.readFileSync(path, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+function discoverClaudeAccessToken() {
+  const envCandidates = [
+    process.env.SUPERTURTLE_CLAUDE_ACCESS_TOKEN,
+    process.env.CLAUDE_CODE_OAUTH_TOKEN,
+  ];
+  for (const candidate of envCandidates) {
+    const token = extractTokenFromCredentialPayload(candidate);
+    if (token) return token;
+  }
+
+  const user = process.env.USER || "unknown";
+  if (process.platform === "darwin") {
+    const attempts = [
+      ["security", ["find-generic-password", "-s", "Claude Code-credentials", "-a", user, "-w"]],
+      ["security", ["find-generic-password", "-s", "Claude Code-credentials", "-w"]],
+    ];
+    for (const [command, args] of attempts) {
+      const result = spawnSync(command, args, { stdio: "pipe" });
+      if (result.status === 0) {
+        const token = extractTokenFromCredentialPayload(result.stdout.toString("utf-8"));
+        if (token) return token;
+      }
+    }
+  }
+
+  if (process.platform === "linux" && spawnSync("sh", ["-c", "command -v secret-tool"], { stdio: "ignore" }).status === 0) {
+    const attempts = [
+      ["secret-tool", ["lookup", "service", "Claude Code-credentials", "username", user]],
+      ["secret-tool", ["lookup", "service", "Claude Code-credentials"]],
+    ];
+    for (const [command, args] of attempts) {
+      const result = spawnSync(command, args, { stdio: "pipe" });
+      if (result.status === 0) {
+        const token = extractTokenFromCredentialPayload(result.stdout.toString("utf-8"));
+        if (token) return token;
+      }
+    }
+  }
+
+  const home = process.env.HOME || "";
+  const fileCandidates = [
+    resolve(home, ".config", "claude-code", "credentials.json"),
+    resolve(home, ".claude", "credentials.json"),
+  ];
+  for (const path of fileCandidates) {
+    const token = readClaudeAccessTokenFromFile(path);
+    if (token) return token;
+  }
+
+  return null;
+}
+
+function parseClaudeSetupArgs(args) {
+  const options = {
+    tokenEnv: null,
+    tokenFile: null,
+  };
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--token-env") {
+      const value = args[index + 1];
+      if (!value || value.startsWith("--")) {
+        throw new Error("Missing value for --token-env");
+      }
+      options.tokenEnv = value;
+      index += 1;
+      continue;
+    }
+    if (arg === "--token-file") {
+      const value = args[index + 1];
+      if (!value || value.startsWith("--")) {
+        throw new Error("Missing value for --token-file");
+      }
+      options.tokenFile = value;
+      index += 1;
+      continue;
+    }
+    throw new Error(`Unknown cloud Claude setup argument: ${arg}`);
+  }
+
+  return options;
+}
+
+function resolveClaudeSetupToken(options) {
+  if (options.tokenEnv) {
+    return extractTokenFromCredentialPayload(process.env[options.tokenEnv] || "");
+  }
+  if (options.tokenFile) {
+    return readClaudeAccessTokenFromFile(resolve(options.tokenFile));
+  }
+  return discoverClaudeAccessToken();
+}
+
 async function login() {
   let options;
   try {
@@ -1049,6 +1186,62 @@ async function cloudPortal() {
   console.log(`Portal URL: ${result.data.portal_url}`);
 }
 
+async function cloudClaudeStatus() {
+  const session = readSession();
+  if (!session?.access_token) {
+    console.error(`Not logged in. Run 'superturtle login'. Expected session file at ${getSessionPath()}`);
+    process.exit(1);
+  }
+
+  const result = await fetchClaudeAuthStatus(session);
+  console.log(`Control plane: ${getSessionControlPlaneBaseUrl(result.session)}`);
+  console.log(`Provider: ${result.data.provider}`);
+  console.log(`Configured: ${result.data.configured ? "yes" : "no"}`);
+  if (result.data.credential?.state) console.log(`State: ${result.data.credential.state}`);
+  if (result.data.credential?.account_email) {
+    console.log(`Claude account: ${result.data.credential.account_email}`);
+  }
+  if (result.data.credential?.last_validated_at) {
+    console.log(`Last validated: ${result.data.credential.last_validated_at}`);
+  }
+}
+
+async function cloudClaudeSetup() {
+  let options;
+  try {
+    options = parseClaudeSetupArgs(process.argv.slice(5));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    console.error("Usage: superturtle cloud claude setup [--token-env <env-var>|--token-file <path>]");
+    process.exit(1);
+  }
+
+  const session = readSession();
+  if (!session?.access_token) {
+    console.error(`Not logged in. Run 'superturtle login'. Expected session file at ${getSessionPath()}`);
+    process.exit(1);
+  }
+
+  const claudeAccessToken = resolveClaudeSetupToken(options);
+  if (!claudeAccessToken) {
+    throw new Error(
+      "No local Claude access token was found. Run Claude login locally or pass --token-env/--token-file."
+    );
+  }
+
+  const result = await setupClaudeAuth(session, claudeAccessToken);
+  console.log(`Control plane: ${getSessionControlPlaneBaseUrl(result.session)}`);
+  console.log(`Provider: ${result.data.provider}`);
+  console.log(`Configured: ${result.data.configured ? "yes" : "no"}`);
+  if (result.data.credential?.state) console.log(`State: ${result.data.credential.state}`);
+  if (result.data.credential?.account_email) {
+    console.log(`Claude account: ${result.data.credential.account_email}`);
+  }
+  if (result.data.credential?.last_validated_at) {
+    console.log(`Last validated: ${result.data.credential.last_validated_at}`);
+  }
+}
+
 function logout() {
   const path = clearSession();
   console.log(`Removed local cloud session at ${path}`);
@@ -1083,6 +1276,19 @@ switch (command) {
     whoami().catch((err) => { console.error(err instanceof Error ? err.message : err); process.exit(1); });
     break;
   case "cloud":
+    if (process.argv[3] === "claude") {
+      if (process.argv[4] === "status") {
+        cloudClaudeStatus().catch((err) => { console.error(err instanceof Error ? err.message : err); process.exit(1); });
+        break;
+      }
+      if (process.argv[4] === "setup") {
+        cloudClaudeSetup().catch((err) => { console.error(err instanceof Error ? err.message : err); process.exit(1); });
+        break;
+      }
+      console.error("Usage: superturtle cloud claude <status|setup>");
+      process.exit(1);
+      break;
+    }
     if (process.argv[3] === "status") {
       cloudStatus().catch((err) => { console.error(err instanceof Error ? err.message : err); process.exit(1); });
       break;
@@ -1099,7 +1305,7 @@ switch (command) {
       cloudResume().catch((err) => { console.error(err instanceof Error ? err.message : err); process.exit(1); });
       break;
     }
-    console.error("Usage: superturtle cloud <status|resume|checkout|portal>");
+    console.error("Usage: superturtle cloud <status|resume|checkout|portal|claude>");
     process.exit(1);
     break;
   case "logout":
@@ -1128,7 +1334,7 @@ Commands:
   init      Set up superturtle in the current project
   login     Sign in to the hosted SuperTurtle control plane
   whoami    Show the current hosted account identity
-  cloud     Hosted cloud commands (status, resume, checkout, portal)
+  cloud     Hosted cloud commands (status, resume, checkout, portal, claude)
   logout    Remove the local hosted account session
   start     Launch the bot
   stop      Stop the bot and all SubTurtles
@@ -1155,7 +1361,9 @@ Cloud:
   superturtle cloud status
   superturtle cloud resume
   superturtle cloud checkout
-  superturtle cloud portal`);
+  superturtle cloud portal
+  superturtle cloud claude status
+  superturtle cloud claude setup`);
     if (command && command !== "help" && command !== "--help" && command !== "-h") {
       process.exit(1);
     }

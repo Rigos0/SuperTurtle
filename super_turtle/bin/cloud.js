@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const { resolve, dirname, parse, sep } = require("path");
 const { spawnSync } = require("child_process");
 const {
+  validateCliClaudeAuthStatusResponse,
   validateCliCloudStatusResponse,
   validateCliTeleportTargetResponse,
   validateCliTokenResponse,
@@ -615,6 +616,20 @@ function validateTeleportTargetResponse(payload, context) {
       instance: response.instance,
       ssh_target: response.ssh_target,
       remote_root: response.remote_root,
+      audit_log: response.audit_log,
+    };
+  } catch (error) {
+    throw remapContractValidationError(error, context);
+  }
+}
+
+function validateClaudeAuthStatusResponse(payload, context) {
+  try {
+    const response = validateCliClaudeAuthStatusResponse(payload);
+    return {
+      provider: response.provider,
+      configured: response.configured,
+      credential: response.credential,
       audit_log: response.audit_log,
     };
   } catch (error) {
@@ -1502,6 +1517,33 @@ async function fetchTeleportTarget(session, env = process.env) {
   };
 }
 
+async function fetchClaudeAuthStatus(session, env = process.env) {
+  const result = await requestWithSession(session, env, "/v1/cli/providers/claude/status");
+  return {
+    ...result,
+    data: validateClaudeAuthStatusResponse(result.data, "Hosted Claude auth status lookup"),
+  };
+}
+
+async function setupClaudeAuth(session, accessToken, env = process.env) {
+  if (!isOpaqueTokenString(accessToken)) {
+    throw new Error("Claude access token is missing or invalid.");
+  }
+  const result = await requestWithSession(session, env, "/v1/cli/providers/claude/setup", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      access_token: accessToken,
+    }),
+  });
+  return {
+    ...result,
+    data: validateClaudeAuthStatusResponse(result.data, "Hosted Claude auth setup"),
+  };
+}
+
 async function createStripeCheckoutSession(session, options = {}, env = process.env) {
   const result = await requestWithSession(session, env, "/v1/billing/stripe/checkout-session", {
     method: "POST",
@@ -1604,6 +1646,7 @@ module.exports = {
   DEFAULT_SESSION_FILE_MAX_BYTES,
   CLOUD_SESSION_SCHEMA_VERSION,
   fetchCloudStatus,
+  fetchClaudeAuthStatus,
   fetchTeleportTarget,
   fetchWhoAmI,
   getBrowserOpenTimeoutMs,
@@ -1619,6 +1662,7 @@ module.exports = {
   readSession,
   refreshSession,
   resumeManagedInstance,
+  setupClaudeAuth,
   mergeSessionSnapshot,
   hasCachedSnapshot,
   invalidateSession,
@@ -1628,6 +1672,7 @@ module.exports = {
   validateLoginStartResponse,
   validateWhoAmIResponse,
   validateCloudStatusResponse,
+  validateClaudeAuthStatusResponse,
   validateTeleportTargetResponse,
   validateStripeCheckoutSessionResponse,
   validateStripeCustomerPortalSessionResponse,

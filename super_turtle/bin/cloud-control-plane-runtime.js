@@ -9,6 +9,7 @@ const {
 } = require("./cloud-stripe-adapter.js");
 
 const {
+  validateCliClaudeAuthStatusResponse,
   assertManagedInstanceTransition,
   assertProvisioningJobTransition,
   validateCliCloudStatusResponse,
@@ -35,6 +36,7 @@ function createDefaultState() {
     entitlements: [],
     subscriptions: [],
     managed_instances: [],
+    provider_credentials: [],
     provisioning_jobs: [],
     billing_events: [],
     audit_log: [],
@@ -77,6 +79,9 @@ function ensureStateShape(state, statePath) {
 
   if (!Array.isArray(state.login_requests)) {
     state.login_requests = [];
+  }
+  if (!Array.isArray(state.provider_credentials)) {
+    state.provider_credentials = [];
   }
 
   return state;
@@ -138,6 +143,9 @@ function createRuntime(options) {
           ? options.stripe.webhookSecret
           : "",
       billingAdapter: createConfiguredStripeBillingAdapter(options),
+    },
+    claude: {
+      authAdapter: createConfiguredClaudeAuthAdapter(options),
     },
     config: {
       provider: "gcp",
@@ -212,6 +220,17 @@ function getSubscription(state, { subscriptionId = null, customerId = null, chec
 
 function getManagedInstance(state, userId) {
   return state.managed_instances.find((instance) => instance && instance.user_id === userId) || null;
+}
+
+function getProviderCredential(state, userId, provider) {
+  return (
+    state.provider_credentials.find(
+      (credential) =>
+        credential &&
+        credential.user_id === userId &&
+        credential.provider === provider
+    ) || null
+  );
 }
 
 function getManagedInstanceByMachineToken(state, machineToken) {
@@ -326,6 +345,26 @@ function buildTeleportTargetPayload(state, instance, config) {
     ssh_target: `${config.managedSshUser}@${instance.hostname}`,
     remote_root: config.managedProjectRoot,
     audit_log: getRecentAuditLog(state, instance.id),
+  });
+}
+
+function buildClaudeAuthStatusPayload(state, credential) {
+  return validateCliClaudeAuthStatusResponse({
+    provider: "claude",
+    configured: Boolean(credential && credential.state === "valid" && credential.access_token),
+    credential: credential
+      ? {
+          id: credential.id,
+          provider: credential.provider,
+          state: credential.state,
+          account_email: credential.account_email || null,
+          configured_at: credential.configured_at || null,
+          last_validated_at: credential.last_validated_at || null,
+          last_error_code: credential.last_error_code || null,
+          last_error_message: credential.last_error_message || null,
+        }
+      : null,
+    audit_log: credential ? getRecentAuditLog(state, credential.id) : [],
   });
 }
 
@@ -1193,6 +1232,152 @@ async function requestStripeCustomerPortalSession(runtime, accessToken) {
   };
 }
 
+function validateClaudeSetupPayload(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return { error: "invalid_request" };
+  }
+  if (typeof payload.access_token !== "string" || payload.access_token.trim().length === 0) {
+    return { error: "invalid_access_token" };
+  }
+  const accessToken = payload.access_token.trim();
+  if (accessToken.length > 4096 || /[\x00-\x1F\x7F]/.test(accessToken)) {
+    return { error: "invalid_access_token" };
+  }
+  return { accessToken };
+}
+
+function requestClaudeProviderStatus(runtime, accessToken) {
+  const state = readState(runtime.statePath);
+  const session = getUserSession(state, accessToken);
+  if (!session) {
+    return { status: 401, data: { error: "invalid_session" } };
+  }
+
+  const credential = getProviderCredential(state, session.user_id, "claude");
+  appendAudit(state, runtime, {
+    actor_type: "user",
+    actor_id: session.user_id,
+    action: "provider_credential.claude_status_lookup",
+    target_type: credential ? "provider_credential" : "user",
+    target_id: credential ? credential.id : session.user_id,
+    metadata: null,
+  });
+  writeState(runtime.statePath, state);
+  return {
+    status: 200,
+    data: buildClaudeAuthStatusPayload(state, credential),
+  };
+}
+
+async function setupClaudeProviderAuth(runtime, accessToken, payload = {}) {
+  const validatedPayload = validateClaudeSetupPayload(payload);
+  if (validatedPayload.error) {
+    return { status: 400, data: { error: validatedPayload.error } };
+  }
+
+  const state = readState(runtime.statePath);
+  const session = getUserSession(state, accessToken);
+  if (!session) {
+    return { status: 401, data: { error: "invalid_session" } };
+  }
+
+  if (!runtime.claude.authAdapter || typeof runtime.claude.authAdapter.validateAccessToken !== "function") {
+    return { status: 503, data: { error: "claude_auth_not_configured" } };
+  }
+
+  const existingCredential = getProviderCredential(state, session.user_id, "claude");
+  let validationResult;
+  try {
+    validationResult = await runtime.claude.authAdapter.validateAccessToken({
+      accessToken: validatedPayload.accessToken,
+      userId: session.user_id,
+    });
+  } catch (error) {
+    appendAudit(state, runtime, {
+      actor_type: "user",
+      actor_id: session.user_id,
+      action: "provider_credential.claude_validation_errored",
+      target_type: existingCredential ? "provider_credential" : "user",
+      target_id: existingCredential ? existingCredential.id : session.user_id,
+      metadata: {
+        error_code: error && typeof error.code === "string" ? error.code : "claude_validation_failed",
+      },
+    });
+    writeState(runtime.statePath, state);
+    return {
+      status: 502,
+      data: {
+        error: error && typeof error.code === "string" ? error.code : "claude_validation_failed",
+      },
+    };
+  }
+
+  if (!validationResult || validationResult.valid !== true) {
+    appendAudit(state, runtime, {
+      actor_type: "user",
+      actor_id: session.user_id,
+      action: "provider_credential.claude_validation_rejected",
+      target_type: existingCredential ? "provider_credential" : "user",
+      target_id: existingCredential ? existingCredential.id : session.user_id,
+      metadata: {
+        error_code:
+          validationResult && typeof validationResult.errorCode === "string"
+            ? validationResult.errorCode
+            : "invalid_claude_credentials",
+      },
+    });
+    writeState(runtime.statePath, state);
+    return {
+      status: 422,
+      data: {
+        error:
+          validationResult && typeof validationResult.errorCode === "string"
+            ? validationResult.errorCode
+            : "invalid_claude_credentials",
+      },
+    };
+  }
+
+  const timestamp = runtime.now();
+  const credential =
+    existingCredential ||
+    {
+      id: runtime.createId("cred"),
+      user_id: session.user_id,
+      provider: "claude",
+      configured_at: timestamp,
+    };
+  if (!existingCredential) {
+    state.provider_credentials.push(credential);
+  }
+  credential.state = "valid";
+  credential.access_token = validatedPayload.accessToken;
+  credential.account_email =
+    validationResult.accountEmail && typeof validationResult.accountEmail === "string"
+      ? validationResult.accountEmail
+      : existingCredential?.account_email || null;
+  credential.configured_at = credential.configured_at || timestamp;
+  credential.last_validated_at = timestamp;
+  credential.last_error_code = null;
+  credential.last_error_message = null;
+
+  appendAudit(state, runtime, {
+    actor_type: "user",
+    actor_id: session.user_id,
+    action: "provider_credential.claude_configured",
+    target_type: "provider_credential",
+    target_id: credential.id,
+    metadata: {
+      account_email: credential.account_email || null,
+    },
+  });
+  writeState(runtime.statePath, state);
+  return {
+    status: 200,
+    data: buildClaudeAuthStatusPayload(state, credential),
+  };
+}
+
 function requestLoginStart(runtime, payload = {}) {
   const state = readState(runtime.statePath);
   const requestPayload =
@@ -1664,6 +1849,50 @@ async function handleHttpRequest(runtime, request) {
     };
   }
 
+  if (request.method === "GET" && request.url === "/v1/cli/providers/claude/status") {
+    const accessToken = extractBearerToken(request);
+    if (!accessToken) {
+      return {
+        status: 401,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        body: JSON.stringify({ error: "missing_bearer_token" }),
+      };
+    }
+    const result = requestClaudeProviderStatus(runtime, accessToken);
+    return {
+      status: result.status,
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
+      body: JSON.stringify(result.data),
+    };
+  }
+
+  if (request.method === "POST" && request.url === "/v1/cli/providers/claude/setup") {
+    let payload;
+    try {
+      payload = await readJsonRequestBody(request, runtime.requestBodyMaxBytes);
+    } catch (error) {
+      return {
+        status: error.status || 400,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        body: JSON.stringify({ error: error.code || "invalid_request" }),
+      };
+    }
+    const accessToken = extractBearerToken(request);
+    if (!accessToken) {
+      return {
+        status: 401,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        body: JSON.stringify({ error: "missing_bearer_token" }),
+      };
+    }
+    const result = await setupClaudeProviderAuth(runtime, accessToken, payload);
+    return {
+      status: result.status,
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
+      body: JSON.stringify(result.data),
+    };
+  }
+
   if (request.method === "GET" && request.url === "/v1/cli/teleport/target") {
     const accessToken = extractBearerToken(request);
     if (!accessToken) {
@@ -1903,6 +2132,40 @@ function createConfiguredStripeBillingAdapter(options) {
   return null;
 }
 
+function createConfiguredClaudeAuthAdapter(options) {
+  const claudeOptions = options && options.claude && typeof options.claude === "object" ? options.claude : null;
+  if (
+    claudeOptions &&
+    claudeOptions.authAdapter &&
+    typeof claudeOptions.authAdapter.validateAccessToken === "function"
+  ) {
+    return claudeOptions.authAdapter;
+  }
+  return createClaudeAuthAdapter();
+}
+
+function createClaudeAuthAdapter() {
+  return {
+    async validateAccessToken({ accessToken }) {
+      const response = await fetch("https://api.anthropic.com/api/oauth/usage", {
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          "anthropic-beta": "oauth-2025-04-20",
+        },
+      });
+      if (response.status === 401 || response.status === 403) {
+        return { valid: false, errorCode: "invalid_claude_credentials" };
+      }
+      if (!response.ok) {
+        const error = new Error(`Anthropic validation returned HTTP ${response.status}.`);
+        error.code = "claude_validation_failed";
+        throw error;
+      }
+      return { valid: true, accountEmail: null };
+    },
+  };
+}
+
 module.exports = {
   CONTROL_PLANE_WRITE_SCOPE,
   STATE_SCHEMA_VERSION,
@@ -1915,6 +2178,7 @@ module.exports = {
   handleHttpRequest,
   readState,
   requestCloudStatus,
+  requestClaudeProviderStatus,
   requestMachineHeartbeat,
   requestMachineRegister,
   requestInstanceReprovision,
@@ -1925,6 +2189,7 @@ module.exports = {
   requestLoginStart,
   requestSession,
   requestSessionRefresh,
+  setupClaudeProviderAuth,
   requestInstanceResume,
   requestTeleportTarget,
   runNextProvisioningJob,
