@@ -340,6 +340,23 @@ server.listen(0, "127.0.0.1", async () => {
     loginPollMode = "normal";
     pollCount = 0;
 
+    const invalidConfiguredControlPlaneLogin = await runCli(
+      ["login", "--no-browser"],
+      {
+        ...env,
+        SUPERTURTLE_CLOUD_URL: `${baseUrl}/tenant-a`,
+      }
+    );
+    assert.strictEqual(invalidConfiguredControlPlaneLogin.code, 1);
+    assert.match(
+      invalidConfiguredControlPlaneLogin.stderr,
+      /Configured hosted control plane returned an invalid control_plane/i
+    );
+    assert.ok(
+      !fs.existsSync(sessionPath),
+      "expected invalid configured control plane URL to avoid writing a session file"
+    );
+
     const login = await runCli(["login", "--no-browser"], env);
     assert.strictEqual(login.code, 0, login.stderr);
     assert.match(login.stdout, /Logged in\./);
@@ -578,6 +595,24 @@ server.listen(0, "127.0.0.1", async () => {
     assert.strictEqual(invalidStoredControlPlaneWhoami.code, 1);
     assert.match(invalidStoredControlPlaneWhoami.stderr, /Hosted session file .* invalid control_plane/i);
     assert.match(invalidStoredControlPlaneWhoami.stderr, /superturtle logout/i);
+
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({
+        schema_version: 1,
+        access_token: "access-abc",
+        refresh_token: "refresh-ghi",
+        expires_at: "2999-03-12T10:00:00Z",
+        control_plane: `${baseUrl}/tenant-a`,
+      }, null, 2)}\n`
+    );
+    const invalidStoredControlPlanePathWhoami = await runCli(["whoami"], env);
+    assert.strictEqual(invalidStoredControlPlanePathWhoami.code, 1);
+    assert.match(
+      invalidStoredControlPlanePathWhoami.stderr,
+      /Hosted session file .* invalid control_plane/i
+    );
+    assert.match(invalidStoredControlPlanePathWhoami.stderr, /superturtle logout/i);
 
     fs.writeFileSync(
       sessionPath,

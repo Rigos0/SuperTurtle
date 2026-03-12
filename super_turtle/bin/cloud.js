@@ -39,6 +39,9 @@ function validateHttpUrl(value, fieldName, context, options = {}) {
   if (options.disallowHash && parsed.hash) {
     throw new Error(`${context} returned an invalid ${fieldName}.`);
   }
+  if (options.disallowPath && parsed.pathname && parsed.pathname !== "/") {
+    throw new Error(`${context} returned an invalid ${fieldName}.`);
+  }
 
   return parsed.toString();
 }
@@ -48,7 +51,7 @@ function getControlPlaneBaseUrl(env = process.env) {
     String(env.SUPERTURTLE_CLOUD_URL || DEFAULT_CONTROL_PLANE),
     "control_plane",
     "Configured hosted control plane",
-    { disallowSearch: true, disallowHash: true }
+    { disallowSearch: true, disallowHash: true, disallowPath: true }
   ).replace(/\/+$/, "");
 }
 
@@ -385,7 +388,7 @@ function validateStoredSession(session, path) {
       session.control_plane,
       "control_plane",
       "Stored hosted session",
-      { disallowSearch: true, disallowHash: true }
+      { disallowSearch: true, disallowHash: true, disallowPath: true }
     ).replace(/\/+$/, "");
   } catch (error) {
     throw invalidSessionFile(path, "has an invalid control_plane");
