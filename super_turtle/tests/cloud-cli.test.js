@@ -13,6 +13,8 @@ const sessionPath = resolve(tmpDir, "cloud-session.json");
 
 let pollCount = 0;
 let refreshCount = 0;
+let sessionMode = "normal";
+let statusMode = "normal";
 
 function runCli(args, env) {
   return new Promise((resolveRun, rejectRun) => {
@@ -83,6 +85,10 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === "GET" && req.url === "/v1/cli/session") {
       assert.strictEqual(req.headers.authorization, "Bearer access-abc");
+      if (sessionMode === "network-fail") {
+        req.socket.destroy();
+        return;
+      }
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({
         user: { id: "user_123", email: "user@example.com" },
@@ -93,6 +99,10 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === "GET" && req.url === "/v1/cli/cloud/status") {
       assert.strictEqual(req.headers.authorization, "Bearer access-abc");
+      if (statusMode === "network-fail") {
+        req.socket.destroy();
+        return;
+      }
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({
         instance: {
@@ -187,6 +197,26 @@ server.listen(0, "127.0.0.1", async () => {
     assert.match(cachedStatus.stderr, /using cached cloud status snapshot/i);
     assert.match(cachedStatus.stdout, /Instance: inst_123/);
     assert.match(cachedStatus.stdout, /Provisioning: running/);
+
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({
+        ...statusSession,
+        access_token: "expired-access",
+        refresh_token: "refresh-def",
+        expires_at: "2000-03-12T10:00:00Z",
+        control_plane: baseUrl,
+      }, null, 2)}\n`
+    );
+    sessionMode = "network-fail";
+
+    const cachedWhoamiAfterRefresh = await runCli(["whoami"], postLoginEnv);
+    assert.strictEqual(cachedWhoamiAfterRefresh.code, 0, cachedWhoamiAfterRefresh.stderr);
+    assert.match(cachedWhoamiAfterRefresh.stderr, /using cached identity snapshot/i);
+    const refreshedCachedSession = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
+    assert.strictEqual(refreshedCachedSession.access_token, "access-abc");
+    assert.strictEqual(refreshedCachedSession.refresh_token, "refresh-ghi");
+    sessionMode = "normal";
 
     fs.writeFileSync(
       sessionPath,

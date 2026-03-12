@@ -28,6 +28,7 @@ const {
   mergeSessionSnapshot,
   openBrowser,
   pollLogin,
+  persistSessionIfChanged,
   readSession,
   startLogin,
   writeSession,
@@ -893,11 +894,11 @@ async function whoami() {
       identity,
       getSessionControlPlaneBaseUrl(result.session)
     );
-    if (JSON.stringify(mergedSession) !== JSON.stringify(session)) {
-      writeSession(mergedSession);
-      session = mergedSession;
-    }
+    session = persistSessionIfChanged(session, mergedSession);
   } catch (error) {
+    if (error && typeof error === "object" && error.session) {
+      session = persistSessionIfChanged(session, error.session);
+    }
     if (!isRetryableCloudError(error) || !hasCachedSnapshot(session, ["user", "workspace", "entitlement"])) {
       throw error;
     }
@@ -935,11 +936,11 @@ async function cloudStatus() {
       status,
       getSessionControlPlaneBaseUrl(result.session)
     );
-    if (JSON.stringify(mergedSession) !== JSON.stringify(session)) {
-      writeSession(mergedSession);
-      session = mergedSession;
-    }
+    session = persistSessionIfChanged(session, mergedSession);
   } catch (error) {
+    if (error && typeof error === "object" && error.session) {
+      session = persistSessionIfChanged(session, error.session);
+    }
     if (!isRetryableCloudError(error) || !hasCachedSnapshot(session, ["instance", "provisioning_job"])) {
       throw error;
     }

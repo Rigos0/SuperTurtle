@@ -97,6 +97,15 @@ function writeSession(session, env = process.env) {
   return path;
 }
 
+function persistSessionIfChanged(previousSession, nextSession, env = process.env) {
+  if (!nextSession) return nextSession;
+  if (JSON.stringify(previousSession) === JSON.stringify(nextSession)) {
+    return nextSession;
+  }
+  writeSession(nextSession, env);
+  return nextSession;
+}
+
 function clearSession(env = process.env) {
   const path = getSessionPath(env);
   if (fs.existsSync(path)) fs.unlinkSync(path);
@@ -316,9 +325,11 @@ async function refreshSession(session, env = process.env) {
 async function requestWithSession(session, env, path) {
   const baseUrl = getSessionControlPlaneBaseUrl(session, env);
   let activeSession = session;
+  let sessionChanged = false;
 
   if (isSessionExpired(activeSession)) {
     activeSession = await refreshSession(activeSession, env);
+    sessionChanged = true;
   }
 
   const doRequest = async (currentSession) =>
@@ -332,9 +343,13 @@ async function requestWithSession(session, env, path) {
   } catch (error) {
     const status = error && typeof error === "object" ? error.status : undefined;
     if (status !== 401 || !activeSession?.refresh_token) {
+      if (sessionChanged && error && typeof error === "object") {
+        error.session = activeSession;
+      }
       throw error;
     }
     activeSession = await refreshSession(activeSession, env);
+    sessionChanged = true;
     const data = await doRequest(activeSession);
     return { data, session: activeSession };
   }
@@ -366,5 +381,6 @@ module.exports = {
   hasCachedSnapshot,
   startLogin,
   isRetryableCloudError,
+  persistSessionIfChanged,
   writeSession,
 };
