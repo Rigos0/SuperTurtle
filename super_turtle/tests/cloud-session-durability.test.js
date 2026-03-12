@@ -69,6 +69,57 @@ try {
       "expected clearSession to fsync the parent directory after deleting the hosted session file"
     );
   }
+
+  assert.throws(
+    () =>
+      writeSession(
+        {
+          access_token: 42,
+          refresh_token: "refresh-def",
+          control_plane: "https://api.superturtle.dev",
+        },
+        env
+      ),
+    /Hosted session file .* invalid access_token/i
+  );
+  assert.ok(
+    !fs.existsSync(sessionPath),
+    "expected invalid hosted session writes to fail before recreating the session file"
+  );
+
+  assert.throws(
+    () =>
+      writeSession(
+        {
+          access_token: "access-abc",
+          refresh_token: "refresh-def",
+          control_plane: "https://api.superturtle.dev",
+          user: { id: "user_123", email: "user@example.com" },
+          workspace: { slug: "acme" },
+          entitlement: { plan: "managed", state: "active" },
+          instance: {
+            id: "inst_123",
+            state: "provisioning",
+            region: "us-central1",
+            hostname: "managed-123.internal",
+          },
+          provisioning_job: {
+            state: "running",
+            updated_at: "2026-03-12T09:59:00Z",
+          },
+          padding: "x".repeat(4096),
+        },
+        {
+          ...env,
+          SUPERTURTLE_CLOUD_SESSION_MAX_BYTES: "512",
+        }
+      ),
+    /Hosted session file .* exceeds the configured size limit of 512 bytes/i
+  );
+  assert.ok(
+    !fs.existsSync(sessionPath),
+    "expected oversized hosted session writes to fail before recreating the session file"
+  );
 } finally {
   fs.openSync = originalOpenSync;
   fs.closeSync = originalCloseSync;

@@ -741,7 +741,13 @@ function writeSession(session, env = process.env) {
     schema_version: CLOUD_SESSION_SCHEMA_VERSION,
     ...session,
   };
+  validateStoredSession(normalized, path);
   const serialized = `${JSON.stringify(normalized, null, 2)}\n`;
+  const serializedBytes = Buffer.byteLength(serialized, "utf-8");
+  const maxBytes = getSessionFileMaxBytes(env);
+  if (serializedBytes > maxBytes) {
+    throw invalidSessionFile(path, `exceeds the configured size limit of ${maxBytes} bytes`);
+  }
   let tempPath = null;
   let tempFd = null;
 

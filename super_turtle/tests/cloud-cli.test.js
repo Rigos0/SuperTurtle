@@ -583,6 +583,25 @@ server.listen(0, "127.0.0.1", async () => {
       "expected invalid browser launch timeout configuration to avoid writing a session file"
     );
 
+    pollCount = 0;
+    const oversizedLocalSessionLogin = await runCli(
+      ["login", "--no-browser"],
+      {
+        ...env,
+        SUPERTURTLE_CLOUD_SESSION_MAX_BYTES: "256",
+      }
+    );
+    assert.strictEqual(oversizedLocalSessionLogin.code, 1);
+    assert.match(
+      oversizedLocalSessionLogin.stderr,
+      /Hosted session file .* exceeds the configured size limit of 256 bytes/i
+    );
+    assert.ok(
+      !fs.existsSync(sessionPath),
+      "expected oversized local hosted session writes to fail without leaving a session file behind"
+    );
+    pollCount = 0;
+
     loginPollDelayMs = 50;
     pollCount = 0;
     const timedOutLogin = await runCli(
