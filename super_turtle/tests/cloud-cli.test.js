@@ -134,8 +134,11 @@ server.listen(0, "127.0.0.1", async () => {
     assert.ok(fs.existsSync(sessionPath), "expected cloud session file to exist");
 
     const savedSession = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
+    assert.strictEqual(savedSession.schema_version, 1);
     assert.strictEqual(savedSession.control_plane, baseUrl);
     assert.strictEqual(savedSession.access_token, "expired-access");
+    const mode = fs.statSync(sessionPath).mode & 0o777;
+    assert.strictEqual(mode, 0o600);
 
     const whoami = await runCli(["whoami"], postLoginEnv);
     assert.strictEqual(whoami.code, 0, whoami.stderr);
@@ -184,6 +187,12 @@ server.listen(0, "127.0.0.1", async () => {
     assert.match(cachedStatus.stderr, /using cached cloud status snapshot/i);
     assert.match(cachedStatus.stdout, /Instance: inst_123/);
     assert.match(cachedStatus.stdout, /Provisioning: running/);
+
+    fs.writeFileSync(sessionPath, "{not-json\n");
+    const corruptWhoami = await runCli(["whoami"], env);
+    assert.strictEqual(corruptWhoami.code, 1);
+    assert.match(corruptWhoami.stderr, /Hosted session file .* invalid JSON/i);
+    assert.match(corruptWhoami.stderr, /superturtle logout/i);
 
     const logout = await runCli(["logout"], env);
     assert.strictEqual(logout.code, 0, logout.stderr);

@@ -7,6 +7,7 @@ const DEFAULT_CONTROL_PLANE = "https://api.superturtle.dev";
 const DEFAULT_POLL_INTERVAL_MS = 2000;
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const SESSION_EXPIRY_SKEW_MS = 30 * 1000;
+const CLOUD_SESSION_SCHEMA_VERSION = 1;
 
 function getControlPlaneBaseUrl(env = process.env) {
   return String(env.SUPERTURTLE_CLOUD_URL || DEFAULT_CONTROL_PLANE).replace(/\/+$/, "");
@@ -36,14 +37,44 @@ function ensureParentDir(filePath) {
 function readSession(env = process.env) {
   const path = getSessionPath(env);
   if (!fs.existsSync(path)) return null;
-  const raw = fs.readFileSync(path, "utf-8");
-  return JSON.parse(raw);
+  let raw;
+  try {
+    raw = fs.readFileSync(path, "utf-8");
+  } catch (error) {
+    throw new Error(
+      `Failed to read hosted session file at ${path}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(
+      `Hosted session file at ${path} is invalid JSON. Run 'superturtle logout' and then 'superturtle login' again.`
+    );
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(
+      `Hosted session file at ${path} is invalid. Run 'superturtle logout' and then 'superturtle login' again.`
+    );
+  }
+
+  return parsed;
 }
 
 function writeSession(session, env = process.env) {
   const path = getSessionPath(env);
   ensureParentDir(path);
-  fs.writeFileSync(path, `${JSON.stringify(session, null, 2)}\n`);
+  const normalized = {
+    schema_version: CLOUD_SESSION_SCHEMA_VERSION,
+    ...session,
+  };
+  const tempPath = `${path}.${process.pid}.tmp`;
+  fs.writeFileSync(tempPath, `${JSON.stringify(normalized, null, 2)}\n`, { mode: 0o600 });
+  fs.renameSync(tempPath, path);
+  fs.chmodSync(path, 0o600);
   return path;
 }
 
@@ -301,6 +332,7 @@ async function fetchCloudStatus(session, env = process.env) {
 module.exports = {
   clearSession,
   DEFAULT_CONTROL_PLANE,
+  CLOUD_SESSION_SCHEMA_VERSION,
   fetchCloudStatus,
   fetchWhoAmI,
   getControlPlaneBaseUrl,
