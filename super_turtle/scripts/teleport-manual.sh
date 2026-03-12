@@ -162,6 +162,23 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function formatProvisioningContext(status) {
+  const instanceState = status?.data?.instance?.state || "unknown";
+  const provisioningJob = status?.data?.provisioning_job;
+  if (!provisioningJob || typeof provisioningJob !== "object") {
+    return `instance state ${instanceState}`;
+  }
+
+  const details = [`instance state ${instanceState}`, `job ${provisioningJob.kind || "unknown"} ${provisioningJob.state || "unknown"}`];
+  if (typeof provisioningJob.error_code === "string" && provisioningJob.error_code.length > 0) {
+    details.push(`error code ${provisioningJob.error_code}`);
+  }
+  if (typeof provisioningJob.error_message === "string" && provisioningJob.error_message.length > 0) {
+    details.push(`error ${provisioningJob.error_message}`);
+  }
+  return details.join(", ");
+}
+
 (async () => {
   let session = readSession();
   if (!session) {
@@ -177,6 +194,7 @@ function sleep(ms) {
   );
   const deadline = Date.now() + timeoutMs;
   let resumeRequested = false;
+  let lastProvisioningContext = "instance state unknown";
 
   while (true) {
     try {
@@ -214,13 +232,20 @@ function sleep(ms) {
       const status = await fetchCloudStatus(session);
       session = persistSessionIfChanged(session, status.session);
       const instanceState = status?.data?.instance?.state || "unknown";
+      lastProvisioningContext = formatProvisioningContext(status);
       if (instanceState === "running") {
         break;
       }
       if (["failed", "deleted", "deleting"].includes(instanceState)) {
-        throw new Error(`Managed instance entered unrecoverable state ${instanceState}.`);
+        throw new Error(`Managed instance became unavailable while waiting for teleport readiness: ${lastProvisioningContext}.`);
       }
       await sleep(Math.min(intervalMs, Math.max(1, deadline - Date.now())));
+    }
+
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Timed out waiting for the managed SuperTurtle VM to become ready after ${timeoutMs}ms (${lastProvisioningContext}).`
+      );
     }
   }
 })().catch((error) => {

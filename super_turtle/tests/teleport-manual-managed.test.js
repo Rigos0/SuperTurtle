@@ -37,8 +37,7 @@ function writeExecutable(path, body) {
   fs.writeFileSync(path, body, { mode: 0o755 });
 }
 
-async function main() {
-  const tmpDir = fs.mkdtempSync(resolve(os.tmpdir(), "superturtle-teleport-managed-"));
+function createBaseEnvironment(tmpDir) {
   const fakeBinDir = resolve(tmpDir, "bin");
   fs.mkdirSync(fakeBinDir, { recursive: true });
   const sshLogPath = resolve(tmpDir, "ssh.log");
@@ -84,6 +83,18 @@ exit 0
       2
     )}\n`
   );
+
+  return { fakeBinDir, sshLogPath, rsyncLogPath, sessionPath };
+}
+
+function pointSessionAtBaseUrl(sessionPath, baseUrl) {
+  const session = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
+  session.control_plane = baseUrl;
+  fs.writeFileSync(sessionPath, `${JSON.stringify(session, null, 2)}\n`);
+}
+
+async function testManagedTeleportWaitsForResume(tmpDir) {
+  const { fakeBinDir, sshLogPath, rsyncLogPath, sessionPath } = createBaseEnvironment(tmpDir);
 
   let resumeCalls = 0;
   let statusCalls = 0;
@@ -200,10 +211,7 @@ exit 0
   const address = server.address();
   assert.ok(address && typeof address === "object");
   const baseUrl = `http://127.0.0.1:${address.port}`;
-
-  const session = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
-  session.control_plane = baseUrl;
-  fs.writeFileSync(sessionPath, `${JSON.stringify(session, null, 2)}\n`);
+  pointSessionAtBaseUrl(sessionPath, baseUrl);
 
   try {
     const result = await runScript({
@@ -227,6 +235,131 @@ exit 0
     assert.match(fs.readFileSync(rsyncLogPath, "utf-8"), /superturtle@vm-ready\.managed\.superturtle\.internal:\/srv\/superturtle\//);
   } finally {
     server.close();
+  }
+}
+
+async function testManagedTeleportSurfacesProvisioningFailure(tmpDir) {
+  const { fakeBinDir, sessionPath } = createBaseEnvironment(tmpDir);
+
+  let resumeCalls = 0;
+  let statusCalls = 0;
+
+  const server = http.createServer((req, res) => {
+    const authorize = req.headers.authorization;
+    assert.strictEqual(authorize, "Bearer access-abc");
+
+    if (req.method === "GET" && req.url === "/v1/cli/teleport/target") {
+      res.writeHead(409, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "managed_instance_not_running" }));
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/v1/cli/cloud/instance/resume") {
+      resumeCalls += 1;
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          instance: {
+            id: "inst_failed",
+            provider: "gcp",
+            state: "provisioning",
+            region: "us-central1",
+            zone: "us-central1-b",
+            hostname: null,
+            vm_name: "vm-failed",
+            machine_token_id: null,
+            last_seen_at: null,
+            resume_requested_at: "2026-03-12T09:58:00Z",
+          },
+          provisioning_job: {
+            id: "job_failed",
+            kind: "resume",
+            state: "queued",
+            attempt: 1,
+            created_at: "2026-03-12T09:58:00Z",
+            started_at: null,
+            updated_at: "2026-03-12T09:58:00Z",
+            completed_at: null,
+            error_code: null,
+            error_message: null,
+          },
+          audit_log: [],
+        })
+      );
+      return;
+    }
+
+    if (req.method === "GET" && req.url === "/v1/cli/cloud/status") {
+      statusCalls += 1;
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          instance: {
+            id: "inst_failed",
+            provider: "gcp",
+            state: "failed",
+            region: "us-central1",
+            zone: "us-central1-b",
+            hostname: null,
+            vm_name: "vm-failed",
+            machine_token_id: null,
+            last_seen_at: null,
+            resume_requested_at: "2026-03-12T09:58:00Z",
+          },
+          provisioning_job: {
+            id: "job_failed",
+            kind: "resume",
+            state: "failed",
+            attempt: 1,
+            created_at: "2026-03-12T09:58:00Z",
+            started_at: "2026-03-12T09:58:10Z",
+            updated_at: "2026-03-12T09:58:20Z",
+            completed_at: "2026-03-12T09:58:30Z",
+            error_code: "startup_script_failed",
+            error_message: "Machine registration did not complete.",
+          },
+          audit_log: [],
+        })
+      );
+      return;
+    }
+
+    res.writeHead(404, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: "not_found" }));
+  });
+
+  await new Promise((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  pointSessionAtBaseUrl(sessionPath, `http://127.0.0.1:${address.port}`);
+
+  try {
+    const result = await runScript({
+      ...process.env,
+      PATH: `${fakeBinDir}:${process.env.PATH}`,
+      SUPERTURTLE_CLOUD_SESSION_PATH: sessionPath,
+      SUPERTURTLE_TELEPORT_INSTANCE_READY_TIMEOUT_MS: "5000",
+      SUPERTURTLE_TELEPORT_INSTANCE_READY_POLL_INTERVAL_MS: "10",
+    });
+
+    assert.strictEqual(result.code, 1, `expected failure, got stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+    assert.strictEqual(resumeCalls, 1);
+    assert.strictEqual(statusCalls, 1);
+    assert.match(
+      result.stderr,
+      /Managed instance became unavailable while waiting for teleport readiness: instance state failed, job resume failed, error code startup_script_failed, error Machine registration did not complete\./
+    );
+  } finally {
+    server.close();
+  }
+}
+
+async function main() {
+  const tmpDir = fs.mkdtempSync(resolve(os.tmpdir(), "superturtle-teleport-managed-"));
+  try {
+    await testManagedTeleportWaitsForResume(resolve(tmpDir, "resume"));
+    await testManagedTeleportSurfacesProvisioningFailure(resolve(tmpDir, "failure"));
+  } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
