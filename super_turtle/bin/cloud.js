@@ -15,8 +15,41 @@ function invalidSessionFile(path, message) {
   );
 }
 
+function validateHttpUrl(value, fieldName, context, options = {}) {
+  if (!isNonEmptyString(value)) {
+    throw new Error(`${context} returned an invalid ${fieldName}.`);
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch (error) {
+    throw new Error(`${context} returned an invalid ${fieldName}.`);
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`${context} returned an invalid ${fieldName}.`);
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error(`${context} returned an invalid ${fieldName}.`);
+  }
+  if (options.disallowSearch && parsed.search) {
+    throw new Error(`${context} returned an invalid ${fieldName}.`);
+  }
+  if (options.disallowHash && parsed.hash) {
+    throw new Error(`${context} returned an invalid ${fieldName}.`);
+  }
+
+  return parsed.toString();
+}
+
 function getControlPlaneBaseUrl(env = process.env) {
-  return String(env.SUPERTURTLE_CLOUD_URL || DEFAULT_CONTROL_PLANE).replace(/\/+$/, "");
+  return validateHttpUrl(
+    String(env.SUPERTURTLE_CLOUD_URL || DEFAULT_CONTROL_PLANE),
+    "control_plane",
+    "Configured hosted control plane",
+    { disallowSearch: true, disallowHash: true }
+  ).replace(/\/+$/, "");
 }
 
 function getSessionPath(env = process.env) {
@@ -110,10 +143,10 @@ function validateLoginStartResponse(payload, context) {
   }
 
   const verificationUri = isNonEmptyString(payload.verification_uri)
-    ? payload.verification_uri
+    ? validateHttpUrl(payload.verification_uri, "verification_uri", context)
     : null;
   const verificationUriComplete = isNonEmptyString(payload.verification_uri_complete)
-    ? payload.verification_uri_complete
+    ? validateHttpUrl(payload.verification_uri_complete, "verification_uri_complete", context)
     : null;
   if (!verificationUri && !verificationUriComplete) {
     throw new Error(
@@ -318,6 +351,16 @@ function validateStoredSession(session, path) {
   }
 
   if (!isNonEmptyString(session.control_plane)) {
+    throw invalidSessionFile(path, "has an invalid control_plane");
+  }
+  try {
+    session.control_plane = validateHttpUrl(
+      session.control_plane,
+      "control_plane",
+      "Stored hosted session",
+      { disallowSearch: true, disallowHash: true }
+    ).replace(/\/+$/, "");
+  } catch (error) {
     throw invalidSessionFile(path, "has an invalid control_plane");
   }
 

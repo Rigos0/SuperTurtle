@@ -76,6 +76,16 @@ const server = http.createServer((req, res) => {
         }));
         return;
       }
+      if (loginStartMode === "invalid-verification-uri") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({
+          device_code: "dev-code-123",
+          user_code: "USER-123",
+          verification_uri: "javascript:alert('owned')",
+          interval_ms: 10,
+        }));
+        return;
+      }
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({
         device_code: "dev-code-123",
@@ -271,6 +281,18 @@ server.listen(0, "127.0.0.1", async () => {
     assert.ok(
       !fs.existsSync(sessionPath),
       "expected malformed login start with invalid interval to avoid writing a session file"
+    );
+
+    loginStartMode = "invalid-verification-uri";
+    const invalidLoginStartVerificationUri = await runCli(["login", "--no-browser"], env);
+    assert.strictEqual(invalidLoginStartVerificationUri.code, 1);
+    assert.match(
+      invalidLoginStartVerificationUri.stderr,
+      /Hosted login start returned an invalid verification_uri/i
+    );
+    assert.ok(
+      !fs.existsSync(sessionPath),
+      "expected malformed login start with invalid verification URI to avoid writing a session file"
     );
 
     loginStartMode = "normal";
@@ -506,6 +528,21 @@ server.listen(0, "127.0.0.1", async () => {
     assert.strictEqual(invalidStoredAccessTokenWhoami.code, 1);
     assert.match(invalidStoredAccessTokenWhoami.stderr, /Hosted session file .* invalid access_token/i);
     assert.match(invalidStoredAccessTokenWhoami.stderr, /superturtle logout/i);
+
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({
+        schema_version: 1,
+        access_token: "access-abc",
+        refresh_token: "refresh-ghi",
+        expires_at: "2999-03-12T10:00:00Z",
+        control_plane: "javascript:alert('owned')",
+      }, null, 2)}\n`
+    );
+    const invalidStoredControlPlaneWhoami = await runCli(["whoami"], env);
+    assert.strictEqual(invalidStoredControlPlaneWhoami.code, 1);
+    assert.match(invalidStoredControlPlaneWhoami.stderr, /Hosted session file .* invalid control_plane/i);
+    assert.match(invalidStoredControlPlaneWhoami.stderr, /superturtle logout/i);
 
     fs.writeFileSync(
       sessionPath,
