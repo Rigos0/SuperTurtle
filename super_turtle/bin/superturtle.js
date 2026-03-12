@@ -18,6 +18,8 @@ const fs = require("fs");
 const readline = require("readline");
 const {
   clearSession,
+  createStripeCheckoutSession,
+  createStripeCustomerPortalSession,
   fetchCloudStatus,
   fetchWhoAmI,
   getControlPlaneBaseUrl,
@@ -811,10 +813,12 @@ function logs() {
   exitFromSpawn(proc, "tail");
 }
 
-function parseCloudArgs(args) {
+function parseCloudArgs(args, parseOptions = {}) {
   const options = {
     openBrowser: true,
+    plan: "managed",
   };
+  const allowPlan = Boolean(parseOptions.allowPlan);
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -824,6 +828,15 @@ function parseCloudArgs(args) {
     }
     if (arg === "--browser") {
       options.openBrowser = true;
+      continue;
+    }
+    if (arg === "--plan" && allowPlan) {
+      const value = args[i + 1];
+      if (!value || value.startsWith("--")) {
+        throw new Error("Missing value for --plan");
+      }
+      options.plan = value;
+      i += 1;
       continue;
     }
     throw new Error(`Unknown cloud argument: ${arg}`);
@@ -994,6 +1007,48 @@ async function cloudResume() {
   }
 }
 
+async function cloudCheckout() {
+  let options;
+  try {
+    options = parseCloudArgs(process.argv.slice(4), { allowPlan: true });
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    console.error("Usage: superturtle cloud checkout [--plan <plan>]");
+    process.exit(1);
+  }
+
+  let session = readSession();
+  if (!session?.access_token) {
+    console.error(`Not logged in. Run 'superturtle login'. Expected session file at ${getSessionPath()}`);
+    process.exit(1);
+  }
+
+  const result = await createStripeCheckoutSession(session, { plan: options.plan });
+  session = persistSessionIfChanged(session, result.session);
+
+  console.log(`Control plane: ${getSessionControlPlaneBaseUrl(session)}`);
+  if (result.data.plan) console.log(`Plan: ${result.data.plan}`);
+  if (result.data.customer_id) console.log(`Customer: ${result.data.customer_id}`);
+  if (result.data.subscription_id) console.log(`Subscription: ${result.data.subscription_id}`);
+  console.log(`Checkout URL: ${result.data.checkout_url}`);
+}
+
+async function cloudPortal() {
+  let session = readSession();
+  if (!session?.access_token) {
+    console.error(`Not logged in. Run 'superturtle login'. Expected session file at ${getSessionPath()}`);
+    process.exit(1);
+  }
+
+  const result = await createStripeCustomerPortalSession(session);
+  session = persistSessionIfChanged(session, result.session);
+
+  console.log(`Control plane: ${getSessionControlPlaneBaseUrl(session)}`);
+  if (result.data.customer_id) console.log(`Customer: ${result.data.customer_id}`);
+  if (result.data.portal_session_id) console.log(`Portal session: ${result.data.portal_session_id}`);
+  console.log(`Portal URL: ${result.data.portal_url}`);
+}
+
 function logout() {
   const path = clearSession();
   console.log(`Removed local cloud session at ${path}`);
@@ -1032,11 +1087,19 @@ switch (command) {
       cloudStatus().catch((err) => { console.error(err instanceof Error ? err.message : err); process.exit(1); });
       break;
     }
+    if (process.argv[3] === "checkout") {
+      cloudCheckout().catch((err) => { console.error(err instanceof Error ? err.message : err); process.exit(1); });
+      break;
+    }
+    if (process.argv[3] === "portal") {
+      cloudPortal().catch((err) => { console.error(err instanceof Error ? err.message : err); process.exit(1); });
+      break;
+    }
     if (process.argv[3] === "resume") {
       cloudResume().catch((err) => { console.error(err instanceof Error ? err.message : err); process.exit(1); });
       break;
     }
-    console.error("Usage: superturtle cloud <status|resume>");
+    console.error("Usage: superturtle cloud <status|resume|checkout|portal>");
     process.exit(1);
     break;
   case "logout":
@@ -1065,7 +1128,7 @@ Commands:
   init      Set up superturtle in the current project
   login     Sign in to the hosted SuperTurtle control plane
   whoami    Show the current hosted account identity
-  cloud     Hosted cloud commands (status, resume)
+  cloud     Hosted cloud commands (status, resume, checkout, portal)
   logout    Remove the local hosted account session
   start     Launch the bot
   stop      Stop the bot and all SubTurtles
@@ -1090,7 +1153,9 @@ Cloud:
   superturtle login
   superturtle whoami
   superturtle cloud status
-  superturtle cloud resume`);
+  superturtle cloud resume
+  superturtle cloud checkout
+  superturtle cloud portal`);
     if (command && command !== "help" && command !== "--help" && command !== "-h") {
       process.exit(1);
     }

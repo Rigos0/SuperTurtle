@@ -607,6 +607,50 @@ function validateCloudStatusResponse(payload, context) {
   }
 }
 
+function validateStripeCheckoutSessionResponse(payload, context) {
+  const response = validateOptionalObject(payload, "response", context);
+  if (!response) {
+    throw new Error(`${context} returned an invalid response.`);
+  }
+
+  if (!isNonEmptyString(response.checkout_session_id)) {
+    throw new Error(`${context} returned an invalid checkout_session_id.`);
+  }
+  const checkoutUrl = validateControlPlaneUrl(response.checkout_url, "checkout_url", context, {
+    disallowHash: true,
+  });
+  const customerId = isNonEmptyString(response.customer_id) ? response.customer_id : null;
+  const subscriptionId = isNonEmptyString(response.subscription_id) ? response.subscription_id : null;
+  const plan = isNonEmptyString(response.plan) ? response.plan : null;
+
+  return {
+    checkout_session_id: response.checkout_session_id,
+    checkout_url: checkoutUrl,
+    customer_id: customerId,
+    subscription_id: subscriptionId,
+    plan,
+  };
+}
+
+function validateStripeCustomerPortalSessionResponse(payload, context) {
+  const response = validateOptionalObject(payload, "response", context);
+  if (!response) {
+    throw new Error(`${context} returned an invalid response.`);
+  }
+
+  const customerId = isNonEmptyString(response.customer_id) ? response.customer_id : null;
+  const portalSessionId = isNonEmptyString(response.portal_session_id) ? response.portal_session_id : null;
+  const portalUrl = validateControlPlaneUrl(response.portal_url, "portal_url", context, {
+    disallowHash: true,
+  });
+
+  return {
+    customer_id: customerId,
+    portal_session_id: portalSessionId,
+    portal_url: portalUrl,
+  };
+}
+
 function normalizeStoredSession(session, env = process.env, fallbackTimestamp = null) {
   if (!session || typeof session !== "object" || Array.isArray(session)) {
     return session;
@@ -1365,7 +1409,7 @@ async function refreshSession(session, env = process.env) {
   return normalizeSessionUpdate(validateTokenResponse(refreshed, "Hosted session refresh"), session, baseUrl);
 }
 
-async function requestWithSession(session, env, path) {
+async function requestWithSession(session, env, path, requestOptions = {}) {
   const baseUrl = getSessionControlPlaneBaseUrl(session, env);
   let activeSession = session;
   let sessionChanged = false;
@@ -1377,7 +1421,13 @@ async function requestWithSession(session, env, path) {
 
   const doRequest = async (currentSession) =>
     requestJson(`${baseUrl}${path}`, {
+      method: requestOptions.method || "GET",
       headers: getAuthHeaders(currentSession),
+      ...requestOptions,
+      headers: {
+        ...getAuthHeaders(currentSession),
+        ...(requestOptions.headers && typeof requestOptions.headers === "object" ? requestOptions.headers : {}),
+      },
     }, env);
 
   try {
@@ -1426,6 +1476,35 @@ async function fetchCloudStatus(session, env = process.env) {
   return {
     ...result,
     data: validateCloudStatusResponse(result.data, "Hosted cloud status lookup"),
+  };
+}
+
+async function createStripeCheckoutSession(session, options = {}, env = process.env) {
+  const result = await requestWithSession(session, env, "/v1/billing/stripe/checkout-session", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      plan: isNonEmptyString(options.plan) ? options.plan.trim() : "managed",
+    }),
+  });
+  return {
+    ...result,
+    data: validateStripeCheckoutSessionResponse(result.data, "Hosted billing checkout session"),
+  };
+}
+
+async function createStripeCustomerPortalSession(session, env = process.env) {
+  const result = await requestWithSession(session, env, "/v1/billing/stripe/customer-portal-session", {
+    method: "POST",
+  });
+  return {
+    ...result,
+    data: validateStripeCustomerPortalSessionResponse(
+      result.data,
+      "Hosted billing customer portal session"
+    ),
   };
 }
 
@@ -1493,6 +1572,8 @@ async function resumeManagedInstance(session, env = process.env) {
 
 module.exports = {
   clearSession,
+  createStripeCheckoutSession,
+  createStripeCustomerPortalSession,
   DEFAULT_CONTROL_PLANE,
   DEFAULT_BROWSER_OPEN_TIMEOUT_MS,
   DEFAULT_REQUEST_TIMEOUT_MS,
@@ -1523,6 +1604,8 @@ module.exports = {
   validateLoginStartResponse,
   validateWhoAmIResponse,
   validateCloudStatusResponse,
+  validateStripeCheckoutSessionResponse,
+  validateStripeCustomerPortalSessionResponse,
   writeSession,
   validateStoredSession,
 };

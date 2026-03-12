@@ -20,6 +20,8 @@ let refreshMode = "normal";
 let sessionMode = "normal";
 let statusMode = "normal";
 let resumeMode = "normal";
+let checkoutMode = "normal";
+let portalMode = "normal";
 let loginPollDelayMs = 0;
 let sessionDelayMs = 0;
 let statusDelayMs = 0;
@@ -655,6 +657,48 @@ const server = http.createServer((req, res) => {
       }));
       return;
     }
+    if (req.method === "POST" && req.url === "/v1/billing/stripe/checkout-session") {
+      assert.strictEqual(req.headers.authorization, "Bearer access-abc");
+      assert.strictEqual(body.plan, "managed");
+      if (checkoutMode === "invalid-url") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({
+          checkout_session_id: "cs_invalid_123",
+          checkout_url: "javascript:alert('owned')",
+          customer_id: "cus_checkout_123",
+          plan: "managed",
+        }));
+        return;
+      }
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        checkout_session_id: "cs_checkout_123",
+        checkout_url: "https://checkout.stripe.test/session/cs_checkout_123",
+        customer_id: "cus_checkout_123",
+        subscription_id: "sub_checkout_123",
+        plan: "managed",
+      }));
+      return;
+    }
+    if (req.method === "POST" && req.url === "/v1/billing/stripe/customer-portal-session") {
+      assert.strictEqual(req.headers.authorization, "Bearer access-abc");
+      if (portalMode === "invalid-url") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({
+          customer_id: "cus_checkout_123",
+          portal_session_id: "bps_invalid_123",
+          portal_url: "javascript:alert('owned')",
+        }));
+        return;
+      }
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        customer_id: "cus_checkout_123",
+        portal_session_id: "bps_portal_123",
+        portal_url: "https://billing.stripe.test/session/bps_portal_123",
+      }));
+      return;
+    }
 
     res.writeHead(404, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: "not found" }));
@@ -1062,6 +1106,19 @@ server.listen(0, "127.0.0.1", async () => {
     assert.match(resumed.stdout, /State: provisioning/);
     assert.match(resumed.stdout, /Provisioning: queued/);
 
+    const checkout = await runCli(["cloud", "checkout"], postLoginEnv);
+    assert.strictEqual(checkout.code, 0, checkout.stderr);
+    assert.match(checkout.stdout, /Plan: managed/);
+    assert.match(checkout.stdout, /Customer: cus_checkout_123/);
+    assert.match(checkout.stdout, /Subscription: sub_checkout_123/);
+    assert.match(checkout.stdout, /Checkout URL: https:\/\/checkout\.stripe\.test\/session\/cs_checkout_123/);
+
+    const portal = await runCli(["cloud", "portal"], postLoginEnv);
+    assert.strictEqual(portal.code, 0, portal.stderr);
+    assert.match(portal.stdout, /Customer: cus_checkout_123/);
+    assert.match(portal.stdout, /Portal session: bps_portal_123/);
+    assert.match(portal.stdout, /Portal URL: https:\/\/billing\.stripe\.test\/session\/bps_portal_123/);
+
     const resumedSession = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
     assert.deepStrictEqual(resumedSession.instance, {
       id: "inst_123",
@@ -1078,6 +1135,18 @@ server.listen(0, "127.0.0.1", async () => {
       attempt: 1,
       updated_at: "2026-03-12T10:01:00Z",
     });
+
+    checkoutMode = "invalid-url";
+    const invalidCheckout = await runCli(["cloud", "checkout"], postLoginEnv);
+    assert.strictEqual(invalidCheckout.code, 1);
+    assert.match(invalidCheckout.stderr, /Hosted billing checkout session returned an invalid checkout_url/i);
+    checkoutMode = "normal";
+
+    portalMode = "invalid-url";
+    const invalidPortal = await runCli(["cloud", "portal"], postLoginEnv);
+    assert.strictEqual(invalidPortal.code, 1);
+    assert.match(invalidPortal.stderr, /Hosted billing customer portal session returned an invalid portal_url/i);
+    portalMode = "normal";
 
     fs.writeFileSync(
       sessionPath,
