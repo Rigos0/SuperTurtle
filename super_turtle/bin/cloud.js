@@ -382,6 +382,9 @@ function validateStoredSession(session, path) {
   if (Object.prototype.hasOwnProperty.call(session, "created_at")) {
     validateTimestamp(session.created_at, "created_at", "Stored hosted session");
   }
+  if (Object.prototype.hasOwnProperty.call(session, "refreshed_at")) {
+    validateTimestamp(session.refreshed_at, "refreshed_at", "Stored hosted session");
+  }
   if (Object.prototype.hasOwnProperty.call(session, "last_sync_at")) {
     validateTimestamp(session.last_sync_at, "last_sync_at", "Stored hosted session");
   }
