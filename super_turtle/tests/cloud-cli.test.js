@@ -634,6 +634,23 @@ server.listen(0, "127.0.0.1", async () => {
       "expected invalid configured control plane URL to avoid writing a session file"
     );
 
+    const insecureConfiguredControlPlaneLogin = await runCli(
+      ["login", "--no-browser"],
+      {
+        ...env,
+        SUPERTURTLE_CLOUD_URL: "http://example.com",
+      }
+    );
+    assert.strictEqual(insecureConfiguredControlPlaneLogin.code, 1);
+    assert.match(
+      insecureConfiguredControlPlaneLogin.stderr,
+      /Configured hosted control plane returned an invalid control_plane/i
+    );
+    assert.ok(
+      !fs.existsSync(sessionPath),
+      "expected non-loopback HTTP control plane URLs to be rejected before login"
+    );
+
     const legacyPredictableTempPath = `${sessionPath}.${process.pid}.tmp`;
     const legacyPredictableTempTargetPath = resolve(tmpDir, "legacy-predictable-temp-target.json");
     fs.writeFileSync(
@@ -1074,6 +1091,23 @@ server.listen(0, "127.0.0.1", async () => {
       /Hosted session file .* invalid control_plane/i
     );
     assert.match(invalidStoredControlPlanePathWhoami.stderr, /superturtle logout/i);
+
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({
+        access_token: "access-abc",
+        refresh_token: "refresh-ghi",
+        expires_at: "2999-03-12T10:00:00Z",
+        control_plane: "http://example.com",
+      }, null, 2)}\n`
+    );
+    const invalidStoredInsecureControlPlaneWhoami = await runCli(["whoami"], env);
+    assert.strictEqual(invalidStoredInsecureControlPlaneWhoami.code, 1);
+    assert.match(
+      invalidStoredInsecureControlPlaneWhoami.stderr,
+      /Hosted session file .* invalid control_plane/i
+    );
+    assert.match(invalidStoredInsecureControlPlaneWhoami.stderr, /superturtle logout/i);
 
     fs.writeFileSync(
       sessionPath,

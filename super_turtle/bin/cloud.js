@@ -41,6 +41,9 @@ function validateHttpUrl(value, fieldName, context, options = {}) {
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     throw new Error(`${context} returned an invalid ${fieldName}.`);
   }
+  if (parsed.protocol === "http:" && !options.allowInsecureHttp) {
+    throw new Error(`${context} returned an invalid ${fieldName}.`);
+  }
   if (parsed.username || parsed.password) {
     throw new Error(`${context} returned an invalid ${fieldName}.`);
   }
@@ -57,13 +60,46 @@ function validateHttpUrl(value, fieldName, context, options = {}) {
   return parsed.toString();
 }
 
+function isLoopbackHostname(hostname) {
+  if (!isNonEmptyString(hostname)) {
+    return false;
+  }
+
+  const normalized = hostname.trim().toLowerCase();
+  if (normalized === "localhost" || normalized === "::1" || normalized.endsWith(".localhost")) {
+    return true;
+  }
+
+  if (/^127(?:\.\d{1,3}){3}$/.test(normalized)) {
+    return normalized
+      .split(".")
+      .every((segment) => Number.isInteger(Number(segment)) && Number(segment) >= 0 && Number(segment) <= 255);
+  }
+
+  return false;
+}
+
+function validateControlPlaneUrl(value, fieldName, context, options = {}) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch (error) {
+    throw new Error(`${context} returned an invalid ${fieldName}.`);
+  }
+
+  return validateHttpUrl(value, fieldName, context, {
+    ...options,
+    allowInsecureHttp: parsed.protocol === "http:" && isLoopbackHostname(parsed.hostname),
+  });
+}
+
 function normalizeUrlOrigin(value, fieldName, context) {
-  const parsed = new URL(validateHttpUrl(value, fieldName, context));
+  const parsed = new URL(validateControlPlaneUrl(value, fieldName, context));
   return parsed.origin;
 }
 
 function getControlPlaneBaseUrl(env = process.env) {
-  return validateHttpUrl(
+  return validateControlPlaneUrl(
     String(env.SUPERTURTLE_CLOUD_URL || DEFAULT_CONTROL_PLANE),
     "control_plane",
     "Configured hosted control plane",
@@ -588,7 +624,7 @@ function validateStoredSession(session, path) {
     throw invalidSessionFile(path, "has an invalid control_plane");
   }
   try {
-    session.control_plane = validateHttpUrl(
+    session.control_plane = validateControlPlaneUrl(
       session.control_plane,
       "control_plane",
       "Stored hosted session",
