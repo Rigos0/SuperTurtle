@@ -12,6 +12,8 @@ const {
   handleHttpRequest,
   readState,
   requestCloudStatus,
+  requestMachineHeartbeat,
+  requestMachineRegister,
   requestLoginPoll,
   requestLoginStart,
   requestSession,
@@ -219,9 +221,48 @@ async function run() {
   assert.ok(completed.instance.hostname);
   assert.ok(completed.instance.machine_token_id);
 
+  const persistedWithMachineToken = readState(statePath);
+  assert.ok(persistedWithMachineToken.managed_instances[0].machine_auth_token);
+
+  const registered = requestMachineRegister(
+    runtime,
+    persistedWithMachineToken.managed_instances[0].machine_auth_token,
+    {
+      hostname: "vm-registered.managed.superturtle.internal",
+      vm_name: "gcp-vm-registered",
+      zone: "us-central1-b",
+    }
+  );
+  assert.strictEqual(registered.status, 200);
+  assert.strictEqual(registered.data.instance.state, "running");
+  assert.strictEqual(registered.data.instance.hostname, "vm-registered.managed.superturtle.internal");
+  assert.strictEqual(registered.data.instance.zone, "us-central1-b");
+
+  const heartbeat = requestMachineHeartbeat(
+    runtime,
+    persistedWithMachineToken.managed_instances[0].machine_auth_token,
+    {
+      health_status: "healthy",
+      region: "us-central1",
+    }
+  );
+  assert.strictEqual(heartbeat.status, 200);
+  assert.strictEqual(heartbeat.data.ok, true);
+  assert.strictEqual(heartbeat.data.health_status, "healthy");
+
   const persistedAfterRun = readState(statePath);
   assert.strictEqual(persistedAfterRun.managed_instances[0].state, "running");
   assert.strictEqual(persistedAfterRun.provisioning_jobs[0].state, "succeeded");
+  assert.strictEqual(
+    persistedAfterRun.managed_instances[0].hostname,
+    "vm-registered.managed.superturtle.internal"
+  );
+  assert.strictEqual(persistedAfterRun.managed_instances[0].health_status, "healthy");
+  assert.match(
+    JSON.stringify(persistedAfterRun.audit_log),
+    /machine\.(registered|heartbeat)/,
+    "expected machine registration and heartbeat events to be written to the durable audit log"
+  );
 
   const runningStatus = requestCloudStatus(runtime, refreshed.data.access_token);
   assert.strictEqual(runningStatus.status, 200);
@@ -294,6 +335,41 @@ async function run() {
   const cloudStatusPayload = await cloudStatusResponse.json();
   assert.strictEqual(cloudStatusPayload.instance.state, "provisioning");
   assert.strictEqual(cloudStatusPayload.provisioning_job.state, "queued");
+
+  const httpRunCompleted = await runNextProvisioningJob(httpRuntime);
+  const httpMachineState = readState(httpPath);
+  const httpMachineToken = httpMachineState.managed_instances[0].machine_auth_token;
+  assert.strictEqual(httpRunCompleted.instance.state, "running");
+
+  const machineRegisterResponse = await fetch(`http://127.0.0.1:${address.port}/v1/machine/register`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${httpMachineToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      hostname: "http-vm.managed.superturtle.internal",
+      vm_name: "http-managed-vm",
+    }),
+  });
+  assert.strictEqual(machineRegisterResponse.status, 200);
+  const machineRegisterPayload = await machineRegisterResponse.json();
+  assert.strictEqual(machineRegisterPayload.instance.hostname, "http-vm.managed.superturtle.internal");
+
+  const machineHeartbeatResponse = await fetch(`http://127.0.0.1:${address.port}/v1/machine/heartbeat`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${httpMachineToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      health_status: "degraded",
+    }),
+  });
+  assert.strictEqual(machineHeartbeatResponse.status, 200);
+  const machineHeartbeatPayload = await machineHeartbeatResponse.json();
+  assert.strictEqual(machineHeartbeatPayload.ok, true);
+  assert.strictEqual(machineHeartbeatPayload.health_status, "degraded");
 
   const loginStartResponse = await fetch(`http://127.0.0.1:${address.port}/v1/cli/login/start`, {
     method: "POST",

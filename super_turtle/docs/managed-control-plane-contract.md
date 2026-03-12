@@ -14,6 +14,10 @@ This document defines the first production-shaped contract for the hosted manage
   Returns the managed instance record, the latest provisioning job, and recent audit entries relevant to the hosted VM lifecycle.
 - `POST /v1/cli/cloud/instance/resume`
   Enqueues or deduplicates a managed-instance resume/provisioning job and returns the updated instance, latest provisioning job, and recent audit entries.
+- `POST /v1/machine/register`
+  Authenticated by the managed VM's machine token. Finalizes bootstrap registration, records the VM identity metadata, and marks the hosted instance as online after provisioning.
+- `POST /v1/machine/heartbeat`
+  Authenticated by the managed VM's machine token. Records a liveness update and current health state for the hosted VM.
 
 ## Resource schema
 
@@ -27,6 +31,7 @@ This document defines the first production-shaped contract for the hosted manage
   `plan`, `state`, optional `subscription_id`, `current_period_end`, `cancel_at_period_end`
 - `managed_instance`
   `id`, `provider`, `state`, optional `region`, `zone`, `hostname`, `vm_name`, `machine_token_id`, `last_seen_at`, `resume_requested_at`
+  Internal durable fields used by the machine lifecycle: `machine_auth_token`, `registered_at`, `health_checked_at`, `health_status`
 - `provisioning_job`
   `id`, `kind`, `state`, optional `attempt`, `created_at`, `started_at`, `updated_at`, `completed_at`, `error_code`, `error_message`
 - `audit_log`

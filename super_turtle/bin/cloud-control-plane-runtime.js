@@ -181,6 +181,18 @@ function getManagedInstance(state, userId) {
   return state.managed_instances.find((instance) => instance && instance.user_id === userId) || null;
 }
 
+function getManagedInstanceByMachineToken(state, machineToken) {
+  return (
+    state.managed_instances.find(
+      (instance) =>
+        instance &&
+        instance.machine_auth_token === machineToken &&
+        instance.state !== "deleted" &&
+        instance.state !== "deleting"
+    ) || null
+  );
+}
+
 function getLatestProvisioningJob(state, instanceId) {
   const jobs = state.provisioning_jobs.filter((job) => job && job.instance_id === instanceId);
   if (jobs.length === 0) {
@@ -246,6 +258,25 @@ function buildCloudStatusPayload(state, instance) {
       : null,
     audit_log: instance ? getRecentAuditLog(state, instance.id) : [],
   });
+}
+
+function buildMachineStatusPayload(instance) {
+  return {
+    instance: instance
+      ? {
+          id: instance.id,
+          provider: instance.provider,
+          state: instance.state,
+          region: instance.region || null,
+          zone: instance.zone || null,
+          hostname: instance.hostname || null,
+          vm_name: instance.vm_name || null,
+          machine_token_id: instance.machine_token_id || null,
+          last_seen_at: instance.last_seen_at || null,
+          resume_requested_at: instance.resume_requested_at || null,
+        }
+      : null,
+  };
 }
 
 function buildWhoAmIPayload(state, session) {
@@ -433,6 +464,113 @@ function enqueueProvisioningJob(state, runtime, instance, session, kind) {
     metadata: { kind, instance_id: instance.id },
   });
   return job;
+}
+
+function authenticateMachineRequest(state, machineToken) {
+  if (typeof machineToken !== "string" || machineToken.length === 0) {
+    return null;
+  }
+  return getManagedInstanceByMachineToken(state, machineToken);
+}
+
+function requestMachineRegister(runtime, machineToken, payload = {}) {
+  const state = readState(runtime.statePath);
+  const instance = authenticateMachineRequest(state, machineToken);
+  if (!instance) {
+    return { status: 401, data: { error: "invalid_machine_token" } };
+  }
+
+  const registerPayload =
+    payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+  const timestamp = runtime.now();
+
+  if (instance.state === "provisioning") {
+    assertManagedInstanceTransition(instance.state, "running");
+    instance.state = "running";
+  }
+
+  if (typeof registerPayload.hostname === "string" && registerPayload.hostname.trim().length > 0) {
+    instance.hostname = registerPayload.hostname.trim();
+  }
+  if (typeof registerPayload.vm_name === "string" && registerPayload.vm_name.trim().length > 0) {
+    instance.vm_name = registerPayload.vm_name.trim();
+  }
+  if (typeof registerPayload.region === "string" && registerPayload.region.trim().length > 0) {
+    instance.region = registerPayload.region.trim();
+  }
+  if (typeof registerPayload.zone === "string" && registerPayload.zone.trim().length > 0) {
+    instance.zone = registerPayload.zone.trim();
+  }
+
+  instance.last_seen_at = timestamp;
+  instance.registered_at = instance.registered_at || timestamp;
+  instance.health_checked_at = timestamp;
+  instance.health_status = "healthy";
+
+  appendAudit(state, runtime, {
+    actor_type: "instance",
+    actor_id: instance.id,
+    action: "machine.registered",
+    target_type: "managed_instance",
+    target_id: instance.id,
+    metadata: {
+      hostname: instance.hostname,
+      vm_name: instance.vm_name,
+    },
+  });
+  writeState(runtime.statePath, state);
+  return { status: 200, data: buildMachineStatusPayload(instance) };
+}
+
+function requestMachineHeartbeat(runtime, machineToken, payload = {}) {
+  const state = readState(runtime.statePath);
+  const instance = authenticateMachineRequest(state, machineToken);
+  if (!instance) {
+    return { status: 401, data: { error: "invalid_machine_token" } };
+  }
+
+  const heartbeatPayload =
+    payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+  const timestamp = runtime.now();
+
+  if (typeof heartbeatPayload.hostname === "string" && heartbeatPayload.hostname.trim().length > 0) {
+    instance.hostname = heartbeatPayload.hostname.trim();
+  }
+  if (typeof heartbeatPayload.vm_name === "string" && heartbeatPayload.vm_name.trim().length > 0) {
+    instance.vm_name = heartbeatPayload.vm_name.trim();
+  }
+  if (typeof heartbeatPayload.region === "string" && heartbeatPayload.region.trim().length > 0) {
+    instance.region = heartbeatPayload.region.trim();
+  }
+  if (typeof heartbeatPayload.zone === "string" && heartbeatPayload.zone.trim().length > 0) {
+    instance.zone = heartbeatPayload.zone.trim();
+  }
+
+  instance.last_seen_at = timestamp;
+  instance.health_checked_at = timestamp;
+  if (typeof heartbeatPayload.health_status === "string" && heartbeatPayload.health_status.trim().length > 0) {
+    instance.health_status = heartbeatPayload.health_status.trim();
+  }
+
+  appendAudit(state, runtime, {
+    actor_type: "instance",
+    actor_id: instance.id,
+    action: "machine.heartbeat",
+    target_type: "managed_instance",
+    target_id: instance.id,
+    metadata: {
+      health_status: instance.health_status || null,
+    },
+  });
+  writeState(runtime.statePath, state);
+  return {
+    status: 200,
+    data: {
+      ok: true,
+      last_seen_at: instance.last_seen_at,
+      health_status: instance.health_status || null,
+    },
+  };
 }
 
 function requestInstanceResume(runtime, accessToken) {
@@ -776,6 +914,7 @@ async function runNextProvisioningJob(runtime) {
     instance.zone = result.zone || instance.zone;
     instance.region = result.region || instance.region;
     instance.machine_token_id = result.machine_token_id || instance.machine_token_id;
+    instance.machine_auth_token = result.machine_auth_token || instance.machine_auth_token || runtime.createId("machine");
     instance.last_seen_at = job.completed_at;
 
     appendAudit(state, runtime, {
@@ -958,6 +1097,60 @@ async function handleHttpRequest(runtime, request) {
     };
   }
 
+  if (request.method === "POST" && request.url === "/v1/machine/register") {
+    let payload;
+    try {
+      payload = await readJsonRequestBody(request, runtime.requestBodyMaxBytes);
+    } catch (error) {
+      return {
+        status: error.status || 400,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        body: JSON.stringify({ error: error.code || "invalid_request" }),
+      };
+    }
+    const machineToken = extractBearerToken(request);
+    if (!machineToken) {
+      return {
+        status: 401,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        body: JSON.stringify({ error: "missing_bearer_token" }),
+      };
+    }
+    const result = requestMachineRegister(runtime, machineToken, payload);
+    return {
+      status: result.status,
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
+      body: JSON.stringify(result.data),
+    };
+  }
+
+  if (request.method === "POST" && request.url === "/v1/machine/heartbeat") {
+    let payload;
+    try {
+      payload = await readJsonRequestBody(request, runtime.requestBodyMaxBytes);
+    } catch (error) {
+      return {
+        status: error.status || 400,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        body: JSON.stringify({ error: error.code || "invalid_request" }),
+      };
+    }
+    const machineToken = extractBearerToken(request);
+    if (!machineToken) {
+      return {
+        status: 401,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        body: JSON.stringify({ error: "missing_bearer_token" }),
+      };
+    }
+    const result = requestMachineHeartbeat(runtime, machineToken, payload);
+    return {
+      status: result.status,
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
+      body: JSON.stringify(result.data),
+    };
+  }
+
   return {
     status: 404,
     headers: { "content-type": "application/json", "cache-control": "no-store" },
@@ -1015,6 +1208,7 @@ function createNoopProvisioner() {
         hostname: `${instance.id}.${config.hostnameDomain}`,
         vm_name: `vm-${instance.id}`,
         machine_token_id: `machine-${instance.id}`,
+        machine_auth_token: `machine-auth-${instance.id}`,
       };
     },
   };
@@ -1030,6 +1224,8 @@ module.exports = {
   handleHttpRequest,
   readState,
   requestCloudStatus,
+  requestMachineHeartbeat,
+  requestMachineRegister,
   requestLoginPoll,
   requestLoginStart,
   requestSession,
