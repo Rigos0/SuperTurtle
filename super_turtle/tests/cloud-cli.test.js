@@ -6,6 +6,7 @@ const http = require("http");
 const os = require("os");
 const { resolve } = require("path");
 const { spawn } = require("child_process");
+const { validateLoginStartResponse } = require("../bin/cloud.js");
 
 const CLI_PATH = resolve(__dirname, "..", "bin", "superturtle.js");
 const tmpDir = fs.mkdtempSync(resolve(os.tmpdir(), "superturtle-cloud-cli-"));
@@ -21,6 +22,27 @@ let statusMode = "normal";
 let loginPollDelayMs = 0;
 let sessionDelayMs = 0;
 let statusDelayMs = 0;
+
+assert.deepStrictEqual(
+  validateLoginStartResponse(
+    {
+      device_code: "dev-code-loopback",
+      verification_uri: "http://127.0.0.1:4318/verify",
+      verification_uri_complete: "http://127.0.0.1:4318/verify?code=USER-123",
+      interval_ms: 10,
+    },
+    "Hosted login start",
+    "http://127.0.0.1:4318"
+  ),
+  {
+    device_code: "dev-code-loopback",
+    verification_uri: "http://127.0.0.1:4318/verify",
+    verification_uri_complete: "http://127.0.0.1:4318/verify?code=USER-123",
+    interval_ms: 10,
+    user_code: null,
+  },
+  "expected loopback HTTP verification URLs to remain valid for local hosted login test harnesses"
+);
 
 function runCli(args, env) {
   return new Promise((resolveRun, rejectRun) => {

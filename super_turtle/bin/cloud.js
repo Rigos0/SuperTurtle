@@ -454,10 +454,10 @@ function validateLoginStartResponse(payload, context, controlPlaneBaseUrl = null
   }
 
   const verificationUri = isNonEmptyString(payload.verification_uri)
-    ? validateHttpUrl(payload.verification_uri, "verification_uri", context)
+    ? validateControlPlaneUrl(payload.verification_uri, "verification_uri", context)
     : null;
   const verificationUriComplete = isNonEmptyString(payload.verification_uri_complete)
-    ? validateHttpUrl(payload.verification_uri_complete, "verification_uri_complete", context)
+    ? validateControlPlaneUrl(payload.verification_uri_complete, "verification_uri_complete", context)
     : null;
   if (!verificationUri && !verificationUriComplete) {
     throw new Error(
