@@ -337,6 +337,11 @@ const server = http.createServer((req, res) => {
         }));
         return;
       }
+      if (refreshMode === "http-403-invalid-content-type") {
+        res.writeHead(403, { "content-type": "text/plain" });
+        res.end("forbidden");
+        return;
+      }
       if (refreshMode === "missing-access-token") {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({
@@ -416,6 +421,11 @@ const server = http.createServer((req, res) => {
         }));
         return;
       }
+      if (sessionMode === "http-403-invalid-content-type") {
+        res.writeHead(403, { "content-type": "text/plain" });
+        res.end("forbidden");
+        return;
+      }
       if (sessionMode === "oversized-response") {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({
@@ -474,6 +484,11 @@ const server = http.createServer((req, res) => {
             updated_at: "2026-03-12T09:59:00Z",
           },
         }));
+        return;
+      }
+      if (statusMode === "http-403-invalid-content-type") {
+        res.writeHead(403, { "content-type": "text/plain" });
+        res.end("forbidden");
         return;
       }
       if (statusMode === "invalid-provisioning-updated-at") {
@@ -969,6 +984,46 @@ server.listen(0, "127.0.0.1", async () => {
     assert.match(cachedStatusFromTimeout.stderr, /using cached cloud status snapshot/i);
     assert.match(cachedStatusFromTimeout.stdout, /Instance: inst_123/);
     statusDelayMs = 0;
+
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({
+        ...statusSession,
+        access_token: "access-abc",
+        refresh_token: "refresh-ghi",
+        expires_at: "2999-03-12T10:00:00Z",
+        control_plane: baseUrl,
+      }, null, 2)}\n`
+    );
+    sessionMode = "http-403-invalid-content-type";
+    const rejectedWhoamiFromNonJson403 = await runCli(["whoami"], env);
+    assert.strictEqual(rejectedWhoamiFromNonJson403.code, 1);
+    assert.match(rejectedWhoamiFromNonJson403.stderr, /Hosted session was rejected by the control plane/i);
+    assert.ok(
+      !fs.existsSync(sessionPath),
+      "expected non-JSON 403 whoami responses to invalidate and remove the local hosted session"
+    );
+    sessionMode = "normal";
+
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({
+        ...statusSession,
+        access_token: "expired-access",
+        refresh_token: "refresh-def",
+        expires_at: "2000-03-12T10:00:00Z",
+        control_plane: baseUrl,
+      }, null, 2)}\n`
+    );
+    refreshMode = "http-403-invalid-content-type";
+    const rejectedRefreshFromNonJson403 = await runCli(["whoami"], env);
+    assert.strictEqual(rejectedRefreshFromNonJson403.code, 1);
+    assert.match(rejectedRefreshFromNonJson403.stderr, /Hosted session was rejected by the control plane/i);
+    assert.ok(
+      !fs.existsSync(sessionPath),
+      "expected non-JSON 403 refresh responses to invalidate and remove the local hosted session"
+    );
+    refreshMode = "normal";
 
     fs.writeFileSync(
       sessionPath,

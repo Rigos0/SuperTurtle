@@ -983,9 +983,14 @@ async function requestJson(url, options = {}, env = process.env) {
 
     const contentType = response.headers.get("content-type");
     if (!isJsonContentType(contentType)) {
-      throw new Error(
+      const error = new Error(
         `Response from ${url} returned unsupported content-type ${contentType || "(missing)"}. Expected application/json.`
       );
+      error.status = response.status;
+      error.statusText = response.statusText;
+      error.contentType = contentType;
+      error.retryAfterMs = getRetryAfterMs(response.headers.get("retry-after"));
+      throw error;
     }
 
     const text = await readResponseText(response, url, maxBytes);
@@ -994,7 +999,13 @@ async function requestJson(url, options = {}, env = process.env) {
       try {
         data = JSON.parse(text);
       } catch (error) {
-        throw new Error(`Invalid JSON from ${url}: ${error instanceof Error ? error.message : String(error)}`);
+        const parseError = new Error(
+          `Invalid JSON from ${url}: ${error instanceof Error ? error.message : String(error)}`
+        );
+        parseError.status = response.status;
+        parseError.statusText = response.statusText;
+        parseError.retryAfterMs = getRetryAfterMs(response.headers.get("retry-after"));
+        throw parseError;
       }
     }
     if (!response.ok) {
