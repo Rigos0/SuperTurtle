@@ -392,11 +392,16 @@ async function hasExistingMcpConfig(): Promise<boolean> {
  * Without this, `import { mcpLog } from "../src/logger"` fails when Codex spawns the subprocess
  * from a different working directory, causing "Transport closed" errors.
  */
-function buildCodexMcpConfig(): Record<string, unknown> {
+function buildCodexMcpConfig(chatId?: string | number): Record<string, unknown> {
   const mcpServers: Record<string, Record<string, unknown>> = {};
   const bunPath = Bun.which("bun") || "/opt/homebrew/bin/bun";
   const envPath = process.env.PATH || "";
-  const chatId = (process.env.TELEGRAM_CHAT_ID || "").trim();
+  const scopedChatId =
+    typeof chatId === "number"
+      ? String(chatId)
+      : typeof chatId === "string"
+        ? chatId.trim()
+        : "";
 
   for (const [name, config] of Object.entries(MCP_SERVERS)) {
     if ("command" in config && "args" in config) {
@@ -405,8 +410,8 @@ function buildCodexMcpConfig(): Record<string, unknown> {
       if (envPath && !env.PATH) {
         env.PATH = envPath;
       }
-      if (chatId) {
-        env.TELEGRAM_CHAT_ID = chatId;
+      if (scopedChatId) {
+        env.TELEGRAM_CHAT_ID = scopedChatId;
       }
 
       mcpServers[name] = {
@@ -826,6 +831,8 @@ export class CodexSession {
   private codex: CodexClient | null = null;
   private thread: CodexThread | null = null;
   private threadId: string | null = null;
+  private usingExistingMcpConfig = false;
+  private programmaticMcpChatId: string | null = null;
   private systemPromptPrepended = false;
   private _model: string;
   private _reasoningEffort: CodexEffortLevel;
@@ -963,7 +970,27 @@ export class CodexSession {
     return this.stopRequested;
   }
 
-  private async ensureInitialized(): Promise<void> {
+  private async ensureInitialized(chatId?: number): Promise<void> {
+    const requestedChatId =
+      typeof chatId === "number" && Number.isFinite(chatId) ? String(chatId) : null;
+
+    if (
+      this.codex &&
+      !this.usingExistingMcpConfig &&
+      requestedChatId &&
+      requestedChatId !== this.programmaticMcpChatId
+    ) {
+      codexLog.info(
+        {
+          previousChatId: this.programmaticMcpChatId,
+          requestedChatId,
+        },
+        "Reinitializing Codex client for chat-scoped MCP config"
+      );
+      this.codex = null;
+      this.thread = null;
+    }
+
     if (this.codex) {
       return;
     }
@@ -980,13 +1007,16 @@ export class CodexSession {
       // Check if MCP servers are already configured in ~/.codex/config.toml
       const codexPathOverride = getCodexSdkPathOverride();
       const hasExisting = await hasExistingMcpConfig();
+      this.usingExistingMcpConfig = hasExisting;
       if (hasExisting) {
         codexLog.info("MCP servers found in ~/.codex/config.toml, using existing config");
+        this.programmaticMcpChatId = null;
         this.codex = new CodexImpl({ codexPathOverride });
       } else {
         // Pass MCP config programmatically if not already configured
         codexLog.info("Passing MCP servers via Codex constructor");
-        const mcpConfig = buildCodexMcpConfig();
+        const mcpConfig = buildCodexMcpConfig(requestedChatId ?? undefined);
+        this.programmaticMcpChatId = requestedChatId;
         this.codex = new CodexImpl({ codexPathOverride, config: mcpConfig });
       }
     } catch (error) {
@@ -997,8 +1027,12 @@ export class CodexSession {
   /**
    * Start a new Codex thread.
    */
-  async startNewThread(model?: string, reasoningEffort?: CodexEffortLevel): Promise<void> {
-    await this.ensureInitialized();
+  async startNewThread(
+    model?: string,
+    reasoningEffort?: CodexEffortLevel,
+    chatId?: number
+  ): Promise<void> {
+    await this.ensureInitialized(chatId);
 
     try {
       if (!this.codex) {
@@ -1055,8 +1089,13 @@ export class CodexSession {
   /**
    * Resume a saved Codex thread by ID.
    */
-  async resumeThread(threadId: string, model?: string, reasoningEffort?: CodexEffortLevel): Promise<void> {
-    await this.ensureInitialized();
+  async resumeThread(
+    threadId: string,
+    model?: string,
+    reasoningEffort?: CodexEffortLevel,
+    chatId?: number
+  ): Promise<void> {
+    await this.ensureInitialized(chatId);
 
     try {
       if (!this.codex) {
@@ -1137,8 +1176,14 @@ export class CodexSession {
       // isQueryRunning flips on. This prevents premature deferred-queue drains.
       this._isProcessing = true;
 
+      await this.ensureInitialized(chatId || undefined);
+
       if (!this.thread) {
-        await this.startNewThread(model, reasoningEffort);
+        if (this.threadId) {
+          await this.resumeThread(this.threadId, model, reasoningEffort, chatId || undefined);
+        } else {
+          await this.startNewThread(model, reasoningEffort, chatId || undefined);
+        }
         if (!this.thread) {
           throw new Error("Failed to create Codex thread");
         }

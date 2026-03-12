@@ -445,6 +445,86 @@ describe("CodexSession", () => {
     }
   });
 
+  it("rebuilds Codex MCP config with TELEGRAM_CHAT_ID when chat scope appears after init", async () => {
+    const constructorCalls: Array<Record<string, unknown> | undefined> = [];
+    const resumeThreadCalls: string[] = [];
+
+    mock.module("@openai/codex-sdk", () => ({
+      Codex: class {
+        constructor(options?: Record<string, unknown>) {
+          constructorCalls.push(options);
+        }
+
+        startThread() {
+          return {
+            id: "thread-mcp-chat-scope",
+            run: async () => ({ finalResponse: "", usage: null }),
+            runStreamed: async () => ({ events: (async function* () {})() }),
+          };
+        }
+
+        resumeThread(threadId: string) {
+          resumeThreadCalls.push(threadId);
+          return {
+            id: threadId,
+            run: async () => ({ finalResponse: "chat scoped reply", usage: null }),
+            runStreamed: async () => ({
+              events: (async function* () {
+                yield {
+                  type: "item.completed",
+                  item: {
+                    type: "agent_message",
+                    id: "msg-chat-scope",
+                    text: "chat scoped reply",
+                  },
+                };
+                yield {
+                  type: "turn.completed",
+                  usage: {
+                    input_tokens: 3,
+                    output_tokens: 4,
+                  },
+                };
+              })(),
+            }),
+          };
+        }
+      },
+    }));
+
+    const { CodexSession } = await loadCodexSessionModule("mcp-chat-scope-refresh");
+    const codex = new CodexSession();
+
+    await codex.startNewThread();
+    const reply = await codex.sendMessage(
+      "Please send the image",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      "text",
+      123,
+      "tester",
+      123
+    );
+
+    expect(reply).toBe("chat scoped reply");
+    expect(constructorCalls).toHaveLength(2);
+    expect(resumeThreadCalls).toEqual(["thread-mcp-chat-scope"]);
+
+    const firstMcpServers = (
+      (constructorCalls[0]?.config as Record<string, unknown>).mcp_servers as Record<string, Record<string, unknown>>
+    );
+    const firstBotControlEnv = firstMcpServers["bot-control"]?.env as Record<string, unknown>;
+    expect(firstBotControlEnv?.TELEGRAM_CHAT_ID).toBeUndefined();
+
+    const secondMcpServers = (
+      (constructorCalls[1]?.config as Record<string, unknown>).mcp_servers as Record<string, Record<string, unknown>>
+    );
+    const secondBotControlEnv = secondMcpServers["bot-control"]?.env as Record<string, unknown>;
+    expect(secondBotControlEnv?.TELEGRAM_CHAT_ID).toBe("123");
+  });
+
   it("hydrates resumed sessions from transcript history before saving", async () => {
     const { WORKING_DIR } = await import("./config");
 
