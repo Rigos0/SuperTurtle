@@ -54,6 +54,13 @@ const server = http.createServer((req, res) => {
     const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf-8")) : null;
     if (req.method === "POST" && req.url === "/v1/cli/login/start") {
       const requestOrigin = `http://${req.headers.host}`;
+      if (loginStartMode === "redirect") {
+        res.writeHead(302, {
+          location: `${requestOrigin}/redirected/login/start`,
+        });
+        res.end();
+        return;
+      }
       if (loginStartMode === "missing-device-code") {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({
@@ -143,6 +150,13 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ error: "slow_down", interval_ms: 25 }));
         return;
       }
+      if (loginPollMode === "redirect" && pollCount === 2) {
+        res.writeHead(302, {
+          location: `http://${req.headers.host}/redirected/login/poll`,
+        });
+        res.end();
+        return;
+      }
       if (loginPollMode === "missing-access-token") {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({
@@ -179,6 +193,13 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === "POST" && req.url === "/v1/cli/session/refresh") {
       assert.strictEqual(body.refresh_token, "refresh-def");
+      if (refreshMode === "redirect") {
+        res.writeHead(302, {
+          location: `http://${req.headers.host}/redirected/session/refresh`,
+        });
+        res.end();
+        return;
+      }
       if (refreshMode === "http-401") {
         res.writeHead(401, { "content-type": "application/json" });
         res.end(JSON.stringify({ error: "refresh token revoked" }));
@@ -216,6 +237,13 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === "GET" && req.url === "/v1/cli/session") {
       assert.strictEqual(req.headers.authorization, "Bearer access-abc");
+      if (sessionMode === "redirect") {
+        res.writeHead(302, {
+          location: `http://${req.headers.host}/redirected/session`,
+        });
+        res.end();
+        return;
+      }
       if (sessionDelayMs > 0) {
         await delay(sessionDelayMs);
       }
@@ -262,6 +290,13 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === "GET" && req.url === "/v1/cli/cloud/status") {
       assert.strictEqual(req.headers.authorization, "Bearer access-abc");
+      if (statusMode === "redirect") {
+        res.writeHead(302, {
+          location: `http://${req.headers.host}/redirected/cloud/status`,
+        });
+        res.end();
+        return;
+      }
       if (statusDelayMs > 0) {
         await delay(statusDelayMs);
       }
@@ -399,6 +434,15 @@ server.listen(0, "127.0.0.1", async () => {
       !fs.existsSync(sessionPath),
       "expected oversized login-start responses to avoid writing a session file"
     );
+    loginStartMode = "redirect";
+    const redirectedLoginStart = await runCli(["login", "--no-browser"], env);
+    assert.strictEqual(redirectedLoginStart.code, 1);
+    assert.match(redirectedLoginStart.stderr, /redirected/i);
+    assert.match(redirectedLoginStart.stderr, /redirects are not allowed/i);
+    assert.ok(
+      !fs.existsSync(sessionPath),
+      "expected redirected login-start responses to avoid writing a session file"
+    );
     loginStartMode = "normal";
 
     loginStartMode = "normal";
@@ -419,6 +463,19 @@ server.listen(0, "127.0.0.1", async () => {
     assert.ok(
       !fs.existsSync(sessionPath),
       "expected malformed login completion snapshot fields to avoid writing a session file"
+    );
+    loginPollMode = "normal";
+    pollCount = 0;
+
+    loginPollMode = "redirect";
+    pollCount = 0;
+    const redirectedLoginPoll = await runCli(["login", "--no-browser"], env);
+    assert.strictEqual(redirectedLoginPoll.code, 1);
+    assert.match(redirectedLoginPoll.stderr, /redirected/i);
+    assert.match(redirectedLoginPoll.stderr, /redirects are not allowed/i);
+    assert.ok(
+      !fs.existsSync(sessionPath),
+      "expected redirected login-poll responses to avoid writing a session file"
     );
     loginPollMode = "normal";
     pollCount = 0;
@@ -573,6 +630,37 @@ server.listen(0, "127.0.0.1", async () => {
       updated_at: "2026-03-12T09:59:00Z",
     });
     assert.ok(statusSession.cloud_status_sync_at, "expected cloud status fetch to persist cloud_status_sync_at");
+
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({
+        ...statusSession,
+        access_token: "expired-access",
+        refresh_token: "refresh-def",
+        expires_at: "2000-03-12T10:00:00Z",
+        control_plane: baseUrl,
+      }, null, 2)}\n`
+    );
+    refreshMode = "redirect";
+    const redirectedRefreshWhoami = await runCli(["whoami"], env);
+    assert.strictEqual(redirectedRefreshWhoami.code, 1);
+    assert.match(redirectedRefreshWhoami.stderr, /redirected/i);
+    assert.match(redirectedRefreshWhoami.stderr, /redirects are not allowed/i);
+    refreshMode = "normal";
+
+    sessionMode = "redirect";
+    const redirectedWhoami = await runCli(["whoami"], env);
+    assert.strictEqual(redirectedWhoami.code, 1);
+    assert.match(redirectedWhoami.stderr, /redirected/i);
+    assert.match(redirectedWhoami.stderr, /redirects are not allowed/i);
+    sessionMode = "normal";
+
+    statusMode = "redirect";
+    const redirectedStatus = await runCli(["cloud", "status"], env);
+    assert.strictEqual(redirectedStatus.code, 1);
+    assert.match(redirectedStatus.stderr, /redirected/i);
+    assert.match(redirectedStatus.stderr, /redirects are not allowed/i);
+    statusMode = "normal";
 
     fs.writeFileSync(
       sessionPath,

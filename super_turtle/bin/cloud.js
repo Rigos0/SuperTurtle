@@ -795,8 +795,18 @@ async function requestJson(url, options = {}, env = process.env) {
   try {
     const response = await fetch(url, {
       ...options,
+      redirect: "manual",
       signal: controller.signal,
     });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      const error = new Error(
+        `Control plane request to ${url} was redirected${location ? ` to ${location}` : ""}, but redirects are not allowed.`
+      );
+      error.status = response.status;
+      error.location = location;
+      throw error;
+    }
     const contentLength = response.headers.get("content-length");
     if (isNonEmptyString(contentLength)) {
       const parsedLength = Number(contentLength);
