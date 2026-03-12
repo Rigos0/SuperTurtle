@@ -107,6 +107,7 @@ function assertCredentiallessRequest(request, context) {
     const env = {
       SUPERTURTLE_CLOUD_URL: "https://api.superturtle.dev",
     };
+    const oversizedToken = "x".repeat(4097);
     const invalidLoginRequestCount = recordedRequests.length;
     const invalidSessionRequestCount = recordedRequests.length;
 
@@ -115,6 +116,19 @@ function assertCredentiallessRequest(request, context) {
         pollLogin(
           {
             device_code: "device-123\u0000malicious",
+            verification_uri: "https://api.superturtle.dev/verify",
+            interval_ms: 10,
+          },
+          { timeoutMs: 5_000 },
+          env
+        ),
+      /Hosted login flow contains an invalid device_code/i
+    );
+    await assert.rejects(
+      () =>
+        pollLogin(
+          {
+            device_code: oversizedToken,
             verification_uri: "https://api.superturtle.dev/verify",
             interval_ms: 10,
           },
@@ -166,9 +180,32 @@ function assertCredentiallessRequest(request, context) {
     );
     await assert.rejects(
       () =>
+        refreshSession(
+          {
+            access_token: "access-abc",
+            refresh_token: oversizedToken,
+            control_plane: "https://api.superturtle.dev",
+          },
+          env
+        ),
+      /Hosted session contains an invalid refresh_token/i
+    );
+    await assert.rejects(
+      () =>
         fetchCloudStatus(
           {
             access_token: "access-abc\u0000malicious",
+            control_plane: "https://api.superturtle.dev",
+          },
+          env
+        ),
+      /Hosted session contains an invalid access_token/i
+    );
+    await assert.rejects(
+      () =>
+        fetchWhoAmI(
+          {
+            access_token: oversizedToken,
             control_plane: "https://api.superturtle.dev",
           },
           env

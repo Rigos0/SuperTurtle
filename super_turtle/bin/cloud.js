@@ -11,6 +11,7 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 15 * 1000;
 const DEFAULT_BROWSER_OPEN_TIMEOUT_MS = 5 * 1000;
 const DEFAULT_RESPONSE_MAX_BYTES = 256 * 1024;
 const DEFAULT_SESSION_FILE_MAX_BYTES = 256 * 1024;
+const MAX_OPAQUE_TOKEN_BYTES = 4096;
 const SESSION_EXPIRY_SKEW_MS = 30 * 1000;
 const CLOUD_SESSION_SCHEMA_VERSION = 1;
 
@@ -413,7 +414,12 @@ function isNonEmptyString(value) {
 }
 
 function isOpaqueTokenString(value) {
-  return typeof value === "string" && /^[\x21-\x7E]+$/.test(value);
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= MAX_OPAQUE_TOKEN_BYTES &&
+    /^[\x21-\x7E]+$/.test(value)
+  );
 }
 
 function validateTimestamp(value, fieldName, context) {
