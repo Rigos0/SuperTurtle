@@ -1,6 +1,11 @@
 const fs = require("fs");
 const { dirname, resolve } = require("path");
 const { createGcpProvisioner } = require("./cloud-gcp-provisioner.js");
+const {
+  normalizeStripeWebhookEvent,
+  parseStripeWebhookEvent,
+  verifyStripeWebhookSignature,
+} = require("./cloud-stripe-adapter.js");
 
 const {
   assertManagedInstanceTransition,
@@ -26,8 +31,10 @@ function createDefaultState() {
     sessions: [],
     login_requests: [],
     entitlements: [],
+    subscriptions: [],
     managed_instances: [],
     provisioning_jobs: [],
+    billing_events: [],
     audit_log: [],
   };
 }
@@ -55,8 +62,10 @@ function ensureStateShape(state, statePath) {
     "identities",
     "sessions",
     "entitlements",
+    "subscriptions",
     "managed_instances",
     "provisioning_jobs",
+    "billing_events",
     "audit_log",
   ]) {
     if (!Array.isArray(state[field])) {
@@ -121,6 +130,12 @@ function createRuntime(options) {
     now: options.now || defaultNow,
     createId: options.createId || randomId,
     provisioner: options.provisioner || createConfiguredProvisioner(options),
+    stripe: {
+      webhookSecret:
+        options.stripe && typeof options.stripe.webhookSecret === "string"
+          ? options.stripe.webhookSecret
+          : "",
+    },
     config: {
       provider: "gcp",
       region: options.region || "us-central1",
@@ -178,6 +193,18 @@ function getEntitlement(state, userId) {
   return state.entitlements.find((entitlement) => entitlement && entitlement.user_id === userId) || null;
 }
 
+function getSubscription(state, { subscriptionId = null, customerId = null, checkoutSessionId = null } = {}) {
+  return (
+    state.subscriptions.find(
+      (subscription) =>
+        subscription &&
+        ((subscriptionId && subscription.provider_subscription_id === subscriptionId) ||
+          (customerId && subscription.provider_customer_id === customerId) ||
+          (checkoutSessionId && subscription.checkout_session_id === checkoutSessionId))
+    ) || null
+  );
+}
+
 function getManagedInstance(state, userId) {
   return state.managed_instances.find((instance) => instance && instance.user_id === userId) || null;
 }
@@ -222,6 +249,14 @@ function getRecentAuditLog(state, targetId) {
 
 function getLoginRequest(state, deviceCode) {
   return state.login_requests.find((request) => request && request.device_code === deviceCode) || null;
+}
+
+function getBillingEvent(state, provider, eventId) {
+  return (
+    state.billing_events.find(
+      (event) => event && event.provider === provider && event.event_id === eventId
+    ) || null
+  );
 }
 
 function appendAudit(state, runtime, entry) {
@@ -375,6 +410,120 @@ function normalizeRequestedScopes(scopes) {
     normalized.push(CONTROL_PLANE_WRITE_SCOPE);
   }
   return Array.from(new Set(normalized));
+}
+
+function isStripeWebhookConfigured(runtime) {
+  return Boolean(runtime.stripe && typeof runtime.stripe.webhookSecret === "string" && runtime.stripe.webhookSecret);
+}
+
+function recordBillingEvent(state, runtime, event) {
+  state.billing_events.push({
+    id: runtime.createId("bill"),
+    provider: "stripe",
+    event_id: event.eventId,
+    event_type: event.eventType,
+    state: event.state || "processed",
+    created_at: runtime.now(),
+  });
+}
+
+function upsertSubscriptionRecord(state, runtime, subject) {
+  let record =
+    getSubscription(state, {
+      subscriptionId: subject.subscriptionId,
+      customerId: subject.customerId,
+      checkoutSessionId: subject.checkoutSessionId,
+    }) || null;
+
+  if (!record) {
+    record = {
+      id: runtime.createId("subrec"),
+      provider: "stripe",
+      user_id: subject.userId,
+      provider_customer_id: subject.customerId || null,
+      provider_subscription_id: subject.subscriptionId || null,
+      checkout_session_id: subject.checkoutSessionId || null,
+      plan: subject.plan || "managed",
+      state: null,
+      current_period_end: null,
+      cancel_at_period_end: false,
+      latest_event_id: subject.eventId,
+      latest_event_type: subject.eventType,
+      created_at: runtime.now(),
+      updated_at: runtime.now(),
+    };
+    state.subscriptions.push(record);
+  }
+
+  if (subject.userId) {
+    record.user_id = subject.userId;
+  }
+  if (subject.customerId) {
+    record.provider_customer_id = subject.customerId;
+  }
+  if (subject.subscriptionId) {
+    record.provider_subscription_id = subject.subscriptionId;
+  }
+  if (subject.checkoutSessionId) {
+    record.checkout_session_id = subject.checkoutSessionId;
+  }
+  if (subject.plan) {
+    record.plan = subject.plan;
+  }
+  if (subject.entitlementState) {
+    record.state = subject.entitlementState;
+  }
+  if (Object.prototype.hasOwnProperty.call(subject, "currentPeriodEnd")) {
+    record.current_period_end = subject.currentPeriodEnd;
+  }
+  if (Object.prototype.hasOwnProperty.call(subject, "cancelAtPeriodEnd")) {
+    record.cancel_at_period_end = subject.cancelAtPeriodEnd;
+  }
+  record.latest_event_id = subject.eventId;
+  record.latest_event_type = subject.eventType;
+  record.updated_at = runtime.now();
+  return record;
+}
+
+function syncEntitlementFromSubscription(state, runtime, subscriptionRecord) {
+  if (!subscriptionRecord.user_id) {
+    throw new Error(`Stripe subscription ${subscriptionRecord.id} is missing a user_id.`);
+  }
+
+  let entitlement = getEntitlement(state, subscriptionRecord.user_id);
+  const nextState = subscriptionRecord.state || "inactive";
+  if (!entitlement) {
+    entitlement = {
+      user_id: subscriptionRecord.user_id,
+      plan: subscriptionRecord.plan || "managed",
+      state: nextState,
+      subscription_id: subscriptionRecord.provider_subscription_id || null,
+      current_period_end: subscriptionRecord.current_period_end || null,
+      cancel_at_period_end: Boolean(subscriptionRecord.cancel_at_period_end),
+    };
+    state.entitlements.push(entitlement);
+  } else {
+    entitlement.plan = subscriptionRecord.plan || entitlement.plan || "managed";
+    entitlement.state = nextState;
+    entitlement.subscription_id = subscriptionRecord.provider_subscription_id || entitlement.subscription_id || null;
+    entitlement.current_period_end = subscriptionRecord.current_period_end || null;
+    entitlement.cancel_at_period_end = Boolean(subscriptionRecord.cancel_at_period_end);
+  }
+
+  appendAudit(state, runtime, {
+    actor_type: "system",
+    actor_id: "stripe",
+    action: "entitlement.synced_from_billing",
+    target_type: "entitlement",
+    target_id: entitlement.user_id,
+    metadata: {
+      subscription_id: entitlement.subscription_id,
+      state: entitlement.state,
+      event_type: subscriptionRecord.latest_event_type,
+    },
+  });
+
+  return entitlement;
 }
 
 function createUserCode() {
@@ -714,6 +863,99 @@ function requestInstanceReprovision(runtime, accessToken) {
   return { status: 200, data: buildCloudStatusPayload(state, instance) };
 }
 
+function requestStripeWebhook(runtime, signatureHeader, rawBody) {
+  if (!isStripeWebhookConfigured(runtime)) {
+    return { status: 503, data: { error: "stripe_webhook_not_configured" } };
+  }
+
+  try {
+    verifyStripeWebhookSignature({
+      payload: rawBody,
+      signatureHeader,
+      webhookSecret: runtime.stripe.webhookSecret,
+      now: Date.parse(runtime.now()),
+    });
+  } catch (error) {
+    const status = error.code === "missing_webhook_secret" ? 503 : 401;
+    return { status, data: { error: error.code || "invalid_signature" } };
+  }
+
+  let parsed;
+  try {
+    parsed = parseStripeWebhookEvent(rawBody);
+  } catch (error) {
+    return { status: 400, data: { error: error.code || "invalid_event" } };
+  }
+
+  const normalized = normalizeStripeWebhookEvent(parsed);
+  const state = readState(runtime.statePath);
+  const existingEvent = getBillingEvent(state, "stripe", normalized.eventId);
+  if (existingEvent) {
+    return {
+      status: 200,
+      data: { ok: true, event_id: normalized.eventId, state: "already_processed" },
+    };
+  }
+
+  if (normalized.kind === "ignored") {
+    recordBillingEvent(state, runtime, { ...normalized, state: "ignored" });
+    appendAudit(state, runtime, {
+      actor_type: "system",
+      actor_id: "stripe",
+      action: "billing.webhook_ignored",
+      target_type: "user",
+      target_id: "unknown",
+      metadata: { event_id: normalized.eventId, event_type: normalized.eventType },
+    });
+    writeState(runtime.statePath, state);
+    return { status: 200, data: { ok: true, event_id: normalized.eventId, state: "ignored" } };
+  }
+
+  const existingSubscription =
+    getSubscription(state, {
+      subscriptionId: normalized.subscriptionId,
+      customerId: normalized.customerId,
+      checkoutSessionId: normalized.checkoutSessionId,
+    }) || null;
+  const userId = normalized.userId || existingSubscription?.user_id || null;
+  if (!userId || !getUser(state, userId)) {
+    return { status: 422, data: { error: "unresolved_billing_user" } };
+  }
+
+  const subscriptionRecord = upsertSubscriptionRecord(state, runtime, {
+    ...normalized,
+    userId,
+  });
+  if (normalized.kind === "subscription") {
+    syncEntitlementFromSubscription(state, runtime, subscriptionRecord);
+  }
+
+  recordBillingEvent(state, runtime, normalized);
+  appendAudit(state, runtime, {
+    actor_type: "system",
+    actor_id: "stripe",
+    action: "billing.webhook_processed",
+    target_type: "user",
+    target_id: userId,
+    metadata: {
+      event_id: normalized.eventId,
+      event_type: normalized.eventType,
+      subscription_id: subscriptionRecord.provider_subscription_id,
+    },
+  });
+  writeState(runtime.statePath, state);
+
+  return {
+    status: 200,
+    data: {
+      ok: true,
+      event_id: normalized.eventId,
+      subscription_id: subscriptionRecord.provider_subscription_id || null,
+      entitlement_state: normalized.kind === "subscription" ? subscriptionRecord.state : null,
+    },
+  };
+}
+
 function requestLoginStart(runtime, payload = {}) {
   const state = readState(runtime.statePath);
   const requestPayload =
@@ -1041,6 +1283,25 @@ function extractBearerToken(request) {
 }
 
 async function handleHttpRequest(runtime, request) {
+  if (request.method === "POST" && request.url === "/v1/billing/stripe/webhook") {
+    let rawBody;
+    try {
+      rawBody = await readRawRequestBody(request, runtime.requestBodyMaxBytes, { requireJsonContentType: true });
+    } catch (error) {
+      return {
+        status: error.status || 400,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        body: JSON.stringify({ error: error.code || "invalid_request" }),
+      };
+    }
+    const result = requestStripeWebhook(runtime, request.headers?.["stripe-signature"], rawBody);
+    return {
+      status: result.status,
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
+      body: JSON.stringify(result.data),
+    };
+  }
+
   if (request.method === "POST" && request.url === "/v1/cli/login/start") {
     let payload;
     try {
@@ -1246,12 +1507,33 @@ async function handleHttpRequest(runtime, request) {
 }
 
 async function readJsonRequestBody(request, maxBytes) {
-  const contentType = request.headers?.["content-type"];
-  if (typeof contentType !== "string" || !/^application\/json(?:\s*;|$)/i.test(contentType)) {
-    const error = new Error("Expected application/json request body.");
-    error.status = 415;
-    error.code = "unsupported_media_type";
+  const raw = await readRawRequestBody(request, maxBytes, { requireJsonContentType: true });
+  if (!raw.trim()) {
+    const error = new Error("Expected JSON request body.");
+    error.status = 400;
+    error.code = "invalid_json";
     throw error;
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch (parseError) {
+    const error = new Error("Request body was not valid JSON.");
+    error.status = 400;
+    error.code = "invalid_json";
+    throw error;
+  }
+}
+
+async function readRawRequestBody(request, maxBytes, options = {}) {
+  if (options.requireJsonContentType) {
+    const contentType = request.headers?.["content-type"];
+    if (typeof contentType !== "string" || !/^application\/json(?:\s*;|$)/i.test(contentType)) {
+      const error = new Error("Expected application/json request body.");
+      error.status = 415;
+      error.code = "unsupported_media_type";
+      throw error;
+    }
   }
 
   let totalBytes = 0;
@@ -1268,22 +1550,7 @@ async function readJsonRequestBody(request, maxBytes) {
     chunks.push(buffer);
   }
 
-  const raw = Buffer.concat(chunks).toString("utf-8");
-  if (!raw.trim()) {
-    const error = new Error("Expected JSON request body.");
-    error.status = 400;
-    error.code = "invalid_json";
-    throw error;
-  }
-
-  try {
-    return JSON.parse(raw);
-  } catch (parseError) {
-    const error = new Error("Request body was not valid JSON.");
-    error.status = 400;
-    error.code = "invalid_json";
-    throw error;
-  }
+  return Buffer.concat(chunks).toString("utf-8");
 }
 
 function createNoopProvisioner() {
@@ -1326,6 +1593,7 @@ module.exports = {
   requestMachineHeartbeat,
   requestMachineRegister,
   requestInstanceReprovision,
+  requestStripeWebhook,
   requestLoginPoll,
   requestLoginStart,
   requestSession,

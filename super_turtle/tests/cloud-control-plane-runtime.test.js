@@ -1,4 +1,5 @@
 const assert = require("assert");
+const crypto = require("crypto");
 const fs = require("fs");
 const http = require("http");
 const os = require("os");
@@ -20,9 +21,15 @@ const {
   requestSession,
   requestSessionRefresh,
   requestInstanceResume,
+  requestStripeWebhook,
   runNextProvisioningJob,
   writeState,
 } = require("../bin/cloud-control-plane-runtime.js");
+
+function signStripePayload(secret, timestamp, payload) {
+  const signature = crypto.createHmac("sha256", secret).update(`${timestamp}.${payload}`).digest("hex");
+  return `t=${timestamp},v1=${signature}`;
+}
 
 function createSeedState() {
   const state = createDefaultState();
@@ -98,6 +105,7 @@ async function run() {
     statePath,
     now: createClock(),
     publicOrigin: "https://api.superturtle.dev",
+    stripe: { webhookSecret: "whsec_test_123" },
     createId(prefix) {
       return `${prefix}_${Math.random().toString(36).slice(2, 8)}`;
     },
@@ -318,9 +326,84 @@ async function run() {
   assert.strictEqual(forbidden.status, 403);
   assert.deepStrictEqual(readState(forbiddenPath).managed_instances, []);
 
+  const checkoutEventPayload = JSON.stringify({
+    id: "evt_checkout_123",
+    type: "checkout.session.completed",
+    data: {
+      object: {
+        id: "cs_test_123",
+        customer: "cus_123",
+        subscription: "sub_123",
+        metadata: {
+          user_id: "user_123",
+          plan: "managed",
+        },
+      },
+    },
+  });
+  const checkoutSignature = signStripePayload("whsec_test_123", 1773309615, checkoutEventPayload);
+  const checkoutWebhook = requestStripeWebhook(runtime, checkoutSignature, checkoutEventPayload);
+  assert.strictEqual(checkoutWebhook.status, 200);
+  assert.strictEqual(checkoutWebhook.data.ok, true);
+
+  const subscriptionEventPayload = JSON.stringify({
+    id: "evt_subscription_123",
+    type: "customer.subscription.updated",
+    data: {
+      object: {
+        id: "sub_123",
+        customer: "cus_123",
+        status: "past_due",
+        cancel_at_period_end: true,
+        current_period_end: 1775902219,
+        items: {
+          data: [
+            {
+              price: {
+                lookup_key: "managed",
+              },
+            },
+          ],
+        },
+      },
+    },
+  });
+  const subscriptionSignature = signStripePayload("whsec_test_123", 1773309615, subscriptionEventPayload);
+  const subscriptionWebhook = requestStripeWebhook(runtime, subscriptionSignature, subscriptionEventPayload);
+  assert.strictEqual(subscriptionWebhook.status, 200);
+  assert.strictEqual(subscriptionWebhook.data.entitlement_state, "past_due");
+
+  const billingPersisted = readState(statePath);
+  assert.strictEqual(billingPersisted.subscriptions.length, 1);
+  assert.strictEqual(billingPersisted.subscriptions[0].provider_customer_id, "cus_123");
+  assert.strictEqual(billingPersisted.subscriptions[0].provider_subscription_id, "sub_123");
+  assert.strictEqual(billingPersisted.subscriptions[0].state, "past_due");
+  assert.strictEqual(billingPersisted.entitlements[0].state, "past_due");
+  assert.strictEqual(billingPersisted.entitlements[0].cancel_at_period_end, true);
+  assert.strictEqual(billingPersisted.billing_events.length, 2);
+  assert.match(
+    JSON.stringify(billingPersisted.audit_log),
+    /billing\.webhook_processed/,
+    "expected Stripe webhook processing to be written to the durable audit log"
+  );
+
+  const deniedAfterBilling = requestInstanceResume(runtime, refreshed.data.access_token);
+  assert.strictEqual(deniedAfterBilling.status, 403);
+
+  const duplicateWebhook = requestStripeWebhook(runtime, subscriptionSignature, subscriptionEventPayload);
+  assert.strictEqual(duplicateWebhook.status, 200);
+  assert.strictEqual(duplicateWebhook.data.state, "already_processed");
+
+  const badSignatureWebhook = requestStripeWebhook(runtime, "t=1773309615,v1=bad", subscriptionEventPayload);
+  assert.strictEqual(badSignatureWebhook.status, 401);
+
   const httpPath = resolve(tmpDir, "http-state.json");
   writeState(httpPath, createSeedState());
-  const httpRuntime = createRuntime({ statePath: httpPath, now: createClock() });
+  const httpRuntime = createRuntime({
+    statePath: httpPath,
+    now: createClock(),
+    stripe: { webhookSecret: "whsec_test_http" },
+  });
   const server = http.createServer(async (req, res) => {
     const response = await handleHttpRequest(httpRuntime, req);
     res.writeHead(response.status, response.headers);
@@ -463,6 +546,44 @@ async function run() {
   assert.strictEqual(loginPollCompletedResponse.status, 200);
   const loginPollCompletedPayload = await loginPollCompletedResponse.json();
   assert.strictEqual(loginPollCompletedPayload.session.id, httpRuntimeCompleted.data.session.id);
+
+  const httpStripePayload = JSON.stringify({
+    id: "evt_http_subscription_123",
+    type: "customer.subscription.updated",
+    data: {
+      object: {
+        id: "sub_123",
+        customer: "cus_http_123",
+        status: "active",
+        cancel_at_period_end: false,
+        current_period_end: 1775902219,
+        metadata: {
+          user_id: "user_123",
+        },
+        items: {
+          data: [
+            {
+              price: {
+                lookup_key: "managed",
+              },
+            },
+          ],
+        },
+      },
+    },
+  });
+  const httpStripeResponse = await fetch(`http://127.0.0.1:${address.port}/v1/billing/stripe/webhook`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "stripe-signature": signStripePayload("whsec_test_http", 1773309615, httpStripePayload),
+    },
+    body: httpStripePayload,
+  });
+  assert.strictEqual(httpStripeResponse.status, 200);
+  const httpStripeResult = await httpStripeResponse.json();
+  assert.strictEqual(httpStripeResult.ok, true);
+  assert.strictEqual(readState(httpPath).entitlements[0].state, "active");
 
   const malformedRefreshResponse = await fetch(`http://127.0.0.1:${address.port}/v1/cli/session/refresh`, {
     method: "POST",
