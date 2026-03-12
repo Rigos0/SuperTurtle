@@ -1320,6 +1320,40 @@ function requestClaudeProviderStatus(runtime, accessToken) {
   };
 }
 
+function revokeClaudeProviderAuth(runtime, accessToken) {
+  const state = readState(runtime.statePath);
+  const session = getUserSession(state, accessToken);
+  if (!session) {
+    return { status: 401, data: { error: "invalid_session" } };
+  }
+
+  const credential = getProviderCredential(state, session.user_id, "claude");
+  if (!credential) {
+    return { status: 404, data: { error: "provider_credential_not_found" } };
+  }
+
+  credential.state = "revoked";
+  credential.access_token = null;
+  credential.last_error_code = null;
+  credential.last_error_message = null;
+
+  appendAudit(state, runtime, {
+    actor_type: "user",
+    actor_id: session.user_id,
+    action: "provider_credential.claude_revoked",
+    target_type: "provider_credential",
+    target_id: credential.id,
+    metadata: {
+      account_email: credential.account_email || null,
+    },
+  });
+  writeState(runtime.statePath, state);
+  return {
+    status: 200,
+    data: buildClaudeAuthStatusPayload(state, credential),
+  };
+}
+
 async function setupClaudeProviderAuth(runtime, accessToken, payload = {}) {
   const validatedPayload = validateClaudeSetupPayload(payload);
   if (validatedPayload.error) {
@@ -1944,6 +1978,23 @@ async function handleHttpRequest(runtime, request) {
     };
   }
 
+  if (request.method === "DELETE" && request.url === "/v1/cli/providers/claude") {
+    const accessToken = extractBearerToken(request);
+    if (!accessToken) {
+      return {
+        status: 401,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        body: JSON.stringify({ error: "missing_bearer_token" }),
+      };
+    }
+    const result = revokeClaudeProviderAuth(runtime, accessToken);
+    return {
+      status: result.status,
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
+      body: JSON.stringify(result.data),
+    };
+  }
+
   if (request.method === "GET" && request.url === "/v1/cli/teleport/target") {
     const accessToken = extractBearerToken(request);
     if (!accessToken) {
@@ -2247,6 +2298,7 @@ module.exports = {
   readState,
   requestCloudStatus,
   requestClaudeProviderStatus,
+  revokeClaudeProviderAuth,
   requestMachineClaudeProviderAuth,
   requestMachineHeartbeat,
   requestMachineRegister,

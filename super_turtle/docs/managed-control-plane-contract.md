@@ -16,6 +16,12 @@ This document defines the first production-shaped contract for the hosted manage
   Returns the signed-in user, linked OAuth identities, active hosted session metadata, and entitlement summary.
 - `GET /v1/cli/cloud/status`
   Returns the managed instance record, the latest provisioning job, and recent audit entries relevant to the hosted VM lifecycle.
+- `GET /v1/cli/providers/claude/status`
+  Returns the current user-scoped hosted Claude credential status, including validation state and recent audit entries.
+- `POST /v1/cli/providers/claude/setup`
+  Validates and stores a user-scoped Claude access token for the signed-in hosted account.
+- `DELETE /v1/cli/providers/claude`
+  Revokes the stored user-scoped Claude credential for the signed-in hosted account and clears the hosted VM retrieval path.
 - `GET /v1/cli/teleport/target`
   Returns the current managed VM's resolved SSH target plus the managed project root to use for the existing teleport handoff flow.
 - `POST /v1/cli/cloud/instance/resume`
@@ -44,11 +50,15 @@ This document defines the first production-shaped contract for the hosted manage
   `id`, `kind`, `state`, optional `attempt`, `created_at`, `started_at`, `updated_at`, `completed_at`, `error_code`, `error_message`
 - `audit_log`
   `id`, `actor_type`, `actor_id`, `action`, `target_type`, `target_id`, `created_at`, optional `metadata`
+- `provider_credential`
+  `id`, `provider`, `state`, optional `account_email`, `configured_at`, `last_validated_at`, `last_error_code`, `last_error_message`
 
 ## Enumerated states
 
 - Identity providers: `github`, `google`
 - Session states: `pending`, `active`, `expired`, `revoked`
+- Provider credential providers: `claude`
+- Provider credential states: `valid`, `invalid`, `revoked`
 - Entitlement states: `inactive`, `trialing`, `active`, `past_due`, `suspended`, `canceled`
 - Instance providers: `gcp`
 - Managed instance states: `requested`, `provisioning`, `running`, `stopped`, `suspended`, `failed`, `deleting`, `deleted`

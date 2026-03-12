@@ -33,6 +33,7 @@ const {
   pollLogin,
   persistSessionIfChanged,
   readSession,
+  revokeClaudeAuth,
   resumeManagedInstance,
   setupClaudeAuth,
   startLogin,
@@ -1242,6 +1243,23 @@ async function cloudClaudeSetup() {
   }
 }
 
+async function cloudClaudeRevoke() {
+  const session = readSession();
+  if (!session?.access_token) {
+    console.error(`Not logged in. Run 'superturtle login'. Expected session file at ${getSessionPath()}`);
+    process.exit(1);
+  }
+
+  const result = await revokeClaudeAuth(session);
+  console.log(`Control plane: ${getSessionControlPlaneBaseUrl(result.session)}`);
+  console.log(`Provider: ${result.data.provider}`);
+  console.log(`Configured: ${result.data.configured ? "yes" : "no"}`);
+  if (result.data.credential?.state) console.log(`State: ${result.data.credential.state}`);
+  if (result.data.credential?.account_email) {
+    console.log(`Claude account: ${result.data.credential.account_email}`);
+  }
+}
+
 function logout() {
   const path = clearSession();
   console.log(`Removed local cloud session at ${path}`);
@@ -1285,7 +1303,11 @@ switch (command) {
         cloudClaudeSetup().catch((err) => { console.error(err instanceof Error ? err.message : err); process.exit(1); });
         break;
       }
-      console.error("Usage: superturtle cloud claude <status|setup>");
+      if (process.argv[4] === "revoke") {
+        cloudClaudeRevoke().catch((err) => { console.error(err instanceof Error ? err.message : err); process.exit(1); });
+        break;
+      }
+      console.error("Usage: superturtle cloud claude <status|setup|revoke>");
       process.exit(1);
       break;
     }
@@ -1363,7 +1385,8 @@ Cloud:
   superturtle cloud checkout
   superturtle cloud portal
   superturtle cloud claude status
-  superturtle cloud claude setup`);
+  superturtle cloud claude setup
+  superturtle cloud claude revoke`);
     if (command && command !== "help" && command !== "--help" && command !== "-h") {
       process.exit(1);
     }

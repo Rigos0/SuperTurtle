@@ -82,6 +82,27 @@ const server = http.createServer((req, res) => {
       return;
     }
 
+    if (req.method === "DELETE" && req.url === "/v1/cli/providers/claude") {
+      assert.strictEqual(req.headers.authorization, "Bearer access_123");
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        provider: "claude",
+        configured: false,
+        credential: {
+          id: "cred_123",
+          provider: "claude",
+          state: "revoked",
+          account_email: "claude-user@example.com",
+          configured_at: "2026-03-12T10:00:00Z",
+          last_validated_at: "2026-03-12T10:00:02Z",
+          last_error_code: null,
+          last_error_message: null,
+        },
+        audit_log: [],
+      }));
+      return;
+    }
+
     res.writeHead(404, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: "not_found" }));
   });
@@ -125,6 +146,12 @@ async function run() {
   assert.match(setup.stdout, /Provider: claude/);
   assert.match(setup.stdout, /Configured: yes/);
   assert.match(setup.stdout, /Last validated: 2026-03-12T10:00:02Z/);
+
+  const revoke = await runCli(["cloud", "claude", "revoke"], env);
+  assert.strictEqual(revoke.code, 0);
+  assert.match(revoke.stdout, /Provider: claude/);
+  assert.match(revoke.stdout, /Configured: no/);
+  assert.match(revoke.stdout, /State: revoked/);
 }
 
 run()

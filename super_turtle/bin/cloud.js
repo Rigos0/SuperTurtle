@@ -1544,6 +1544,16 @@ async function setupClaudeAuth(session, accessToken, env = process.env) {
   };
 }
 
+async function revokeClaudeAuth(session, env = process.env) {
+  const result = await requestWithSession(session, env, "/v1/cli/providers/claude", {
+    method: "DELETE",
+  });
+  return {
+    ...result,
+    data: validateClaudeAuthStatusResponse(result.data, "Hosted Claude auth revoke"),
+  };
+}
+
 async function createStripeCheckoutSession(session, options = {}, env = process.env) {
   const result = await requestWithSession(session, env, "/v1/billing/stripe/checkout-session", {
     method: "POST",
@@ -1661,6 +1671,7 @@ module.exports = {
   pollLogin,
   readSession,
   refreshSession,
+  revokeClaudeAuth,
   resumeManagedInstance,
   setupClaudeAuth,
   mergeSessionSnapshot,

@@ -8,6 +8,7 @@ const {
   createDefaultState,
   createRuntime,
   readState,
+  revokeClaudeProviderAuth,
   requestClaudeProviderStatus,
   setupClaudeProviderAuth,
   writeState,
@@ -121,6 +122,20 @@ async function run() {
     JSON.stringify(persistedAfterReject.audit_log),
     /provider_credential\.claude_validation_rejected/,
     "expected rejected Claude validation attempts to be written to the audit log"
+  );
+
+  const revoked = revokeClaudeProviderAuth(runtime, "access_123");
+  assert.strictEqual(revoked.status, 200);
+  assert.strictEqual(revoked.data.configured, false);
+  assert.strictEqual(revoked.data.credential.state, "revoked");
+
+  const persistedAfterRevoke = readState(statePath);
+  assert.strictEqual(persistedAfterRevoke.provider_credentials[0].state, "revoked");
+  assert.strictEqual(persistedAfterRevoke.provider_credentials[0].access_token, null);
+  assert.match(
+    JSON.stringify(persistedAfterRevoke.audit_log),
+    /provider_credential\.claude_revoked/,
+    "expected Claude credential revocation to be written to the audit log"
   );
 }
 
