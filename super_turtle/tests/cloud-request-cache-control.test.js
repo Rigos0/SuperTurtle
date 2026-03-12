@@ -107,7 +107,27 @@ function assertCredentiallessRequest(request, context) {
     const env = {
       SUPERTURTLE_CLOUD_URL: "https://api.superturtle.dev",
     };
+    const invalidLoginRequestCount = recordedRequests.length;
     const invalidSessionRequestCount = recordedRequests.length;
+
+    await assert.rejects(
+      () =>
+        pollLogin(
+          {
+            device_code: "device-123\nmalicious",
+            verification_uri: "https://api.superturtle.dev/verify",
+            interval_ms: 10,
+          },
+          { timeoutMs: 5_000 },
+          env
+        ),
+      /Hosted login flow contains an invalid device_code/i
+    );
+    assert.strictEqual(
+      recordedRequests.length,
+      invalidLoginRequestCount,
+      "expected malformed in-memory hosted login device codes to fail closed before issuing poll requests"
+    );
 
     await assert.rejects(
       () =>
@@ -137,7 +157,7 @@ function assertCredentiallessRequest(request, context) {
         refreshSession(
           {
             access_token: "access-abc",
-            refresh_token: { token: "refresh-def" },
+            refresh_token: "refresh-def\r\nX-Injected: true",
             control_plane: "https://api.superturtle.dev",
           },
           env
@@ -148,7 +168,7 @@ function assertCredentiallessRequest(request, context) {
       () =>
         fetchCloudStatus(
           {
-            access_token: ["access-abc"],
+            access_token: "access-abc\tmalicious",
             control_plane: "https://api.superturtle.dev",
           },
           env

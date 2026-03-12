@@ -198,17 +198,24 @@ function getSessionControlPlaneBaseUrl(session, env = process.env) {
 }
 
 function getSessionAccessToken(session) {
-  if (!isNonEmptyString(session?.access_token)) {
+  if (!isOpaqueTokenString(session?.access_token)) {
     throw new Error("Hosted session contains an invalid access_token.");
   }
   return session.access_token;
 }
 
 function getSessionRefreshToken(session) {
-  if (!isNonEmptyString(session?.refresh_token)) {
+  if (!isOpaqueTokenString(session?.refresh_token)) {
     throw new Error("Hosted session contains an invalid refresh_token.");
   }
   return session.refresh_token;
+}
+
+function getLoginDeviceCode(started) {
+  if (!isOpaqueTokenString(started?.device_code)) {
+    throw new Error("Hosted login flow contains an invalid device_code.");
+  }
+  return started.device_code;
 }
 
 function ensureSafeSessionDirectory(dirPath, options = {}) {
@@ -405,6 +412,10 @@ function isNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function isOpaqueTokenString(value) {
+  return typeof value === "string" && value.length > 0 && value.trim() === value && !/\s/.test(value);
+}
+
 function validateTimestamp(value, fieldName, context) {
   if (value == null) {
     return null;
@@ -429,13 +440,13 @@ function validateTokenResponse(payload, context) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error(`${context} returned an invalid response.`);
   }
-  if (!isNonEmptyString(payload.access_token)) {
+  if (!isOpaqueTokenString(payload.access_token)) {
     throw new Error(`${context} did not include a valid access_token.`);
   }
   if (
     Object.prototype.hasOwnProperty.call(payload, "refresh_token") &&
     payload.refresh_token != null &&
-    !isNonEmptyString(payload.refresh_token)
+    !isOpaqueTokenString(payload.refresh_token)
   ) {
     throw new Error(`${context} returned an invalid refresh_token.`);
   }
@@ -480,7 +491,7 @@ function validateLoginStartResponse(payload, context, controlPlaneBaseUrl = null
     throw new Error(`${context} returned an invalid response.`);
   }
 
-  if (!isNonEmptyString(payload.device_code)) {
+  if (!isOpaqueTokenString(payload.device_code)) {
     throw new Error(`${context} did not include a valid device_code.`);
   }
 
@@ -742,14 +753,14 @@ function validateStoredSession(session, path) {
     throw invalidSessionFile(path, "has an invalid control_plane");
   }
 
-  if (!isNonEmptyString(session.access_token)) {
+  if (!isOpaqueTokenString(session.access_token)) {
     throw invalidSessionFile(path, "has an invalid access_token");
   }
 
   if (
     Object.prototype.hasOwnProperty.call(session, "refresh_token") &&
     session.refresh_token != null &&
-    !isNonEmptyString(session.refresh_token)
+    !isOpaqueTokenString(session.refresh_token)
   ) {
     throw invalidSessionFile(path, "has an invalid refresh_token");
   }
@@ -1311,7 +1322,7 @@ async function pollLogin(started, options = {}, env = process.env) {
       const completed = await requestJson(`${baseUrl}/v1/cli/login/poll`, {
         method: "POST",
         headers: getJsonRequestHeaders(),
-        body: JSON.stringify({ device_code: started.device_code }),
+        body: JSON.stringify({ device_code: getLoginDeviceCode(started) }),
       }, env);
       return validateTokenResponse(completed, "Hosted login completion");
     } catch (error) {
