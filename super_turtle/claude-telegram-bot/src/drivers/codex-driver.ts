@@ -3,6 +3,30 @@ import type { ChatDriver, DriverRunInput, DriverStatusSnapshot } from "./types";
 import type { McpCompletionCallback } from "../types";
 import { codexLog } from "../logger";
 
+const RETRYABLE_TRANSPORT_PATTERNS = [
+  "stream disconnected before completion",
+  "connection reset",
+  "econnreset",
+  "socket hang up",
+  "network error",
+  "timed out",
+  "timeout",
+  "unexpected status 502",
+  "unexpected status 503",
+  "unexpected status 504",
+];
+
+export function isRetryableCodexTransportError(error: unknown): boolean {
+  const errorStr = String(error).toLowerCase();
+  if (!errorStr.includes("codex")) {
+    return false;
+  }
+  if (errorStr.includes("401 unauthorized") || errorStr.includes("missing bearer")) {
+    return false;
+  }
+  return RETRYABLE_TRANSPORT_PATTERNS.some((pattern) => errorStr.includes(pattern));
+}
+
 async function wait(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -225,7 +249,11 @@ export class CodexDriver implements ChatDriver {
 
   isStallError(error: unknown): boolean {
     const errorStr = String(error).toLowerCase();
-    return errorStr.includes("stream stalled") || errorStr.includes("event stream stalled");
+    return (
+      errorStr.includes("stream stalled") ||
+      errorStr.includes("event stream stalled") ||
+      isRetryableCodexTransportError(error)
+    );
   }
 
   isCancellationError(error: unknown): boolean {

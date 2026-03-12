@@ -20,13 +20,41 @@ afterEach(() => {
 });
 
 describe("CodexDriver", () => {
+  it("classifies transient Codex stream disconnects as retriable stalls", async () => {
+    const { CodexDriver } = await loadCodexDriverModule();
+    const driver = new CodexDriver();
+
+    expect(
+      driver.isStallError(
+        new Error(
+          "Codex stream error: Reconnecting... 1/5 (stream disconnected before completion: An error occurred while processing your request.)"
+        )
+      )
+    ).toBe(true);
+  });
+
+  it("does not classify Codex auth failures as retriable stalls", async () => {
+    const { CodexDriver } = await loadCodexDriverModule();
+    const driver = new CodexDriver();
+
+    expect(
+      driver.isStallError(
+        new Error(
+          "Codex stream error: Reconnecting... 1/5 (unexpected status 401 Unauthorized: Missing bearer or basic authentication in header)"
+        )
+      )
+    ).toBe(false);
+  });
+
   it("does not derive reasoning effort from message keywords", async () => {
+    const actualStreaming = await import(`../handlers/streaming.ts?actual=${Date.now()}-${Math.random()}`);
     mock.module("../handlers/streaming", () => ({
       checkPendingAskUserRequests: async () => false,
       checkPendingBotControlRequests: async () => false,
       checkPendingPinoLogsRequests: async () => false,
       checkPendingSendImageRequests: async () => false,
       checkPendingSendTurtleRequests: async () => false,
+      isSpawnOrchestrationToolStatus: actualStreaming.isSpawnOrchestrationToolStatus,
     }));
 
     const reasoningEfforts: Array<string | undefined> = [];
@@ -59,6 +87,7 @@ describe("CodexDriver", () => {
 
   it("flushes pending send_image requests for Codex MCP tool calls", async () => {
     const sendImageChecks: number[] = [];
+    const actualStreaming = await import(`../handlers/streaming.ts?actual=${Date.now()}-${Math.random()}`);
 
     mock.module("../handlers/streaming", () => ({
       checkPendingAskUserRequests: async () => false,
@@ -69,6 +98,7 @@ describe("CodexDriver", () => {
         return true;
       },
       checkPendingSendTurtleRequests: async () => false,
+      isSpawnOrchestrationToolStatus: actualStreaming.isSpawnOrchestrationToolStatus,
     }));
 
     codexSession.sendMessage = (async (

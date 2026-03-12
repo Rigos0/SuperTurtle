@@ -22,6 +22,87 @@ function baseInput(message: string) {
 }
 
 describe("driver routing retry parity", () => {
+  it("retries transient Codex transport disconnects with an extra retry budget", async () => {
+    const driver = getDriver("codex") as unknown as DriverLike;
+    const original = {
+      runMessage: driver.runMessage,
+      isStallError: driver.isStallError,
+      isCrashError: driver.isCrashError,
+      kill: driver.kill,
+    };
+
+    const seenMessages: string[] = [];
+    let attempts = 0;
+    let kills = 0;
+
+    try {
+      driver.kill = async () => {
+        kills += 1;
+      };
+      driver.runMessage = async (input) => {
+        attempts += 1;
+        seenMessages.push(input.message);
+        if (attempts < 3) {
+          throw new Error(
+            "Codex stream error: Reconnecting... 1/5 (stream disconnected before completion: An error occurred while processing your request.)"
+          );
+        }
+        return "ok";
+      };
+
+      const result = await runMessageWithDriver("codex", baseInput("try again on cloud"));
+      expect(result).toBe("ok");
+      expect(attempts).toBe(3);
+      expect(kills).toBe(2);
+      expect(seenMessages).toEqual([
+        "try again on cloud",
+        "try again on cloud",
+        "try again on cloud",
+      ]);
+    } finally {
+      driver.runMessage = original.runMessage;
+      driver.isStallError = original.isStallError;
+      driver.isCrashError = original.isCrashError;
+      driver.kill = original.kill;
+    }
+  });
+
+  it("does not retry Codex auth failures that look like reconnects", async () => {
+    const driver = getDriver("codex") as unknown as DriverLike;
+    const original = {
+      runMessage: driver.runMessage,
+      isStallError: driver.isStallError,
+      isCrashError: driver.isCrashError,
+      kill: driver.kill,
+    };
+
+    let attempts = 0;
+    let kills = 0;
+
+    try {
+      driver.kill = async () => {
+        kills += 1;
+      };
+      driver.runMessage = async () => {
+        attempts += 1;
+        throw new Error(
+          "Codex stream error: Reconnecting... 1/5 (unexpected status 401 Unauthorized: Missing bearer or basic authentication in header)"
+        );
+      };
+
+      await expect(
+        runMessageWithDriver("codex", baseInput("use codex"))
+      ).rejects.toThrow("401 Unauthorized");
+      expect(attempts).toBe(1);
+      expect(kills).toBe(0);
+    } finally {
+      driver.runMessage = original.runMessage;
+      driver.isStallError = original.isStallError;
+      driver.isCrashError = original.isCrashError;
+      driver.kill = original.kill;
+    }
+  });
+
   it("does not retry crash errors after tool execution", async () => {
     const driver = getDriver("claude") as unknown as DriverLike;
     const original = {
@@ -218,6 +299,97 @@ describe("driver routing retry parity", () => {
       expect(result).toBe("ok");
       expect(attempts).toBe(2);
       expect(seenMessages[1]?.includes("/subturtle/ctl list")).toBe(true);
+    } finally {
+      driver.runMessage = original.runMessage;
+      driver.isStallError = original.isStallError;
+      driver.isCrashError = original.isCrashError;
+      driver.kill = original.kill;
+    }
+  });
+
+  it("retries transient Codex disconnects when no tools ran by killing the session", async () => {
+    const driver = getDriver("codex") as unknown as DriverLike;
+    const original = {
+      runMessage: driver.runMessage,
+      isStallError: driver.isStallError,
+      isCrashError: driver.isCrashError,
+      kill: driver.kill,
+    };
+
+    const seenMessages: string[] = [];
+    let attempts = 0;
+    let kills = 0;
+
+    try {
+      driver.isStallError = (error) =>
+        String(error).toLowerCase().includes("stream disconnected before completion");
+      driver.isCrashError = () => false;
+      driver.kill = async () => {
+        kills += 1;
+      };
+      driver.runMessage = async (input) => {
+        attempts += 1;
+        seenMessages.push(input.message);
+        if (attempts === 1) {
+          throw new Error(
+            "Codex stream error: Reconnecting... 1/5 (stream disconnected before completion: An error occurred while processing your request.)"
+          );
+        }
+        return "ok";
+      };
+
+      const result = await runMessageWithDriver("codex", baseInput("continue from cloud"));
+      expect(result).toBe("ok");
+      expect(attempts).toBe(2);
+      expect(kills).toBe(1);
+      expect(seenMessages).toEqual(["continue from cloud", "continue from cloud"]);
+    } finally {
+      driver.runMessage = original.runMessage;
+      driver.isStallError = original.isStallError;
+      driver.isCrashError = original.isCrashError;
+      driver.kill = original.kill;
+    }
+  });
+
+  it("retries transient Codex disconnects after tool activity with a safe continuation prompt", async () => {
+    const driver = getDriver("codex") as unknown as DriverLike;
+    const original = {
+      runMessage: driver.runMessage,
+      isStallError: driver.isStallError,
+      isCrashError: driver.isCrashError,
+      kill: driver.kill,
+    };
+
+    const seenMessages: string[] = [];
+    let attempts = 0;
+    let kills = 0;
+
+    try {
+      driver.isStallError = (error) =>
+        String(error).toLowerCase().includes("stream disconnected before completion");
+      driver.isCrashError = () => false;
+      driver.kill = async () => {
+        kills += 1;
+      };
+      driver.runMessage = async (input) => {
+        attempts += 1;
+        seenMessages.push(input.message);
+        if (attempts === 1) {
+          await input.statusCallback("tool", "<code>git status</code>");
+          throw new Error(
+            "Codex stream error: Reconnecting... 1/5 (stream disconnected before completion: An error occurred while processing your request.)"
+          );
+        }
+        return "ok";
+      };
+
+      const result = await runMessageWithDriver("codex", baseInput("finish the task"));
+      expect(result).toBe("ok");
+      expect(attempts).toBe(2);
+      expect(kills).toBe(0);
+      expect(seenMessages[1]?.includes("Do not blindly repeat side-effecting operations")).toBe(
+        true
+      );
     } finally {
       driver.runMessage = original.runMessage;
       driver.isStallError = original.isStallError;

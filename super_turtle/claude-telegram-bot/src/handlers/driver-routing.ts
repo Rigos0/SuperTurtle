@@ -18,7 +18,9 @@ export interface DriverMessageInput {
   statusCallback: StatusCallback;
 }
 
-const MAX_RETRIES = 1;
+const DEFAULT_MAX_RETRIES = 1;
+const CODEX_MAX_RETRIES = 2;
+const RETRY_BACKOFF_MS = 1200;
 let backgroundRunDepth = 0;
 let backgroundRunPreempted = false;
 let executingDriverId: DriverId | null = null;
@@ -101,9 +103,10 @@ export async function runMessageWithDriver(
   input: DriverMessageInput
 ): Promise<string> {
   const driver = getDriver(driverId);
+  const maxRetries = driverId === "codex" ? CODEX_MAX_RETRIES : DEFAULT_MAX_RETRIES;
   let message = input.message;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     let sawToolUse = false;
     let sawSpawnOrchestration = false;
 
@@ -139,7 +142,7 @@ export async function runMessageWithDriver(
           err: error,
           driverId,
           attempt: attempt + 1,
-          maxAttempts: MAX_RETRIES + 1,
+          maxAttempts: maxRetries + 1,
           sawToolUse,
           sawSpawnOrchestration,
           chatId: input.chatId,
@@ -147,7 +150,7 @@ export async function runMessageWithDriver(
         },
         "Driver run attempt failed"
       );
-      if (attempt >= MAX_RETRIES) {
+      if (attempt >= maxRetries) {
         throw error;
       }
 
@@ -157,6 +160,7 @@ export async function runMessageWithDriver(
             { driverId, attempt: attempt + 1, action: "stall_spawn_orchestration_recovery" },
             "Applying spawn-orchestration recovery prompt"
           );
+          await Bun.sleep(RETRY_BACKOFF_MS);
           message = buildSpawnOrchestrationRecoveryPrompt(message);
           continue;
         }
@@ -167,11 +171,13 @@ export async function runMessageWithDriver(
             "Stall without tool use: killing driver session before retry"
           );
           await driver.kill();
+          await Bun.sleep(RETRY_BACKOFF_MS);
         } else {
           routingLog.info(
             { driverId, attempt: attempt + 1, action: "stall_continuation_retry" },
             "Stall after tool use: continuing with recovery prompt"
           );
+          await Bun.sleep(RETRY_BACKOFF_MS);
           message = buildStallRecoveryPrompt(message);
         }
         continue;
@@ -183,6 +189,7 @@ export async function runMessageWithDriver(
           "Crash without tool use: killing driver session before retry"
         );
         await driver.kill();
+        await Bun.sleep(RETRY_BACKOFF_MS);
         continue;
       }
 
