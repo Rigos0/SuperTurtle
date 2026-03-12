@@ -6,7 +6,7 @@ const http = require("http");
 const os = require("os");
 const { resolve } = require("path");
 const { spawn } = require("child_process");
-const { validateLoginStartResponse } = require("../bin/cloud.js");
+const { getControlPlaneBaseUrl, validateLoginStartResponse } = require("../bin/cloud.js");
 
 const CLI_PATH = resolve(__dirname, "..", "bin", "superturtle.js");
 const tmpDir = fs.mkdtempSync(resolve(os.tmpdir(), "superturtle-cloud-cli-"));
@@ -42,6 +42,35 @@ assert.deepStrictEqual(
     user_code: null,
   },
   "expected loopback HTTP verification URLs to remain valid for local hosted login test harnesses"
+);
+
+assert.strictEqual(
+  getControlPlaneBaseUrl({
+    SUPERTURTLE_CLOUD_URL: "http://[::1]:4318",
+  }),
+  "http://[::1]:4318",
+  "expected IPv6 loopback HTTP control plane URLs to remain valid for local hosted login test harnesses"
+);
+
+assert.deepStrictEqual(
+  validateLoginStartResponse(
+    {
+      device_code: "dev-code-loopback-ipv6",
+      verification_uri: "http://[::1]:4318/verify",
+      verification_uri_complete: "http://[::1]:4318/verify?code=USER-123",
+      interval_ms: 10,
+    },
+    "Hosted login start",
+    "http://[::1]:4318"
+  ),
+  {
+    device_code: "dev-code-loopback-ipv6",
+    verification_uri: "http://[::1]:4318/verify",
+    verification_uri_complete: "http://[::1]:4318/verify?code=USER-123",
+    interval_ms: 10,
+    user_code: null,
+  },
+  "expected IPv6 loopback HTTP verification URLs to remain valid for local hosted login test harnesses"
 );
 
 function runCli(args, env) {

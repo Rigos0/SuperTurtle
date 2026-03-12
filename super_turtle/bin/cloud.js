@@ -66,12 +66,20 @@ function isLoopbackHostname(hostname) {
   }
 
   const normalized = hostname.trim().toLowerCase();
-  if (normalized === "localhost" || normalized === "::1" || normalized.endsWith(".localhost")) {
+  const bracketless =
+    normalized.startsWith("[") && normalized.endsWith("]") ? normalized.slice(1, -1) : normalized;
+
+  if (
+    bracketless === "localhost" ||
+    bracketless === "::1" ||
+    bracketless === "0:0:0:0:0:0:0:1" ||
+    bracketless.endsWith(".localhost")
+  ) {
     return true;
   }
 
-  if (/^127(?:\.\d{1,3}){3}$/.test(normalized)) {
-    return normalized
+  if (/^127(?:\.\d{1,3}){3}$/.test(bracketless)) {
+    return bracketless
       .split(".")
       .every((segment) => Number.isInteger(Number(segment)) && Number(segment) >= 0 && Number(segment) <= 255);
   }
