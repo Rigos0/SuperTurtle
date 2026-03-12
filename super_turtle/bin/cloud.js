@@ -308,6 +308,72 @@ function normalizeStoredSession(session, env = process.env, fallbackTimestamp = 
   return normalized;
 }
 
+function validateStoredSession(session, path) {
+  if (!session || typeof session !== "object" || Array.isArray(session)) {
+    throw invalidSessionFile(path, "is invalid");
+  }
+
+  if (!Number.isInteger(session.schema_version) || session.schema_version <= 0) {
+    throw invalidSessionFile(path, "has an invalid schema_version");
+  }
+
+  if (!isNonEmptyString(session.control_plane)) {
+    throw invalidSessionFile(path, "has an invalid control_plane");
+  }
+
+  if (!isNonEmptyString(session.access_token)) {
+    throw invalidSessionFile(path, "has an invalid access_token");
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(session, "refresh_token") &&
+    session.refresh_token != null &&
+    !isNonEmptyString(session.refresh_token)
+  ) {
+    throw invalidSessionFile(path, "has an invalid refresh_token");
+  }
+
+  if (Object.prototype.hasOwnProperty.call(session, "expires_at")) {
+    validateTimestamp(session.expires_at, "expires_at", "Stored hosted session");
+  }
+  if (Object.prototype.hasOwnProperty.call(session, "created_at")) {
+    validateTimestamp(session.created_at, "created_at", "Stored hosted session");
+  }
+  if (Object.prototype.hasOwnProperty.call(session, "last_sync_at")) {
+    validateTimestamp(session.last_sync_at, "last_sync_at", "Stored hosted session");
+  }
+  if (Object.prototype.hasOwnProperty.call(session, "identity_sync_at")) {
+    validateTimestamp(session.identity_sync_at, "identity_sync_at", "Stored hosted session");
+  }
+  if (Object.prototype.hasOwnProperty.call(session, "cloud_status_sync_at")) {
+    validateTimestamp(session.cloud_status_sync_at, "cloud_status_sync_at", "Stored hosted session");
+  }
+
+  validateWhoAmIResponse(
+    {
+      user: Object.prototype.hasOwnProperty.call(session, "user") ? session.user : undefined,
+      workspace: Object.prototype.hasOwnProperty.call(session, "workspace")
+        ? session.workspace
+        : undefined,
+      entitlement: Object.prototype.hasOwnProperty.call(session, "entitlement")
+        ? session.entitlement
+        : undefined,
+    },
+    "Stored hosted session"
+  );
+  validateCloudStatusResponse(
+    {
+      instance: Object.prototype.hasOwnProperty.call(session, "instance") ? session.instance : undefined,
+      provisioning_job: Object.prototype.hasOwnProperty.call(session, "provisioning_job")
+        ? session.provisioning_job
+        : undefined,
+    },
+    "Stored hosted session"
+  );
+
+  return session;
+}
+
 function readSession(env = process.env) {
   const path = getSessionPath(env);
   if (!fs.existsSync(path)) return null;
@@ -346,6 +412,16 @@ function readSession(env = process.env) {
     throw new Error(
       `Hosted session file at ${path} uses schema_version ${normalized.schema_version}, but this CLI supports up to ${CLOUD_SESSION_SCHEMA_VERSION}. Upgrade SuperTurtle or run 'superturtle logout' and then 'superturtle login' again.`
     );
+  }
+
+  try {
+    validateStoredSession(normalized, path);
+  } catch (error) {
+    if (error instanceof Error && /Stored hosted session returned an invalid /.test(error.message)) {
+      const detail = error.message.replace(/^Stored hosted session returned an invalid /, "");
+      throw invalidSessionFile(path, `has an invalid ${detail.replace(/\.$/, "")}`);
+    }
+    throw error;
   }
 
   if (JSON.stringify(parsed) !== JSON.stringify(normalized)) {
@@ -710,4 +786,5 @@ module.exports = {
   validateWhoAmIResponse,
   validateCloudStatusResponse,
   writeSession,
+  validateStoredSession,
 };

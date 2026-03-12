@@ -495,6 +495,60 @@ server.listen(0, "127.0.0.1", async () => {
     fs.writeFileSync(
       sessionPath,
       `${JSON.stringify({
+        schema_version: 1,
+        access_token: 42,
+        refresh_token: "refresh-ghi",
+        expires_at: "2999-03-12T10:00:00Z",
+        control_plane: baseUrl,
+      }, null, 2)}\n`
+    );
+    const invalidStoredAccessTokenWhoami = await runCli(["whoami"], env);
+    assert.strictEqual(invalidStoredAccessTokenWhoami.code, 1);
+    assert.match(invalidStoredAccessTokenWhoami.stderr, /Hosted session file .* invalid access_token/i);
+    assert.match(invalidStoredAccessTokenWhoami.stderr, /superturtle logout/i);
+
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({
+        schema_version: 1,
+        access_token: "access-abc",
+        refresh_token: "refresh-ghi",
+        expires_at: "2999-03-12T10:00:00Z",
+        control_plane: baseUrl,
+        identity_sync_at: "not-a-timestamp",
+        user: { id: "user_123", email: "user@example.com" },
+      }, null, 2)}\n`
+    );
+    const invalidStoredTimestampWhoami = await runCli(["whoami"], env);
+    assert.strictEqual(invalidStoredTimestampWhoami.code, 1);
+    assert.match(invalidStoredTimestampWhoami.stderr, /Hosted session file .* invalid identity_sync_at/i);
+    assert.match(invalidStoredTimestampWhoami.stderr, /superturtle logout/i);
+
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({
+        schema_version: 1,
+        access_token: "access-abc",
+        refresh_token: "refresh-ghi",
+        expires_at: "2999-03-12T10:00:00Z",
+        control_plane: baseUrl,
+        provisioning_job: {
+          state: "succeeded",
+          updated_at: "not-a-timestamp",
+        },
+      }, null, 2)}\n`
+    );
+    const invalidStoredProvisioningWhoami = await runCli(["cloud", "status"], env);
+    assert.strictEqual(invalidStoredProvisioningWhoami.code, 1);
+    assert.match(
+      invalidStoredProvisioningWhoami.stderr,
+      /Hosted session file .* invalid provisioning_job.updated_at/i
+    );
+    assert.match(invalidStoredProvisioningWhoami.stderr, /superturtle logout/i);
+
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify({
         access_token: "expired-access",
         refresh_token: "refresh-def",
         expires_at: "2000-03-12T10:00:00Z",
