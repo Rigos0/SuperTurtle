@@ -11,8 +11,24 @@ function loadCloudWithSpawnStub(spawnStub) {
 }
 
 try {
+  let spawnCalls = 0;
+  let cloud = loadCloudWithSpawnStub(() => {
+    spawnCalls += 1;
+    return { status: 0, error: null };
+  });
+
+  assert.throws(
+    () => cloud.openBrowser("javascript:alert('owned')"),
+    /Hosted browser login returned an invalid verification_uri/i
+  );
+  assert.throws(
+    () => cloud.openBrowser("http://example.com/verify"),
+    /Hosted browser login returned an invalid verification_uri/i
+  );
+  assert.strictEqual(spawnCalls, 0, "expected invalid browser-open URLs to be rejected before spawnSync");
+
   let captured = null;
-  let cloud = loadCloudWithSpawnStub((command, args, options) => {
+  cloud = loadCloudWithSpawnStub((command, args, options) => {
     captured = { command, args, options };
     return { status: 0, error: null };
   });

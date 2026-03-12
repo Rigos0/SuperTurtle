@@ -1081,6 +1081,7 @@ function getRetryAfterMs(value) {
 }
 
 function openBrowser(url, env = process.env) {
+  validateControlPlaneUrl(url, "verification_uri", "Hosted browser login");
   const platform = process.platform;
   const timeout = getBrowserOpenTimeoutMs(env);
   const commands =
