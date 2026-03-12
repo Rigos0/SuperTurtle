@@ -1145,15 +1145,33 @@ function getRetryAfterMs(value) {
 }
 
 function openBrowser(url, env = process.env) {
-  validateControlPlaneUrl(url, "verification_uri", "Hosted browser login", { disallowHash: true });
+  const normalizedUrl = validateControlPlaneUrl(url, "verification_uri", "Hosted browser login", {
+    disallowHash: true,
+  });
+  const expectedOrigin = normalizeUrlOrigin(
+    getControlPlaneBaseUrl(env),
+    "control_plane",
+    "Configured hosted control plane"
+  );
+  const verificationOrigin = normalizeUrlOrigin(
+    normalizedUrl,
+    "verification_uri",
+    "Hosted browser login"
+  );
+  if (verificationOrigin !== expectedOrigin) {
+    throw new Error(
+      "Hosted browser login returned a verification_uri that does not match the configured control plane origin."
+    );
+  }
+
   const platform = process.platform;
   const timeout = getBrowserOpenTimeoutMs(env);
   const commands =
     platform === "darwin"
-      ? [["open", [url]]]
+      ? [["open", [normalizedUrl]]]
       : platform === "win32"
-        ? [["cmd", ["/c", "start", "", url]]]
-        : [["xdg-open", [url]]];
+        ? [["cmd", ["/c", "start", "", normalizedUrl]]]
+        : [["xdg-open", [normalizedUrl]]];
 
   for (const [command, args] of commands) {
     const result = spawnSync(command, args, {

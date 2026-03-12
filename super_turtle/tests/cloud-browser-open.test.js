@@ -26,6 +26,10 @@ try {
     /Hosted browser login returned an invalid verification_uri/i
   );
   assert.throws(
+    () => cloud.openBrowser("https://example.com/verify"),
+    /does not match the configured control plane origin/i
+  );
+  assert.throws(
     () => cloud.openBrowser("https://superturtle.dev/login#fragment"),
     /Hosted browser login returned an invalid verification_uri/i
   );
@@ -37,7 +41,7 @@ try {
     return { status: 0, error: null };
   });
 
-  const opened = cloud.openBrowser("https://superturtle.dev/login", {
+  const opened = cloud.openBrowser("https://api.superturtle.dev/login", {
     SUPERTURTLE_CLOUD_BROWSER_TIMEOUT_MS: "1234",
   });
   assert.strictEqual(opened, true);
@@ -46,14 +50,14 @@ try {
   assert.strictEqual(captured.options.stdio, "ignore");
 
   cloud = loadCloudWithSpawnStub(() => ({ status: null, error: new Error("timed out") }));
-  const timedOut = cloud.openBrowser("https://superturtle.dev/login");
+  const timedOut = cloud.openBrowser("https://api.superturtle.dev/login");
   assert.strictEqual(timedOut, false, "expected timed out browser launches to fail closed");
 
   cloud = loadCloudWithSpawnStub(() => {
     throw new Error("spawnSync should not be called for invalid timeout config");
   });
   assert.throws(
-    () => cloud.openBrowser("https://superturtle.dev/login", {
+    () => cloud.openBrowser("https://api.superturtle.dev/login", {
       SUPERTURTLE_CLOUD_BROWSER_TIMEOUT_MS: "0",
     }),
     /Configured hosted browser launch timeout must be a positive number of milliseconds/i
