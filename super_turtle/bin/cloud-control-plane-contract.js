@@ -384,6 +384,21 @@ function validateCliClaudeAuthStatusResponse(payload) {
   };
 }
 
+function validateMachineClaudeAuthResponse(payload) {
+  const response = validateObject(payload, "response");
+  return {
+    provider: validateEnum(
+      response.provider,
+      PROVIDER_CREDENTIAL_PROVIDERS,
+      "provider"
+    ),
+    configured: validateBoolean(response.configured, "configured"),
+    access_token: validateDisplayField(response.access_token, "access_token"),
+    credential: validateProviderCredential(response.credential, "credential"),
+    audit_log: validateAuditLog(response.audit_log, "audit_log"),
+  };
+}
+
 function canTransition(transitionMap, fromState, toState) {
   if (!Object.prototype.hasOwnProperty.call(transitionMap, fromState)) {
     return false;
@@ -424,6 +439,7 @@ module.exports = {
   canTransition,
   validateCliClaudeAuthStatusResponse,
   validateCliCloudStatusResponse,
+  validateMachineClaudeAuthResponse,
   validateCliTeleportTargetResponse,
   validateCliTokenResponse,
   validateCliWhoAmIResponse,

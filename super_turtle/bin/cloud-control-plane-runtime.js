@@ -13,6 +13,7 @@ const {
   assertManagedInstanceTransition,
   assertProvisioningJobTransition,
   validateCliCloudStatusResponse,
+  validateMachineClaudeAuthResponse,
   validateCliTeleportTargetResponse,
   validateCliTokenResponse,
   validateCliWhoAmIResponse,
@@ -352,6 +353,30 @@ function buildClaudeAuthStatusPayload(state, credential) {
   return validateCliClaudeAuthStatusResponse({
     provider: "claude",
     configured: Boolean(credential && credential.state === "valid" && credential.access_token),
+    credential: credential
+      ? {
+          id: credential.id,
+          provider: credential.provider,
+          state: credential.state,
+          account_email: credential.account_email || null,
+          configured_at: credential.configured_at || null,
+          last_validated_at: credential.last_validated_at || null,
+          last_error_code: credential.last_error_code || null,
+          last_error_message: credential.last_error_message || null,
+        }
+      : null,
+    audit_log: credential ? getRecentAuditLog(state, credential.id) : [],
+  });
+}
+
+function buildMachineClaudeAuthPayload(state, credential) {
+  return validateMachineClaudeAuthResponse({
+    provider: "claude",
+    configured: Boolean(credential && credential.state === "valid" && credential.access_token),
+    access_token:
+      credential && credential.state === "valid" && credential.access_token
+        ? credential.access_token
+        : null,
     credential: credential
       ? {
           id: credential.id,
@@ -808,6 +833,32 @@ function requestMachineHeartbeat(runtime, machineToken, payload = {}) {
       last_seen_at: instance.last_seen_at,
       health_status: instance.health_status || null,
     },
+  };
+}
+
+function requestMachineClaudeProviderAuth(runtime, machineToken) {
+  const state = readState(runtime.statePath);
+  const instance = authenticateMachineRequest(state, machineToken);
+  if (!instance) {
+    return { status: 401, data: { error: "invalid_machine_token" } };
+  }
+
+  const credential = getProviderCredential(state, instance.user_id, "claude");
+
+  appendAudit(state, runtime, {
+    actor_type: "instance",
+    actor_id: instance.id,
+    action: "provider_credential.claude_machine_lookup",
+    target_type: credential ? "provider_credential" : "managed_instance",
+    target_id: credential ? credential.id : instance.id,
+    metadata: {
+      configured: credential ? "true" : "false",
+    },
+  });
+  writeState(runtime.statePath, state);
+  return {
+    status: 200,
+    data: buildMachineClaudeAuthPayload(state, credential || null),
   };
 }
 
@@ -2026,6 +2077,23 @@ async function handleHttpRequest(runtime, request) {
     };
   }
 
+  if (request.method === "GET" && request.url === "/v1/machine/providers/claude") {
+    const machineToken = extractBearerToken(request);
+    if (!machineToken) {
+      return {
+        status: 401,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        body: JSON.stringify({ error: "missing_bearer_token" }),
+      };
+    }
+    const result = requestMachineClaudeProviderAuth(runtime, machineToken);
+    return {
+      status: result.status,
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
+      body: JSON.stringify(result.data),
+    };
+  }
+
   return {
     status: 404,
     headers: { "content-type": "application/json", "cache-control": "no-store" },
@@ -2179,6 +2247,7 @@ module.exports = {
   readState,
   requestCloudStatus,
   requestClaudeProviderStatus,
+  requestMachineClaudeProviderAuth,
   requestMachineHeartbeat,
   requestMachineRegister,
   requestInstanceReprovision,

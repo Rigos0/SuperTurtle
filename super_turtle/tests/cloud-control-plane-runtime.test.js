@@ -13,6 +13,7 @@ const {
   handleHttpRequest,
   readState,
   requestCloudStatus,
+  requestMachineClaudeProviderAuth,
   requestMachineHeartbeat,
   requestMachineRegister,
   requestInstanceReprovision,
@@ -67,6 +68,18 @@ function createSeedState() {
     subscription_id: "sub_123",
     current_period_end: "2026-04-12T10:00:00Z",
     cancel_at_period_end: false,
+  });
+  state.provider_credentials.push({
+    id: "cred_123",
+    user_id: "user_123",
+    provider: "claude",
+    state: "valid",
+    access_token: "claude-valid-token",
+    account_email: "claude-user@example.com",
+    configured_at: "2026-03-12T10:00:00Z",
+    last_validated_at: "2026-03-12T10:00:00Z",
+    last_error_code: null,
+    last_error_message: null,
   });
   return state;
 }
@@ -262,6 +275,16 @@ async function run() {
   assert.strictEqual(heartbeat.data.ok, true);
   assert.strictEqual(heartbeat.data.health_status, "healthy");
 
+  const machineClaude = requestMachineClaudeProviderAuth(
+    runtime,
+    persistedWithMachineToken.managed_instances[0].machine_auth_token
+  );
+  assert.strictEqual(machineClaude.status, 200);
+  assert.strictEqual(machineClaude.data.provider, "claude");
+  assert.strictEqual(machineClaude.data.configured, true);
+  assert.strictEqual(machineClaude.data.access_token, "claude-valid-token");
+  assert.strictEqual(machineClaude.data.credential.account_email, "claude-user@example.com");
+
   const persistedAfterRun = readState(statePath);
   assert.strictEqual(persistedAfterRun.managed_instances[0].state, "running");
   assert.strictEqual(persistedAfterRun.provisioning_jobs[0].state, "succeeded");
@@ -272,8 +295,8 @@ async function run() {
   assert.strictEqual(persistedAfterRun.managed_instances[0].health_status, "healthy");
   assert.match(
     JSON.stringify(persistedAfterRun.audit_log),
-    /machine\.(registered|heartbeat)/,
-    "expected machine registration and heartbeat events to be written to the durable audit log"
+    /machine\.(registered|heartbeat)|provider_credential\.claude_machine_lookup/,
+    "expected machine lifecycle and Claude lookup events to be written to the durable audit log"
   );
 
   const runningStatus = requestCloudStatus(runtime, refreshed.data.access_token);
@@ -333,6 +356,9 @@ async function run() {
   });
   const reprovisionForbidden = requestInstanceReprovision(reprovisionForbiddenRuntime, "access_123");
   assert.strictEqual(reprovisionForbidden.status, 409);
+
+  const invalidMachineClaude = requestMachineClaudeProviderAuth(runtime, "machine_auth_invalid");
+  assert.strictEqual(invalidMachineClaude.status, 401);
 
   const forbiddenPath = resolve(tmpDir, "forbidden-state.json");
   const forbiddenState = createSeedState();
@@ -636,6 +662,17 @@ async function run() {
   const machineHeartbeatPayload = await machineHeartbeatResponse.json();
   assert.strictEqual(machineHeartbeatPayload.ok, true);
   assert.strictEqual(machineHeartbeatPayload.health_status, "degraded");
+
+  const machineClaudeResponse = await fetch(`http://127.0.0.1:${address.port}/v1/machine/providers/claude`, {
+    headers: {
+      authorization: `Bearer ${httpMachineToken}`,
+    },
+  });
+  assert.strictEqual(machineClaudeResponse.status, 200);
+  const machineClaudePayload = await machineClaudeResponse.json();
+  assert.strictEqual(machineClaudePayload.provider, "claude");
+  assert.strictEqual(machineClaudePayload.configured, true);
+  assert.strictEqual(machineClaudePayload.access_token, "claude-valid-token");
 
   const teleportTargetResponse = await fetch(`http://127.0.0.1:${address.port}/v1/cli/teleport/target`, {
     headers: {
