@@ -1,5 +1,5 @@
 # Current task
-Simplify `src/app/(account)/account/page.tsx`: remove dark gradient summary panel and SectionHeading import; use clean simple cards for identity, billing, CLI, machine. Fix the /pricing link since pricing page is deleted.
+Grep the entire `src/` tree for dangling imports to deleted files and fix them all.
 
 # End goal with specs
 A clean, minimal app with only the pages and components needed for:
@@ -29,8 +29,8 @@ The repo is at the cwd (superturtle-web). Some deletions may already be done fro
 - [x] Simplify `src/app/layout.tsx`: remove Footer entirely, keep header (logo + nav), main content, Toaster, Analytics
 - [x] Simplify `src/app/navigation.tsx`: remove Overview/Pricing nav links and mobile Sheet drawer; just AccountMenu when logged in or sign-in button when logged out. Then delete `src/components/ui/sheet.tsx` if orphaned.
 - [x] Simplify `src/app/(auth)/auth-ui.tsx`: remove two-column layout, Terms/Privacy links, AuthFact cards; single-column sign-in card with GitHub button
-- [ ] Simplify `src/app/(account)/account/page.tsx`: remove dark gradient summary panel and SectionHeading import; use clean simple cards for identity, billing, CLI, machine. Fix the /pricing link since pricing page is deleted. <- current
-- [ ] Grep entire src/ tree for dangling imports to deleted files and fix them all
+- [x] Simplify `src/app/(account)/account/page.tsx`: remove dark gradient summary panel and SectionHeading import; use clean simple cards for identity, billing, CLI, machine. Fix the /pricing link since pricing page is deleted.
+- [ ] Grep entire src/ tree for dangling imports to deleted files and fix them all <- current
 - [ ] Run npm run build and fix all errors until it passes
 - [ ] Run npm run lint and fix all errors until it passes
 - [ ] Commit all changes with a clear message
