@@ -37,6 +37,34 @@ SSH_PORT=""
 SSH_IDENTITY=""
 DRY_RUN=0
 USE_MANAGED_TARGET=0
+CURRENT_PHASE="preflight"
+
+emit_status() {
+  local key="$1"
+  shift || true
+  printf '[teleport-status] %s=%s\n' "$key" "$*"
+}
+
+set_phase() {
+  CURRENT_PHASE="$1"
+  emit_status "phase" "$1"
+}
+
+set_active_owner() {
+  emit_status "active_owner" "$1"
+}
+
+set_destination_state() {
+  emit_status "destination_state" "$1"
+}
+
+set_failure_reason() {
+  emit_status "failure_reason" "$*"
+}
+
+clear_failure_reason() {
+  emit_status "failure_reason" ""
+}
 
 if [[ $# -eq 1 && ( "$1" == "--help" || "$1" == "-h" ) ]]; then
   usage
@@ -242,6 +270,7 @@ function formatProvisioningContext(status) {
     process.stderr.write(
       `[teleport] transient control-plane error during ${phase}; retrying: ${errorContext}\n`
     );
+    process.stderr.write(`[teleport-status] failure_reason=${phase} transient error: ${errorContext}\n`);
     await sleep(Math.min(remainingMs, Math.max(intervalMs, retryAfterMs, 1)));
     return true;
   };
@@ -250,6 +279,11 @@ function formatProvisioningContext(status) {
     try {
       const target = await fetchTeleportTarget(session);
       session = persistSessionIfChanged(session, target.session);
+      process.stderr.write("[teleport-status] phase=target_ready\n");
+      process.stderr.write(
+        `[teleport-status] destination_state=${target?.data?.instance?.state || "running"}\n`
+      );
+      process.stderr.write("[teleport-status] failure_reason=\n");
       process.stdout.write(JSON.stringify(target.data));
       return;
     } catch (error) {
@@ -269,9 +303,14 @@ function formatProvisioningContext(status) {
 
     if (!resumeRequested) {
       process.stderr.write("[teleport] managed instance is not ready; requesting resume\n");
+      process.stderr.write("[teleport-status] phase=resuming_destination\n");
       try {
         const resumed = await resumeManagedInstance(session);
         session = persistSessionIfChanged(session, resumed.session);
+        process.stderr.write(
+          `[teleport-status] destination_state=${resumed?.data?.instance?.state || "provisioning"}\n`
+        );
+        process.stderr.write("[teleport-status] failure_reason=\n");
         resumeRequested = true;
       } catch (error) {
         if (error && typeof error === "object" && error.session) {
@@ -291,6 +330,8 @@ function formatProvisioningContext(status) {
     }
 
     process.stderr.write("[teleport] waiting for managed instance to become ready\n");
+    process.stderr.write("[teleport-status] phase=waiting_for_destination\n");
+    let lastInstanceState = "";
     while (Date.now() < deadline) {
       let status;
       try {
@@ -307,22 +348,36 @@ function formatProvisioningContext(status) {
       session = persistSessionIfChanged(session, status.session);
       const instanceState = status?.data?.instance?.state || "unknown";
       lastProvisioningContext = formatProvisioningContext(status);
+      if (instanceState !== lastInstanceState) {
+        process.stderr.write(`[teleport-status] destination_state=${instanceState}\n`);
+        lastInstanceState = instanceState;
+      }
       if (instanceState === "running") {
+        process.stderr.write("[teleport-status] failure_reason=\n");
         break;
       }
       if (["failed", "deleted", "deleting"].includes(instanceState)) {
+        process.stderr.write(
+          `[teleport-status] failure_reason=Managed instance became unavailable while waiting for teleport readiness: ${lastProvisioningContext}.\n`
+        );
         throw new Error(`Managed instance became unavailable while waiting for teleport readiness: ${lastProvisioningContext}.`);
       }
       await sleep(Math.min(intervalMs, Math.max(1, deadline - Date.now())));
     }
 
     if (Date.now() >= deadline) {
+      process.stderr.write(
+        `[teleport-status] failure_reason=Timed out waiting for the managed SuperTurtle VM to become ready after ${timeoutMs}ms (${lastProvisioningContext}).\n`
+      );
       throw new Error(
         `Timed out waiting for the managed SuperTurtle VM to become ready after ${timeoutMs}ms (${lastProvisioningContext}).`
       );
     }
   }
 })().catch((error) => {
+  process.stderr.write(
+    `[teleport-status] failure_reason=${String(error instanceof Error ? error.message : error)}\n`
+  );
   process.stderr.write(String(error instanceof Error ? error.message : error) + "\n");
   process.exit(1);
 });
@@ -387,6 +442,11 @@ fi
 if [[ "$USE_MANAGED_TARGET" -eq 1 ]]; then
   resolve_managed_target
 fi
+
+set_phase "preflight"
+set_active_owner "local"
+set_destination_state "unknown"
+clear_failure_reason
 
 ssh_run() {
   local -a cmd=(ssh)
@@ -642,6 +702,7 @@ echo "[teleport] repo root: ${REPO_ROOT}"
 echo "[teleport] ssh target: ${SSH_TARGET}"
 echo "[teleport] remote root: ${REMOTE_ROOT}"
 
+set_phase "local_preflight"
 local_preflight
 
 run_python export --project-root "$REPO_ROOT" --remote-root "$REMOTE_ROOT" --ssh-target "$SSH_TARGET" >/dev/null
@@ -651,38 +712,52 @@ ACTIVE_DRIVER="$(read_json_field "$CONTEXT_FILE" "active_driver")"
 ACTIVE_DRIVER="${ACTIVE_DRIVER:-claude}"
 
 echo "[teleport] active driver: ${ACTIVE_DRIVER}"
+set_phase "remote_preflight"
 remote_preflight "$ACTIVE_DRIVER"
 
 echo "[teleport] initial sync"
+set_phase "initial_sync"
 run_rsync
 
 if (( DRY_RUN == 1 )); then
   echo "[teleport] dry-run complete"
+  set_phase "dry_run_complete"
+  clear_failure_reason
   exit 0
 fi
 
 echo "[teleport] remote dependency install"
+set_phase "remote_dependency_install"
 remote_install_dependencies
 
 stop_local_subturtles
 
 echo "[teleport] exporting final handoff state"
+set_phase "exporting_final_handoff"
 run_python export --project-root "$REPO_ROOT" --remote-root "$REMOTE_ROOT" --ssh-target "$SSH_TARGET" >/dev/null
 
 stop_local_bot
 
 echo "[teleport] final sync"
+set_phase "final_sync"
 run_rsync
 
 echo "[teleport] importing portable runtime state on remote"
+set_phase "importing_remote_state"
 remote_import_runtime
 
 echo "[teleport] starting remote bot"
+set_phase "starting_remote_bot"
 start_remote_bot
 
 echo "[teleport] verifying remote bot"
+set_phase "verifying_remote_bot"
 verify_remote_bot
 
 send_remote_notification "Teleport complete. Super Turtle is now running on ${SSH_TARGET}."
 
 echo "[teleport] success"
+set_phase "complete"
+set_active_owner "cloud"
+set_destination_state "running"
+clear_failure_reason

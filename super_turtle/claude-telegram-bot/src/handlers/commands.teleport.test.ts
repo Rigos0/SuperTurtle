@@ -45,6 +45,8 @@ async function runTeleportProbe(messageText: string, options?: {
     mode: "dry-run" | "live";
   };
   existingLogs?: string[];
+  activeLogContent?: string;
+  existingLogContents?: Record<string, string>;
 }): Promise<TeleportProbeResult> {
   const env: Record<string, string> = {
     ...process.env,
@@ -63,6 +65,8 @@ async function runTeleportProbe(messageText: string, options?: {
     const running = ${JSON.stringify(options?.running ?? false)};
     const activeLock = ${JSON.stringify(options?.activeLock ?? null)};
     const existingLogs = ${JSON.stringify(options?.existingLogs ?? [])};
+    const activeLogContent = ${JSON.stringify(options?.activeLogContent ?? null)};
+    const existingLogContents = ${JSON.stringify(options?.existingLogContents ?? {})};
 
     const replies = [];
     let spawnCmd = [];
@@ -83,7 +87,7 @@ async function runTeleportProbe(messageText: string, options?: {
     const { enqueueDeferredMessage } = await import(deferredQueuePath);
     const { handleTeleportCommand } = await import(modulePath);
     const { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } = await import("fs");
-    const { join } = await import("path");
+    const { dirname, join } = await import("path");
     const { tmpdir } = await import("os");
 
     const ipcDir = mkdtempSync(join(tmpdir(), "teleport-ask-user-"));
@@ -106,11 +110,18 @@ async function runTeleportProbe(messageText: string, options?: {
           "",
         ].join("\\n")
       );
+      if (activeLogContent != null) {
+        mkdirSync(dirname(activeLock.logPath), { recursive: true });
+        writeFileSync(activeLock.logPath, activeLogContent);
+      }
     }
     if (existingLogs.length > 0) {
       mkdirSync(teleportLogDir, { recursive: true });
       for (const logName of existingLogs) {
-        writeFileSync(join(teleportLogDir, logName), "[teleport] existing log\\n");
+        writeFileSync(
+          join(teleportLogDir, logName),
+          existingLogContents[logName] || "[teleport] existing log\\n"
+        );
       }
     }
 
@@ -151,6 +162,9 @@ async function runTeleportProbe(messageText: string, options?: {
 
     rmSync(teleportStateDir, { recursive: true, force: true });
     rmSync(teleportLogDir, { recursive: true, force: true });
+    if (activeLock?.logPath) {
+      rmSync(activeLock.logPath, { force: true });
+    }
     rmSync(ipcDir, { recursive: true, force: true });
     console.log(marker + JSON.stringify({ replies, spawnCmd, spawnOpts, unrefCalled, askUserRequest }));
   `;
@@ -258,6 +272,11 @@ describe("/teleport", () => {
         launchedAt: "2026-03-12T10:30:00Z",
         mode: "dry-run",
       },
+      activeLogContent:
+        "[teleport-status] phase=waiting_for_destination\n" +
+        "[teleport-status] active_owner=local\n" +
+        "[teleport-status] destination_state=provisioning\n" +
+        "[teleport-status] failure_reason=\n",
     });
 
     if (result.exitCode !== 0) {
@@ -265,7 +284,16 @@ describe("/teleport", () => {
     }
 
     expect(result.payload?.replies).toEqual([
-      { text: "🛰️ Managed teleport dry-run is running.\nStarted: 2026-03-12T10:30:00Z\nLog: /tmp/existing-teleport.log" },
+      {
+        text:
+          "🛰️ Managed teleport dry-run is running.\n" +
+          "Started: 2026-03-12T10:30:00Z\n" +
+          "Phase: waiting for destination\n" +
+          "Active owner: local\n" +
+          "Destination runtime: provisioning\n" +
+          "Latest failure: none\n" +
+          "Log: /tmp/existing-teleport.log",
+      },
     ]);
     expect(result.payload?.spawnCmd).toEqual([]);
   });
@@ -276,6 +304,13 @@ describe("/teleport", () => {
         "2026-03-12T09-00-00.000Z.log",
         "2026-03-12T10-00-00.000Z-dry-run.log",
       ],
+      existingLogContents: {
+        "2026-03-12T10-00-00.000Z-dry-run.log":
+          "[teleport-status] phase=waiting_for_destination\n" +
+          "[teleport-status] active_owner=local\n" +
+          "[teleport-status] destination_state=provisioning\n" +
+          "[teleport-status] failure_reason=Timed out waiting for the managed SuperTurtle VM to become ready after 600000ms.\n",
+      },
     });
 
     if (result.exitCode !== 0) {
@@ -286,7 +321,7 @@ describe("/teleport", () => {
       {
         text: expect.stringMatching(
           new RegExp(
-            `No managed teleport is running\\.\\nLast log: ${process.cwd().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/\\.superturtle/logs/teleport/2026-03-12T10-00-00\\.000Z-dry-run\\.log$`
+            `No managed teleport is running\\.\\nPhase: waiting for destination\\nActive owner: local\\nDestination runtime: provisioning\\nLatest failure: Timed out waiting for the managed SuperTurtle VM to become ready after 600000ms\\.\\nLast log: ${process.cwd().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/\\.superturtle/logs/teleport/2026-03-12T10-00-00\\.000Z-dry-run\\.log$`
           )
         ),
       },

@@ -153,7 +153,11 @@ function createTeleportLogFile(dryRun: boolean): string {
   appendFileSync(
     logPath,
     `[teleport] launched_at=${new Date().toISOString()}\n` +
-      `[teleport] mode=${dryRun ? "dry-run" : "live"}\n`,
+      `[teleport] mode=${dryRun ? "dry-run" : "live"}\n` +
+      `[teleport-status] phase=launching\n` +
+      `[teleport-status] active_owner=local\n` +
+      `[teleport-status] destination_state=unknown\n` +
+      `[teleport-status] failure_reason=\n`,
     { mode: 0o600 }
   );
   return logPath;
@@ -231,6 +235,121 @@ function getLatestTeleportLogPath(): string | null {
 
   const latestEntry = entries.at(-1);
   return latestEntry ? join(TELEPORT_LOG_DIR, latestEntry) : null;
+}
+
+type TeleportStatusSummary = {
+  phase: string | null;
+  activeOwner: string | null;
+  destinationState: string | null;
+  latestFailureReason: string | null;
+};
+
+function readTeleportStatusSummary(logPath: string | null): TeleportStatusSummary {
+  if (!logPath) {
+    return {
+      phase: null,
+      activeOwner: null,
+      destinationState: null,
+      latestFailureReason: null,
+    };
+  }
+
+  let raw = "";
+  try {
+    raw = readFileSync(logPath, "utf-8");
+  } catch {
+    return {
+      phase: null,
+      activeOwner: null,
+      destinationState: null,
+      latestFailureReason: null,
+    };
+  }
+
+  let phase: string | null = null;
+  let activeOwner: string | null = null;
+  let destinationState: string | null = null;
+  let latestFailureReason: string | null = null;
+
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("[teleport-status] phase=")) {
+      phase = trimmed.slice("[teleport-status] phase=".length) || null;
+      continue;
+    }
+    if (trimmed.startsWith("[teleport-status] active_owner=")) {
+      activeOwner = trimmed.slice("[teleport-status] active_owner=".length) || null;
+      continue;
+    }
+    if (trimmed.startsWith("[teleport-status] destination_state=")) {
+      destinationState = trimmed.slice("[teleport-status] destination_state=".length) || null;
+      continue;
+    }
+    if (trimmed.startsWith("[teleport-status] failure_reason=")) {
+      latestFailureReason = trimmed.slice("[teleport-status] failure_reason=".length) || null;
+      continue;
+    }
+
+    const legacyFailureReason = extractTeleportFailureReason(trimmed);
+    if (legacyFailureReason) {
+      latestFailureReason = legacyFailureReason;
+    }
+  }
+
+  return {
+    phase,
+    activeOwner,
+    destinationState,
+    latestFailureReason,
+  };
+}
+
+function extractTeleportFailureReason(line: string): string | null {
+  if (/^\[teleport\] success$/i.test(line)) {
+    return null;
+  }
+  if (/^\[teleport(?:\]\[remote\]|\])\s+/i.test(line)) {
+    const message = line.replace(/^\[teleport(?:\]\[remote\]|\])\s+/i, "");
+    if (/(missing|expected|did not|unknown option|unexpected argument|do not pass|timed out|unavailable|failed|error)/i.test(message)) {
+      return message;
+    }
+  }
+  if (/^(error|failed):/i.test(line)) {
+    return line;
+  }
+  return null;
+}
+
+function formatTeleportStatusValue(value: string | null, fallback = "unknown"): string {
+  if (!value) return fallback;
+  return value.replaceAll("_", " ");
+}
+
+function formatTeleportStatusReply(
+  headline: string,
+  options: {
+    startedAt?: string | null;
+    logPath?: string | null;
+    logLabel?: "Log" | "Last log";
+    summary: TeleportStatusSummary;
+    fallbackOwner?: string | null;
+  }
+): string {
+  const lines = [headline];
+  if (options.startedAt) {
+    lines.push(`Started: ${options.startedAt}`);
+  }
+  lines.push(`Phase: ${formatTeleportStatusValue(options.summary.phase)}`);
+  lines.push(
+    `Active owner: ${formatTeleportStatusValue(options.summary.activeOwner || options.fallbackOwner || null)}`
+  );
+  lines.push(`Destination runtime: ${formatTeleportStatusValue(options.summary.destinationState)}`);
+  lines.push(`Latest failure: ${options.summary.latestFailureReason || "none"}`);
+  if (options.logPath) {
+    lines.push(`${options.logLabel || "Log"}: ${options.logPath}`);
+  }
+  return lines.join("\n");
 }
 
 function countDeferredQueueItems(): number {
@@ -432,8 +551,14 @@ export async function handleTeleportCommand(ctx: Context): Promise<void> {
       const modeLabel = activeTeleport.mode === "dry-run" ? "dry-run" : "live";
       const launchedAt = activeTeleport.launchedAt || "unknown";
       const logPath = activeTeleport.logPath || "unknown";
+      const summary = readTeleportStatusSummary(activeTeleport.logPath);
       await ctx.reply(
-        `🛰️ Managed teleport ${modeLabel} is running.\nStarted: ${launchedAt}\nLog: ${logPath}`
+        formatTeleportStatusReply(`🛰️ Managed teleport ${modeLabel} is running.`, {
+          startedAt: launchedAt,
+          logPath,
+          summary,
+          fallbackOwner: "local",
+        })
       );
       return;
     }
@@ -441,7 +566,11 @@ export async function handleTeleportCommand(ctx: Context): Promise<void> {
     const latestLogPath = getLatestTeleportLogPath();
     await ctx.reply(
       latestLogPath
-        ? `🛰️ No managed teleport is running.\nLast log: ${latestLogPath}`
+        ? formatTeleportStatusReply("🛰️ No managed teleport is running.", {
+          logPath: latestLogPath,
+          logLabel: "Last log",
+          summary: readTeleportStatusSummary(latestLogPath),
+        })
         : "🛰️ No managed teleport is running.\nNo teleport logs found yet."
     );
     return;
