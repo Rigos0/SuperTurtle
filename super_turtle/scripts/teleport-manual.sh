@@ -673,6 +673,48 @@ EOF
 
 remote_preflight() {
   local active_driver="$1"
+  local transport="$2"
+  if [[ "$transport" == "e2b" ]]; then
+    remote_bash "$REMOTE_ROOT" "$active_driver" <<'EOF'
+set -euo pipefail
+remote_root="$1"
+active_driver="$2"
+
+require_cmd() {
+  local cmd="$1"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "[teleport][remote] Missing required command: ${cmd}" >&2
+    exit 1
+  fi
+}
+
+os_name="$(uname -s)"
+if [[ "$os_name" != "Linux" ]]; then
+  echo "[teleport][remote] Expected Linux but found ${os_name}" >&2
+  exit 1
+fi
+
+require_cmd git
+require_cmd bun
+require_cmd python3
+require_cmd tmux
+require_cmd tar
+
+case "$active_driver" in
+  codex)
+    require_cmd codex
+    ;;
+  claude|*)
+    require_cmd claude
+    ;;
+esac
+
+mkdir -p "$remote_root"
+echo "[teleport][remote] preflight ok (${active_driver})"
+EOF
+    return
+  fi
+
   remote_bash "$REMOTE_ROOT" "$active_driver" <<'EOF'
 set -euo pipefail
 remote_root="$1"
@@ -894,7 +936,7 @@ ACTIVE_DRIVER="${ACTIVE_DRIVER:-claude}"
 
 echo "[teleport] active driver: ${ACTIVE_DRIVER}"
 set_phase "remote_preflight"
-remote_preflight "$ACTIVE_DRIVER"
+remote_preflight "$ACTIVE_DRIVER" "$TELEPORT_TRANSPORT"
 
 echo "[teleport] initial sync"
 set_phase "initial_sync"

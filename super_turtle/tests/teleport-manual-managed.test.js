@@ -741,8 +741,14 @@ function runScript(args) {
     return;
   }
 
+  if (script.includes('preflight ok')) {
+    if (script.includes("require_cmd rsync")) {
+      throw new Error("E2B preflight unexpectedly required rsync");
+    }
+    return;
+  }
+
   if (
-    script.includes('preflight ok') ||
     script.includes('bun install') ||
     script.includes('teleport_handoff.py" import') ||
     script.includes('bun super_turtle/bin/superturtle.js start') ||

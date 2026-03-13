@@ -1,5 +1,5 @@
 # Current task
-Continue replacing managed VM assumptions with one persistent E2B sandbox per user, now that `teleport-manual.sh` can branch into an E2B upload/run helper path and the remaining work is validating the bundled helper against the real E2B SDK/runtime plus completing the rest of the production cutover semantics.
+Continue replacing managed VM assumptions with one persistent E2B sandbox per user, with the next focus still on the remaining real-sandbox validation and production cutover semantics now that sandbox preflight no longer carries the SSH-only `rsync` requirement.
 
 # End goal with specs
 A fully working /teleport feature where:
@@ -48,6 +48,7 @@ A fully working /teleport feature where:
   - Progress: `super_turtle/scripts/teleport-manual.sh` now has a real E2B transport branch instead of failing immediately: it uploads repo archives through a helper, runs remote preflight/import/start/status scripts through the same transport abstraction, keeps the SSH path unchanged, and is covered by `super_turtle/tests/teleport-manual-managed.test.js` with a fake E2B helper backend.
   - Progress: `super_turtle/bin/teleport-e2b.js` now defines the local helper contract for sandbox file upload and remote script execution, so the remaining work is wiring and validating that helper against the real `e2b` SDK in live managed sandboxes rather than inventing the transport boundary later.
   - Progress: `super_turtle/bin/teleport-e2b.js` now supports either named or default `Sandbox` exports plus an explicit `SUPERTURTLE_TELEPORT_E2B_SDK_PATH` override, and `super_turtle/tests/teleport-e2b.test.js` exercises `upload-file` / `run-script` directly through a stub E2B SDK so helper behavior is validated at the SDK boundary instead of only through the fake shell helper wrapper.
+  - Progress: `teleport-manual.sh` now emits an E2B-specific remote preflight script that drops the SSH-only `rsync` requirement while keeping the SSH transport checks intact, and the managed teleport integration test now fails if sandbox preflight regresses back to requiring `rsync`.
 - Define managed-runtime lifecycle and idempotent sandbox create/connect-resume/pause/reprovision/delete behavior
 - Build the production superturtle-teleport E2B template with pinned toolchain, startup scripts, health checks, log paths, and provider config directories
 - Store hosted runtime identity as sandbox_id + template_id in the control plane instead of SSH coordinates
