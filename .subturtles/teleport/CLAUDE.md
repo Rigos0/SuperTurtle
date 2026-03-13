@@ -1,5 +1,5 @@
 # Current task
-Continue replacing managed VM assumptions with one persistent E2B sandbox per user, with the next focus on durable sandbox lifecycle now that managed teleport bootstraps sandbox-local runtime config and can post initial machine register/heartbeat back to the control plane when a bootstrap token is available.
+Continue replacing managed VM assumptions with one persistent E2B sandbox per user. IMPORTANT DIRECTION FROM HUMAN: We are doing E2B ONLY. Do NOT build SSH/rsync transport abstractions or "transport-aware" branching. Remove any if/else transport switching you already added. The teleport path is E2B — period. Build the E2B sandbox lifecycle, E2B file upload, E2B command/PTY execution directly. No SSH fallback, no transport abstraction layer. Keep it simple. Current focus: keep making the sandbox lifecycle durable now that teleport seeds persistent machine-heartbeat helpers inside the sandbox.
 
 # End goal with specs
 A fully working /teleport feature where:
@@ -53,6 +53,7 @@ A fully working /teleport feature where:
   - Progress: `super_turtle/bin/teleport-e2b.js` now has a `sync-archive` subcommand, `teleport-manual.sh` uses that helper boundary for E2B repo transfer, and both the stubbed SDK test plus the opt-in live E2B smoke test now validate archive upload/extract/cleanup semantics against sandbox file + command APIs instead of leaving repo sync split across bash and unverified remote shell glue.
   - Progress: `super_turtle/bin/teleport-e2b.js` now also has a non-destructive `extract-archive` subcommand, and `teleport-manual.sh --managed` uses it to seed local `~/.codex/auth.json` into `/home/user/.codex/auth.json` inside E2B sandboxes with permission fixup so managed cutover can carry driver auth state that lives outside the repo.
   - Progress: `/teleport --managed` now bootstraps sandbox-local runtime config after final E2B sync by creating `.superturtle/.env` when needed, rewriting sandbox path settings, writing machine register/heartbeat helper scripts into `.superturtle/managed-runtime`, and posting initial `/v1/machine/register` plus `/v1/machine/heartbeat` calls when the hosted teleport target includes a machine bootstrap token.
+  - Progress: `/teleport --managed` now also writes a durable in-sandbox heartbeat loop/start pair, persists the heartbeat interval plus tmux session name in `control-plane.env`, and autostarts the machine-heartbeat tmux session after the initial register/heartbeat unless the local operator explicitly disables it with `SUPERTURTLE_TELEPORT_E2B_HEARTBEAT_AUTOSTART=0`.
 - Define managed-runtime lifecycle and idempotent sandbox create/connect-resume/pause/reprovision/delete behavior
 - Build the production superturtle-teleport E2B template with pinned toolchain, startup scripts, health checks, log paths, and provider config directories
 - Store hosted runtime identity as sandbox_id + template_id in the control plane instead of SSH coordinates

@@ -979,6 +979,7 @@ async function testManagedTeleportUsesE2BHelperForSandboxCutover(tmpDir) {
       SUPERTURTLE_CLOUD_SESSION_PATH: sessionPath,
       SUPERTURTLE_TELEPORT_E2B_HELPER_PATH: helperPath,
       SUPERTURTLE_TELEPORT_CTL_PATH: ctlPath,
+      SUPERTURTLE_TELEPORT_E2B_HEARTBEAT_AUTOSTART: "0",
     });
 
     assert.strictEqual(result.code, 0, `expected success, got stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
@@ -1022,6 +1023,22 @@ async function testManagedTeleportUsesE2BHelperForSandboxCutover(tmpDir) {
     assert.ok(
       fs.existsSync(resolve(sandboxRoot, "home", "user", "agentic", ".superturtle", "managed-runtime", "superturtle-machine-register.sh")),
       "expected machine register helper to be written"
+    );
+    assert.ok(
+      fs.existsSync(resolve(sandboxRoot, "home", "user", "agentic", ".superturtle", "managed-runtime", "superturtle-machine-heartbeat-loop.sh")),
+      "expected machine heartbeat loop helper to be written"
+    );
+    assert.ok(
+      fs.existsSync(resolve(sandboxRoot, "home", "user", "agentic", ".superturtle", "managed-runtime", "superturtle-machine-heartbeat-start.sh")),
+      "expected machine heartbeat start helper to be written"
+    );
+    assert.strictEqual(
+      readEnvValue(resolve(sandboxProjectRoot, ".superturtle", "managed-runtime", "control-plane.env"), "MACHINE_HEARTBEAT_INTERVAL_SECONDS"),
+      "30"
+    );
+    assert.strictEqual(
+      readEnvValue(resolve(sandboxProjectRoot, ".superturtle", "managed-runtime", "control-plane.env"), "MACHINE_HEARTBEAT_SESSION"),
+      "superturtle-machine-heartbeat-sandbox_123"
     );
   } finally {
     server.close();

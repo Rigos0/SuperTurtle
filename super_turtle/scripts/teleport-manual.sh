@@ -33,6 +33,8 @@ E2B_HELPER_PATH="${SUPERTURTLE_TELEPORT_E2B_HELPER_PATH:-${REPO_ROOT}/super_turt
 ENV_FILE="${REPO_ROOT}/.superturtle/.env"
 E2B_REMOTE_HOME="${SUPERTURTLE_TELEPORT_E2B_HOME:-/home/user}"
 CODEX_AUTH_SOURCE_PATH="${SUPERTURTLE_TELEPORT_CODEX_AUTH_PATH:-$HOME/.codex/auth.json}"
+MACHINE_HEARTBEAT_INTERVAL_SECONDS="${SUPERTURTLE_TELEPORT_MACHINE_HEARTBEAT_INTERVAL_SECONDS:-30}"
+MACHINE_HEARTBEAT_AUTOSTART="${SUPERTURTLE_TELEPORT_E2B_HEARTBEAT_AUTOSTART:-1}"
 
 SSH_TARGET=""
 REMOTE_ROOT=""
@@ -46,6 +48,16 @@ MACHINE_AUTH_TOKEN=""
 DRY_RUN=0
 USE_MANAGED_TARGET=0
 CURRENT_PHASE="preflight"
+
+if [[ ! "$MACHINE_HEARTBEAT_INTERVAL_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "[teleport] SUPERTURTLE_TELEPORT_MACHINE_HEARTBEAT_INTERVAL_SECONDS must be a positive integer" >&2
+  exit 1
+fi
+
+if [[ "$MACHINE_HEARTBEAT_AUTOSTART" != "0" && "$MACHINE_HEARTBEAT_AUTOSTART" != "1" ]]; then
+  echo "[teleport] SUPERTURTLE_TELEPORT_E2B_HEARTBEAT_AUTOSTART must be 0 or 1" >&2
+  exit 1
+fi
 
 emit_status() {
   local key="$1"
@@ -744,7 +756,7 @@ bootstrap_e2b_runtime() {
 
   echo "[teleport] bootstrapping managed sandbox runtime"
   set_phase "bootstrapping_remote_runtime"
-  remote_bash "$REMOTE_ROOT" "$E2B_REMOTE_HOME" "$CONTROL_PLANE_ORIGIN" "$MACHINE_AUTH_TOKEN" "$E2B_SANDBOX_ID" "$E2B_TEMPLATE_ID" <<'EOF'
+  remote_bash "$REMOTE_ROOT" "$E2B_REMOTE_HOME" "$CONTROL_PLANE_ORIGIN" "$MACHINE_AUTH_TOKEN" "$E2B_SANDBOX_ID" "$E2B_TEMPLATE_ID" "$MACHINE_HEARTBEAT_INTERVAL_SECONDS" "$MACHINE_HEARTBEAT_AUTOSTART" <<'EOF'
 set -euo pipefail
 remote_root="$1"
 remote_home="$2"
@@ -752,6 +764,8 @@ control_plane_origin="$3"
 machine_auth_token="$4"
 sandbox_id="$5"
 template_id="$6"
+heartbeat_interval_seconds="$7"
+heartbeat_autostart="$8"
 managed_runtime_dir="$remote_root/.superturtle/managed-runtime"
 env_file="$remote_root/.superturtle/.env"
 
@@ -805,9 +819,18 @@ PY
 mkdir -p "$remote_home/.claude" "$remote_home/.codex"
 chmod 700 "$remote_home/.claude" "$remote_home/.codex"
 
+sanitize_name() {
+  printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9_-' '-' | sed -e 's/^-*//' -e 's/-*$//'
+}
+
+heartbeat_session_suffix="$(sanitize_name "${sandbox_id:-$(basename "$remote_root")}")"
+heartbeat_session_suffix="${heartbeat_session_suffix:-default}"
+heartbeat_session="superturtle-machine-heartbeat-${heartbeat_session_suffix}"
 control_plane_env="$managed_runtime_dir/control-plane.env"
 register_script="$managed_runtime_dir/superturtle-machine-register.sh"
 heartbeat_script="$managed_runtime_dir/superturtle-machine-heartbeat.sh"
+heartbeat_loop_script="$managed_runtime_dir/superturtle-machine-heartbeat-loop.sh"
+heartbeat_start_script="$managed_runtime_dir/superturtle-machine-heartbeat-start.sh"
 
 {
   printf 'CONTROL_PLANE_ORIGIN=%q\n' "$control_plane_origin"
@@ -816,6 +839,8 @@ heartbeat_script="$managed_runtime_dir/superturtle-machine-heartbeat.sh"
   printf 'MACHINE_AUTH_TOKEN=%q\n' "$machine_auth_token"
   printf 'SANDBOX_ID=%q\n' "$sandbox_id"
   printf 'TEMPLATE_ID=%q\n' "$template_id"
+  printf 'MACHINE_HEARTBEAT_INTERVAL_SECONDS=%q\n' "$heartbeat_interval_seconds"
+  printf 'MACHINE_HEARTBEAT_SESSION=%q\n' "$heartbeat_session"
 } > "$control_plane_env"
 chmod 600 "$control_plane_env"
 
@@ -888,9 +913,55 @@ PY
 EOF_HEARTBEAT
 chmod 700 "$heartbeat_script"
 
+cat > "$heartbeat_loop_script" <<'EOF_HEARTBEAT_LOOP'
+#!/usr/bin/env bash
+set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+set -a
+source "$script_dir/control-plane.env"
+set +a
+
+interval="${MACHINE_HEARTBEAT_INTERVAL_SECONDS:-30}"
+if [[ ! "$interval" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Invalid MACHINE_HEARTBEAT_INTERVAL_SECONDS: $interval" >&2
+  exit 1
+fi
+
+log_path="$script_dir/superturtle-machine-heartbeat.log"
+while true; do
+  if ! "$script_dir/superturtle-machine-heartbeat.sh" >>"$log_path" 2>&1; then
+    printf '[%s] machine heartbeat failed\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$log_path"
+  fi
+  sleep "$interval"
+done
+EOF_HEARTBEAT_LOOP
+chmod 700 "$heartbeat_loop_script"
+
+cat > "$heartbeat_start_script" <<'EOF_HEARTBEAT_START'
+#!/usr/bin/env bash
+set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+set -a
+source "$script_dir/control-plane.env"
+set +a
+
+session_name="${MACHINE_HEARTBEAT_SESSION:-superturtle-machine-heartbeat-default}"
+if tmux has-session -t "$session_name" 2>/dev/null; then
+  exit 0
+fi
+
+tmux new-session -d -s "$session_name" "$script_dir/superturtle-machine-heartbeat-loop.sh"
+EOF_HEARTBEAT_START
+chmod 700 "$heartbeat_start_script"
+
 if [[ -n "$control_plane_origin" && -n "$machine_auth_token" ]]; then
   "$register_script" >/dev/null
   "$heartbeat_script" >/dev/null
+  if [[ "$heartbeat_autostart" == "1" ]]; then
+    "$heartbeat_start_script" >/dev/null
+  else
+    echo "[teleport][remote] machine heartbeat autostart disabled; leaving helper scripts in place"
+  fi
 else
   echo "[teleport][remote] control-plane bootstrap token unavailable; skipping initial machine register/heartbeat"
 fi
