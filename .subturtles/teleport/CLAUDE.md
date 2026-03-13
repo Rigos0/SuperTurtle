@@ -1,45 +1,38 @@
 # Current task
-Finish a testable end-to-end local -> cloud managed teleport path on E2B using the existing working pieces, and do not spend time broadening transport abstractions unless they directly block the E2B test path. Current focus: keep clearing live-cutover blockers after local Claude/Codex auth seeding, with destination-auth preflight now failing before local shutdown when the active driver cannot run on the target, rollback in place for post-cutover verification failures, the post-final-sync dependency reinstall restored for E2B cutover, machine register/heartbeat bootstrap failures surfaced as warnings instead of aborting the teleport, live E2B smoke coverage validating the real `extract-archive` auth-bootstrap path used during managed cutover, and tmux-session shutdown now releasing hosted runtime leases so ownership can transfer cleanly during cutover.
+Ship a manually testable local -> cloud managed teleport prototype on E2B. Optimize for one happy path the human can run soon, not for production completeness. Do not spend time on template publishing, billing, admin tooling, generalized transport cleanup, or full cloud -> local return unless a real prototype test is blocked without it. The prototype path can now consume a checked-in managed target JSON file for a real sandbox, so the next work should stay focused on the remaining health/ownership checks and the human test recipe.
 
 # End goal with specs
-- `/teleport` from Telegram can move the live bot from local -> E2B managed sandbox end to end
-- The active path for this worker is the hosted managed E2B sandbox flow, not generic transport work
+- `/teleport` from Telegram can move the live bot from local -> an E2B managed sandbox in one happy-path prototype flow
+- The prototype may assume one fixed template ID or an already-created or resumable managed sandbox if that keeps the first real test simple
 - The same Telegram bot identity is preserved through the semantic handoff bundle model
-- The destination runtime is verified healthy before ownership transfer completes
 - Existing local Claude/Codex auth is reused to seed the managed sandbox when available
-- Hosted control-plane endpoints used by the test flow return the data the runtime actually needs
-- The repo ends with a concrete operator test recipe and explicit known gaps
-- Cloud -> local return remains in scope, but local -> cloud testability is the immediate priority
+- Use the minimum destination health verification needed before ownership transfer
+- If rollback is already cheap, keep it; otherwise prefer a visible failure over more framework work
+- The repo ends with a short operator test recipe, exact prerequisites, and explicit blockers
+- Production hardening is out of scope for this pass unless it directly blocks the first live prototype
 
 # Roadmap (Completed)
 - Hosted browser login and CLI account linking are working against the live control plane
 - Linked local startup ownership enforcement exists with lease claim, heartbeat, release, and conflict refusal
 - `/teleport` preflight confirm/cancel, idle-only rejection, and richer status reporting exist
-- The current implementation already has E2B helper commands, archive sync, auth bootstrap, and sandbox runtime bootstrap pieces
-- Local tests already cover the E2B helper path and managed teleport bootstrap path
+- The current implementation already has E2B helper commands, archive sync, auth bootstrap, sandbox runtime bootstrap, and basic rollback pieces
+- Local tests already cover the E2B helper path, managed teleport bootstrap path, and tmux-style lease release path
 
 # Roadmap (Upcoming)
-- Make the current local -> cloud E2B teleport path runnable end to end against live infrastructure
-- Tighten destination health verification, failure handling, and operator feedback around cutover
-- Validate that hosted cloud-status, teleport-target, machine-register, and machine-heartbeat compose cleanly in the real flow
-- Leave a concise operator test recipe plus known limitations after the path works
-- Only after local -> cloud is testable, close the largest blocker on cloud -> local return
+- Make one happy-path local -> cloud E2B prototype runnable end to end against live infrastructure
+- Keep only the minimum health checks and failure handling needed for a credible first test
+- Validate that hosted cloud-status, teleport-target, machine-register, and machine-heartbeat are good enough for the prototype
+- Leave a short operator test recipe plus exact prerequisites and blockers
+- Defer broader productionization until after the first live prototype succeeds
 
 # Backlog
 - [x] Inventory the existing managed teleport, cloud control-plane, and E2B helper pieces already in the repo
 - [x] Add `/teleport` preflight confirm/cancel, idle-only checks, and better status reporting
-- [x] Build the E2B helper path for archive sync, script execution, and auth/bootstrap support
-- [ ] Finish the live local -> cloud E2B teleport path end to end, fix whatever blocks a real test, and leave it runnable by the human <- current
-  - Progress: `teleport-manual.sh` no longer drops `~/.codex` from `ALLOWED_PATHS` during the remote start rewrite, so an E2B sandbox that was seeded with local Codex auth stays able to start and verify the teleported runtime instead of losing access to the codex config dir at the last step.
-  - Progress: `teleport-manual.sh --managed` now discovers reusable local Claude auth from env/keychain/credentials files, stages it into the E2B sandbox after final sync, merges it into the sandbox `.superturtle/.env`, and removes the temporary bootstrap file so first live cutovers do not depend solely on preconfigured hosted Claude auth.
-  - Progress: managed teleport integration coverage now proves both local Codex auth and local Claude auth are seeded into the sandbox during the E2B path.
-  - Progress: the E2B path now reruns `bun install` after the final archive sync, so the last sync no longer wipes the remote dependencies that the managed sandbox needs immediately before import/start/verify.
-  - Progress: if local -> cloud cutover fails after the local bot has been stopped but before the remote runtime is verified healthy, `teleport-manual.sh` now stops the partially started remote bot, restarts the local tmux runtime, and keeps the failure surfaced in the teleport log instead of leaving the bot down.
-  - Progress: initial `/v1/machine/register` and `/v1/machine/heartbeat` bootstrap failures are now treated as non-fatal warnings during E2B cutover, so a transient hosted control-plane issue no longer aborts teleport after local shutdown; managed teleport coverage now exercises that degraded-success path.
-  - Progress: the live E2B helper smoke now exercises `extract-archive` against a real sandbox for both project-root and home-directory destinations, which validates the same archive extraction path used to seed Claude/Codex auth into managed cutovers.
-  - Progress: the runtime ownership agent now releases hosted leases on `SIGHUP`, and regression coverage proves the local tmux-session shutdown path used by teleport does not strand the old owner lease during local -> cloud cutover.
-  - Progress: the managed E2B path now verifies destination auth for the active driver immediately after sync and aborts before local shutdown if the target cannot run that driver; regression coverage proves missing Codex auth fails before dependency install or remote start.
-- [ ] Verify destination health and ownership-transfer behavior under success and failure, adding rollback or failure surfacing only where needed to make testing reliable
-- [ ] Validate the hosted control-plane contract used by the test flow (`cloud status`, `instance resume`, `teleport target`, `machine register`, `machine heartbeat`) and fix mismatches
-- [ ] Write a concise operator test recipe plus known limitations for the current E2E teleport path
-- [ ] If local -> cloud is working, implement the smallest viable cloud -> local return path needed for another real test pass
+- [x] Build the E2B helper path for archive sync, script execution, auth seeding, and sandbox bootstrap support
+- [ ] Make one happy-path local -> cloud prototype runnable end to end with an existing or resumable E2B sandbox and fixed template assumptions where needed <- current
+  - Progress: `teleport-manual.sh --managed` now accepts `SUPERTURTLE_TELEPORT_MANAGED_TARGET_PATH`, so a local prototype run can bypass hosted `/v1/cli/teleport/target` lookup and point directly at a real E2B sandbox description while keeping the same managed teleport flow.
+  - Progress: regression coverage now proves the override path works without any cloud session file, and the live E2B helper smoke still passes with `SUPERTURTLE_RUN_LIVE_E2B_TESTS=1`.
+- [ ] Keep only the minimum health and rollback behavior required to avoid a broken first prototype run
+- [ ] Write the shortest useful human test recipe for the prototype and list exact prerequisites
+- [ ] After one real prototype attempt, fix only the concrete blocker surfaced by that run
+- [ ] Defer cloud -> local return and broader productionization unless the first prototype succeeds

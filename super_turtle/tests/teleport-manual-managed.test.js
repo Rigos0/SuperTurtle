@@ -264,6 +264,10 @@ function pointSessionAtBaseUrl(sessionPath, baseUrl) {
   fs.writeFileSync(sessionPath, `${JSON.stringify(session, null, 2)}\n`);
 }
 
+function writeManagedTargetOverride(path, payload) {
+  fs.writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`);
+}
+
 async function testManagedTeleportWaitsForResume(tmpDir) {
   const { fakeBinDir, sshLogPath, rsyncLogPath, sessionPath } = createBaseEnvironment(tmpDir);
 
@@ -790,6 +794,49 @@ async function testManagedTeleportTimesOutWithSandboxWordingForE2BRuntime(tmpDir
   } finally {
     server.close();
   }
+}
+
+async function testManagedTeleportUsesManagedTargetOverrideForE2BSandbox(tmpDir) {
+  const { fakeBinDir, sshLogPath, rsyncLogPath, ctlPath, e2bHelperLogPath } = createBaseEnvironment(tmpDir);
+  const helperPath = resolve(tmpDir, "fake-e2b-helper");
+  const sandboxRoot = resolve(tmpDir, "sandbox-root");
+  const targetOverridePath = resolve(tmpDir, "managed-target.json");
+  createFakeE2BHelper(helperPath, e2bHelperLogPath, sandboxRoot);
+  writeManagedTargetOverride(targetOverridePath, {
+    transport: "e2b",
+    sandbox_id: "sandbox_override",
+    template_id: "template_teleport_v1",
+    project_root: "/home/user/agentic",
+    audit_log: [],
+  });
+
+  const result = await runTeleport(["--managed"], {
+    ...process.env,
+    PATH: `${fakeBinDir}:${process.env.PATH}`,
+    SUPERTURTLE_CLOUD_SESSION_PATH: resolve(tmpDir, "missing-cloud-session.json"),
+    SUPERTURTLE_TELEPORT_MANAGED_TARGET_PATH: targetOverridePath,
+    SUPERTURTLE_TELEPORT_E2B_HELPER_PATH: helperPath,
+    SUPERTURTLE_TELEPORT_CTL_PATH: ctlPath,
+  });
+
+  assert.strictEqual(result.code, 0, `expected success, got stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  assert.match(result.stdout, /\[teleport\] using managed target override from /);
+  assert.match(result.stdout, /\[teleport\] managed sandbox: sandbox_override/);
+  assert.match(result.stdout, /\[teleport\] template id: template_teleport_v1/);
+  assert.match(result.stdout, /\[teleport\] success/);
+  assert.ok(!fs.existsSync(sshLogPath), "expected SSH not to run for an override-backed E2B target");
+  assert.ok(!fs.existsSync(rsyncLogPath), "expected rsync not to run for an override-backed E2B target");
+
+  const helperLog = readHelperLog(e2bHelperLogPath);
+  assert.ok(helperLog.some((entry) => entry.subcommand === "sync-archive"), "expected archive sync");
+  assert.ok(
+    helperLog.some(
+      (entry) =>
+        entry.subcommand === "run-script" &&
+        /managed_runtime_dir="\$remote_root\/\.superturtle\/managed-runtime"/.test(entry.script)
+    ),
+    "expected sandbox runtime bootstrap"
+  );
 }
 
 function createFakeE2BHelper(helperPath, logPath, sandboxRoot, options = {}) {
@@ -1646,6 +1693,7 @@ async function main() {
     await testManagedTeleportRetriesTransientStatusFailure(resolve(tmpDir, "retry-status"));
     await testManagedTeleportSurfacesProvisioningFailure(resolve(tmpDir, "failure"));
     await testManagedTeleportTimesOutWithSandboxWordingForE2BRuntime(resolve(tmpDir, "e2b-timeout"));
+    await testManagedTeleportUsesManagedTargetOverrideForE2BSandbox(resolve(tmpDir, "e2b-target-override"));
     await testManagedTeleportUsesE2BHelperForSandboxCutover(resolve(tmpDir, "e2b-target"));
     await testManagedTeleportContinuesWhenMachineBootstrapFails(resolve(tmpDir, "e2b-control-plane-warning"));
     await testManagedTeleportBootstrapsLocalClaudeAuthIntoSandbox(resolve(tmpDir, "e2b-claude-auth"));

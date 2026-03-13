@@ -22,6 +22,10 @@ Options:
   --identity <PATH>  SSH identity file
   --dry-run          Run preflight, export, and rsync dry-run only
   -h, --help         Show this help
+
+Environment:
+  SUPERTURTLE_TELEPORT_MANAGED_TARGET_PATH
+                    Read the managed target JSON from a local file instead of the hosted API
 EOF
 }
 
@@ -36,6 +40,7 @@ CLAUDE_CREDENTIALS_SOURCE_PATH="${SUPERTURTLE_TELEPORT_CLAUDE_CREDENTIALS_PATH:-
 CODEX_AUTH_SOURCE_PATH="${SUPERTURTLE_TELEPORT_CODEX_AUTH_PATH:-$HOME/.codex/auth.json}"
 MACHINE_HEARTBEAT_INTERVAL_SECONDS="${SUPERTURTLE_TELEPORT_MACHINE_HEARTBEAT_INTERVAL_SECONDS:-30}"
 MACHINE_HEARTBEAT_AUTOSTART="${SUPERTURTLE_TELEPORT_E2B_HEARTBEAT_AUTOSTART:-1}"
+MANAGED_TARGET_OVERRIDE_PATH="${SUPERTURTLE_TELEPORT_MANAGED_TARGET_PATH:-}"
 
 SSH_TARGET=""
 REMOTE_ROOT=""
@@ -193,7 +198,53 @@ e2b_helper() {
 
 resolve_managed_target() {
   local output
-  if ! output="$(
+  if [[ -n "$MANAGED_TARGET_OVERRIDE_PATH" ]]; then
+    if [[ ! -f "$MANAGED_TARGET_OVERRIDE_PATH" ]]; then
+      echo "[teleport] Missing managed target override file: ${MANAGED_TARGET_OVERRIDE_PATH}" >&2
+      exit 1
+    fi
+    echo "[teleport] using managed target override from ${MANAGED_TARGET_OVERRIDE_PATH}"
+    if ! output="$(python3 - "$MANAGED_TARGET_OVERRIDE_PATH" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+
+try:
+    loaded = json.loads(path.read_text(encoding="utf-8"))
+except FileNotFoundError:
+    raise SystemExit(f"[teleport] Missing managed target override file: {path}")
+except json.JSONDecodeError as exc:
+    raise SystemExit(f"[teleport] Invalid managed target override JSON in {path}: {exc}")
+
+if not isinstance(loaded, dict):
+    raise SystemExit(f"[teleport] Managed target override in {path} must be a JSON object")
+
+if isinstance(loaded.get("data"), dict):
+    payload = dict(loaded["data"])
+    session = loaded.get("session")
+else:
+    payload = dict(loaded)
+    session = loaded.get("session")
+
+if not isinstance(payload, dict):
+    raise SystemExit(f"[teleport] Managed target override in {path} must contain a JSON object payload")
+
+if (
+    not payload.get("control_plane_origin")
+    and isinstance(session, dict)
+    and isinstance(session.get("control_plane"), str)
+    and session["control_plane"].strip()
+):
+    payload["control_plane_origin"] = session["control_plane"].strip()
+
+print(json.dumps(payload))
+PY
+    )"; then
+      exit 1
+    fi
+  elif ! output="$(
     cd "$REPO_ROOT"
     node - <<'NODE'
 const {
