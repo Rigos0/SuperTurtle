@@ -26,9 +26,9 @@ function seedTeleportContext() {
   );
 }
 
-function runScript(env) {
+function runTeleport(args, env) {
   return new Promise((resolveRun, rejectRun) => {
-    const child = spawn("bash", [SCRIPT_PATH, "--managed", "--dry-run"], {
+    const child = spawn("bash", [SCRIPT_PATH, ...args], {
       cwd: REPO_ROOT,
       env,
       stdio: ["ignore", "pipe", "pipe"],
@@ -49,6 +49,10 @@ function runScript(env) {
   });
 }
 
+function runDryRun(env) {
+  return runTeleport(["--managed", "--dry-run"], env);
+}
+
 function writeExecutable(path, body) {
   fs.writeFileSync(path, body, { mode: 0o755 });
 }
@@ -62,6 +66,8 @@ function createBaseEnvironment(tmpDir) {
   const sshLogPath = resolve(realTmpDir, "ssh.log");
   const rsyncLogPath = resolve(realTmpDir, "rsync.log");
   const sessionPath = resolve(realTmpDir, "cloud-session.json");
+  const ctlPath = resolve(realTmpDir, "fake-ctl");
+  const e2bHelperLogPath = resolve(realTmpDir, "e2b-helper.log.jsonl");
 
   writeExecutable(
     resolve(fakeBinDir, "ssh"),
@@ -85,6 +91,37 @@ set -euo pipefail
 exit 0
 `
   );
+  writeExecutable(
+    resolve(fakeBinDir, "tmux"),
+    `#!/usr/bin/env bash
+set -euo pipefail
+exit 1
+`
+  );
+  writeExecutable(
+    resolve(fakeBinDir, "tar"),
+    `#!/usr/bin/env bash
+set -euo pipefail
+if [[ "\${1:-}" == "-czf" ]]; then
+  archive_path="\${2:?missing archive path}"
+  tmp_dir="$(mktemp -d)"
+  trap 'rm -rf "$tmp_dir"' EXIT
+  /usr/bin/tar -czf "$archive_path" -C "$tmp_dir" .
+  exit 0
+fi
+exec /usr/bin/tar "$@"
+`
+  );
+  writeExecutable(
+    ctlPath,
+    `#!/usr/bin/env bash
+set -euo pipefail
+if [[ "\${1:-}" == "list" ]]; then
+  exit 0
+fi
+exit 0
+`
+  );
 
   fs.writeFileSync(
     sessionPath,
@@ -103,7 +140,7 @@ exit 0
     )}\n`
   );
 
-  return { fakeBinDir, sshLogPath, rsyncLogPath, sessionPath };
+  return { fakeBinDir, sshLogPath, rsyncLogPath, sessionPath, ctlPath, e2bHelperLogPath };
 }
 
 function pointSessionAtBaseUrl(sessionPath, baseUrl) {
@@ -233,7 +270,7 @@ async function testManagedTeleportWaitsForResume(tmpDir) {
   pointSessionAtBaseUrl(sessionPath, baseUrl);
 
   try {
-    const result = await runScript({
+    const result = await runDryRun({
       ...process.env,
       PATH: `${fakeBinDir}:${process.env.PATH}`,
       SUPERTURTLE_CLOUD_SESSION_PATH: sessionPath,
@@ -385,7 +422,7 @@ async function testManagedTeleportRetriesTransientStatusFailure(tmpDir) {
   pointSessionAtBaseUrl(sessionPath, `http://127.0.0.1:${address.port}`);
 
   try {
-    const result = await runScript({
+    const result = await runDryRun({
       ...process.env,
       PATH: `${fakeBinDir}:${process.env.PATH}`,
       SUPERTURTLE_CLOUD_SESSION_PATH: sessionPath,
@@ -506,7 +543,7 @@ async function testManagedTeleportSurfacesProvisioningFailure(tmpDir) {
   pointSessionAtBaseUrl(sessionPath, `http://127.0.0.1:${address.port}`);
 
   try {
-    const result = await runScript({
+    const result = await runDryRun({
       ...process.env,
       PATH: `${fakeBinDir}:${process.env.PATH}`,
       SUPERTURTLE_CLOUD_SESSION_PATH: sessionPath,
@@ -618,7 +655,7 @@ async function testManagedTeleportTimesOutWithSandboxWordingForE2BRuntime(tmpDir
   pointSessionAtBaseUrl(sessionPath, `http://127.0.0.1:${address.port}`);
 
   try {
-    const result = await runScript({
+    const result = await runDryRun({
       ...process.env,
       PATH: `${fakeBinDir}:${process.env.PATH}`,
       SUPERTURTLE_CLOUD_SESSION_PATH: sessionPath,
@@ -640,8 +677,116 @@ async function testManagedTeleportTimesOutWithSandboxWordingForE2BRuntime(tmpDir
   }
 }
 
-async function testManagedTeleportRejectsE2BTargetUntilSandboxCutoverExists(tmpDir) {
-  const { fakeBinDir, sshLogPath, rsyncLogPath, sessionPath } = createBaseEnvironment(tmpDir);
+function createFakeE2BHelper(helperPath, logPath, sandboxRoot) {
+  writeExecutable(
+    helperPath,
+    `#!/usr/bin/env node
+const fs = require("fs");
+const { dirname, resolve } = require("path");
+const { spawnSync } = require("child_process");
+
+const logPath = ${JSON.stringify(logPath)};
+const sandboxRoot = ${JSON.stringify(sandboxRoot)};
+
+function log(entry) {
+  fs.appendFileSync(logPath, JSON.stringify(entry) + "\\n");
+}
+
+function readOption(args, name) {
+  const index = args.indexOf(name);
+  if (index === -1 || index + 1 >= args.length) {
+    throw new Error("Missing option " + name);
+  }
+  return args[index + 1];
+}
+
+function sandboxPath(targetPath) {
+  return resolve(sandboxRoot, "." + targetPath);
+}
+
+function runUpload(args) {
+  const sandboxId = readOption(args, "--sandbox-id");
+  const source = readOption(args, "--source");
+  const destination = readOption(args, "--destination");
+  const sandboxDestination = sandboxPath(destination);
+  fs.mkdirSync(dirname(sandboxDestination), { recursive: true });
+  fs.copyFileSync(source, sandboxDestination);
+  log({ subcommand: "upload-file", sandboxId, source, destination });
+}
+
+function runScript(args) {
+  const sandboxId = readOption(args, "--sandbox-id");
+  const cwdIndex = args.indexOf("--cwd");
+  const cwd = cwdIndex !== -1 ? args[cwdIndex + 1] : "/";
+  const separatorIndex = args.indexOf("--");
+  const command = separatorIndex === -1 ? [] : args.slice(separatorIndex + 1);
+  const script = fs.readFileSync(0, "utf-8");
+  const interpreterArgs = command.slice(1).map((value) => value.startsWith("/") ? sandboxPath(value) : value);
+  log({ subcommand: "run-script", sandboxId, cwd, command, script });
+
+  if (script.includes('tar -xzf "$archive_path" -C "$remote_root"')) {
+    const remoteRoot = interpreterArgs[2];
+    const archivePath = interpreterArgs[3];
+    fs.mkdirSync(remoteRoot, { recursive: true });
+    const result = spawnSync("tar", ["-xzf", archivePath, "-C", remoteRoot], { stdio: "pipe" });
+    if (result.status !== 0) {
+      process.stderr.write(result.stderr);
+      process.exit(result.status || 1);
+    }
+    return;
+  }
+
+  if (script.includes('status_output="$(bun super_turtle/bin/superturtle.js status)"')) {
+    process.stdout.write("Bot: running (sandbox-session)\\n");
+    return;
+  }
+
+  if (
+    script.includes('preflight ok') ||
+    script.includes('bun install') ||
+    script.includes('teleport_handoff.py" import') ||
+    script.includes('bun super_turtle/bin/superturtle.js start') ||
+    script.includes('teleport_handoff.py" notify')
+  ) {
+    return;
+  }
+
+  throw new Error("Unexpected run-script payload");
+}
+
+const [subcommand, ...args] = process.argv.slice(2);
+try {
+  if (subcommand === "upload-file") {
+    runUpload(args);
+  } else if (subcommand === "run-script") {
+    runScript(args);
+  } else {
+    throw new Error("Unknown subcommand " + subcommand);
+  }
+} catch (error) {
+  process.stderr.write(String(error instanceof Error ? error.message : error) + "\\n");
+  process.exit(1);
+}
+`
+  );
+}
+
+function readHelperLog(path) {
+  if (!fs.existsSync(path)) {
+    return [];
+  }
+  return fs.readFileSync(path, "utf-8")
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+}
+
+async function testManagedTeleportUsesE2BHelperForSandboxCutover(tmpDir) {
+  const { fakeBinDir, sshLogPath, rsyncLogPath, sessionPath, ctlPath, e2bHelperLogPath } = createBaseEnvironment(tmpDir);
+  const helperPath = resolve(tmpDir, "fake-e2b-helper");
+  const sandboxRoot = resolve(tmpDir, "sandbox-root");
+  createFakeE2BHelper(helperPath, e2bHelperLogPath, sandboxRoot);
 
   const server = http.createServer((req, res) => {
     const authorize = req.headers.authorization;
@@ -685,21 +830,29 @@ async function testManagedTeleportRejectsE2BTargetUntilSandboxCutoverExists(tmpD
   pointSessionAtBaseUrl(sessionPath, `http://127.0.0.1:${address.port}`);
 
   try {
-    const result = await runScript({
+    const result = await runTeleport(["--managed"], {
       ...process.env,
       PATH: `${fakeBinDir}:${process.env.PATH}`,
       SUPERTURTLE_CLOUD_SESSION_PATH: sessionPath,
+      SUPERTURTLE_TELEPORT_E2B_HELPER_PATH: helperPath,
+      SUPERTURTLE_TELEPORT_CTL_PATH: ctlPath,
     });
 
-    assert.strictEqual(result.code, 1, `expected failure, got stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
-    assert.match(
-      result.stderr,
-      /Managed teleport target uses E2B sandbox transport, but teleport-manual\.sh still only supports SSH cutover\./
-    );
-    assert.match(result.stderr, /\[teleport\] managed target transport: e2b/);
-    assert.match(result.stderr, /\[teleport\] sandbox_id: sandbox_123/);
+    assert.strictEqual(result.code, 0, `expected success, got stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+    assert.match(result.stdout, /\[teleport\] managed sandbox: sandbox_123/);
+    assert.match(result.stdout, /\[teleport\] template id: template_teleport_v1/);
+    assert.match(result.stdout, /\[teleport\] project root: \/home\/user\/agentic/);
+    assert.match(result.stdout, /\[teleport\] success/);
     assert.ok(!fs.existsSync(sshLogPath), "expected SSH not to run for an E2B target");
     assert.ok(!fs.existsSync(rsyncLogPath), "expected rsync not to run for an E2B target");
+
+    const helperLog = readHelperLog(e2bHelperLogPath);
+    assert.ok(helperLog.some((entry) => entry.subcommand === "upload-file"), "expected archive upload");
+    assert.ok(helperLog.some((entry) => entry.subcommand === "run-script" && /preflight ok/.test(entry.script)), "expected remote preflight");
+    assert.ok(helperLog.some((entry) => entry.subcommand === "run-script" && /bun install/.test(entry.script)), "expected remote dependency install");
+    assert.ok(helperLog.some((entry) => entry.subcommand === "run-script" && /teleport_handoff\.py" import/.test(entry.script)), "expected runtime import");
+    assert.ok(helperLog.some((entry) => entry.subcommand === "run-script" && /bun super_turtle\/bin\/superturtle\.js start/.test(entry.script)), "expected remote start");
+    assert.ok(helperLog.some((entry) => entry.subcommand === "run-script" && /status_output="\$\(bun super_turtle\/bin\/superturtle\.js status\)"/.test(entry.script)), "expected remote status verification");
   } finally {
     server.close();
   }
@@ -712,7 +865,7 @@ async function main() {
     await testManagedTeleportRetriesTransientStatusFailure(resolve(tmpDir, "retry-status"));
     await testManagedTeleportSurfacesProvisioningFailure(resolve(tmpDir, "failure"));
     await testManagedTeleportTimesOutWithSandboxWordingForE2BRuntime(resolve(tmpDir, "e2b-timeout"));
-    await testManagedTeleportRejectsE2BTargetUntilSandboxCutoverExists(resolve(tmpDir, "e2b-target"));
+    await testManagedTeleportUsesE2BHelperForSandboxCutover(resolve(tmpDir, "e2b-target"));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

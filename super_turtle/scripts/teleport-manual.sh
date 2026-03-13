@@ -28,13 +28,17 @@ EOF
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 HELPER_PY="${REPO_ROOT}/super_turtle/state/teleport_handoff.py"
-CTL_PATH="${REPO_ROOT}/super_turtle/subturtle/ctl"
+CTL_PATH="${SUPERTURTLE_TELEPORT_CTL_PATH:-${REPO_ROOT}/super_turtle/subturtle/ctl}"
+E2B_HELPER_PATH="${SUPERTURTLE_TELEPORT_E2B_HELPER_PATH:-${REPO_ROOT}/super_turtle/bin/teleport-e2b.js}"
 ENV_FILE="${REPO_ROOT}/.superturtle/.env"
 
 SSH_TARGET=""
 REMOTE_ROOT=""
 SSH_PORT=""
 SSH_IDENTITY=""
+TELEPORT_TRANSPORT="ssh"
+E2B_SANDBOX_ID=""
+E2B_TEMPLATE_ID=""
 DRY_RUN=0
 USE_MANAGED_TARGET=0
 CURRENT_PHASE="preflight"
@@ -156,6 +160,10 @@ derive_tmux_session_name() {
 
 run_python() {
   python3 "$HELPER_PY" "$@"
+}
+
+e2b_helper() {
+  node "$E2B_HELPER_PATH" "$@"
 }
 
 resolve_managed_target() {
@@ -421,26 +429,36 @@ PY
 )"
 
   if [[ "$TELEPORT_TRANSPORT" == "e2b" ]]; then
-    echo "[teleport-status] failure_reason=Managed teleport target uses E2B sandbox transport, but teleport-manual.sh still only supports SSH cutover." >&2
-    echo "[teleport] managed target transport: e2b" >&2
-    echo "[teleport] sandbox_id: $(python3 - "$output" <<'PY'
+    E2B_SANDBOX_ID="$(python3 - "$output" <<'PY'
 import json
 import sys
 
 payload = json.loads(sys.argv[1])
 print(payload.get("sandbox_id", ""))
 PY
-)" >&2
-    echo "[teleport] template_id: $(python3 - "$output" <<'PY'
+)"
+    E2B_TEMPLATE_ID="$(python3 - "$output" <<'PY'
 import json
 import sys
 
 payload = json.loads(sys.argv[1])
 print(payload.get("template_id", ""))
 PY
-)" >&2
-    echo "[teleport] E2B file upload and PTY bootstrap are not implemented in this script yet." >&2
-    exit 1
+)"
+    REMOTE_ROOT="$(python3 - "$output" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+print(payload.get("project_root") or payload.get("remote_root") or "")
+PY
+)"
+    if [[ -z "$E2B_SANDBOX_ID" || -z "$E2B_TEMPLATE_ID" || -z "$REMOTE_ROOT" ]]; then
+      echo "[teleport-status] failure_reason=Managed teleport target did not include the E2B sandbox identity and project root required for sandbox cutover." >&2
+      echo "[teleport] invalid managed target payload for E2B teleport" >&2
+      exit 1
+    fi
+    return
   fi
 
   SSH_TARGET="$(python3 - "$output" <<'PY'
@@ -521,12 +539,29 @@ ssh_run() {
   "${cmd[@]}"
 }
 
+remote_bash() {
+  if [[ "$TELEPORT_TRANSPORT" == "e2b" ]]; then
+    e2b_helper run-script --sandbox-id "$E2B_SANDBOX_ID" --cwd "/" -- bash -s -- "$@"
+    return
+  fi
+  ssh_run bash -s -- "$@"
+}
+
 local_preflight() {
-  require_cmd ssh
-  require_cmd rsync
   require_cmd bun
   require_cmd python3
-  if [[ "$USE_MANAGED_TARGET" -eq 1 ]]; then
+  if [[ "$TELEPORT_TRANSPORT" == "e2b" ]]; then
+    require_cmd node
+    require_cmd tar
+    if [[ ! -f "$E2B_HELPER_PATH" ]]; then
+      echo "[teleport] Missing E2B helper script: ${E2B_HELPER_PATH}" >&2
+      exit 1
+    fi
+  else
+    require_cmd ssh
+    require_cmd rsync
+  fi
+  if [[ "$USE_MANAGED_TARGET" -eq 1 || "$TELEPORT_TRANSPORT" == "e2b" ]]; then
     require_cmd node
   fi
 
@@ -579,9 +614,66 @@ run_rsync() {
   "${cmd[@]}"
 }
 
+create_repo_archive() {
+  local archive_base
+  archive_base="$(mktemp "${TMPDIR:-/tmp}/superturtle-teleport.XXXXXX")"
+  rm -f "$archive_base"
+  local archive_path="${archive_base}.tar.gz"
+  tar -czf "$archive_path" \
+    --exclude ".DS_Store" \
+    --exclude "node_modules" \
+    --exclude ".venv" \
+    --exclude "__pycache__" \
+    --exclude ".pytest_cache" \
+    --exclude ".mypy_cache" \
+    --exclude ".next" \
+    --exclude "dist" \
+    --exclude "build" \
+    --exclude ".turbo" \
+    --exclude ".tmp" \
+    --exclude "*.pyc" \
+    -C "$REPO_ROOT" .
+  printf '%s\n' "$archive_path"
+}
+
+e2b_sync_repo() {
+  if (( DRY_RUN == 1 )); then
+    echo "[teleport] dry-run: skipping sandbox archive upload"
+    return
+  fi
+
+  local archive_path
+  archive_path="$(create_repo_archive)"
+  local remote_archive="/tmp/superturtle-teleport-${E2B_SANDBOX_ID}-${CURRENT_PHASE}.tar.gz"
+  local status=0
+
+  if ! e2b_helper upload-file --sandbox-id "$E2B_SANDBOX_ID" --source "$archive_path" --destination "$remote_archive"; then
+    status=$?
+  elif ! remote_bash "$REMOTE_ROOT" "$remote_archive" <<'EOF'
+set -euo pipefail
+remote_root="$1"
+archive_path="$2"
+
+parent_dir="$(dirname "$remote_root")"
+mkdir -p "$parent_dir"
+rm -rf "$remote_root"
+mkdir -p "$remote_root"
+tar -xzf "$archive_path" -C "$remote_root"
+rm -f "$archive_path"
+EOF
+  then
+    status=$?
+  fi
+
+  rm -f "$archive_path"
+  if (( status != 0 )); then
+    return "$status"
+  fi
+}
+
 remote_preflight() {
   local active_driver="$1"
-  ssh_run bash -s -- "$REMOTE_ROOT" "$active_driver" <<'EOF'
+  remote_bash "$REMOTE_ROOT" "$active_driver" <<'EOF'
 set -euo pipefail
 remote_root="$1"
 active_driver="$2"
@@ -605,6 +697,7 @@ require_cmd rsync
 require_cmd bun
 require_cmd python3
 require_cmd tmux
+require_cmd tar
 
 case "$active_driver" in
   codex)
@@ -621,7 +714,7 @@ EOF
 }
 
 remote_install_dependencies() {
-  ssh_run bash -s -- "$REMOTE_ROOT" <<'EOF'
+  remote_bash "$REMOTE_ROOT" <<'EOF'
 set -euo pipefail
 remote_root="$1"
 cd "$remote_root/super_turtle/claude-telegram-bot"
@@ -658,7 +751,7 @@ stop_local_bot() {
 }
 
 remote_import_runtime() {
-  ssh_run bash -s -- "$REMOTE_ROOT" <<'EOF'
+  remote_bash "$REMOTE_ROOT" <<'EOF'
 set -euo pipefail
 remote_root="$1"
 python3 "$remote_root/super_turtle/state/teleport_handoff.py" import --project-root "$remote_root"
@@ -666,7 +759,7 @@ EOF
 }
 
 start_remote_bot() {
-  ssh_run bash -s -- "$REMOTE_ROOT" <<'EOF'
+  remote_bash "$REMOTE_ROOT" <<'EOF'
 set -euo pipefail
 remote_root="$1"
 env_file="$remote_root/.superturtle/.env"
@@ -735,7 +828,7 @@ EOF
 }
 
 verify_remote_bot() {
-  ssh_run bash -s -- "$REMOTE_ROOT" <<'EOF'
+  remote_bash "$REMOTE_ROOT" <<'EOF'
 set -euo pipefail
 remote_root="$1"
 cd "$remote_root"
@@ -752,7 +845,7 @@ send_remote_notification() {
   local message="$1"
   local message_b64
   message_b64="$(printf '%s' "$message" | base64 | tr -d '\n')"
-  ssh_run bash -s -- "$REMOTE_ROOT" "$message_b64" <<'EOF'
+  remote_bash "$REMOTE_ROOT" "$message_b64" <<'EOF'
 set -euo pipefail
 remote_root="$1"
 message_b64="$2"
@@ -761,14 +854,39 @@ python3 "$remote_root/super_turtle/state/teleport_handoff.py" notify --project-r
 EOF
 }
 
+run_transport_sync() {
+  if [[ "$TELEPORT_TRANSPORT" == "e2b" ]]; then
+    e2b_sync_repo
+    return
+  fi
+  run_rsync
+}
+
+run_handoff_export() {
+  local destination_label
+  destination_label="$SSH_TARGET"
+  if [[ "$TELEPORT_TRANSPORT" == "e2b" ]]; then
+    destination_label="sandbox:${E2B_SANDBOX_ID}"
+    run_python export --project-root "$REPO_ROOT" --remote-root "$REMOTE_ROOT" --transport "$TELEPORT_TRANSPORT" --destination-label "$destination_label" >/dev/null
+    return
+  fi
+  run_python export --project-root "$REPO_ROOT" --remote-root "$REMOTE_ROOT" --transport "$TELEPORT_TRANSPORT" --destination-label "$destination_label" --ssh-target "$SSH_TARGET" >/dev/null
+}
+
 echo "[teleport] repo root: ${REPO_ROOT}"
-echo "[teleport] ssh target: ${SSH_TARGET}"
-echo "[teleport] remote root: ${REMOTE_ROOT}"
+if [[ "$TELEPORT_TRANSPORT" == "e2b" ]]; then
+  echo "[teleport] managed sandbox: ${E2B_SANDBOX_ID}"
+  echo "[teleport] template id: ${E2B_TEMPLATE_ID}"
+  echo "[teleport] project root: ${REMOTE_ROOT}"
+else
+  echo "[teleport] ssh target: ${SSH_TARGET}"
+  echo "[teleport] remote root: ${REMOTE_ROOT}"
+fi
 
 set_phase "local_preflight"
 local_preflight
 
-run_python export --project-root "$REPO_ROOT" --remote-root "$REMOTE_ROOT" --transport ssh --destination-label "$SSH_TARGET" --ssh-target "$SSH_TARGET" >/dev/null
+run_handoff_export
 CONTEXT_FILE="${REPO_ROOT}/.superturtle/teleport/context.json"
 TOKEN_PREFIX="$(read_json_field "$CONTEXT_FILE" "token_prefix")"
 ACTIVE_DRIVER="$(read_json_field "$CONTEXT_FILE" "active_driver")"
@@ -780,7 +898,7 @@ remote_preflight "$ACTIVE_DRIVER"
 
 echo "[teleport] initial sync"
 set_phase "initial_sync"
-run_rsync
+run_transport_sync
 
 if (( DRY_RUN == 1 )); then
   echo "[teleport] dry-run complete"
@@ -797,13 +915,13 @@ stop_local_subturtles
 
 echo "[teleport] exporting final handoff state"
 set_phase "exporting_final_handoff"
-run_python export --project-root "$REPO_ROOT" --remote-root "$REMOTE_ROOT" --transport ssh --destination-label "$SSH_TARGET" --ssh-target "$SSH_TARGET" >/dev/null
+run_handoff_export
 
 stop_local_bot
 
 echo "[teleport] final sync"
 set_phase "final_sync"
-run_rsync
+run_transport_sync
 
 echo "[teleport] importing portable runtime state on remote"
 set_phase "importing_remote_state"
@@ -817,7 +935,11 @@ echo "[teleport] verifying remote bot"
 set_phase "verifying_remote_bot"
 verify_remote_bot
 
-send_remote_notification "Teleport complete. Super Turtle is now running on ${SSH_TARGET}."
+if [[ "$TELEPORT_TRANSPORT" == "e2b" ]]; then
+  send_remote_notification "Teleport complete. Super Turtle is now running on managed sandbox ${E2B_SANDBOX_ID}."
+else
+  send_remote_notification "Teleport complete. Super Turtle is now running on ${SSH_TARGET}."
+fi
 
 echo "[teleport] success"
 set_phase "complete"

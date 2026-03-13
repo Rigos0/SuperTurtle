@@ -1,5 +1,5 @@
 # Current task
-Continue replacing managed VM assumptions with one persistent E2B sandbox per user, now that the teleport handoff bundle records destination transport/label metadata for SSH and future E2B cutovers and the remaining work is in the actual E2B file/PTY runtime path.
+Continue replacing managed VM assumptions with one persistent E2B sandbox per user, now that `teleport-manual.sh` can branch into an E2B upload/run helper path and the remaining work is validating the bundled helper against the real E2B SDK/runtime plus completing the rest of the production cutover semantics.
 
 # End goal with specs
 A fully working /teleport feature where:
@@ -45,6 +45,8 @@ A fully working /teleport feature where:
   - Progress: `teleport-manual.sh --managed` now labels hosted readiness polling as `managed runtime`/`managed instance`/`managed sandbox` based on the control-plane provider signal, so timeout and unavailability failures stop hard-coding `managed SuperTurtle VM` when the destination is E2B-backed.
   - Progress: `/teleport` hosted preflight failures now say `destination managed instance` for GCP-backed runtimes and keep `destination sandbox` for E2B-backed runtimes instead of hard-coding `destination sandbox` for every provider.
   - Progress: `super_turtle/state/teleport_handoff.py export` now accepts `--transport` and `--destination-label`, persists `destination_transport` / `destination_label` in the handoff bundle, and keeps the current SSH export path explicit so future E2B file-upload/PTY cutovers can reuse the same semantic handoff text without pretending the destination is an SSH host.
+  - Progress: `super_turtle/scripts/teleport-manual.sh` now has a real E2B transport branch instead of failing immediately: it uploads repo archives through a helper, runs remote preflight/import/start/status scripts through the same transport abstraction, keeps the SSH path unchanged, and is covered by `super_turtle/tests/teleport-manual-managed.test.js` with a fake E2B helper backend.
+  - Progress: `super_turtle/bin/teleport-e2b.js` now defines the local helper contract for sandbox file upload and remote script execution, so the remaining work is wiring and validating that helper against the real `e2b` SDK in live managed sandboxes rather than inventing the transport boundary later.
 - Define managed-runtime lifecycle and idempotent sandbox create/connect-resume/pause/reprovision/delete behavior
 - Build the production superturtle-teleport E2B template with pinned toolchain, startup scripts, health checks, log paths, and provider config directories
 - Store hosted runtime identity as sandbox_id + template_id in the control plane instead of SSH coordinates
