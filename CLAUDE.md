@@ -116,7 +116,8 @@ Managed teleport: with hosted browser OAuth login now live, turn the current man
 - `/teleport` is confirm-based, not one-shot
 - Ownership transfers only after the destination runtime is verified healthy
 - Missing destination provider auth blocks teleport before ownership transfer
-- For v1, the first managed provider setup can be completed from the user’s own machine/browser during the first teleport flow instead of requiring direct interactive auth inside the managed sandbox
+- If the local machine already has working Claude/Codex auth, first teleport should reuse that existing local auth to seed the managed sandbox instead of forcing a fresh browser/device OAuth flow
+- For v1, direct interactive auth inside the managed sandbox is fallback-only; the preferred path is to bootstrap hosted provider auth from the already logged-in local machine during first teleport
 - The product spec is bidirectional, but rollout is phased: local -> cloud first, cloud -> local next
 
 ## Recommended MVP architecture
@@ -264,9 +265,9 @@ bun --eval 'import { addJob } from "./super_turtle/claude-telegram-bot/src/cron.
 
 ### Provider auth + entitlement gates
 - [ ] Block teleport before ownership transfer when required destination provider auth is missing
-- [ ] Productize first-teleport provider setup so the user can complete hosted Claude/Codex auth from their own machine/browser
-- [ ] Support user-scoped Claude hosted auth bootstrap from the local machine instead of requiring direct browser login inside the managed sandbox
-- [ ] Support user-scoped Codex hosted auth bootstrap from the local machine instead of API-key-only setup or direct browser login inside the managed sandbox
+- [ ] Productize first-teleport provider setup so the user can reuse existing local Claude/Codex auth when available, with browser/device auth only as fallback
+- [ ] Support user-scoped Claude hosted auth bootstrap from the local machine by reusing existing local auth state or token material instead of requiring direct browser login inside the managed sandbox
+- [ ] Support user-scoped Codex hosted auth bootstrap from the local machine by reusing existing local auth state or API-key-backed login instead of requiring direct browser login inside the managed sandbox
 - [ ] Store user-scoped hosted provider auth material securely in the control plane and use it only for that user’s sandbox/session
 - [ ] Add reauth/refresh/recovery flows when hosted Claude/Codex auth expires, is revoked, or becomes invalid
 - [ ] Add managed Claude/Codex settings and secret-deny policy for hosted sandboxes
@@ -286,12 +287,14 @@ bun --eval 'import { addJob } from "./super_turtle/claude-telegram-bot/src/cron.
 - Recommended hosted account model: GitHub/Google OAuth on the site plus a CLI browser/device login flow
 - Current live hosted auth base URL: `https://superturtle-web.vercel.app`
 - Recommended pricing shape: monthly subscription, one user, one managed sandbox, one bot
-- V1 hosted provider setup should be initiated from the user’s own machine during first managed teleport, reusing the local-browser bootstrap model already proven on Azure
+- V1 hosted provider setup should prefer reusing existing local Claude/Codex auth when the user is already logged in; browser/device login is the fallback path, not the default
 - Recommended v1 launch posture: Claude-first hosted support, Codex explicitly beta
 - Recommended runtime posture: one persistent E2B sandbox per paid account with hosted ownership control
 - Preferred remote control path: E2B SDK + PTY/files/commands; SSH is only an operator escape hatch
 - Existing manual teleport implementation remains the baseline cutover path to reuse
 - Current manual teleport preserves semantic continuity, not exact provider-native thread continuity
+- Feasibility validation on March 13, 2026: an E2B sandbox was created from the `claude` template, missing runtime packages were installed, the `feat/teleport` repo branch was cloned, `.superturtle/.env` was rewritten for sandbox-local paths, Claude auth was reused from existing local token material, Codex was installed and logged in with `codex login --with-api-key` using the existing local API key, both CLIs emitted streaming output, and `node super_turtle/bin/superturtle.js start` successfully booted `@superturtle_bot` inside the sandbox
+- Replication details from that validation: use the existing local `E2B_API_KEY`; create an E2B sandbox; install `tmux`, `rsync`, `bun`, and `@openai/codex` if missing; clone the repo into `/home/user/agentic`; rewrite `.superturtle/.env` so `CLAUDE_WORKING_DIR` and `ALLOWED_PATHS` point at sandbox paths; seed Claude from existing local auth material; seed Codex from the existing local API key; then run `node super_turtle/bin/superturtle.js start` from the repo root
 - The actual docs repo lives in sibling path `../turtlesite/`; edit `../turtlesite/docs/` for public docs when we are ready to publish managed teleport docs
 
 ## Skippable limitations
