@@ -55,6 +55,12 @@ assert.strictEqual(
   "expected IPv6 loopback HTTP control plane URLs to remain valid for local hosted login test harnesses"
 );
 
+assert.strictEqual(
+  getControlPlaneBaseUrl({}),
+  "https://superturtle-web.vercel.app",
+  "expected hosted CLI commands to default to the live Vercel control plane"
+);
+
 assert.deepStrictEqual(
   validateLoginStartResponse(
     {

@@ -1,5 +1,5 @@
 # Current task
-Wire the deployed hosted control plane to real managed-runtime endpoints (/v1/cli/cloud/status, resume, teleport target).
+Replace managed VM assumptions with one persistent E2B sandbox per user.
 
 # End goal with specs
 A fully working /teleport feature where:
@@ -36,8 +36,9 @@ A fully working /teleport feature where:
 - [x] Keep /teleport idle-only; reject while work is active or queued with clear error message
 - [x] Improve /teleport status with phase, active owner, destination runtime state, and latest failure reason
 - [x] Surface clear preflight failures for missing login, missing cloud auth, and destination sandbox issues
-- Wire the deployed hosted control plane to real managed-runtime endpoints (/v1/cli/cloud/status, resume, teleport target) <- current
-- Replace managed VM assumptions with one persistent E2B sandbox per user
+- [x] Wire the deployed hosted control plane to real managed-runtime endpoints (/v1/cli/cloud/status, resume, teleport target)
+  - Updated the default hosted control-plane origin in `super_turtle/bin/cloud.js` to `https://superturtle-web.vercel.app` so cloud status, resume, and teleport-target calls now hit the live deployed endpoints without requiring `SUPERTURTLE_CLOUD_URL`.
+- Replace managed VM assumptions with one persistent E2B sandbox per user <- current
 - Define managed-runtime lifecycle and idempotent sandbox create/connect-resume/pause/reprovision/delete behavior
 - Build the production superturtle-teleport E2B template with pinned toolchain, startup scripts, health checks, log paths, and provider config directories
 - Store hosted runtime identity as sandbox_id + template_id in the control plane instead of SSH coordinates

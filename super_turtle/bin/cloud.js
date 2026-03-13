@@ -11,7 +11,7 @@ const {
   validateCliWhoAmIResponse,
 } = require("./cloud-control-plane-contract.js");
 
-const DEFAULT_CONTROL_PLANE = "https://api.superturtle.dev";
+const DEFAULT_CONTROL_PLANE = "https://superturtle-web.vercel.app";
 const DEFAULT_POLL_INTERVAL_MS = 2000;
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 15 * 1000;
