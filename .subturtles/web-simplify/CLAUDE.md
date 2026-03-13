@@ -1,5 +1,5 @@
 # Current task
-Grep the entire `src/` tree for dangling imports to deleted files and fix them all.
+Run `npm run build` and fix all errors until it passes.
 
 # End goal with specs
 A clean, minimal app with only the pages and components needed for:
@@ -30,7 +30,7 @@ The repo is at the cwd (superturtle-web). Some deletions may already be done fro
 - [x] Simplify `src/app/navigation.tsx`: remove Overview/Pricing nav links and mobile Sheet drawer; just AccountMenu when logged in or sign-in button when logged out. Then delete `src/components/ui/sheet.tsx` if orphaned.
 - [x] Simplify `src/app/(auth)/auth-ui.tsx`: remove two-column layout, Terms/Privacy links, AuthFact cards; single-column sign-in card with GitHub button
 - [x] Simplify `src/app/(account)/account/page.tsx`: remove dark gradient summary panel and SectionHeading import; use clean simple cards for identity, billing, CLI, machine. Fix the /pricing link since pricing page is deleted.
-- [ ] Grep entire src/ tree for dangling imports to deleted files and fix them all <- current
-- [ ] Run npm run build and fix all errors until it passes
+- [x] Grep entire src/ tree for dangling imports to deleted files and fix them all
+- [ ] Run npm run build and fix all errors until it passes <- current
 - [ ] Run npm run lint and fix all errors until it passes
 - [ ] Commit all changes with a clear message
