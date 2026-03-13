@@ -7,6 +7,15 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-03-13
+
+### Fixed
+- Codex MCP chat scope now refreshes when a real Telegram chat id appears, so chat-scoped tools like `send_image` keep working after session init
+- supervision wakeups now ignore stale inbox items from previous worker runs and reduce stuck-notification noise with quiet-time gating
+- `superturtle stop` no longer errors when stopping SubTurtles; `subturtle/ctl` now supports `stopall`
+- busy text messages now visibly queue like voice messages instead of waiting silently behind runner-level sequencing
+- stop acknowledgements are normalized: explicit stops no longer emit duplicate replies, and idle stops now say `Nothing to stop.`
+
 ## [0.2.3] - 2026-03-09
 
 ### Added
