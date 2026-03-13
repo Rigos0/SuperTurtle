@@ -4,6 +4,7 @@ const {
   assertManagedInstanceTransition,
   assertProvisioningJobTransition,
   validateCliCloudStatusResponse,
+  validateCliTeleportTargetResponse,
   validateCliTokenResponse,
   validateCliWhoAmIResponse,
 } = require("../bin/cloud-control-plane-contract.js");
@@ -113,6 +114,29 @@ const {
   });
   assert.strictEqual(cloudStatus.audit_log[0].action, "instance.resume_requested");
 
+  const e2bTeleportTarget = validateCliTeleportTargetResponse({
+    instance: {
+      id: "inst_e2b",
+      provider: "e2b",
+      state: "running",
+      sandbox_id: "sandbox_123",
+      template_id: "template_teleport_v1",
+      last_seen_at: "2026-03-12T10:00:00Z",
+    },
+    transport: "e2b",
+    sandbox_id: "sandbox_123",
+    template_id: "template_teleport_v1",
+    project_root: "/home/user/agentic",
+    sandbox_metadata: {
+      account_id: "acct_123",
+      sandbox_role: "managed_runtime",
+    },
+    audit_log: [],
+  });
+  assert.strictEqual(e2bTeleportTarget.transport, "e2b");
+  assert.strictEqual(e2bTeleportTarget.project_root, "/home/user/agentic");
+  assert.strictEqual(e2bTeleportTarget.sandbox_id, "sandbox_123");
+
   assert.doesNotThrow(() => assertManagedInstanceTransition("requested", "provisioning"));
   assert.doesNotThrow(() => assertManagedInstanceTransition("suspended", "running"));
   assert.doesNotThrow(() => assertProvisioningJobTransition("queued", "running"));
@@ -156,6 +180,21 @@ const {
         },
       }),
     /updated_at/i
+  );
+
+  assert.throws(
+    () =>
+      validateCliTeleportTargetResponse({
+        instance: {
+          id: "inst_e2b",
+          provider: "e2b",
+          state: "running",
+        },
+        transport: "e2b",
+        template_id: "template_teleport_v1",
+        project_root: "/home/user/agentic",
+      }),
+    /sandbox_id/i
   );
 
   assert.throws(

@@ -1,5 +1,5 @@
 # Current task
-Replace managed VM assumptions with one persistent E2B sandbox per user.
+Continue replacing managed VM assumptions with one persistent E2B sandbox per user, starting from the shared teleport target contract.
 
 # End goal with specs
 A fully working /teleport feature where:
@@ -39,6 +39,7 @@ A fully working /teleport feature where:
 - [x] Wire the deployed hosted control plane to real managed-runtime endpoints (/v1/cli/cloud/status, resume, teleport target)
   - Updated the default hosted control-plane origin in `super_turtle/bin/cloud.js` to `https://superturtle-web.vercel.app` so cloud status, resume, and teleport-target calls now hit the live deployed endpoints without requiring `SUPERTURTLE_CLOUD_URL`.
 - Replace managed VM assumptions with one persistent E2B sandbox per user <- current
+  - Progress: the local control-plane contract now accepts either legacy SSH teleport targets or E2B sandbox targets (`transport`, `sandbox_id`, `template_id`, `project_root`) without breaking the current SSH path, and the manual teleport script now fails explicitly if the hosted API switches to `transport=e2b` before the file/PTY cutover lands.
 - Define managed-runtime lifecycle and idempotent sandbox create/connect-resume/pause/reprovision/delete behavior
 - Build the production superturtle-teleport E2B template with pinned toolchain, startup scripts, health checks, log paths, and provider config directories
 - Store hosted runtime identity as sandbox_id + template_id in the control plane instead of SSH coordinates

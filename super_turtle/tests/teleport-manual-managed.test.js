@@ -38,11 +38,13 @@ function writeExecutable(path, body) {
 }
 
 function createBaseEnvironment(tmpDir) {
-  const fakeBinDir = resolve(tmpDir, "bin");
+  fs.mkdirSync(tmpDir, { recursive: true });
+  const realTmpDir = fs.realpathSync(tmpDir);
+  const fakeBinDir = resolve(realTmpDir, "bin");
   fs.mkdirSync(fakeBinDir, { recursive: true });
-  const sshLogPath = resolve(tmpDir, "ssh.log");
-  const rsyncLogPath = resolve(tmpDir, "rsync.log");
-  const sessionPath = resolve(tmpDir, "cloud-session.json");
+  const sshLogPath = resolve(realTmpDir, "ssh.log");
+  const rsyncLogPath = resolve(realTmpDir, "rsync.log");
+  const sessionPath = resolve(realTmpDir, "cloud-session.json");
 
   writeExecutable(
     resolve(fakeBinDir, "ssh"),
@@ -75,7 +77,7 @@ exit 0
         control_plane: "http://127.0.0.1:1",
         access_token: "access-abc",
         refresh_token: "refresh-abc",
-        expires_at: "2026-03-13T00:00:00Z",
+        expires_at: "2999-03-13T00:00:00Z",
         created_at: "2026-03-12T00:00:00Z",
         last_sync_at: "2026-03-12T00:00:00Z",
       },
@@ -507,12 +509,78 @@ async function testManagedTeleportSurfacesProvisioningFailure(tmpDir) {
   }
 }
 
+async function testManagedTeleportRejectsE2BTargetUntilSandboxCutoverExists(tmpDir) {
+  const { fakeBinDir, sshLogPath, rsyncLogPath, sessionPath } = createBaseEnvironment(tmpDir);
+
+  const server = http.createServer((req, res) => {
+    const authorize = req.headers.authorization;
+    assert.strictEqual(authorize, "Bearer access-abc");
+
+    if (req.method === "GET" && req.url === "/v1/cli/teleport/target") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          instance: {
+            id: "inst_e2b",
+            provider: "e2b",
+            state: "running",
+            sandbox_id: "sandbox_123",
+            template_id: "template_teleport_v1",
+            machine_token_id: "machine-token-123",
+            last_seen_at: "2026-03-12T10:00:00Z",
+            resume_requested_at: "2026-03-12T09:58:00Z",
+          },
+          transport: "e2b",
+          sandbox_id: "sandbox_123",
+          template_id: "template_teleport_v1",
+          project_root: "/home/user/agentic",
+          sandbox_metadata: {
+            account_id: "acct_123",
+            sandbox_role: "managed_runtime",
+          },
+          audit_log: [],
+        })
+      );
+      return;
+    }
+
+    res.writeHead(404, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: "not_found" }));
+  });
+
+  await new Promise((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  pointSessionAtBaseUrl(sessionPath, `http://127.0.0.1:${address.port}`);
+
+  try {
+    const result = await runScript({
+      ...process.env,
+      PATH: `${fakeBinDir}:${process.env.PATH}`,
+      SUPERTURTLE_CLOUD_SESSION_PATH: sessionPath,
+    });
+
+    assert.strictEqual(result.code, 1, `expected failure, got stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+    assert.match(
+      result.stderr,
+      /Managed teleport target uses E2B sandbox transport, but teleport-manual\.sh still only supports SSH cutover\./
+    );
+    assert.match(result.stderr, /\[teleport\] managed target transport: e2b/);
+    assert.match(result.stderr, /\[teleport\] sandbox_id: sandbox_123/);
+    assert.ok(!fs.existsSync(sshLogPath), "expected SSH not to run for an E2B target");
+    assert.ok(!fs.existsSync(rsyncLogPath), "expected rsync not to run for an E2B target");
+  } finally {
+    server.close();
+  }
+}
+
 async function main() {
   const tmpDir = fs.mkdtempSync(resolve(os.tmpdir(), "superturtle-teleport-managed-"));
   try {
     await testManagedTeleportWaitsForResume(resolve(tmpDir, "resume"));
     await testManagedTeleportRetriesTransientStatusFailure(resolve(tmpDir, "retry-status"));
     await testManagedTeleportSurfacesProvisioningFailure(resolve(tmpDir, "failure"));
+    await testManagedTeleportRejectsE2BTargetUntilSandboxCutoverExists(resolve(tmpDir, "e2b-target"));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

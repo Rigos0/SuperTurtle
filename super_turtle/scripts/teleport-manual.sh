@@ -386,12 +386,44 @@ NODE
     exit 1
   fi
 
+  TELEPORT_TRANSPORT="$(python3 - "$output" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+print(payload.get("transport") or "ssh")
+PY
+)"
+
+  if [[ "$TELEPORT_TRANSPORT" == "e2b" ]]; then
+    echo "[teleport-status] failure_reason=Managed teleport target uses E2B sandbox transport, but teleport-manual.sh still only supports SSH cutover." >&2
+    echo "[teleport] managed target transport: e2b" >&2
+    echo "[teleport] sandbox_id: $(python3 - "$output" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+print(payload.get("sandbox_id", ""))
+PY
+)" >&2
+    echo "[teleport] template_id: $(python3 - "$output" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+print(payload.get("template_id", ""))
+PY
+)" >&2
+    echo "[teleport] E2B file upload and PTY bootstrap are not implemented in this script yet." >&2
+    exit 1
+  fi
+
   SSH_TARGET="$(python3 - "$output" <<'PY'
 import json
 import sys
 
 payload = json.loads(sys.argv[1])
-print(payload["ssh_target"])
+print(payload.get("ssh_target", ""))
 PY
 )"
   REMOTE_ROOT="$(python3 - "$output" <<'PY'
@@ -399,9 +431,15 @@ import json
 import sys
 
 payload = json.loads(sys.argv[1])
-print(payload["remote_root"])
+print(payload.get("project_root") or payload.get("remote_root") or "")
 PY
 )"
+
+  if [[ -z "$SSH_TARGET" || -z "$REMOTE_ROOT" ]]; then
+    echo "[teleport-status] failure_reason=Managed teleport target did not include the SSH target and project root required for SSH cutover." >&2
+    echo "[teleport] invalid managed target payload for SSH teleport" >&2
+    exit 1
+  fi
 }
 
 read_json_field() {

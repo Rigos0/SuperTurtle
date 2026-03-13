@@ -382,8 +382,10 @@ function buildTeleportTargetPayload(state, instance, config) {
           resume_requested_at: instance.resume_requested_at || null,
         }
       : null,
+    transport: "ssh",
     ssh_target: `${config.managedSshUser}@${instance.hostname}`,
     remote_root: config.managedProjectRoot,
+    project_root: config.managedProjectRoot,
     audit_log: getRecentAuditLog(state, instance.id),
   });
 }

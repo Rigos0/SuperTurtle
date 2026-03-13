@@ -7,7 +7,8 @@ const PROVIDER_CREDENTIAL_PROVIDERS = ["claude"];
 const PROVIDER_CREDENTIAL_STATES = ["valid", "invalid", "revoked"];
 const SESSION_STATES = ["pending", "active", "expired", "revoked"];
 const ENTITLEMENT_STATES = ["inactive", "trialing", "active", "past_due", "suspended", "canceled"];
-const INSTANCE_PROVIDERS = ["gcp"];
+const INSTANCE_PROVIDERS = ["gcp", "e2b"];
+const TELEPORT_TARGET_TRANSPORTS = ["ssh", "e2b"];
 const MANAGED_INSTANCE_STATES = [
   "requested",
   "provisioning",
@@ -246,6 +247,8 @@ function validateManagedInstance(value, fieldName = "instance") {
     zone: validateDisplayField(instance.zone, `${fieldName}.zone`),
     hostname: validateDisplayField(instance.hostname, `${fieldName}.hostname`),
     vm_name: validateDisplayField(instance.vm_name, `${fieldName}.vm_name`),
+    sandbox_id: validateDisplayField(instance.sandbox_id, `${fieldName}.sandbox_id`),
+    template_id: validateDisplayField(instance.template_id, `${fieldName}.template_id`),
     machine_token_id: validateDisplayField(instance.machine_token_id, `${fieldName}.machine_token_id`),
     last_seen_at: validateTimestamp(instance.last_seen_at, `${fieldName}.last_seen_at`),
     resume_requested_at: validateTimestamp(
@@ -345,10 +348,45 @@ function validateCliCloudStatusResponse(payload) {
 
 function validateCliTeleportTargetResponse(payload) {
   const response = validateObject(payload, "response");
+  const hasSandboxFields =
+    response.sandbox_id != null || response.template_id != null || response.project_root != null;
+  const transport =
+    validateEnum(response.transport, TELEPORT_TARGET_TRANSPORTS, "transport") ||
+    (hasSandboxFields ? "e2b" : "ssh");
+  const sshTarget = validateDisplayField(response.ssh_target, "ssh_target");
+  const remoteRoot = validateDisplayField(response.remote_root, "remote_root");
+  const sandboxId = validateDisplayField(response.sandbox_id, "sandbox_id");
+  const templateId = validateDisplayField(response.template_id, "template_id");
+  const projectRoot = validateDisplayField(response.project_root, "project_root");
+
+  if (transport === "ssh") {
+    if (!sshTarget) {
+      fail("ssh_target");
+    }
+    if (!remoteRoot && !projectRoot) {
+      fail("remote_root");
+    }
+  } else {
+    if (!sandboxId) {
+      fail("sandbox_id");
+    }
+    if (!templateId) {
+      fail("template_id");
+    }
+    if (!projectRoot && !remoteRoot) {
+      fail("project_root");
+    }
+  }
+
   return {
     instance: validateManagedInstance(response.instance, "instance"),
-    ssh_target: validateDisplayField(response.ssh_target, "ssh_target"),
-    remote_root: validateDisplayField(response.remote_root, "remote_root"),
+    transport,
+    ssh_target: sshTarget,
+    remote_root: remoteRoot || projectRoot,
+    sandbox_id: sandboxId,
+    template_id: templateId,
+    project_root: projectRoot || remoteRoot,
+    sandbox_metadata: validateStringRecord(response.sandbox_metadata, "sandbox_metadata"),
     audit_log: validateAuditLog(response.audit_log, "audit_log"),
   };
 }

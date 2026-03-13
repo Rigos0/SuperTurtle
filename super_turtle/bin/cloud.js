@@ -614,8 +614,13 @@ function validateTeleportTargetResponse(payload, context) {
     const response = validateCliTeleportTargetResponse(payload);
     return {
       instance: response.instance,
+      transport: response.transport,
       ssh_target: response.ssh_target,
       remote_root: response.remote_root,
+      sandbox_id: response.sandbox_id,
+      template_id: response.template_id,
+      project_root: response.project_root,
+      sandbox_metadata: response.sandbox_metadata,
       audit_log: response.audit_log,
     };
   } catch (error) {

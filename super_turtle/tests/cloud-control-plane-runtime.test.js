@@ -308,11 +308,13 @@ async function run() {
 
   const teleportTarget = requestTeleportTarget(runtime, refreshed.data.access_token);
   assert.strictEqual(teleportTarget.status, 200);
+  assert.strictEqual(teleportTarget.data.transport, "ssh");
   assert.strictEqual(
     teleportTarget.data.ssh_target,
     "superturtle@vm-registered.managed.superturtle.internal"
   );
   assert.strictEqual(teleportTarget.data.remote_root, "/srv/superturtle");
+  assert.strictEqual(teleportTarget.data.project_root, "/srv/superturtle");
   assert.strictEqual(teleportTarget.data.instance.id, created.data.instance.id);
   assert.match(
     JSON.stringify(readState(statePath).audit_log),
