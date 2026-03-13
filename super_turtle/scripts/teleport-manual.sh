@@ -54,6 +54,7 @@ REMOTE_START_ATTEMPTED=0
 REMOTE_RUNTIME_VERIFIED=0
 ROLLBACK_ATTEMPTED=0
 LATEST_FAILURE_REASON=""
+LOCAL_CLAUDE_ACCESS_TOKEN=""
 
 if [[ ! "$MACHINE_HEARTBEAT_INTERVAL_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
   echo "[teleport] SUPERTURTLE_TELEPORT_MACHINE_HEARTBEAT_INTERVAL_SECONDS must be a positive integer" >&2
@@ -811,6 +812,19 @@ for (const filePath of fileCandidates) {
 NODE
 }
 
+get_local_claude_access_token() {
+  if [[ -n "$LOCAL_CLAUDE_ACCESS_TOKEN" ]]; then
+    printf '%s' "$LOCAL_CLAUDE_ACCESS_TOKEN"
+    return
+  fi
+  LOCAL_CLAUDE_ACCESS_TOKEN="$(discover_local_claude_access_token)"
+  printf '%s' "$LOCAL_CLAUDE_ACCESS_TOKEN"
+}
+
+has_local_codex_auth() {
+  [[ -s "$CODEX_AUTH_SOURCE_PATH" ]]
+}
+
 e2b_sync_repo() {
   if (( DRY_RUN == 1 )); then
     echo "[teleport] dry-run: skipping sandbox archive upload"
@@ -837,7 +851,7 @@ bootstrap_e2b_codex_auth() {
     return
   fi
 
-  if [[ ! -f "$CODEX_AUTH_SOURCE_PATH" ]]; then
+  if ! has_local_codex_auth; then
     echo "[teleport] local Codex auth cache not found at ${CODEX_AUTH_SOURCE_PATH}; reusing any existing sandbox auth"
     return
   fi
@@ -874,7 +888,7 @@ bootstrap_e2b_claude_auth() {
   fi
 
   local claude_token=""
-  claude_token="$(discover_local_claude_access_token)"
+  claude_token="$(get_local_claude_access_token)"
   if [[ -z "$claude_token" ]]; then
     if [[ -n "$CLAUDE_CREDENTIALS_SOURCE_PATH" ]]; then
       echo "[teleport] local Claude auth was not found at ${CLAUDE_CREDENTIALS_SOURCE_PATH}; reusing any existing sandbox auth"
@@ -901,6 +915,92 @@ bootstrap_e2b_claude_auth() {
   if (( status != 0 )); then
     return "$status"
   fi
+}
+
+verify_remote_driver_auth() {
+  local active_driver="$1"
+  local local_claude_available="0"
+  local local_codex_available="0"
+
+  if [[ "$TELEPORT_TRANSPORT" == "e2b" ]]; then
+    if [[ -n "$(get_local_claude_access_token)" ]]; then
+      local_claude_available="1"
+    fi
+    if has_local_codex_auth; then
+      local_codex_available="1"
+    fi
+  fi
+
+  echo "[teleport] verifying destination auth for active driver (${active_driver})"
+  set_phase "verifying_destination_auth"
+  remote_bash "$REMOTE_ROOT" "$active_driver" "$local_claude_available" "$local_codex_available" <<'EOF'
+set -euo pipefail
+remote_root="$1"
+active_driver="$2"
+local_claude_available="$3"
+local_codex_available="$4"
+remote_home="${HOME:-$(python3 - <<'PY'
+from pathlib import Path
+print(Path.home())
+PY
+)}"
+env_file="$remote_root/.superturtle/.env"
+
+env_has_value() {
+  local key="$1"
+  local file_path="$2"
+  python3 - "$key" "$file_path" <<'PY'
+from pathlib import Path
+import sys
+
+key = sys.argv[1]
+path = Path(sys.argv[2])
+if not path.exists():
+    raise SystemExit(1)
+
+for raw in path.read_text().splitlines():
+    stripped = raw.strip()
+    if not stripped or stripped.startswith("#") or "=" not in raw:
+        continue
+    current_key, _, value = raw.partition("=")
+    if current_key == key and value.strip():
+        raise SystemExit(0)
+
+raise SystemExit(1)
+PY
+}
+
+case "$active_driver" in
+  codex)
+    if [[ "$local_codex_available" == "1" ]]; then
+      echo "[teleport][remote] auth preflight ok (codex via local bootstrap)"
+      exit 0
+    fi
+    if [[ -s "$remote_home/.codex/auth.json" ]]; then
+      echo "[teleport][remote] auth preflight ok (codex via existing destination auth)"
+      exit 0
+    fi
+    echo "[teleport][remote] Missing destination Codex auth. Run 'codex login' on the destination or set SUPERTURTLE_TELEPORT_CODEX_AUTH_PATH locally before teleport." >&2
+    exit 1
+    ;;
+  claude|*)
+    if [[ "$local_claude_available" == "1" ]]; then
+      echo "[teleport][remote] auth preflight ok (claude via local bootstrap)"
+      exit 0
+    fi
+    if env_has_value "CLAUDE_CODE_OAUTH_TOKEN" "$env_file"; then
+      echo "[teleport][remote] auth preflight ok (claude via .superturtle/.env)"
+      exit 0
+    fi
+    if [[ -s "$remote_home/.config/claude-code/credentials.json" || -s "$remote_home/.claude/credentials.json" ]]; then
+      echo "[teleport][remote] auth preflight ok (claude via existing destination credentials)"
+      exit 0
+    fi
+    echo "[teleport][remote] Missing destination Claude auth. Reuse local Claude auth for managed teleport or configure CLAUDE_CODE_OAUTH_TOKEN / Claude credentials on the destination before teleport." >&2
+    exit 1
+    ;;
+esac
+EOF
 }
 
 bootstrap_e2b_runtime() {
@@ -1570,6 +1670,8 @@ bootstrap_e2b_codex_auth
 echo "[teleport] initial sync"
 set_phase "initial_sync"
 run_transport_sync
+
+verify_remote_driver_auth "$ACTIVE_DRIVER"
 
 if (( DRY_RUN == 1 )); then
   echo "[teleport] dry-run complete"

@@ -803,6 +803,7 @@ const { spawnSync } = require("child_process");
 const logPath = ${JSON.stringify(logPath)};
 const sandboxRoot = ${JSON.stringify(sandboxRoot)};
 const failVerify = ${options.failVerify ? "true" : "false"};
+const failAuth = ${options.failAuth ? "true" : "false"};
 
 function log(entry) {
   fs.appendFileSync(logPath, JSON.stringify(entry) + "\\n");
@@ -900,6 +901,31 @@ function runUpload(args) {
     }
     process.stdout.write("Bot: running (sandbox-session)\\n");
     return;
+  }
+
+  if (script.includes('Missing destination Claude auth') || script.includes('Missing destination Codex auth')) {
+    const activeDriver = interpreterArgs.find((value) => value === "claude" || value === "codex") || "claude";
+    const authFlags = interpreterArgs.filter((value) => value === "0" || value === "1");
+    const localClaudeAvailable = authFlags[0] || "0";
+    const localCodexAvailable = authFlags[1] || "0";
+    if (
+      !failAuth ||
+      (activeDriver === "claude" && localClaudeAvailable === "1") ||
+      (activeDriver === "codex" && localCodexAvailable === "1")
+    ) {
+      process.stdout.write("[teleport][remote] auth preflight ok\\n");
+      return;
+    }
+    if (activeDriver === "codex") {
+      process.stderr.write(
+        "[teleport][remote] Missing destination Codex auth. Run 'codex login' on the destination or set SUPERTURTLE_TELEPORT_CODEX_AUTH_PATH locally before teleport.\\n"
+      );
+    } else {
+      process.stderr.write(
+        "[teleport][remote] Missing destination Claude auth. Reuse local Claude auth for managed teleport or configure CLAUDE_CODE_OAUTH_TOKEN / Claude credentials on the destination before teleport.\\n"
+      );
+    }
+    process.exit(1);
   }
 
   if (script.includes('managed_runtime_dir="$remote_root/.superturtle/managed-runtime"')) {
@@ -1521,6 +1547,98 @@ async function testManagedTeleportRollsBackLocalBotWhenRemoteVerifyFails(tmpDir)
   }
 }
 
+async function testManagedTeleportFailsBeforeShutdownWhenCodexAuthMissing(tmpDir) {
+  const {
+    fakeBinDir,
+    sessionPath,
+    ctlPath,
+    e2bHelperLogPath,
+    tmuxStateDir,
+  } = createBaseEnvironment(tmpDir, { activeDriver: "codex" });
+  const helperPath = resolve(tmpDir, "fake-e2b-helper");
+  const sandboxRoot = resolve(tmpDir, "sandbox-root");
+  createFakeE2BHelper(helperPath, e2bHelperLogPath, sandboxRoot, { failAuth: true });
+  const localSessionName = deriveLocalTmuxSessionName();
+  writeTmuxSession(tmuxStateDir, localSessionName);
+
+  const server = http.createServer((req, res) => {
+    const authorize = req.headers.authorization;
+    assert.strictEqual(authorize, "Bearer access-abc");
+
+    if (req.method === "GET" && req.url === "/v1/cli/teleport/target") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          instance: {
+            id: "inst_e2b_auth_missing",
+            provider: "e2b",
+            state: "running",
+            sandbox_id: "sandbox_auth_missing",
+            template_id: "template_teleport_v1",
+            machine_token_id: "machine-token-123",
+            last_seen_at: "2026-03-12T10:00:00Z",
+            resume_requested_at: "2026-03-12T09:58:00Z",
+          },
+          transport: "e2b",
+          sandbox_id: "sandbox_auth_missing",
+          template_id: "template_teleport_v1",
+          project_root: "/home/user/agentic",
+          audit_log: [],
+        })
+      );
+      return;
+    }
+
+    res.writeHead(404, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: "not_found" }));
+  });
+
+  await new Promise((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  pointSessionAtBaseUrl(sessionPath, `http://127.0.0.1:${address.port}`);
+
+  try {
+    const result = await runTeleport(["--managed"], {
+      ...process.env,
+      PATH: `${fakeBinDir}:${process.env.PATH}`,
+      SUPERTURTLE_CLOUD_SESSION_PATH: sessionPath,
+      SUPERTURTLE_TELEPORT_E2B_HELPER_PATH: helperPath,
+      SUPERTURTLE_TELEPORT_CTL_PATH: ctlPath,
+      SUPERTURTLE_TEST_TMUX_STATE_DIR: tmuxStateDir,
+      SUPERTURTLE_TELEPORT_CODEX_AUTH_PATH: resolve(tmpDir, "missing-codex-auth.json"),
+    });
+
+    assert.strictEqual(result.code, 1, `expected auth preflight failure, got stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+    assert.match(
+      result.stderr,
+      /\[teleport\]\[remote\] Missing destination Codex auth\. Run 'codex login' on the destination or set SUPERTURTLE_TELEPORT_CODEX_AUTH_PATH locally before teleport\./
+    );
+    assert.match(result.stdout, /\[teleport\] verifying destination auth for active driver \(codex\)/);
+    assert.ok(tmuxSessionExists(tmuxStateDir, localSessionName), "expected local tmux session to remain running when auth preflight fails");
+
+    const helperLog = readHelperLog(e2bHelperLogPath);
+    assert.ok(
+      helperLog.some(
+        (entry) =>
+          entry.subcommand === "run-script" &&
+          /Missing destination Codex auth/.test(entry.script)
+      ),
+      "expected destination auth preflight to run"
+    );
+    assert.ok(
+      !helperLog.some((entry) => entry.subcommand === "run-script" && /bun install/.test(entry.script)),
+      "expected teleport to fail before remote dependency install"
+    );
+    assert.ok(
+      !helperLog.some((entry) => entry.subcommand === "run-script" && /bun super_turtle\/bin\/superturtle\.js start/.test(entry.script)),
+      "expected teleport to fail before remote start"
+    );
+  } finally {
+    server.close();
+  }
+}
+
 async function main() {
   const tmpDir = fs.mkdtempSync(resolve(os.tmpdir(), "superturtle-teleport-managed-"));
   try {
@@ -1532,6 +1650,7 @@ async function main() {
     await testManagedTeleportContinuesWhenMachineBootstrapFails(resolve(tmpDir, "e2b-control-plane-warning"));
     await testManagedTeleportBootstrapsLocalClaudeAuthIntoSandbox(resolve(tmpDir, "e2b-claude-auth"));
     await testManagedTeleportBootstrapsLocalCodexAuthIntoSandbox(resolve(tmpDir, "e2b-codex-auth"));
+    await testManagedTeleportFailsBeforeShutdownWhenCodexAuthMissing(resolve(tmpDir, "e2b-auth-missing"));
     await testManagedTeleportRollsBackLocalBotWhenRemoteVerifyFails(resolve(tmpDir, "e2b-rollback"));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
