@@ -16,6 +16,7 @@ const HELPER_TIMEOUT_MS = 60 * 1000;
 const REMOTE_DIR = "/tmp/superturtle-live-smoke";
 const REMOTE_FILE = `${REMOTE_DIR}/handoff.txt`;
 const REMOTE_PROJECT_ROOT = `${REMOTE_DIR}/project`;
+const REMOTE_HOME = "/home/user";
 const TEMP_SCRIPT_PREFIX = "superturtle-teleport-";
 
 function skip(message) {
@@ -92,16 +93,30 @@ async function main() {
   const sourcePath = resolve(tmpDir, "handoff.txt");
   const archiveSourceDir = resolve(tmpDir, "archive-source");
   const archivePath = resolve(tmpDir, "repo.tar.gz");
+  const authArchiveSourceDir = resolve(tmpDir, "auth-archive-source");
+  const authArchivePath = resolve(tmpDir, "auth-bootstrap.tar.gz");
   const payload = `semantic handoff ${Date.now()}\n`;
   fs.writeFileSync(sourcePath, payload);
   fs.mkdirSync(resolve(archiveSourceDir, "runtime-import"), { recursive: true });
   fs.writeFileSync(resolve(archiveSourceDir, "runtime-import", "handoff.txt"), payload);
   fs.writeFileSync(resolve(archiveSourceDir, "README.md"), "sandbox cutover smoke\n");
+  fs.mkdirSync(resolve(authArchiveSourceDir, ".superturtle", "managed-runtime"), { recursive: true });
+  fs.mkdirSync(resolve(authArchiveSourceDir, ".codex"), { recursive: true });
+  fs.writeFileSync(
+    resolve(authArchiveSourceDir, ".superturtle", "managed-runtime", "claude-access-token.txt"),
+    "claude-live-token\n"
+  );
+  fs.writeFileSync(resolve(authArchiveSourceDir, ".codex", "auth.json"), '{"token":"codex-live"}\n');
   const archiveResult = spawnSync("tar", ["-czf", archivePath, "-C", archiveSourceDir, "."], {
     cwd: REPO_ROOT,
     stdio: "pipe",
   });
   assert.strictEqual(archiveResult.status, 0, archiveResult.stderr.toString("utf-8"));
+  const authArchiveResult = spawnSync("tar", ["-czf", authArchivePath, "-C", authArchiveSourceDir, "."], {
+    cwd: REPO_ROOT,
+    stdio: "pipe",
+  });
+  assert.strictEqual(authArchiveResult.status, 0, authArchiveResult.stderr.toString("utf-8"));
 
   let sandbox = null;
   try {
@@ -141,6 +156,38 @@ async function main() {
     const syncedReadme = await sandbox.files.read(`${REMOTE_PROJECT_ROOT}/README.md`);
     assert.strictEqual(syncedReadme, "sandbox cutover smoke\n");
 
+    const extractClaudeResult = await runHelper([
+      "extract-archive",
+      "--sandbox-id",
+      sandboxId,
+      "--source",
+      authArchivePath,
+      "--destination-root",
+      REMOTE_PROJECT_ROOT,
+      "--archive-path",
+      "/tmp/superturtle-live-auth-project.tar.gz",
+    ]);
+    assert.strictEqual(extractClaudeResult.code, 0, extractClaudeResult.stderr);
+    const extractedClaudeToken = await sandbox.files.read(
+      `${REMOTE_PROJECT_ROOT}/.superturtle/managed-runtime/claude-access-token.txt`
+    );
+    assert.strictEqual(extractedClaudeToken, "claude-live-token\n");
+
+    const extractCodexResult = await runHelper([
+      "extract-archive",
+      "--sandbox-id",
+      sandboxId,
+      "--source",
+      authArchivePath,
+      "--destination-root",
+      REMOTE_HOME,
+      "--archive-path",
+      "/tmp/superturtle-live-auth-home.tar.gz",
+    ]);
+    assert.strictEqual(extractCodexResult.code, 0, extractCodexResult.stderr);
+    const extractedCodexAuth = await sandbox.files.read(`${REMOTE_HOME}/.codex/auth.json`);
+    assert.strictEqual(extractedCodexAuth, '{"token":"codex-live"}\n');
+
     const scriptBody = [
       "set -euo pipefail",
       "pwd",
@@ -179,7 +226,9 @@ async function main() {
         (entry) =>
           entry.name !== undefined &&
           !String(entry.name).startsWith(TEMP_SCRIPT_PREFIX) &&
-          String(entry.name) !== "superturtle-live-sync.tar.gz"
+          String(entry.name) !== "superturtle-live-sync.tar.gz" &&
+          String(entry.name) !== "superturtle-live-auth-project.tar.gz" &&
+          String(entry.name) !== "superturtle-live-auth-home.tar.gz"
       ),
       "expected helper temp scripts to be cleaned up from /tmp"
     );
