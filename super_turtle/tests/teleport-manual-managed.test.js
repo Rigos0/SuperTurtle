@@ -11,6 +11,7 @@ const REPO_ROOT = resolve(__dirname, "..", "..");
 const SCRIPT_PATH = resolve(REPO_ROOT, "super_turtle", "scripts", "teleport-manual.sh");
 const TELEPORT_CONTEXT_PATH = resolve(REPO_ROOT, ".superturtle", "teleport", "context.json");
 const ENV_FILE_PATH = resolve(REPO_ROOT, ".superturtle", ".env");
+const LOCAL_CLOUD_LEASE_PATH = resolve(REPO_ROOT, ".superturtle", "cloud-runtime-lease.json");
 
 function readEnvValue(path, key) {
   if (!fs.existsSync(path)) {
@@ -266,6 +267,36 @@ function pointSessionAtBaseUrl(sessionPath, baseUrl) {
 
 function writeManagedTargetOverride(path, payload) {
   fs.writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`);
+}
+
+function writeLocalCloudLeaseState(payload = {}) {
+  fs.mkdirSync(resolve(REPO_ROOT, ".superturtle"), { recursive: true });
+  fs.writeFileSync(
+    LOCAL_CLOUD_LEASE_PATH,
+    `${JSON.stringify(
+      {
+        claimed_at: "2026-03-12T10:00:00Z",
+        control_plane: "http://127.0.0.1:1",
+        runtime_id: "runtime_local_teleport",
+        tmux_session: deriveLocalTmuxSessionName(),
+        lease: {
+          lease_id: "lease_local_teleport",
+          lease_epoch: 4,
+          runtime_id: "runtime_local_teleport",
+          owner_type: "local",
+          owner_hostname: "test-host",
+          owner_pid: 4321,
+          acquired_at: "2026-03-12T10:00:00Z",
+          heartbeat_at: "2026-03-12T10:00:15Z",
+          expires_at: "2026-03-12T10:01:00Z",
+          metadata: {},
+        },
+        ...payload,
+      },
+      null,
+      2
+    )}\n`
+  );
 }
 
 async function testManagedTeleportWaitsForResume(tmpDir) {
@@ -1053,12 +1084,22 @@ function tmuxSessionExists(stateDir, sessionName) {
 }
 
 async function testManagedTeleportUsesE2BHelperForSandboxCutover(tmpDir) {
-  const { fakeBinDir, sshLogPath, rsyncLogPath, sessionPath, ctlPath, e2bHelperLogPath } = createBaseEnvironment(tmpDir);
+  const {
+    fakeBinDir,
+    sshLogPath,
+    rsyncLogPath,
+    sessionPath,
+    ctlPath,
+    e2bHelperLogPath,
+    tmuxStateDir,
+  } = createBaseEnvironment(tmpDir);
   const helperPath = resolve(tmpDir, "fake-e2b-helper");
   const sandboxRoot = resolve(tmpDir, "sandbox-root");
   createFakeE2BHelper(helperPath, e2bHelperLogPath, sandboxRoot);
   const machineRegisterPayloads = [];
   const machineHeartbeatPayloads = [];
+  let runtimeLeaseReleases = 0;
+  let releasedLeasePayload = null;
 
   const server = http.createServer((req, res) => {
     const authorize = req.headers.authorization;
@@ -1113,6 +1154,38 @@ async function testManagedTeleportUsesE2BHelperForSandboxCutover(tmpDir) {
       return;
     }
 
+    if (req.method === "POST" && req.url === "/v1/cli/runtime/lease/release") {
+      assert.strictEqual(authorize, "Bearer access-abc");
+      let body = "";
+      req.setEncoding("utf-8");
+      req.on("data", (chunk) => {
+        body += chunk;
+      });
+      req.on("end", () => {
+        runtimeLeaseReleases += 1;
+        releasedLeasePayload = JSON.parse(body);
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(
+          JSON.stringify({
+            released: true,
+            lease: {
+              lease_id: "lease_local_teleport",
+              lease_epoch: 4,
+              runtime_id: "runtime_local_teleport",
+              owner_type: "local",
+              owner_hostname: "test-host",
+              owner_pid: 4321,
+              acquired_at: "2026-03-12T10:00:00Z",
+              heartbeat_at: "2026-03-12T10:00:15Z",
+              expires_at: "2026-03-12T10:01:00Z",
+              metadata: {},
+            },
+          })
+        );
+      });
+      return;
+    }
+
     res.writeHead(404, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: "not_found" }));
   });
@@ -1123,12 +1196,15 @@ async function testManagedTeleportUsesE2BHelperForSandboxCutover(tmpDir) {
   pointSessionAtBaseUrl(sessionPath, `http://127.0.0.1:${address.port}`);
 
   try {
+    writeTmuxSession(tmuxStateDir, deriveLocalTmuxSessionName());
+    writeLocalCloudLeaseState();
     const result = await runTeleport(["--managed"], {
       ...process.env,
       PATH: `${fakeBinDir}:${process.env.PATH}`,
       SUPERTURTLE_CLOUD_SESSION_PATH: sessionPath,
       SUPERTURTLE_TELEPORT_E2B_HELPER_PATH: helperPath,
       SUPERTURTLE_TELEPORT_CTL_PATH: ctlPath,
+      SUPERTURTLE_TEST_TMUX_STATE_DIR: tmuxStateDir,
       SUPERTURTLE_TELEPORT_E2B_HEARTBEAT_AUTOSTART: "0",
     });
 
@@ -1136,9 +1212,17 @@ async function testManagedTeleportUsesE2BHelperForSandboxCutover(tmpDir) {
     assert.match(result.stdout, /\[teleport\] managed sandbox: sandbox_123/);
     assert.match(result.stdout, /\[teleport\] template id: template_teleport_v1/);
     assert.match(result.stdout, /\[teleport\] project root: \/home\/user\/agentic/);
+    assert.match(result.stdout, /\[teleport\] releasing local hosted runtime ownership/);
     assert.match(result.stdout, /\[teleport\] success/);
     assert.ok(!fs.existsSync(sshLogPath), "expected SSH not to run for an E2B target");
     assert.ok(!fs.existsSync(rsyncLogPath), "expected rsync not to run for an E2B target");
+    assert.strictEqual(runtimeLeaseReleases, 1, "expected one local hosted lease release before remote startup");
+    assert.deepStrictEqual(releasedLeasePayload, {
+      lease_id: "lease_local_teleport",
+      lease_epoch: 4,
+      runtime_id: "runtime_local_teleport",
+    });
+    assert.ok(!fs.existsSync(LOCAL_CLOUD_LEASE_PATH), "expected local hosted lease file to be cleared after release");
 
     const helperLog = readHelperLog(e2bHelperLogPath);
     assert.ok(helperLog.some((entry) => entry.subcommand === "sync-archive"), "expected archive sync");
@@ -1218,6 +1302,7 @@ async function testManagedTeleportUsesE2BHelperForSandboxCutover(tmpDir) {
       "superturtle-machine-heartbeat-sandbox_123"
     );
   } finally {
+    fs.rmSync(LOCAL_CLOUD_LEASE_PATH, { force: true });
     server.close();
   }
 }

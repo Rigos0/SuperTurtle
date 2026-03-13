@@ -61,6 +61,7 @@ ROLLBACK_ATTEMPTED=0
 LATEST_FAILURE_REASON=""
 LOCAL_CLAUDE_ACCESS_TOKEN=""
 LOCAL_CLOUD_SESSION_PATH=""
+LOCAL_CLOUD_LEASE_PATH="${REPO_ROOT}/.superturtle/cloud-runtime-lease.json"
 
 if [[ ! "$MACHINE_HEARTBEAT_INTERVAL_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
   echo "[teleport] SUPERTURTLE_TELEPORT_MACHINE_HEARTBEAT_INTERVAL_SECONDS must be a positive integer" >&2
@@ -1509,6 +1510,84 @@ stop_local_bot() {
   fi
 }
 
+release_local_hosted_lease() {
+  if (( LOCAL_BOT_STOPPED == 0 )) || [[ ! -f "$LOCAL_CLOUD_LEASE_PATH" ]]; then
+    return 0
+  fi
+
+  echo "[teleport] releasing local hosted runtime ownership"
+  set_phase "releasing_local_ownership"
+  node - "$REPO_ROOT" "$LOCAL_CLOUD_LEASE_PATH" <<'EOF'
+const fs = require("fs");
+const path = require("path");
+
+const repoRoot = process.argv[2];
+const leasePath = process.argv[3];
+const {
+  isRetryableCloudError,
+  persistSessionIfChanged,
+  readSession,
+  releaseRuntimeLease,
+} = require(path.resolve(repoRoot, "super_turtle", "bin", "cloud.js"));
+
+async function main() {
+  if (!fs.existsSync(leasePath)) {
+    return;
+  }
+
+  let leaseState;
+  try {
+    leaseState = JSON.parse(fs.readFileSync(leasePath, "utf-8"));
+  } catch (error) {
+    throw new Error(`Local hosted runtime lease state is unreadable: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  const leaseId = leaseState?.lease?.lease_id;
+  const leaseEpoch = leaseState?.lease?.lease_epoch;
+  const runtimeId = leaseState?.runtime_id;
+
+  if (!leaseId || !Number.isInteger(leaseEpoch) || !runtimeId) {
+    fs.rmSync(leasePath, { force: true });
+    return;
+  }
+
+  let session = readSession(process.env);
+  if (!session?.access_token) {
+    throw new Error("Linked cloud session missing while releasing local hosted runtime ownership.");
+  }
+
+  try {
+    const result = await releaseRuntimeLease(
+      session,
+      {
+        lease_id: leaseId,
+        lease_epoch: leaseEpoch,
+        runtime_id: runtimeId,
+      },
+      process.env
+    );
+    persistSessionIfChanged(session, result.session, process.env);
+  } catch (error) {
+    if (error && typeof error === "object" && error.session) {
+      session = persistSessionIfChanged(session, error.session, process.env);
+    }
+    const detail = error instanceof Error ? error.message : String(error);
+    if (isRetryableCloudError(error)) {
+      throw new Error(`Timed out releasing local hosted runtime ownership: ${detail}`);
+    }
+    throw new Error(`Failed to release local hosted runtime ownership: ${detail}`);
+  }
+
+  fs.rmSync(leasePath, { force: true });
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+});
+EOF
+}
+
 restart_local_bot() {
   echo "[teleport] restarting local bot after failed cutover"
   (
@@ -1800,6 +1879,8 @@ set_phase "exporting_final_handoff"
 run_handoff_export
 
 stop_local_bot
+
+release_local_hosted_lease
 
 echo "[teleport] final sync"
 set_phase "final_sync"
