@@ -647,21 +647,7 @@ e2b_sync_repo() {
   local remote_archive="/tmp/superturtle-teleport-${E2B_SANDBOX_ID}-${CURRENT_PHASE}.tar.gz"
   local status=0
 
-  if ! e2b_helper upload-file --sandbox-id "$E2B_SANDBOX_ID" --source "$archive_path" --destination "$remote_archive"; then
-    status=$?
-  elif ! remote_bash "$REMOTE_ROOT" "$remote_archive" <<'EOF'
-set -euo pipefail
-remote_root="$1"
-archive_path="$2"
-
-parent_dir="$(dirname "$remote_root")"
-mkdir -p "$parent_dir"
-rm -rf "$remote_root"
-mkdir -p "$remote_root"
-tar -xzf "$archive_path" -C "$remote_root"
-rm -f "$archive_path"
-EOF
-  then
+  if ! e2b_helper sync-archive --sandbox-id "$E2B_SANDBOX_ID" --source "$archive_path" --remote-root "$REMOTE_ROOT" --archive-path "$remote_archive"; then
     status=$?
   fi
 

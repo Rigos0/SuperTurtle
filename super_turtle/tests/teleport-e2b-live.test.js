@@ -4,7 +4,7 @@ const assert = require("assert");
 const fs = require("fs");
 const os = require("os");
 const { resolve } = require("path");
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 const { Sandbox } = require("e2b");
 
 const REPO_ROOT = resolve(__dirname, "..", "..");
@@ -15,6 +15,7 @@ const SANDBOX_TIMEOUT_MS = 5 * 60 * 1000;
 const HELPER_TIMEOUT_MS = 60 * 1000;
 const REMOTE_DIR = "/tmp/superturtle-live-smoke";
 const REMOTE_FILE = `${REMOTE_DIR}/handoff.txt`;
+const REMOTE_PROJECT_ROOT = `${REMOTE_DIR}/project`;
 const TEMP_SCRIPT_PREFIX = "superturtle-teleport-";
 
 function skip(message) {
@@ -89,8 +90,18 @@ async function main() {
 
   const tmpDir = fs.mkdtempSync(resolve(os.tmpdir(), "superturtle-teleport-e2b-live-"));
   const sourcePath = resolve(tmpDir, "handoff.txt");
+  const archiveSourceDir = resolve(tmpDir, "archive-source");
+  const archivePath = resolve(tmpDir, "repo.tar.gz");
   const payload = `semantic handoff ${Date.now()}\n`;
   fs.writeFileSync(sourcePath, payload);
+  fs.mkdirSync(resolve(archiveSourceDir, "runtime-import"), { recursive: true });
+  fs.writeFileSync(resolve(archiveSourceDir, "runtime-import", "handoff.txt"), payload);
+  fs.writeFileSync(resolve(archiveSourceDir, "README.md"), "sandbox cutover smoke\n");
+  const archiveResult = spawnSync("tar", ["-czf", archivePath, "-C", archiveSourceDir, "."], {
+    cwd: REPO_ROOT,
+    stdio: "pipe",
+  });
+  assert.strictEqual(archiveResult.status, 0, archiveResult.stderr.toString("utf-8"));
 
   let sandbox = null;
   try {
@@ -112,11 +123,30 @@ async function main() {
     const uploadedPayload = await sandbox.files.read(REMOTE_FILE);
     assert.strictEqual(uploadedPayload, payload);
 
+    const syncResult = await runHelper([
+      "sync-archive",
+      "--sandbox-id",
+      sandboxId,
+      "--source",
+      archivePath,
+      "--remote-root",
+      REMOTE_PROJECT_ROOT,
+      "--archive-path",
+      "/tmp/superturtle-live-sync.tar.gz",
+    ]);
+    assert.strictEqual(syncResult.code, 0, syncResult.stderr);
+
+    const syncedPayload = await sandbox.files.read(`${REMOTE_PROJECT_ROOT}/runtime-import/handoff.txt`);
+    assert.strictEqual(syncedPayload, payload);
+    const syncedReadme = await sandbox.files.read(`${REMOTE_PROJECT_ROOT}/README.md`);
+    assert.strictEqual(syncedReadme, "sandbox cutover smoke\n");
+
     const scriptBody = [
       "set -euo pipefail",
       "pwd",
       "printf 'args=%s,%s\\n' \"$1\" \"$2\"",
-      `cat ${REMOTE_FILE}`,
+      "test -f runtime-import/handoff.txt",
+      "cat runtime-import/handoff.txt",
       "",
     ].join("\n");
     const runResult = await runHelper(
@@ -125,7 +155,7 @@ async function main() {
         "--sandbox-id",
         sandboxId,
         "--cwd",
-        REMOTE_DIR,
+        REMOTE_PROJECT_ROOT,
         "--timeout-ms",
         "20000",
         "--",
@@ -139,13 +169,18 @@ async function main() {
     );
 
     assert.strictEqual(runResult.code, 0, runResult.stderr);
-    assert.match(runResult.stdout, new RegExp(`^${REMOTE_DIR}$`, "m"));
+    assert.match(runResult.stdout, new RegExp(`^${REMOTE_PROJECT_ROOT}$`, "m"));
     assert.match(runResult.stdout, /^args=alpha,beta$/m);
     assert.match(runResult.stdout, new RegExp(payload.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "m"));
 
     const tmpEntries = await sandbox.files.list("/tmp");
     assert.ok(
-      tmpEntries.every((entry) => entry.name !== undefined && !String(entry.name).startsWith(TEMP_SCRIPT_PREFIX)),
+      tmpEntries.every(
+        (entry) =>
+          entry.name !== undefined &&
+          !String(entry.name).startsWith(TEMP_SCRIPT_PREFIX) &&
+          String(entry.name) !== "superturtle-live-sync.tar.gz"
+      ),
       "expected helper temp scripts to be cleaned up from /tmp"
     );
   } finally {

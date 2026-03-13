@@ -4,7 +4,7 @@ const assert = require("assert");
 const fs = require("fs");
 const os = require("os");
 const { dirname, resolve } = require("path");
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 
 const REPO_ROOT = resolve(__dirname, "..", "..");
 const HELPER_PATH = resolve(REPO_ROOT, "super_turtle", "bin", "teleport-e2b.js");
@@ -18,7 +18,8 @@ function createFakeSdkModule(tmpDir, exportStyle) {
   const sdkPath = resolve(tmpDir, `fake-e2b-${exportStyle}.mjs`);
   writeExecutable(
     sdkPath,
-    `import fs from "fs";
+    `import { spawnSync } from "child_process";
+import fs from "fs";
 import { dirname, resolve } from "path";
 
 const sandboxRoot = process.env.FAKE_E2B_SANDBOX_ROOT;
@@ -71,6 +72,26 @@ class FakeSandbox {
         if (removeMatch) {
           fs.rmSync(mapPath(removeMatch[1]), { force: true });
           return { exitCode: 0, stdout: "", stderr: "" };
+        }
+
+        const removeDirectoryMatch = command.match(/^rm -rf '([^']+)'$/);
+        if (removeDirectoryMatch) {
+          fs.rmSync(mapPath(removeDirectoryMatch[1]), { recursive: true, force: true });
+          return { exitCode: 0, stdout: "", stderr: "" };
+        }
+
+        const archiveExtractMatch = command.match(/^tar -xzf '([^']+)' -C '([^']+)'$/);
+        if (archiveExtractMatch) {
+          const archivePath = archiveExtractMatch[1];
+          const destinationDir = archiveExtractMatch[2];
+          const result = spawnSync("tar", ["-xzf", mapPath(archivePath), "-C", mapPath(destinationDir)], {
+            stdio: "pipe",
+          });
+          return {
+            exitCode: result.status || 0,
+            stdout: result.stdout.toString("utf-8"),
+            stderr: result.stderr.toString("utf-8"),
+          };
         }
 
         if (typeof options.onStdout === "function") {
@@ -176,6 +197,64 @@ async function testUploadFileUsesSandboxSdk(tmpDir) {
   assert.strictEqual(logEntries[2].destinationPath, "/workspace/state/handoff.txt");
 }
 
+async function testSyncArchiveUploadsAndExtractsRepoArchive(tmpDir) {
+  const sandboxRoot = resolve(tmpDir, "sandbox-sync");
+  const logPath = resolve(tmpDir, "sync.log.jsonl");
+  const sdkPath = createFakeSdkModule(tmpDir, "named");
+  const archiveSourceDir = resolve(tmpDir, "archive-source");
+  const archivePath = resolve(tmpDir, "repo.tar.gz");
+
+  fs.mkdirSync(resolve(archiveSourceDir, "runtime-import"), { recursive: true });
+  fs.writeFileSync(resolve(archiveSourceDir, "runtime-import", "handoff.txt"), "semantic continuity\n");
+  fs.writeFileSync(resolve(archiveSourceDir, "README.md"), "sandbox sync\n");
+
+  const archiveResult = spawnSync("tar", ["-czf", archivePath, "-C", archiveSourceDir, "."], {
+    cwd: REPO_ROOT,
+    stdio: "pipe",
+  });
+  assert.strictEqual(archiveResult.status, 0, archiveResult.stderr.toString("utf-8"));
+
+  const result = await runHelper(
+    [
+      "sync-archive",
+      "--sandbox-id",
+      "sandbox_sync",
+      "--source",
+      archivePath,
+      "--remote-root",
+      "/workspace/project",
+      "--archive-path",
+      "/tmp/custom-sync.tar.gz",
+    ],
+    {
+      env: {
+        ...process.env,
+        SUPERTURTLE_TELEPORT_E2B_SDK_PATH: sdkPath,
+        FAKE_E2B_SANDBOX_ROOT: sandboxRoot,
+        FAKE_E2B_LOG_PATH: logPath,
+      },
+    }
+  );
+
+  assert.strictEqual(result.code, 0, result.stderr);
+  assert.strictEqual(fs.readFileSync(resolve(sandboxRoot, "workspace", "project", "runtime-import", "handoff.txt"), "utf-8"), "semantic continuity\n");
+  assert.strictEqual(fs.readFileSync(resolve(sandboxRoot, "workspace", "project", "README.md"), "utf-8"), "sandbox sync\n");
+  assert.ok(!fs.existsSync(resolve(sandboxRoot, "tmp", "custom-sync.tar.gz")), "expected temporary archive cleanup");
+
+  const logEntries = readLog(logPath);
+  assert.deepStrictEqual(
+    logEntries.map((entry) => entry.type),
+    ["connect", "run", "write", "run", "run", "run", "run", "run"]
+  );
+  assert.match(logEntries[1].command, /^mkdir -p '\/tmp'$/);
+  assert.strictEqual(logEntries[2].destinationPath, "/tmp/custom-sync.tar.gz");
+  assert.strictEqual(logEntries[3].command, "mkdir -p '/workspace'");
+  assert.strictEqual(logEntries[4].command, "rm -rf '/workspace/project'");
+  assert.strictEqual(logEntries[5].command, "mkdir -p '/workspace/project'");
+  assert.strictEqual(logEntries[6].command, "tar -xzf '/tmp/custom-sync.tar.gz' -C '/workspace/project'");
+  assert.strictEqual(logEntries[7].command, "rm -f '/tmp/custom-sync.tar.gz'");
+}
+
 async function testRunScriptUsesDefaultExportAndCleansUpTempScript(tmpDir) {
   const sandboxRoot = resolve(tmpDir, "sandbox-run");
   const logPath = resolve(tmpDir, "run.log.jsonl");
@@ -254,6 +333,7 @@ async function main() {
   const tmpDir = fs.mkdtempSync(resolve(os.tmpdir(), "superturtle-teleport-e2b-"));
   try {
     await testUploadFileUsesSandboxSdk(resolve(tmpDir, "upload"));
+    await testSyncArchiveUploadsAndExtractsRepoArchive(resolve(tmpDir, "sync"));
     await testRunScriptUsesDefaultExportAndCleansUpTempScript(resolve(tmpDir, "run"));
     await testRunScriptSurfacesCommandFailure(resolve(tmpDir, "failure"));
   } finally {

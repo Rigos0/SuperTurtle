@@ -8,6 +8,7 @@ function usage() {
   console.error(
     "Usage:\n" +
       "  node super_turtle/bin/teleport-e2b.js upload-file --sandbox-id <id> --source <path> --destination <path>\n" +
+      "  node super_turtle/bin/teleport-e2b.js sync-archive --sandbox-id <id> --source <path> --remote-root <path> [--archive-path <path>]\n" +
       "  node super_turtle/bin/teleport-e2b.js run-script --sandbox-id <id> [--cwd <path>] [--timeout-ms <ms>] -- <command> [args...]\n"
   );
 }
@@ -167,6 +168,37 @@ async function uploadFile(commandArgs) {
   await sandbox.files.write(destinationPath, payload);
 }
 
+async function syncArchive(commandArgs) {
+  const { options } = parseOptions(commandArgs);
+  const sandboxId = readRequiredOption(options, "sandbox_id");
+  const sourcePath = readRequiredOption(options, "source");
+  const remoteRoot = readRequiredOption(options, "remote_root");
+  const archivePath =
+    typeof options.archive_path === "string" && options.archive_path.length > 0
+      ? options.archive_path
+      : `/tmp/superturtle-teleport-sync-${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2)}.tar.gz`;
+  const sandbox = await connectSandbox(sandboxId);
+  await ensureRemoteParent(sandbox, archivePath);
+  const payload = fs.readFileSync(sourcePath);
+  await sandbox.files.write(archivePath, payload);
+
+  const remoteParent = path.posix.dirname(remoteRoot);
+  try {
+    await runCommandInSandbox(sandbox, `mkdir -p ${shellQuote(remoteParent)}`, { cwd: "/" });
+    await runCommandInSandbox(sandbox, `rm -rf ${shellQuote(remoteRoot)}`, { cwd: "/" });
+    await runCommandInSandbox(sandbox, `mkdir -p ${shellQuote(remoteRoot)}`, { cwd: "/" });
+    await runCommandInSandbox(
+      sandbox,
+      `tar -xzf ${shellQuote(archivePath)} -C ${shellQuote(remoteRoot)}`,
+      { cwd: "/" }
+    );
+  } finally {
+    try {
+      await runCommandInSandbox(sandbox, `rm -f ${shellQuote(archivePath)}`, { cwd: "/" });
+    } catch {}
+  }
+}
+
 async function runScript(commandArgs) {
   const { options, positional } = parseOptions(commandArgs);
   const sandboxId = readRequiredOption(options, "sandbox_id");
@@ -211,6 +243,9 @@ async function main() {
     switch (subcommand) {
       case "upload-file":
         await uploadFile(commandArgs);
+        return;
+      case "sync-archive":
+        await syncArchive(commandArgs);
         return;
       case "run-script":
         await runScript(commandArgs);

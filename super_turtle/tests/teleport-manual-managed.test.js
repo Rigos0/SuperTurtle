@@ -659,7 +659,7 @@ async function testManagedTeleportTimesOutWithSandboxWordingForE2BRuntime(tmpDir
       ...process.env,
       PATH: `${fakeBinDir}:${process.env.PATH}`,
       SUPERTURTLE_CLOUD_SESSION_PATH: sessionPath,
-      SUPERTURTLE_TELEPORT_INSTANCE_READY_TIMEOUT_MS: "100",
+      SUPERTURTLE_TELEPORT_INSTANCE_READY_TIMEOUT_MS: "250",
       SUPERTURTLE_TELEPORT_INSTANCE_READY_POLL_INTERVAL_MS: "10",
     });
 
@@ -670,7 +670,7 @@ async function testManagedTeleportTimesOutWithSandboxWordingForE2BRuntime(tmpDir
     assert.match(result.stderr, /waiting for managed sandbox to become ready/i);
     assert.match(
       result.stderr,
-      /Timed out waiting for the managed sandbox to become ready after 100ms \(instance state provisioning, job resume running\)\./
+      /Timed out waiting for the managed sandbox to become ready after 250ms \(instance state provisioning, job resume running\)\./
     );
   } finally {
     server.close();
@@ -712,6 +712,27 @@ function runUpload(args) {
   fs.mkdirSync(dirname(sandboxDestination), { recursive: true });
   fs.copyFileSync(source, sandboxDestination);
   log({ subcommand: "upload-file", sandboxId, source, destination });
+}
+
+function runSyncArchive(args) {
+  const sandboxId = readOption(args, "--sandbox-id");
+  const source = readOption(args, "--source");
+  const remoteRoot = readOption(args, "--remote-root");
+  const archivePath = readOption(args, "--archive-path");
+  const sandboxArchivePath = sandboxPath(archivePath);
+  const sandboxRemoteRoot = sandboxPath(remoteRoot);
+  fs.mkdirSync(dirname(sandboxArchivePath), { recursive: true });
+  fs.copyFileSync(source, sandboxArchivePath);
+  fs.mkdirSync(dirname(sandboxRemoteRoot), { recursive: true });
+  fs.rmSync(sandboxRemoteRoot, { recursive: true, force: true });
+  fs.mkdirSync(sandboxRemoteRoot, { recursive: true });
+  const result = spawnSync("tar", ["-xzf", sandboxArchivePath, "-C", sandboxRemoteRoot], { stdio: "pipe" });
+  if (result.status !== 0) {
+    process.stderr.write(result.stderr);
+    process.exit(result.status || 1);
+  }
+  fs.rmSync(sandboxArchivePath, { force: true });
+  log({ subcommand: "sync-archive", sandboxId, source, remoteRoot, archivePath });
 }
 
 function runScript(args) {
@@ -764,6 +785,8 @@ const [subcommand, ...args] = process.argv.slice(2);
 try {
   if (subcommand === "upload-file") {
     runUpload(args);
+  } else if (subcommand === "sync-archive") {
+    runSyncArchive(args);
   } else if (subcommand === "run-script") {
     runScript(args);
   } else {
@@ -853,7 +876,7 @@ async function testManagedTeleportUsesE2BHelperForSandboxCutover(tmpDir) {
     assert.ok(!fs.existsSync(rsyncLogPath), "expected rsync not to run for an E2B target");
 
     const helperLog = readHelperLog(e2bHelperLogPath);
-    assert.ok(helperLog.some((entry) => entry.subcommand === "upload-file"), "expected archive upload");
+    assert.ok(helperLog.some((entry) => entry.subcommand === "sync-archive"), "expected archive sync");
     assert.ok(helperLog.some((entry) => entry.subcommand === "run-script" && /preflight ok/.test(entry.script)), "expected remote preflight");
     assert.ok(helperLog.some((entry) => entry.subcommand === "run-script" && /bun install/.test(entry.script)), "expected remote dependency install");
     assert.ok(helperLog.some((entry) => entry.subcommand === "run-script" && /teleport_handoff\.py" import/.test(entry.script)), "expected runtime import");
