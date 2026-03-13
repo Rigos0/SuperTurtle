@@ -1,5 +1,5 @@
 # Current task
-Surface clear preflight failures for missing login, missing cloud auth, and destination sandbox issues.
+Wire the deployed hosted control plane to real managed-runtime endpoints (/v1/cli/cloud/status, resume, teleport target).
 
 # End goal with specs
 A fully working /teleport feature where:
@@ -35,8 +35,8 @@ A fully working /teleport feature where:
 - [x] Add /teleport preflight summary with confirm/cancel before cutover using ask_user MCP tool for inline Telegram buttons
 - [x] Keep /teleport idle-only; reject while work is active or queued with clear error message
 - [x] Improve /teleport status with phase, active owner, destination runtime state, and latest failure reason
-- Surface clear preflight failures for missing login, missing cloud auth, and destination sandbox issues <- current
-- Wire the deployed hosted control plane to real managed-runtime endpoints (/v1/cli/cloud/status, resume, teleport target)
+- [x] Surface clear preflight failures for missing login, missing cloud auth, and destination sandbox issues
+- Wire the deployed hosted control plane to real managed-runtime endpoints (/v1/cli/cloud/status, resume, teleport target) <- current
 - Replace managed VM assumptions with one persistent E2B sandbox per user
 - Define managed-runtime lifecycle and idempotent sandbox create/connect-resume/pause/reprovision/delete behavior
 - Build the production superturtle-teleport E2B template with pinned toolchain, startup scripts, health checks, log paths, and provider config directories

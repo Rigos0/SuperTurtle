@@ -47,6 +47,15 @@ async function runTeleportProbe(messageText: string, options?: {
   existingLogs?: string[];
   activeLogContent?: string;
   existingLogContents?: Record<string, string>;
+  cloudSession?: "valid" | "missing" | "invalid";
+  cloudStatusResponse?: {
+    status?: number;
+    body?: Record<string, unknown>;
+  };
+  claudeStatusResponse?: {
+    status?: number;
+    body?: Record<string, unknown>;
+  };
 }): Promise<TeleportProbeResult> {
   const env: Record<string, string> = {
     ...process.env,
@@ -67,6 +76,35 @@ async function runTeleportProbe(messageText: string, options?: {
     const existingLogs = ${JSON.stringify(options?.existingLogs ?? [])};
     const activeLogContent = ${JSON.stringify(options?.activeLogContent ?? null)};
     const existingLogContents = ${JSON.stringify(options?.existingLogContents ?? {})};
+    const cloudSessionMode = ${JSON.stringify(options?.cloudSession ?? "valid")};
+    const cloudStatusResponse = ${JSON.stringify(options?.cloudStatusResponse ?? {
+      status: 200,
+      body: {
+        response: {
+          instance: {
+            id: "inst_123",
+            provider: "gcp",
+            state: "running",
+          },
+          provisioning_job: null,
+          audit_log: [],
+        },
+      },
+    })};
+    const claudeStatusResponse = ${JSON.stringify(options?.claudeStatusResponse ?? {
+      status: 200,
+      body: {
+        response: {
+          provider: "claude",
+          configured: true,
+          credential: {
+            provider: "claude",
+            state: "valid",
+          },
+          audit_log: [],
+        },
+      },
+    })};
 
     const replies = [];
     let spawnCmd = [];
@@ -85,19 +123,59 @@ async function runTeleportProbe(messageText: string, options?: {
 
     const { beginBackgroundRun, endBackgroundRun } = await import(driverRoutingPath);
     const { enqueueDeferredMessage } = await import(deferredQueuePath);
-    const { handleTeleportCommand } = await import(modulePath);
     const { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } = await import("fs");
     const { dirname, join } = await import("path");
     const { tmpdir } = await import("os");
 
     const ipcDir = mkdtempSync(join(tmpdir(), "teleport-ask-user-"));
     process.env.SUPERTURTLE_IPC_DIR = ipcDir;
+    const cloudConfigDir = mkdtempSync(join(process.cwd(), ".teleport-cloud-config-"));
+    process.env.XDG_CONFIG_HOME = cloudConfigDir;
+    process.env.SUPERTURTLE_CLOUD_SESSION_PATH = join(
+      cloudConfigDir,
+      "superturtle",
+      "cloud-session.json"
+    );
 
     const teleportStateDir = join(process.cwd(), ".superturtle", "teleport");
     const teleportLockPath = join(teleportStateDir, "managed-active.lock");
     const teleportLogDir = join(process.cwd(), ".superturtle", "logs", "teleport");
+    const cloudSessionPath = process.env.SUPERTURTLE_CLOUD_SESSION_PATH;
     rmSync(teleportStateDir, { recursive: true, force: true });
     rmSync(teleportLogDir, { recursive: true, force: true });
+    rmSync(cloudConfigDir, { recursive: true, force: true });
+    mkdirSync(dirname(cloudSessionPath), { recursive: true });
+    if (cloudSessionMode === "valid") {
+      writeFileSync(
+        cloudSessionPath,
+        JSON.stringify({
+          schema_version: 1,
+          control_plane: "https://cloud.example.com",
+          access_token: "access-token",
+        })
+      );
+    } else if (cloudSessionMode === "invalid") {
+      writeFileSync(cloudSessionPath, "{not-json");
+    }
+
+    globalThis.fetch = async (url) => {
+      const path = new URL(String(url)).pathname;
+      const selected = path === "/v1/cli/cloud/status"
+        ? cloudStatusResponse
+        : path === "/v1/cli/providers/claude/status"
+        ? claudeStatusResponse
+        : { status: 404, body: { error: "not_found" } };
+      return new Response(JSON.stringify(selected.body), {
+        status: selected.status,
+        headers: {
+          "content-type": "application/json",
+          "cache-control": "no-store",
+        },
+      });
+    };
+
+    const { handleTeleportCommand } = await import(modulePath);
+
     if (activeLock) {
       mkdirSync(teleportStateDir, { recursive: true });
       writeFileSync(
@@ -165,6 +243,7 @@ async function runTeleportProbe(messageText: string, options?: {
     if (activeLock?.logPath) {
       rmSync(activeLock.logPath, { force: true });
     }
+    rmSync(cloudConfigDir, { recursive: true, force: true });
     rmSync(ipcDir, { recursive: true, force: true });
     console.log(marker + JSON.stringify({ replies, spawnCmd, spawnOpts, unrefCalled, askUserRequest }));
   `;
@@ -205,7 +284,7 @@ describe("/teleport", () => {
     expect(result.payload).not.toBeNull();
     expect(result.payload?.replies).toHaveLength(1);
     expect(result.payload?.replies[0]?.text).toBe(
-      "❓ Teleport preflight:\nMode: dry-run\nDestination: linked managed SuperTurtle runtime\nChecks passed: bot idle, queue empty, no active teleport\nContinue?"
+      "❓ Teleport preflight:\nMode: dry-run\nDestination: linked managed SuperTurtle runtime\nChecks passed: bot idle, queue empty, no active teleport\nHosted checks: cloud login ready, managed Claude auth ready, destination runtime running\nContinue?"
     );
     const keyboardRows = (result.payload?.replies[0]?.extra?.reply_markup?.inline_keyboard || [])
       .filter((row) => row.length > 0);
@@ -214,7 +293,7 @@ describe("/teleport", () => {
       [{ text: "Cancel", callback_data: expect.stringMatching(/^askuser:[A-Za-z0-9._-]+:1$/) }],
     ]);
     expect(result.payload?.askUserRequest).toMatchObject({
-      question: "Teleport preflight:\nMode: dry-run\nDestination: linked managed SuperTurtle runtime\nChecks passed: bot idle, queue empty, no active teleport\nContinue?",
+      question: "Teleport preflight:\nMode: dry-run\nDestination: linked managed SuperTurtle runtime\nChecks passed: bot idle, queue empty, no active teleport\nHosted checks: cloud login ready, managed Claude auth ready, destination runtime running\nContinue?",
       options: ["Start dry-run", "Cancel"],
       status: "sent",
       chat_id: "123",
@@ -223,6 +302,115 @@ describe("/teleport", () => {
     });
     expect(result.payload?.spawnCmd).toEqual([]);
     expect(result.payload?.unrefCalled).toBe(false);
+  });
+
+  it("surfaces a missing cloud login before opening teleport confirmation", async () => {
+    const result = await runTeleportProbe("/teleport", {
+      cloudSession: "missing",
+    });
+
+    if (result.exitCode !== 0) {
+      throw new Error(`Teleport missing-login probe failed:\n${result.stderr || result.stdout}`);
+    }
+
+    expect(result.payload?.replies).toEqual([
+      {
+        text: expect.stringMatching(
+          /^❌ Teleport requires a linked cloud account\. Run `superturtle login` on this machine first\.\nExpected session file: .+cloud-session\.json$/
+        ),
+      },
+    ]);
+    expect(result.payload?.askUserRequest).toBeNull();
+    expect(result.payload?.spawnCmd).toEqual([]);
+  });
+
+  it("surfaces an invalid cloud session before opening teleport confirmation", async () => {
+    const result = await runTeleportProbe("/teleport", {
+      cloudSession: "invalid",
+    });
+
+    if (result.exitCode !== 0) {
+      throw new Error(`Teleport invalid-session probe failed:\n${result.stderr || result.stdout}`);
+    }
+
+    expect(result.payload?.replies).toEqual([
+      {
+        text: expect.stringMatching(
+          /^❌ Teleport requires a valid linked cloud session\. Run `superturtle login` again on this machine\.\nReason: Hosted session file at .+cloud-session\.json is invalid JSON\. Run 'superturtle logout' and then 'superturtle login' again\.$/
+        ),
+      },
+    ]);
+    expect(result.payload?.askUserRequest).toBeNull();
+    expect(result.payload?.spawnCmd).toEqual([]);
+  });
+
+  it("surfaces missing managed Claude auth before opening teleport confirmation", async () => {
+    const result = await runTeleportProbe("/teleport", {
+      claudeStatusResponse: {
+        status: 200,
+        body: {
+          response: {
+            provider: "claude",
+            configured: false,
+            credential: null,
+            audit_log: [],
+          },
+        },
+      },
+    });
+
+    if (result.exitCode !== 0) {
+      throw new Error(`Teleport missing-auth probe failed:\n${result.stderr || result.stdout}`);
+    }
+
+    expect(result.payload?.replies).toEqual([
+      {
+        text:
+          "❌ Teleport preflight failed:\n" +
+          "- Managed Claude auth is not configured. Run `superturtle cloud claude setup` on this machine first.",
+      },
+    ]);
+    expect(result.payload?.askUserRequest).toBeNull();
+    expect(result.payload?.spawnCmd).toEqual([]);
+  });
+
+  it("surfaces failed destination sandbox state before opening teleport confirmation", async () => {
+    const result = await runTeleportProbe("/teleport", {
+      cloudStatusResponse: {
+        status: 200,
+        body: {
+          response: {
+            instance: {
+              id: "inst_123",
+              provider: "gcp",
+              state: "failed",
+            },
+            provisioning_job: {
+              kind: "resume",
+              state: "failed",
+              error_code: "sandbox_boot_failed",
+              error_message: "sandbox bootstrap failed",
+            },
+            audit_log: [],
+          },
+        },
+      },
+    });
+
+    if (result.exitCode !== 0) {
+      throw new Error(`Teleport destination-state probe failed:\n${result.stderr || result.stdout}`);
+    }
+
+    expect(result.payload?.replies).toEqual([
+      {
+        text:
+          "❌ Teleport preflight failed:\n" +
+          "- The destination sandbox has a failed resume job: sandbox_boot_failed.\n" +
+          "- The destination sandbox is failed.",
+      },
+    ]);
+    expect(result.payload?.askUserRequest).toBeNull();
+    expect(result.payload?.spawnCmd).toEqual([]);
   });
 
   it("refuses to start while the bot is busy", async () => {

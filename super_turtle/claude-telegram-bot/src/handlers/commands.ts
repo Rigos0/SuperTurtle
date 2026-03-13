@@ -4,6 +4,7 @@
 
 import { InlineKeyboard, type Context } from "grammy";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, rmSync } from "fs";
+import { createRequire } from "module";
 import { join } from "path";
 import { session, getAvailableModels, EFFORT_DISPLAY, type EffortLevel } from "../session";
 import { codexSession } from "../codex-session";
@@ -49,6 +50,7 @@ const TELEPORT_CLAIM_DIR = `${TELEPORT_LOCK_PATH}.d`;
 export const TELEPORT_PREFLIGHT_COMMAND_KIND = "teleport_preflight";
 const LOOPLOGS_LINE_COUNT = 50;
 const RESUME_SESSIONS_LIMIT = 5;
+const require = createRequire(import.meta.url);
 const CLAUDE_USAGE_RATE_LIMIT_MESSAGE =
   "Claude usage is temporarily unavailable due to Anthropic service limits. This comes from Anthropic's usage endpoint, not from Super Turtle.";
 
@@ -118,6 +120,41 @@ type TeleportCommandOptions =
     action: "status";
   };
 
+type HostedCloudSession = Record<string, unknown>;
+
+type HostedCloudStatusResult = {
+  instance: {
+    state: string | null;
+  } | null;
+  provisioning_job: {
+    kind: string | null;
+    state: string | null;
+    error_code: string | null;
+    error_message: string | null;
+  } | null;
+};
+
+type HostedClaudeAuthStatusResult = {
+  configured: boolean | null;
+  credential: {
+    state: string | null;
+  } | null;
+};
+
+type HostedCloudModule = {
+  getSessionPath: (env?: NodeJS.ProcessEnv) => string;
+  getSessionControlPlaneBaseUrl: (session: HostedCloudSession, env?: NodeJS.ProcessEnv) => string;
+  invalidateSession: (env?: NodeJS.ProcessEnv, message?: string) => Error;
+  isSessionExpired: (session: HostedCloudSession) => boolean;
+  persistSessionIfChanged: (
+    previousSession: HostedCloudSession,
+    nextSession: HostedCloudSession,
+    env?: NodeJS.ProcessEnv
+  ) => HostedCloudSession;
+  refreshSession: (session: HostedCloudSession, env?: NodeJS.ProcessEnv) => Promise<HostedCloudSession>;
+  readSession: (env?: NodeJS.ProcessEnv) => HostedCloudSession | null;
+};
+
 function parseTeleportCommandOptions(text: string | undefined): TeleportCommandOptions | null {
   const args = text?.split(/\s+/).slice(1).filter(Boolean) || [];
   if (args.length === 1 && args[0]?.trim().toLowerCase() === "status") {
@@ -138,6 +175,10 @@ function parseTeleportCommandOptions(text: string | undefined): TeleportCommandO
   }
 
   return { action: "launch", dryRun };
+}
+
+function getHostedCloudModule(): HostedCloudModule {
+  return require("../../../bin/cloud.js") as HostedCloudModule;
 }
 
 function formatTeleportLogTimestamp(date: Date): string {
@@ -385,19 +426,264 @@ function getManagedTeleportLaunchBlocker(): string | null {
   return null;
 }
 
-function buildTeleportPreflightQuestion(dryRun: boolean): string {
+function describeManagedTeleportDestinationState(state: string | null): string {
+  switch (state) {
+    case "running":
+      return "destination runtime running";
+    case "requested":
+    case "provisioning":
+      return `destination runtime ${state} (starting)`;
+    case "stopped":
+    case "suspended":
+      return `destination runtime ${state} (will resume)`;
+    default:
+      return `destination runtime ${state || "unknown"}`;
+  }
+}
+
+function formatTeleportPreflightFailureList(failures: string[]): string {
+  return [
+    "❌ Teleport preflight failed:",
+    ...failures.map((failure) => `- ${failure}`),
+  ].join("\n");
+}
+
+function formatTeleportPreflightErrorDetail(error: unknown): string {
+  const raw = String(error instanceof Error ? error.message : error || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!raw) return "unknown error";
+  return raw.length > 220 ? `${raw.slice(0, 217)}...` : raw;
+}
+
+function isSessionReauthRequiredError(error: unknown): boolean {
+  return Boolean(
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "SESSION_REAUTH_REQUIRED"
+  );
+}
+
+function getHostedSessionAccessToken(session: HostedCloudSession): string {
+  const token = session.access_token;
+  if (typeof token !== "string" || token.trim().length === 0) {
+    throw new Error("Hosted session is missing an access token.");
+  }
+  return token;
+}
+
+async function requestHostedTeleportPreflight<T>(
+  cloud: HostedCloudModule,
+  session: HostedCloudSession,
+  path: string
+): Promise<{ session: HostedCloudSession; response: T }> {
+  const runRequest = async (activeSession: HostedCloudSession): Promise<T> => {
+    const response = await fetch(`${cloud.getSessionControlPlaneBaseUrl(activeSession, process.env)}${path}`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${getHostedSessionAccessToken(activeSession)}`,
+      },
+      cache: "no-store",
+      credentials: "omit",
+      referrerPolicy: "no-referrer",
+      redirect: "manual",
+    });
+
+    let payload: unknown = null;
+    const text = await response.text();
+    if (text) {
+      payload = JSON.parse(text);
+    }
+
+    if (!response.ok) {
+      const errorMessage =
+        payload &&
+        typeof payload === "object" &&
+        "error" in payload &&
+        typeof (payload as { error?: unknown }).error === "string"
+          ? (payload as { error: string }).error
+          : `Request failed with ${response.status}`;
+      const error = new Error(errorMessage);
+      (error as Error & { status?: number }).status = response.status;
+      throw error;
+    }
+
+    if (!payload || typeof payload !== "object" || !("response" in payload)) {
+      throw new Error(`Hosted control plane returned an invalid response for ${path}.`);
+    }
+
+    return (payload as { response: T }).response;
+  };
+
+  let activeSession = session;
+  let sessionChanged = false;
+  if (cloud.isSessionExpired(activeSession)) {
+    activeSession = await cloud.refreshSession(activeSession, process.env);
+    sessionChanged = true;
+  }
+
+  try {
+    const response = await runRequest(activeSession);
+    return { session: activeSession, response };
+  } catch (error) {
+    const status = error && typeof error === "object" && "status" in error
+      ? (error as { status?: unknown }).status
+      : undefined;
+    const hasRefreshToken =
+      activeSession &&
+      typeof activeSession === "object" &&
+      typeof activeSession.refresh_token === "string" &&
+      activeSession.refresh_token.trim().length > 0;
+
+    if ((status === 401 || status === 403) && hasRefreshToken) {
+      activeSession = await cloud.refreshSession(activeSession, process.env);
+      sessionChanged = true;
+      try {
+        const response = await runRequest(activeSession);
+        return { session: activeSession, response };
+      } catch (retryError) {
+        const retryStatus =
+          retryError &&
+          typeof retryError === "object" &&
+          "status" in retryError
+            ? (retryError as { status?: unknown }).status
+            : undefined;
+        if (retryStatus === 401 || retryStatus === 403) {
+          throw cloud.invalidateSession(process.env, "was rejected after refresh");
+        }
+        throw retryError;
+      }
+    }
+
+    if (status === 401 && !hasRefreshToken) {
+      throw cloud.invalidateSession(process.env, "expired and cannot be refreshed");
+    }
+    if (status === 403) {
+      throw cloud.invalidateSession(process.env, "was rejected by the control plane");
+    }
+    if (sessionChanged && error && typeof error === "object") {
+      (error as { session?: HostedCloudSession }).session = activeSession;
+    }
+    throw error;
+  }
+}
+
+async function getManagedTeleportHostedPreflight():
+  Promise<{ destinationSummary: string } | { blocker: string }> {
+  const cloud = getHostedCloudModule();
+  const sessionPath = cloud.getSessionPath(process.env);
+
+  let cloudSession: HostedCloudSession | null = null;
+  try {
+    cloudSession = cloud.readSession(process.env);
+  } catch (error) {
+    return {
+      blocker:
+        "❌ Teleport requires a valid linked cloud session. Run `superturtle login` again on this machine.\n" +
+        `Reason: ${formatTeleportPreflightErrorDetail(error)}`,
+    };
+  }
+
+  if (!cloudSession) {
+    return {
+      blocker:
+        "❌ Teleport requires a linked cloud account. Run `superturtle login` on this machine first.\n" +
+        `Expected session file: ${sessionPath}`,
+    };
+  }
+
+  let cloudStatus: HostedCloudStatusResult;
+  try {
+    const result = await requestHostedTeleportPreflight<HostedCloudStatusResult>(
+      cloud,
+      cloudSession,
+      "/v1/cli/cloud/status"
+    );
+    cloudSession = cloud.persistSessionIfChanged(cloudSession, result.session, process.env);
+    cloudStatus = result.response;
+  } catch (error) {
+    return {
+      blocker: isSessionReauthRequiredError(error)
+        ? "❌ Teleport requires a valid linked cloud session. Run `superturtle login` again on this machine."
+        : `❌ Teleport preflight could not verify the destination runtime: ${formatTeleportPreflightErrorDetail(error)}`,
+    };
+  }
+
+  let claudeStatus: HostedClaudeAuthStatusResult;
+  try {
+    const result = await requestHostedTeleportPreflight<HostedClaudeAuthStatusResult>(
+      cloud,
+      cloudSession,
+      "/v1/cli/providers/claude/status"
+    );
+    cloud.persistSessionIfChanged(cloudSession, result.session, process.env);
+    claudeStatus = result.response;
+  } catch (error) {
+    return {
+      blocker: isSessionReauthRequiredError(error)
+        ? "❌ Teleport requires a valid linked cloud session. Run `superturtle login` again on this machine."
+        : `❌ Teleport preflight could not verify managed Claude auth: ${formatTeleportPreflightErrorDetail(error)}`,
+    };
+  }
+
+  const failures: string[] = [];
+  if (!claudeStatus.configured) {
+    failures.push(
+      "Managed Claude auth is not configured. Run `superturtle cloud claude setup` on this machine first."
+    );
+  } else if (
+    claudeStatus.credential?.state &&
+    claudeStatus.credential.state !== "valid"
+  ) {
+    failures.push(
+      `Managed Claude auth is ${claudeStatus.credential.state}. Run \`superturtle cloud claude setup\` again before teleporting.`
+    );
+  }
+
+  const instance = cloudStatus.instance;
+  const provisioningJob = cloudStatus.provisioning_job;
+  if (!instance) {
+    failures.push("No linked managed runtime is available for this account yet.");
+  } else {
+    if (provisioningJob?.state === "failed") {
+      const jobContext = [
+        provisioningJob.kind ? `${provisioningJob.kind} job` : "provisioning job",
+        provisioningJob.error_code || provisioningJob.error_message || null,
+      ]
+        .filter(Boolean)
+        .join(": ");
+      failures.push(`The destination sandbox has a failed ${jobContext || "provisioning job"}.`);
+    }
+
+    if (["failed", "deleted", "deleting"].includes(instance.state || "")) {
+      failures.push(`The destination sandbox is ${instance.state}.`);
+    }
+  }
+
+  if (failures.length > 0) {
+    return { blocker: formatTeleportPreflightFailureList(failures) };
+  }
+
+  return {
+    destinationSummary: describeManagedTeleportDestinationState(instance?.state || null),
+  };
+}
+
+function buildTeleportPreflightQuestion(dryRun: boolean, destinationSummary: string): string {
   return [
     "Teleport preflight:",
     `Mode: ${dryRun ? "dry-run" : "live cutover"}`,
     "Destination: linked managed SuperTurtle runtime",
     "Checks passed: bot idle, queue empty, no active teleport",
+    `Hosted checks: cloud login ready, managed Claude auth ready, ${destinationSummary}`,
     "Continue?",
   ].join("\n");
 }
 
 async function sendTeleportPreflightPrompt(
   ctx: Context,
-  options: { dryRun: boolean }
+  options: { dryRun: boolean; destinationSummary: string }
 ): Promise<void> {
   const chatId = ctx.chat?.id;
   if (!chatId) {
@@ -414,7 +700,7 @@ async function sendTeleportPreflightPrompt(
     JSON.stringify(
       {
         request_id: requestId,
-        question: buildTeleportPreflightQuestion(options.dryRun),
+        question: buildTeleportPreflightQuestion(options.dryRun, options.destinationSummary),
         options: [options.dryRun ? "Start dry-run" : "Start teleport", "Cancel"],
         status: "pending",
         chat_id: String(chatId),
@@ -582,7 +868,16 @@ export async function handleTeleportCommand(ctx: Context): Promise<void> {
     return;
   }
 
-  await sendTeleportPreflightPrompt(ctx, { dryRun: options.dryRun });
+  const hostedPreflight = await getManagedTeleportHostedPreflight();
+  if ("blocker" in hostedPreflight) {
+    await ctx.reply(hostedPreflight.blocker);
+    return;
+  }
+
+  await sendTeleportPreflightPrompt(ctx, {
+    dryRun: options.dryRun,
+    destinationSummary: hostedPreflight.destinationSummary,
+  });
 }
 
 function getCodexUnavailableMessage(): string {
