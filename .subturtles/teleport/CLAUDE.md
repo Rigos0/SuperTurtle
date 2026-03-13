@@ -1,5 +1,5 @@
 # Current task
-Fix any pre-existing build errors in `../superturtle-web/` so `npm run build` passes cleanly before adding managed runtime changes.
+Add /teleport preflight summary with confirm/cancel before cutover using ask_user MCP tool for inline Telegram buttons.
 
 # End goal with specs
 A fully working /teleport feature where:
@@ -30,8 +30,10 @@ A fully working /teleport feature where:
 # Backlog
 - [x] Examine both repos to map what exists: check ../superturtle-web/ for E2B integration, managed instance routes, sandbox adapters, and route handlers; check agentic repo for teleport command handler, handoff code in super_turtle/state/teleport_handoff.py, E2B config, cloud control plane runtime in super_turtle/bin/cloud-control-plane-runtime.js, and provider auth helpers
   - Inventory captured in `.subturtles/teleport/INVENTORY.md`.
-- Fix any pre-existing build errors in ../superturtle-web/ (known: simple-import-sort/imports errors in src/app/v1/cli/runtime/lease/claim/route.ts, heartbeat/route.ts, release/route.ts and src/features/cloud/controllers/runtime-lease.ts) so npm run build passes clean <- current
+- [x] Fix any pre-existing build errors in ../superturtle-web/ (known: simple-import-sort/imports errors in src/app/v1/cli/runtime/lease/claim/route.ts, heartbeat/route.ts, release/route.ts and src/features/cloud/controllers/runtime-lease.ts) so npm run build passes clean
+  - Verified `npm run build` passes in `../superturtle-web/` on March 13, 2026.
 - Add /teleport preflight summary with confirm/cancel before cutover using ask_user MCP tool for inline Telegram buttons
+- Add /teleport preflight summary with confirm/cancel before cutover using ask_user MCP tool for inline Telegram buttons <- current
 - Keep /teleport idle-only; reject while work is active or queued with clear error message
 - Improve /teleport status with phase, active owner, destination runtime state, and latest failure reason
 - Surface clear preflight failures for missing login, missing cloud auth, and destination sandbox issues
