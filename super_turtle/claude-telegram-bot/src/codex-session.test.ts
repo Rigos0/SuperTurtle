@@ -9,23 +9,35 @@ process.env.CLAUDE_WORKING_DIR ||= process.cwd();
 process.env.CODEX_ENABLED ||= "true";
 process.env.CODEX_CLI_AVAILABLE_OVERRIDE ||= "true";
 
-const TOKEN_PREFIX = (process.env.TELEGRAM_BOT_TOKEN || "test-token").split(":")[0] || "default";
-const CODEX_PREFS_FILE = `/tmp/codex-telegram-${TOKEN_PREFIX}-prefs.json`;
-const CODEX_SESSION_FILE = `/tmp/codex-telegram-${TOKEN_PREFIX}-session.json`;
+const TEST_TOKEN_PREFIX = "test-token-codex-session";
+const TEST_TELEGRAM_TOKEN = `${TEST_TOKEN_PREFIX}:fixture`;
+const CODEX_PREFS_FILE = `/tmp/codex-telegram-${TEST_TOKEN_PREFIX}-prefs.json`;
+const CODEX_SESSION_FILE = `/tmp/codex-telegram-${TEST_TOKEN_PREFIX}-session.json`;
 const originalHome = process.env.HOME;
+const originalTelegramToken = process.env.TELEGRAM_BOT_TOKEN;
+const actualConfig = await import("./config");
 
 type CodexSessionModule = typeof import("./codex-session");
 const codexSessionPath = resolve(import.meta.dir, "codex-session.ts");
 const codexProbeMarker = "__CODEX_SESSION_DEFAULTS__=";
 
 async function loadCodexSessionModule(tag: string): Promise<CodexSessionModule> {
+  const mockedConfig = {
+    ...actualConfig,
+    TOKEN_PREFIX: TEST_TOKEN_PREFIX,
+  };
+  mock.module("./config", () => mockedConfig);
   return import(`./codex-session.ts?test=${tag}-${Date.now()}-${Math.random()}`);
 }
 
 async function probeCodexSession(envOverrides: Record<string, string | undefined>) {
+  const probeTokenPrefix = `test-token-codex-session-probe-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const probeTelegramToken = `${probeTokenPrefix}:fixture`;
+  const prefsFile = `/tmp/codex-telegram-${probeTokenPrefix}-prefs.json`;
+  const sessionFile = `/tmp/codex-telegram-${probeTokenPrefix}-session.json`;
   const env: Record<string, string> = {
     ...process.env,
-    TELEGRAM_BOT_TOKEN: "test-token",
+    TELEGRAM_BOT_TOKEN: probeTelegramToken,
     TELEGRAM_ALLOWED_USERS: "123",
     CLAUDE_WORKING_DIR: process.cwd(),
     CODEX_ENABLED: "true",
@@ -39,8 +51,8 @@ async function probeCodexSession(envOverrides: Record<string, string | undefined
 
   const script = `
     const { rmSync, writeFileSync } = await import("fs");
-    const prefsFile = "/tmp/codex-telegram-test-token-prefs.json";
-    const sessionFile = "/tmp/codex-telegram-test-token-session.json";
+    const prefsFile = ${JSON.stringify(prefsFile)};
+    const sessionFile = ${JSON.stringify(sessionFile)};
     rmSync(prefsFile, { force: true });
     rmSync(sessionFile, { force: true });
     ${envOverrides.CODEX_PREFS_JSON ? `writeFileSync(prefsFile, ${JSON.stringify(envOverrides.CODEX_PREFS_JSON)});` : ""}
@@ -59,21 +71,26 @@ async function probeCodexSession(envOverrides: Record<string, string | undefined
     stderr: "pipe",
   });
 
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
+  try {
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
 
-  const payloadLine = stdout.split("\n").find((line) => line.startsWith(codexProbeMarker));
-  return {
-    exitCode,
-    stderr,
-    payload: payloadLine ? JSON.parse(payloadLine.slice(codexProbeMarker.length)) as {
-      model: string;
-      reasoningEffort: string;
-    } : null,
-  };
+    const payloadLine = stdout.split("\n").find((line) => line.startsWith(codexProbeMarker));
+    return {
+      exitCode,
+      stderr,
+      payload: payloadLine ? JSON.parse(payloadLine.slice(codexProbeMarker.length)) as {
+        model: string;
+        reasoningEffort: string;
+      } : null,
+    };
+  } finally {
+    rmSync(prefsFile, { force: true });
+    rmSync(sessionFile, { force: true });
+  }
 }
 
 function cleanupCodexFiles(): void {
@@ -83,6 +100,7 @@ function cleanupCodexFiles(): void {
 
 beforeEach(() => {
   cleanupCodexFiles();
+  process.env.TELEGRAM_BOT_TOKEN = TEST_TELEGRAM_TOKEN;
   const isolatedHome = join(
     tmpdir(),
     `codex-session-test-home-${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -95,6 +113,11 @@ afterEach(() => {
   cleanupCodexFiles();
   delete process.env.DEFAULT_CODEX_MODEL;
   delete process.env.DEFAULT_CODEX_EFFORT;
+  if (typeof originalTelegramToken === "string") {
+    process.env.TELEGRAM_BOT_TOKEN = originalTelegramToken;
+  } else {
+    delete process.env.TELEGRAM_BOT_TOKEN;
+  }
   if (typeof originalHome === "string") {
     process.env.HOME = originalHome;
   } else {

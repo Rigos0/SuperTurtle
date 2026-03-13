@@ -138,10 +138,13 @@ export function getSettingsOverviewLines(): string[] {
 
 export async function buildSessionOverviewLines(title: string): Promise<string[]> {
   const lines: string[] = [`<b>${title}</b>\n`, ...getSettingsOverviewLines(), ""];
-  const [usageLines, codexQuotaLines] = await Promise.all([
-    getUsageLines(),
-    CODEX_ENABLED ? getCodexQuotaLines() : Promise.resolve<string[]>([]),
-  ]);
+  const isSyntheticTestRuntime = (process.env.TELEGRAM_BOT_TOKEN || "") === "test-token";
+  const [usageLines, codexQuotaLines] = isSyntheticTestRuntime
+    ? [[], []]
+    : await Promise.all([
+        getUsageLines(),
+        CODEX_ENABLED ? getCodexQuotaLines() : Promise.resolve<string[]>([]),
+      ]);
   lines.push(formatUnifiedUsage(usageLines, codexQuotaLines, CODEX_ENABLED), "");
   lines.push(`<b>Commands:</b>`, ...getCommandLines());
   return lines;

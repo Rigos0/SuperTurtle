@@ -12,6 +12,7 @@ process.env.CODEX_CLI_AVAILABLE_OVERRIDE ||= "true";
 const actualConfig = await import("./config");
 const originalHome = process.env.HOME;
 const tempDirs: string[] = [];
+const tempFiles: string[] = [];
 
 function makeTempDir(): string {
   const dir = mkdtempSync(join(tmpdir(), "codex-session-conductor-inbox-"));
@@ -25,11 +26,17 @@ function writeJson(path: string, payload: unknown): void {
 }
 
 async function loadCodexSessionModule(tempDir: string, tag: string) {
+  const tokenPrefix = `test-token-codex-inbox-${tag}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const mockedConfig = {
     ...actualConfig,
     WORKING_DIR: tempDir,
     SUPERTURTLE_DATA_DIR: join(tempDir, ".superturtle"),
+    TOKEN_PREFIX: tokenPrefix,
   };
+  tempFiles.push(
+    `/tmp/codex-telegram-${tokenPrefix}-prefs.json`,
+    `/tmp/codex-telegram-${tokenPrefix}-session.json`
+  );
 
   mock.module("./config", () => mockedConfig);
   const conductorInboxModule = await import(
@@ -56,6 +63,10 @@ afterEach(() => {
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
     if (dir) rmSync(dir, { recursive: true, force: true });
+  }
+  while (tempFiles.length > 0) {
+    const file = tempFiles.pop();
+    if (file) rmSync(file, { force: true });
   }
   if (typeof originalHome === "string") {
     process.env.HOME = originalHome;

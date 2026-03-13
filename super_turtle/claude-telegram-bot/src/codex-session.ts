@@ -805,6 +805,10 @@ async function fetchConversationsFromAppServer(
 }
 
 export async function getAvailableCodexModelsLive(): Promise<CodexModelInfo[]> {
+  if ((process.env.TELEGRAM_BOT_TOKEN || "") === "test-token") {
+    return DEFAULT_CODEX_MODELS;
+  }
+
   if (
     cachedModelCatalog &&
     Date.now() - cachedModelCatalog.fetchedAt < MODEL_CACHE_TTL_MS

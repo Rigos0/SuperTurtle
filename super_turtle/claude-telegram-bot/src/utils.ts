@@ -204,24 +204,36 @@ export interface TypingController {
 
 export function startTypingIndicator(ctx: Context): TypingController {
   let running = true;
+  let nextTickTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const loop = async () => {
-    while (running) {
-      try {
-        await ctx.replyWithChatAction("typing");
-      } catch (error) {
-        utilsLog.debug({ err: error }, "Typing indicator failed");
-      }
-      await Bun.sleep(4000);
-    }
+  const scheduleNextTick = () => {
+    if (!running) return;
+    nextTickTimer = setTimeout(() => {
+      nextTickTimer = null;
+      void tick();
+    }, 4000);
   };
 
-  // Start the loop
-  loop();
+  const tick = async () => {
+    if (!running) return;
+    try {
+      await ctx.replyWithChatAction("typing");
+    } catch (error) {
+      utilsLog.debug({ err: error }, "Typing indicator failed");
+    }
+    scheduleNextTick();
+  };
+
+  // Fire immediately, then repeat on a cancellable timer.
+  void tick();
 
   return {
     stop: () => {
       running = false;
+      if (nextTickTimer !== null) {
+        clearTimeout(nextTickTimer);
+        nextTickTimer = null;
+      }
     },
   };
 }
