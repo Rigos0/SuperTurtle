@@ -999,6 +999,7 @@ function runUpload(args) {
 	  if (
 	    script.includes('bun install') ||
 	    script.includes('chmod 600 "$remote_home/.codex/auth.json"') ||
+	    script.includes('chmod 600 "$remote_home/.config/superturtle/cloud-session.json"') ||
 	    script.includes('teleport_handoff.py" import') ||
 	    script.includes('bun super_turtle/bin/superturtle.js start') ||
 	    script.includes('tmux kill-session -t "$tmux_session"') ||
@@ -1479,6 +1480,82 @@ async function testManagedTeleportBootstrapsLocalClaudeAuthIntoSandbox(tmpDir) {
   }
 }
 
+async function testManagedTeleportBootstrapsLocalCloudSessionIntoSandbox(tmpDir) {
+  const { fakeBinDir, sshLogPath, rsyncLogPath, sessionPath, ctlPath, e2bHelperLogPath } = createBaseEnvironment(tmpDir);
+  const helperPath = resolve(tmpDir, "fake-e2b-helper");
+  const sandboxRoot = resolve(tmpDir, "sandbox-root");
+  createFakeE2BHelper(helperPath, e2bHelperLogPath, sandboxRoot);
+
+  const server = http.createServer((req, res) => {
+    const authorize = req.headers.authorization;
+    assert.strictEqual(authorize, "Bearer access-abc");
+
+    if (req.method === "GET" && req.url === "/v1/cli/teleport/target") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          instance: {
+            id: "inst_e2b_cloud_session",
+            provider: "e2b",
+            state: "running",
+            sandbox_id: "sandbox_cloud_session",
+            template_id: "template_teleport_v1",
+            machine_token_id: "machine-token-123",
+            last_seen_at: "2026-03-12T10:00:00Z",
+            resume_requested_at: "2026-03-12T09:58:00Z",
+          },
+          transport: "e2b",
+          sandbox_id: "sandbox_cloud_session",
+          template_id: "template_teleport_v1",
+          project_root: "/home/user/agentic",
+          audit_log: [],
+        })
+      );
+      return;
+    }
+
+    res.writeHead(404, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: "not_found" }));
+  });
+
+  await new Promise((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  pointSessionAtBaseUrl(sessionPath, `http://127.0.0.1:${address.port}`);
+
+  try {
+    const result = await runTeleport(["--managed"], {
+      ...process.env,
+      PATH: `${fakeBinDir}:${process.env.PATH}`,
+      SUPERTURTLE_CLOUD_SESSION_PATH: sessionPath,
+      SUPERTURTLE_TELEPORT_E2B_HELPER_PATH: helperPath,
+      SUPERTURTLE_TELEPORT_CTL_PATH: ctlPath,
+    });
+
+    assert.strictEqual(result.code, 0, `expected success, got stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+    assert.match(result.stdout, /\[teleport\] bootstrapping linked cloud session into managed sandbox/);
+    assert.ok(!fs.existsSync(sshLogPath), "expected SSH not to run for an E2B target");
+    assert.ok(!fs.existsSync(rsyncLogPath), "expected rsync not to run for an E2B target");
+    assert.strictEqual(
+      fs.readFileSync(resolve(sandboxRoot, "home", "user", ".config", "superturtle", "cloud-session.json"), "utf-8"),
+      fs.readFileSync(sessionPath, "utf-8")
+    );
+
+    const helperLog = readHelperLog(e2bHelperLogPath);
+    assert.ok(helperLog.some((entry) => entry.subcommand === "extract-archive"), "expected cloud session archive extraction");
+    assert.ok(
+      helperLog.some(
+        (entry) =>
+          entry.subcommand === "run-script" &&
+          /chmod 600 "\$remote_home\/\.config\/superturtle\/cloud-session\.json"/.test(entry.script)
+      ),
+      "expected cloud session permission fixup"
+    );
+  } finally {
+    server.close();
+  }
+}
+
 async function testManagedTeleportRollsBackLocalBotWhenRemoteVerifyFails(tmpDir) {
   const {
     fakeBinDir,
@@ -1698,6 +1775,7 @@ async function main() {
     await testManagedTeleportContinuesWhenMachineBootstrapFails(resolve(tmpDir, "e2b-control-plane-warning"));
     await testManagedTeleportBootstrapsLocalClaudeAuthIntoSandbox(resolve(tmpDir, "e2b-claude-auth"));
     await testManagedTeleportBootstrapsLocalCodexAuthIntoSandbox(resolve(tmpDir, "e2b-codex-auth"));
+    await testManagedTeleportBootstrapsLocalCloudSessionIntoSandbox(resolve(tmpDir, "e2b-cloud-session"));
     await testManagedTeleportFailsBeforeShutdownWhenCodexAuthMissing(resolve(tmpDir, "e2b-auth-missing"));
     await testManagedTeleportRollsBackLocalBotWhenRemoteVerifyFails(resolve(tmpDir, "e2b-rollback"));
   } finally {

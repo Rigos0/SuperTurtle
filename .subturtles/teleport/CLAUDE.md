@@ -1,5 +1,5 @@
 # Current task
-Ship a manually testable local -> cloud managed teleport prototype on E2B. Optimize for one happy path the human can run soon, not for production completeness. Do not spend time on template publishing, billing, admin tooling, generalized transport cleanup, or full cloud -> local return unless a real prototype test is blocked without it. The prototype path can now consume a checked-in managed target JSON file for a real sandbox, so the next work should stay focused on the remaining health/ownership checks and the human test recipe.
+Ship a manually testable local -> cloud managed teleport prototype on E2B. Optimize for one happy path the human can run soon, not for production completeness. Do not spend time on template publishing, billing, admin tooling, generalized transport cleanup, or full cloud -> local return unless a real prototype test is blocked without it. The prototype path can now consume a checked-in managed target JSON file for a real sandbox, and the sandbox now receives the linked hosted cloud session during live cutover, so the next work should stay focused on validating the destination ownership handoff and tightening the human test recipe.
 
 # End goal with specs
 - `/teleport` from Telegram can move the live bot from local -> an E2B managed sandbox in one happy-path prototype flow
@@ -32,6 +32,7 @@ Ship a manually testable local -> cloud managed teleport prototype on E2B. Optim
 - [ ] Make one happy-path local -> cloud prototype runnable end to end with an existing or resumable E2B sandbox and fixed template assumptions where needed <- current
   - Progress: `teleport-manual.sh --managed` now accepts `SUPERTURTLE_TELEPORT_MANAGED_TARGET_PATH`, so a local prototype run can bypass hosted `/v1/cli/teleport/target` lookup and point directly at a real E2B sandbox description while keeping the same managed teleport flow.
   - Progress: regression coverage now proves the override path works without any cloud session file, and the live E2B helper smoke still passes with `SUPERTURTLE_RUN_LIVE_E2B_TESTS=1`.
+  - Progress: live managed E2B cutover now seeds the linked hosted cloud session into `~/.config/superturtle/cloud-session.json` inside the sandbox so remote `superturtle start` can reuse the account link and participate in hosted lease ownership.
 - [ ] Keep only the minimum health and rollback behavior required to avoid a broken first prototype run
 - [ ] Write the shortest useful human test recipe for the prototype and list exact prerequisites
 - [ ] After one real prototype attempt, fix only the concrete blocker surfaced by that run

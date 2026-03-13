@@ -60,6 +60,7 @@ REMOTE_RUNTIME_VERIFIED=0
 ROLLBACK_ATTEMPTED=0
 LATEST_FAILURE_REASON=""
 LOCAL_CLAUDE_ACCESS_TOKEN=""
+LOCAL_CLOUD_SESSION_PATH=""
 
 if [[ ! "$MACHINE_HEARTBEAT_INTERVAL_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
   echo "[teleport] SUPERTURTLE_TELEPORT_MACHINE_HEARTBEAT_INTERVAL_SECONDS must be a positive integer" >&2
@@ -876,6 +877,25 @@ has_local_codex_auth() {
   [[ -s "$CODEX_AUTH_SOURCE_PATH" ]]
 }
 
+discover_local_cloud_session_path() {
+  (
+    cd "$REPO_ROOT"
+    node <<'NODE'
+const { getSessionPath } = require("./super_turtle/bin/cloud.js");
+process.stdout.write(getSessionPath(process.env));
+NODE
+  )
+}
+
+get_local_cloud_session_path() {
+  if [[ -n "$LOCAL_CLOUD_SESSION_PATH" ]]; then
+    printf '%s' "$LOCAL_CLOUD_SESSION_PATH"
+    return
+  fi
+  LOCAL_CLOUD_SESSION_PATH="$(discover_local_cloud_session_path)"
+  printf '%s' "$LOCAL_CLOUD_SESSION_PATH"
+}
+
 e2b_sync_repo() {
   if (( DRY_RUN == 1 )); then
     echo "[teleport] dry-run: skipping sandbox archive upload"
@@ -966,6 +986,44 @@ bootstrap_e2b_claude_auth() {
   if (( status != 0 )); then
     return "$status"
   fi
+}
+
+bootstrap_e2b_cloud_session() {
+  if [[ "$TELEPORT_TRANSPORT" != "e2b" ]]; then
+    return
+  fi
+
+  local session_path=""
+  session_path="$(get_local_cloud_session_path)"
+  if [[ -z "$session_path" || ! -s "$session_path" ]]; then
+    echo "[teleport] local hosted cloud session not found at ${session_path:-unknown}; reusing any existing sandbox cloud session"
+    return
+  fi
+
+  local archive_path remote_archive status
+  archive_path="$(create_relative_file_archive "$session_path" ".config/superturtle/cloud-session.json")"
+  remote_archive="/tmp/superturtle-cloud-session-${E2B_SANDBOX_ID}.tar.gz"
+  status=0
+
+  echo "[teleport] bootstrapping linked cloud session into managed sandbox"
+  set_phase "bootstrapping_remote_auth"
+  if ! e2b_helper extract-archive --sandbox-id "$E2B_SANDBOX_ID" --source "$archive_path" --destination-root "$E2B_REMOTE_HOME" --archive-path "$remote_archive"; then
+    status=$?
+  fi
+  rm -f "$archive_path"
+  if (( status != 0 )); then
+    return "$status"
+  fi
+
+  remote_bash "$E2B_REMOTE_HOME" <<'EOF'
+set -euo pipefail
+remote_home="$1"
+mkdir -p "$remote_home/.config/superturtle"
+chmod 700 "$remote_home/.config" "$remote_home/.config/superturtle"
+if [[ -f "$remote_home/.config/superturtle/cloud-session.json" ]]; then
+  chmod 600 "$remote_home/.config/superturtle/cloud-session.json"
+fi
+EOF
 }
 
 verify_remote_driver_auth() {
@@ -1754,6 +1812,7 @@ if [[ "$TELEPORT_TRANSPORT" == "e2b" ]]; then
 fi
 
 bootstrap_e2b_claude_auth
+bootstrap_e2b_cloud_session
 
 bootstrap_e2b_runtime
 
