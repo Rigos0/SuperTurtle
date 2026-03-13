@@ -365,6 +365,7 @@ async function run() {
   assert.strictEqual(e2bTeleportTarget.data.sandbox_id, `sandbox-${e2bCompleted.instance.id}`);
   assert.strictEqual(e2bTeleportTarget.data.template_id, "template_teleport_v1");
   assert.strictEqual(e2bTeleportTarget.data.project_root, "/srv/superturtle");
+  assert.strictEqual(e2bTeleportTarget.data.machine_auth_token, `machine-auth-${e2bCompleted.instance.id}`);
   assert.deepStrictEqual(e2bTeleportTarget.data.sandbox_metadata, {
     user_id: "user_123",
     instance_id: e2bCompleted.instance.id,

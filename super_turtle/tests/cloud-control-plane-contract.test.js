@@ -126,6 +126,7 @@ const {
     transport: "e2b",
     sandbox_id: "sandbox_123",
     template_id: "template_teleport_v1",
+    machine_auth_token: "machine-auth-123",
     project_root: "/home/user/agentic",
     sandbox_metadata: {
       account_id: "acct_123",
@@ -136,6 +137,7 @@ const {
   assert.strictEqual(e2bTeleportTarget.transport, "e2b");
   assert.strictEqual(e2bTeleportTarget.project_root, "/home/user/agentic");
   assert.strictEqual(e2bTeleportTarget.sandbox_id, "sandbox_123");
+  assert.strictEqual(e2bTeleportTarget.machine_auth_token, "machine-auth-123");
 
   assert.doesNotThrow(() => assertManagedInstanceTransition("requested", "provisioning"));
   assert.doesNotThrow(() => assertManagedInstanceTransition("suspended", "running"));

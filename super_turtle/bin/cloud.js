@@ -620,6 +620,7 @@ function validateTeleportTargetResponse(payload, context) {
       sandbox_id: response.sandbox_id,
       template_id: response.template_id,
       project_root: response.project_root,
+      machine_auth_token: response.machine_auth_token,
       sandbox_metadata: response.sandbox_metadata,
       audit_log: response.audit_log,
     };

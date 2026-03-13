@@ -841,6 +841,15 @@ function runUpload(args) {
     return;
   }
 
+  if (script.includes('managed_runtime_dir="$remote_root/.superturtle/managed-runtime"')) {
+    const result = spawnSync("bash", interpreterArgs, { input: script, stdio: "pipe" });
+    if (result.status !== 0) {
+      process.stderr.write(result.stderr);
+      process.exit(result.status || 1);
+    }
+    return;
+  }
+
   if (script.includes('preflight ok')) {
     if (script.includes("require_cmd rsync")) {
       throw new Error("E2B preflight unexpectedly required rsync");
@@ -898,12 +907,14 @@ async function testManagedTeleportUsesE2BHelperForSandboxCutover(tmpDir) {
   const helperPath = resolve(tmpDir, "fake-e2b-helper");
   const sandboxRoot = resolve(tmpDir, "sandbox-root");
   createFakeE2BHelper(helperPath, e2bHelperLogPath, sandboxRoot);
+  const machineRegisterPayloads = [];
+  const machineHeartbeatPayloads = [];
 
   const server = http.createServer((req, res) => {
     const authorize = req.headers.authorization;
-    assert.strictEqual(authorize, "Bearer access-abc");
 
     if (req.method === "GET" && req.url === "/v1/cli/teleport/target") {
+      assert.strictEqual(authorize, "Bearer access-abc");
       res.writeHead(200, { "content-type": "application/json" });
       res.end(
         JSON.stringify({
@@ -920,6 +931,7 @@ async function testManagedTeleportUsesE2BHelperForSandboxCutover(tmpDir) {
           transport: "e2b",
           sandbox_id: "sandbox_123",
           template_id: "template_teleport_v1",
+          machine_auth_token: "machine-auth-sandbox-123",
           project_root: "/home/user/agentic",
           sandbox_metadata: {
             account_id: "acct_123",
@@ -928,6 +940,26 @@ async function testManagedTeleportUsesE2BHelperForSandboxCutover(tmpDir) {
           audit_log: [],
         })
       );
+      return;
+    }
+
+    if (req.method === "POST" && (req.url === "/v1/machine/register" || req.url === "/v1/machine/heartbeat")) {
+      assert.strictEqual(authorize, "Bearer machine-auth-sandbox-123");
+      let body = "";
+      req.setEncoding("utf-8");
+      req.on("data", (chunk) => {
+        body += chunk;
+      });
+      req.on("end", () => {
+        const payload = JSON.parse(body);
+        if (req.url === "/v1/machine/register") {
+          machineRegisterPayloads.push(payload);
+        } else {
+          machineHeartbeatPayloads.push(payload);
+        }
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+      });
       return;
     }
 
@@ -960,10 +992,37 @@ async function testManagedTeleportUsesE2BHelperForSandboxCutover(tmpDir) {
     const helperLog = readHelperLog(e2bHelperLogPath);
     assert.ok(helperLog.some((entry) => entry.subcommand === "sync-archive"), "expected archive sync");
     assert.ok(helperLog.some((entry) => entry.subcommand === "run-script" && /preflight ok/.test(entry.script)), "expected remote preflight");
+    assert.ok(
+      helperLog.some(
+        (entry) =>
+          entry.subcommand === "run-script" &&
+          /managed_runtime_dir="\$remote_root\/\.superturtle\/managed-runtime"/.test(entry.script)
+      ),
+      "expected sandbox runtime bootstrap"
+    );
     assert.ok(helperLog.some((entry) => entry.subcommand === "run-script" && /bun install/.test(entry.script)), "expected remote dependency install");
     assert.ok(helperLog.some((entry) => entry.subcommand === "run-script" && /teleport_handoff\.py" import/.test(entry.script)), "expected runtime import");
     assert.ok(helperLog.some((entry) => entry.subcommand === "run-script" && /bun super_turtle\/bin\/superturtle\.js start/.test(entry.script)), "expected remote start");
     assert.ok(helperLog.some((entry) => entry.subcommand === "run-script" && /status_output="\$\(bun super_turtle\/bin\/superturtle\.js status\)"/.test(entry.script)), "expected remote status verification");
+    assert.strictEqual(machineRegisterPayloads.length, 1, "expected a machine register call");
+    assert.strictEqual(machineHeartbeatPayloads.length, 1, "expected a machine heartbeat call");
+    assert.strictEqual(machineRegisterPayloads[0].sandbox_id, "sandbox_123");
+    assert.strictEqual(machineRegisterPayloads[0].template_id, "template_teleport_v1");
+    assert.strictEqual(machineHeartbeatPayloads[0].health_status, "healthy");
+    const sandboxProjectRoot = resolve(sandboxRoot, "home", "user", "agentic");
+    const sandboxHome = resolve(sandboxRoot, "home", "user");
+    assert.strictEqual(
+      readEnvValue(resolve(sandboxRoot, "home", "user", "agentic", ".superturtle", ".env"), "CLAUDE_WORKING_DIR"),
+      sandboxProjectRoot
+    );
+    assert.strictEqual(
+      readEnvValue(resolve(sandboxRoot, "home", "user", "agentic", ".superturtle", ".env"), "ALLOWED_PATHS"),
+      `${sandboxProjectRoot},${sandboxHome}/.claude,${sandboxHome}/.codex`
+    );
+    assert.ok(
+      fs.existsSync(resolve(sandboxRoot, "home", "user", "agentic", ".superturtle", "managed-runtime", "superturtle-machine-register.sh")),
+      "expected machine register helper to be written"
+    );
   } finally {
     server.close();
   }

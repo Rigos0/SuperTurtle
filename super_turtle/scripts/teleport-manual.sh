@@ -41,6 +41,8 @@ SSH_IDENTITY=""
 TELEPORT_TRANSPORT="ssh"
 E2B_SANDBOX_ID=""
 E2B_TEMPLATE_ID=""
+CONTROL_PLANE_ORIGIN=""
+MACHINE_AUTH_TOKEN=""
 DRY_RUN=0
 USE_MANAGED_TARGET=0
 CURRENT_PHASE="preflight"
@@ -315,7 +317,15 @@ function capitalizeLabel(value) {
         `[teleport-status] destination_state=${target?.data?.instance?.state || "running"}\n`
       );
       process.stderr.write("[teleport-status] failure_reason=\n");
-      process.stdout.write(JSON.stringify(target.data));
+      process.stdout.write(
+        JSON.stringify({
+          ...target.data,
+          control_plane_origin:
+            session && typeof session.control_plane === "string" && session.control_plane.trim().length > 0
+              ? session.control_plane
+              : null,
+        })
+      );
       return;
     } catch (error) {
       if (error && typeof error === "object" && error.session) {
@@ -453,6 +463,22 @@ import sys
 
 payload = json.loads(sys.argv[1])
 print(payload.get("project_root") or payload.get("remote_root") or "")
+PY
+)"
+    CONTROL_PLANE_ORIGIN="$(python3 - "$output" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+print(payload.get("control_plane_origin") or "")
+PY
+)"
+    MACHINE_AUTH_TOKEN="$(python3 - "$output" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+print(payload.get("machine_auth_token") or "")
 PY
 )"
     if [[ -z "$E2B_SANDBOX_ID" || -z "$E2B_TEMPLATE_ID" || -z "$REMOTE_ROOT" ]]; then
@@ -707,6 +733,166 @@ mkdir -p "$remote_home/.codex"
 chmod 700 "$remote_home/.codex"
 if [[ -f "$remote_home/.codex/auth.json" ]]; then
   chmod 600 "$remote_home/.codex/auth.json"
+fi
+EOF
+}
+
+bootstrap_e2b_runtime() {
+  if [[ "$TELEPORT_TRANSPORT" != "e2b" ]]; then
+    return
+  fi
+
+  echo "[teleport] bootstrapping managed sandbox runtime"
+  set_phase "bootstrapping_remote_runtime"
+  remote_bash "$REMOTE_ROOT" "$E2B_REMOTE_HOME" "$CONTROL_PLANE_ORIGIN" "$MACHINE_AUTH_TOKEN" "$E2B_SANDBOX_ID" "$E2B_TEMPLATE_ID" <<'EOF'
+set -euo pipefail
+remote_root="$1"
+remote_home="$2"
+control_plane_origin="$3"
+machine_auth_token="$4"
+sandbox_id="$5"
+template_id="$6"
+managed_runtime_dir="$remote_root/.superturtle/managed-runtime"
+env_file="$remote_root/.superturtle/.env"
+
+mkdir -p "$managed_runtime_dir"
+mkdir -p "$(dirname "$env_file")"
+touch "$env_file"
+chmod 600 "$env_file"
+
+python3 - "$env_file" "$remote_root" "$remote_home" <<'PY'
+from pathlib import Path
+import sys
+
+env_path = Path(sys.argv[1])
+remote_root = sys.argv[2]
+remote_home = sys.argv[3]
+allowed_paths = ",".join(
+    [
+        remote_root,
+        f"{remote_home}/.claude",
+        f"{remote_home}/.codex",
+    ]
+)
+desired = {
+    "CLAUDE_WORKING_DIR": remote_root,
+    "ALLOWED_PATHS": allowed_paths,
+}
+
+lines = env_path.read_text().splitlines()
+updated = []
+seen = set()
+
+for raw in lines:
+    stripped = raw.strip()
+    if not stripped or stripped.startswith("#") or "=" not in raw:
+        updated.append(raw)
+        continue
+    key, _, _ = raw.partition("=")
+    if key in desired:
+        updated.append(f"{key}={desired[key]}")
+        seen.add(key)
+    else:
+        updated.append(raw)
+
+for key, value in desired.items():
+    if key not in seen:
+        updated.append(f"{key}={value}")
+
+env_path.write_text("\n".join(updated) + "\n")
+PY
+
+mkdir -p "$remote_home/.claude" "$remote_home/.codex"
+chmod 700 "$remote_home/.claude" "$remote_home/.codex"
+
+control_plane_env="$managed_runtime_dir/control-plane.env"
+register_script="$managed_runtime_dir/superturtle-machine-register.sh"
+heartbeat_script="$managed_runtime_dir/superturtle-machine-heartbeat.sh"
+
+{
+  printf 'CONTROL_PLANE_ORIGIN=%q\n' "$control_plane_origin"
+  printf 'CONTROL_PLANE_REGISTER_URL=%q\n' "${control_plane_origin%/}/v1/machine/register"
+  printf 'CONTROL_PLANE_HEARTBEAT_URL=%q\n' "${control_plane_origin%/}/v1/machine/heartbeat"
+  printf 'MACHINE_AUTH_TOKEN=%q\n' "$machine_auth_token"
+  printf 'SANDBOX_ID=%q\n' "$sandbox_id"
+  printf 'TEMPLATE_ID=%q\n' "$template_id"
+} > "$control_plane_env"
+chmod 600 "$control_plane_env"
+
+cat > "$register_script" <<'EOF_REGISTER'
+#!/usr/bin/env bash
+set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+set -a
+source "$script_dir/control-plane.env"
+set +a
+python3 - <<'PY'
+import json
+import os
+import socket
+import sys
+import urllib.request
+
+payload = {
+    "hostname": socket.gethostname(),
+    "sandbox_id": os.environ["SANDBOX_ID"],
+    "template_id": os.environ["TEMPLATE_ID"],
+}
+request = urllib.request.Request(
+    os.environ["CONTROL_PLANE_REGISTER_URL"],
+    data=json.dumps(payload).encode("utf-8"),
+    headers={
+        "Authorization": f'Bearer {os.environ["MACHINE_AUTH_TOKEN"]}',
+        "Content-Type": "application/json",
+    },
+    method="POST",
+)
+with urllib.request.urlopen(request, timeout=30) as response:
+    sys.stdout.write(response.read().decode("utf-8"))
+PY
+EOF_REGISTER
+chmod 700 "$register_script"
+
+cat > "$heartbeat_script" <<'EOF_HEARTBEAT'
+#!/usr/bin/env bash
+set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+set -a
+source "$script_dir/control-plane.env"
+set +a
+python3 - <<'PY'
+import json
+import os
+import socket
+import sys
+import urllib.request
+
+payload = {
+    "hostname": socket.gethostname(),
+    "sandbox_id": os.environ["SANDBOX_ID"],
+    "template_id": os.environ["TEMPLATE_ID"],
+    "health_status": "healthy",
+}
+request = urllib.request.Request(
+    os.environ["CONTROL_PLANE_HEARTBEAT_URL"],
+    data=json.dumps(payload).encode("utf-8"),
+    headers={
+        "Authorization": f'Bearer {os.environ["MACHINE_AUTH_TOKEN"]}',
+        "Content-Type": "application/json",
+    },
+    method="POST",
+)
+with urllib.request.urlopen(request, timeout=30) as response:
+    sys.stdout.write(response.read().decode("utf-8"))
+PY
+EOF_HEARTBEAT
+chmod 700 "$heartbeat_script"
+
+if [[ -n "$control_plane_origin" && -n "$machine_auth_token" ]]; then
+  "$register_script" >/dev/null
+  "$heartbeat_script" >/dev/null
+else
+  echo "[teleport][remote] control-plane bootstrap token unavailable; skipping initial machine register/heartbeat"
 fi
 EOF
 }
@@ -1005,6 +1191,8 @@ stop_local_bot
 echo "[teleport] final sync"
 set_phase "final_sync"
 run_transport_sync
+
+bootstrap_e2b_runtime
 
 echo "[teleport] importing portable runtime state on remote"
 set_phase "importing_remote_state"

@@ -391,6 +391,7 @@ function buildTeleportTargetPayload(state, instance, config) {
     sandbox_id: isE2bTarget ? instance.sandbox_id || null : null,
     template_id: isE2bTarget ? instance.template_id || null : null,
     project_root: config.managedProjectRoot,
+    machine_auth_token: isE2bTarget ? instance.machine_auth_token || null : null,
     sandbox_metadata: isE2bTarget
       ? {
           user_id: instance.user_id,

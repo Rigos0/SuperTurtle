@@ -358,6 +358,7 @@ function validateCliTeleportTargetResponse(payload) {
   const sandboxId = validateDisplayField(response.sandbox_id, "sandbox_id");
   const templateId = validateDisplayField(response.template_id, "template_id");
   const projectRoot = validateDisplayField(response.project_root, "project_root");
+  const machineAuthToken = validateDisplayField(response.machine_auth_token, "machine_auth_token");
 
   if (transport === "ssh") {
     if (!sshTarget) {
@@ -386,6 +387,7 @@ function validateCliTeleportTargetResponse(payload) {
     sandbox_id: sandboxId,
     template_id: templateId,
     project_root: projectRoot || remoteRoot,
+    machine_auth_token: machineAuthToken,
     sandbox_metadata: validateStringRecord(response.sandbox_metadata, "sandbox_metadata"),
     audit_log: validateAuditLog(response.audit_log, "audit_log"),
   };
