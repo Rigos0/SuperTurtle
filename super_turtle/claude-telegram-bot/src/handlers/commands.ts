@@ -21,6 +21,7 @@ import {
   BOT_DIR,
   TOKEN_PREFIX,
   DEFAULT_CODEX_EFFORT,
+  SUPERTURTLE_RUNTIME_ROLE,
   getCodexUnavailableReason,
 } from "../config";
 import { getContextReport } from "../context-command";
@@ -33,6 +34,13 @@ import { clearPreparedSnapshots, getPreparedSnapshotCount } from "../cron-superv
 import { getAllDeferredQueues } from "../deferred-queue";
 import { cmdLog } from "../logger";
 import type { BotCommand } from "grammy/types";
+import {
+  activateTeleportOwnershipForCurrentProject,
+  launchTeleportRuntimeForCurrentProject,
+  loadTeleportStateForCurrentProject,
+  reconcileTeleportOwnershipForCurrentProject,
+  releaseTeleportOwnershipForCurrentProject,
+} from "../teleport";
 
 // Canonical main-loop log written by live.sh (tmux + caffeinate + run-loop).
 export const MAIN_LOOP_LOG_PATH = `/tmp/claude-telegram-${TOKEN_PREFIX}-bot-ts.log`;
@@ -42,7 +50,7 @@ const RESUME_SESSIONS_LIMIT = 5;
 const CLAUDE_USAGE_RATE_LIMIT_MESSAGE =
   "Claude usage is temporarily unavailable due to Anthropic service limits. This comes from Anthropic's usage endpoint, not from Super Turtle.";
 
-export const TELEGRAM_COMMANDS: readonly BotCommand[] = [
+const LOCAL_TELEGRAM_COMMANDS = [
   { command: "new", description: "Start a fresh session" },
   { command: "stop", description: "Stop current work" },
   { command: "model", description: "Switch model or effort" },
@@ -56,13 +64,38 @@ export const TELEGRAM_COMMANDS: readonly BotCommand[] = [
   { command: "sub", description: "Manage SubTurtles" },
   { command: "cron", description: "Show scheduled jobs" },
   { command: "debug", description: "Show debug state" },
+  { command: "teleport", description: "Move Telegram control to E2B" },
   { command: "restart", description: "Restart the bot" },
 ] as const;
+
+const TELEPORT_REMOTE_COMMANDS = [
+  { command: "home", description: "Return Telegram control to your PC" },
+  { command: "status", description: "Show detailed status" },
+  { command: "looplogs", description: "Show main loop logs" },
+  { command: "pinologs", description: "Show Pino logs" },
+  { command: "debug", description: "Show debug state" },
+  { command: "restart", description: "Restart the bot" },
+] as const;
+
+export const TELEGRAM_COMMANDS: readonly BotCommand[] =
+  SUPERTURTLE_RUNTIME_ROLE === "teleport-remote"
+    ? TELEPORT_REMOTE_COMMANDS
+    : LOCAL_TELEGRAM_COMMANDS;
 
 /**
  * Shared command list for display in /new and /status, and new_session bot-control.
  */
 export function getCommandLines(): string[] {
+  if (SUPERTURTLE_RUNTIME_ROLE === "teleport-remote") {
+    return [
+      `/home - Return control to PC`,
+      `/status - Detailed status`,
+      `/looplogs - Main loop logs`,
+      `/pinologs - Pino logs`,
+      `/debug - Debug state`,
+      `/restart - Restart the bot`,
+    ];
+  }
   const switchLine = CODEX_AVAILABLE
     ? `/switch - Claude ↔ Codex`
     : `/switch - Driver controls (Codex unavailable)`;
@@ -79,6 +112,7 @@ export function getCommandLines(): string[] {
     `/resume - Resume a session`,
     `/sub - SubTurtles`,
     `/cron - Scheduled jobs`,
+    `/teleport - Move control to E2B`,
   ];
 }
 
@@ -424,9 +458,99 @@ export async function handleStatus(ctx: Context): Promise<void> {
     return;
   }
 
+  if (SUPERTURTLE_RUNTIME_ROLE === "local") {
+    await reconcileTeleportOwnershipForCurrentProject();
+  }
+
   const lines = await buildSessionOverviewLines("Status");
+  const teleportState = loadTeleportStateForCurrentProject();
+  if (teleportState) {
+    lines.push(
+      "",
+      `<b>Teleport:</b> ${escapeHtml(teleportState.ownerMode || "local")} · sandbox ${escapeHtml(teleportState.sandboxId)}`
+    );
+  } else {
+    lines.push("", `<b>Teleport:</b> local only`);
+  }
 
   await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
+}
+
+export async function handleTeleport(ctx: Context): Promise<void> {
+  const userId = ctx.from?.id;
+
+  if (!isAuthorized(userId, ALLOWED_USERS)) {
+    await ctx.reply("Unauthorized.");
+    return;
+  }
+
+  if (SUPERTURTLE_RUNTIME_ROLE === "teleport-remote") {
+    await ctx.reply("ℹ️ Already running in E2B webhook mode. Use /home to return ownership to your PC.");
+    return;
+  }
+
+  await reconcileTeleportOwnershipForCurrentProject();
+  const existingState = loadTeleportStateForCurrentProject();
+  if (existingState?.ownerMode === "remote") {
+    await ctx.reply(
+      `ℹ️ Telegram is already routed to E2B.\nSandbox: ${existingState.sandboxId}\nUse /home from the remote turtle to return ownership to this PC.`
+    );
+    return;
+  }
+
+  if (isAnyDriverRunning() || isBackgroundRunActive()) {
+    await ctx.reply("⏳ Stop current work before teleporting.");
+    return;
+  }
+
+  const progress = await ctx.reply("🌀 Teleporting to E2B...");
+  try {
+    const state = await launchTeleportRuntimeForCurrentProject();
+    await activateTeleportOwnershipForCurrentProject();
+    await ctx.reply(
+      `✅ Teleported to E2B.\nSandbox: ${state.sandboxId}\nWebhook: ${state.webhookUrl}\nLocal bot stays running but Telegram is now routed to the remote runtime.`
+    );
+  } catch (error) {
+    cmdLog.error({ err: error }, "Teleport command failed");
+    await ctx.reply(`❌ Teleport failed: ${String(error).slice(0, 200)}`);
+  } finally {
+    try {
+      await ctx.api.deleteMessage(progress.chat.id, progress.message_id);
+    } catch {
+      // Ignore transient cleanup failures.
+    }
+  }
+}
+
+export async function handleHome(ctx: Context): Promise<void> {
+  const userId = ctx.from?.id;
+
+  if (!isAuthorized(userId, ALLOWED_USERS)) {
+    await ctx.reply("Unauthorized.");
+    return;
+  }
+
+  if (SUPERTURTLE_RUNTIME_ROLE !== "teleport-remote") {
+    await ctx.reply("ℹ️ This turtle is already local. Use /teleport to move Telegram ownership to E2B.");
+    return;
+  }
+
+  const progress = await ctx.reply("🏠 Returning Telegram ownership to your PC...");
+  try {
+    await releaseTeleportOwnershipForCurrentProject();
+    await ctx.reply(
+      "✅ Telegram ownership returned to the local polling turtle. This remote sandbox is still running, but it no longer owns updates."
+    );
+  } catch (error) {
+    cmdLog.error({ err: error }, "Home command failed");
+    await ctx.reply(`❌ Failed to return home: ${String(error).slice(0, 200)}`);
+  } finally {
+    try {
+      await ctx.api.deleteMessage(progress.chat.id, progress.message_id);
+    } catch {
+      // Ignore transient cleanup failures.
+    }
+  }
 }
 
 /**

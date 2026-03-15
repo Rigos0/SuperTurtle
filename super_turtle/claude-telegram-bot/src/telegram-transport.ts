@@ -8,6 +8,7 @@ export type TelegramTransportMode = "polling" | "webhook";
 export type TelegramTransportConfig =
   | {
       mode: "polling";
+      clearWebhookOnStart?: boolean;
     }
   | {
       mode: "webhook";
@@ -17,6 +18,7 @@ export type TelegramTransportConfig =
       port: number;
       secretToken: string | null;
       healthPath: string;
+      registerWebhook: boolean;
     };
 
 type TelegramBotLike = {
@@ -67,12 +69,25 @@ function parsePort(rawPort: string | undefined): number {
   return port;
 }
 
+function parseBoolean(rawValue: string | undefined, fallback: boolean): boolean {
+  if (rawValue === undefined || rawValue.trim() === "") {
+    return fallback;
+  }
+  const normalized = rawValue.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return fallback;
+}
+
 export function resolveTelegramTransportConfig(
   env: Record<string, string | undefined> = process.env
 ): TelegramTransportConfig {
   const rawMode = env.TELEGRAM_TRANSPORT?.trim().toLowerCase() || "polling";
   if (rawMode === "polling") {
-    return { mode: "polling" };
+    return {
+      mode: "polling",
+      clearWebhookOnStart: true,
+    };
   }
 
   if (rawMode !== "webhook") {
@@ -103,6 +118,7 @@ export function resolveTelegramTransportConfig(
     port: parsePort(env.PORT || env.TELEGRAM_WEBHOOK_PORT),
     secretToken: env.TELEGRAM_WEBHOOK_SECRET?.trim() || null,
     healthPath: env.TELEGRAM_WEBHOOK_HEALTH_PATH?.trim() || "/healthz",
+    registerWebhook: parseBoolean(env.TELEGRAM_WEBHOOK_REGISTER, true),
   };
 }
 
@@ -171,7 +187,9 @@ export async function startTelegramTransport(
 ): Promise<TelegramTransportHandle> {
   if (config.mode === "polling") {
     transportLog.info("Starting Telegram polling transport");
-    await bot.api.deleteWebhook({ drop_pending_updates: true });
+    if (config.clearWebhookOnStart !== false) {
+      await bot.api.deleteWebhook({ drop_pending_updates: true });
+    }
 
     const runner = (dependencies.startPollingRunner || defaultStartPollingRunner)(bot);
     return {
@@ -194,10 +212,12 @@ export async function startTelegramTransport(
     "Starting Telegram webhook transport"
   );
 
-  const webhookOptions = config.secretToken
-    ? { secret_token: config.secretToken }
-    : undefined;
-  await bot.api.setWebhook(config.publicUrl, webhookOptions);
+  if (config.registerWebhook) {
+    const webhookOptions = config.secretToken
+      ? { secret_token: config.secretToken }
+      : undefined;
+    await bot.api.setWebhook(config.publicUrl, webhookOptions);
+  }
 
   const server = (dependencies.serve || defaultServe)({
     port: config.port,

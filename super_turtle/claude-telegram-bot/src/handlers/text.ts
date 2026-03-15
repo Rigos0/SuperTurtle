@@ -4,7 +4,7 @@
 
 import type { Context, NextFunction } from "grammy";
 import { session } from "../session";
-import { ALLOWED_USERS } from "../config";
+import { ALLOWED_USERS, SUPERTURTLE_RUNTIME_ROLE } from "../config";
 import { getCurrentDriver } from "../drivers/registry";
 import { isAuthorized, rateLimiter } from "../security";
 import {
@@ -37,6 +37,7 @@ import {
   preemptBackgroundRunForUserPriority,
   runMessageWithActiveDriver,
 } from "./driver-routing";
+import { TELEPORT_CONTROL_MESSAGE } from "../teleport";
 
 export interface HandleTextOptions {
   silent?: boolean;
@@ -103,6 +104,13 @@ export async function handleText(
         : message,
     messageTruncated: message.length > 500,
   });
+
+  if (SUPERTURTLE_RUNTIME_ROLE === "teleport-remote") {
+    if (!silent) {
+      await ctx.reply(TELEPORT_CONTROL_MESSAGE);
+    }
+    return;
+  }
 
   // 1.5. Bare "stop" — interrupt the foreground run/queue only.
   if (isStopIntent(message)) {

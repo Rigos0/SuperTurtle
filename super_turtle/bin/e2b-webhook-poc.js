@@ -1,35 +1,19 @@
 #!/usr/bin/env node
 "use strict";
 
-const fs = require("fs");
-const os = require("os");
 const { basename, resolve } = require("path");
-const { spawnSync } = require("child_process");
 const {
-  buildHealthUrl,
-  buildPocConfig,
-  buildRemoteBootstrapCommand,
-  buildRemoteEnv,
-  buildRemoteStartCommand,
-  buildStateRecord,
-  buildWebhookUrl,
+  clearRemoteWebhook,
   formatStateSummary,
   getBoundProjectRoot,
+  getTeleportStatus,
+  launchTeleportRuntime,
   loadPocState,
-  loadProjectEnv,
-  savePocState,
+  pauseTeleportSandbox,
+  resumeTeleportSandbox,
+  setRemoteWebhook,
+  tailTeleportLogs,
 } = require("./e2b-webhook-poc-lib.js");
-
-async function importSandbox() {
-  try {
-    return await import("@e2b/code-interpreter");
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(
-      `Failed to load the E2B SDK (${message}). Run 'cd super_turtle && bun install' first.`
-    );
-  }
-}
 
 function parseArgs(argv) {
   const args = argv.slice(2);
@@ -66,121 +50,6 @@ function projectRootFromOptions(options) {
   return getBoundProjectRoot(options.cwd || process.cwd());
 }
 
-function createArchiveBuffer(projectRoot) {
-  const tarArgs = [
-    "-czf",
-    "-",
-    "--exclude=.git",
-    "--exclude=.env",
-    "--exclude=node_modules",
-    "--exclude=.venv",
-    "--exclude=.subturtles",
-    "--exclude=.superturtle",
-    "--exclude=*.log",
-    ".",
-  ];
-
-  const proc = spawnSync("tar", tarArgs, {
-    cwd: projectRoot,
-    encoding: null,
-    maxBuffer: 512 * 1024 * 1024,
-    env: {
-      ...process.env,
-      COPYFILE_DISABLE: "1",
-    },
-  });
-
-  if (proc.error) {
-    throw new Error(`Failed to create project archive: ${proc.error.message}`);
-  }
-  if (proc.status !== 0) {
-    const stderr = proc.stderr ? proc.stderr.toString("utf-8") : "";
-    throw new Error(`Failed to create project archive: ${stderr.trim() || "tar exited non-zero."}`);
-  }
-
-  return proc.stdout;
-}
-
-async function fetchJson(url, options) {
-  const response = await fetch(url, options);
-  const text = await response.text();
-  let payload = null;
-  if (text) {
-    try {
-      payload = JSON.parse(text);
-    } catch {
-      payload = text;
-    }
-  }
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} from ${url}: ${typeof payload === "string" ? payload : JSON.stringify(payload)}`);
-  }
-  return payload;
-}
-
-async function setTelegramWebhook(botToken, webhookUrl, webhookSecret, options = {}) {
-  const endpoint = `https://api.telegram.org/bot${botToken}/setWebhook`;
-  return fetchJson(endpoint, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      url: webhookUrl,
-      secret_token: webhookSecret,
-      drop_pending_updates: Boolean(options.dropPendingUpdates),
-    }),
-  });
-}
-
-async function deleteTelegramWebhook(botToken, options = {}) {
-  const endpoint = `https://api.telegram.org/bot${botToken}/deleteWebhook`;
-  return fetchJson(endpoint, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      drop_pending_updates: Boolean(options.dropPendingUpdates),
-    }),
-  });
-}
-
-async function getTelegramWebhookInfo(botToken) {
-  const endpoint = `https://api.telegram.org/bot${botToken}/getWebhookInfo`;
-  return fetchJson(endpoint, { method: "GET" });
-}
-
-async function waitForHealth(url, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-  let lastError = null;
-
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(url, { method: "GET" });
-      if (response.ok) {
-        return true;
-      }
-      lastError = new Error(`health returned ${response.status}`);
-    } catch (error) {
-      lastError = error;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-  }
-
-  throw new Error(
-    `Timed out waiting for sandbox health at ${url}: ${lastError instanceof Error ? lastError.message : String(lastError)}`
-  );
-}
-
-async function lookupSandboxInfo(Sandbox, sandboxId) {
-  const paginator = await Sandbox.list();
-  while (paginator.hasNext) {
-    const items = await paginator.nextItems();
-    const match = items.find((item) => item.sandboxId === sandboxId);
-    if (match) {
-      return match;
-    }
-  }
-  return null;
-}
-
 function printHelp() {
   console.log(`Usage: node super_turtle/bin/e2b-webhook-poc.js <command> [options]
 
@@ -207,87 +76,28 @@ Common options:
 
 async function launch(options) {
   const projectRoot = projectRootFromOptions(options);
-  const projectEnv = loadProjectEnv(projectRoot);
-  const existingState = loadPocState(projectRoot);
-  const config = buildPocConfig(projectRoot, {
+  const state = await launchTeleportRuntime(projectRoot, {
     port: options.port,
     timeoutMs: options["timeout-ms"],
     remoteRoot: options["remote-root"],
     webhookPath: options["webhook-path"],
     webhookSecret: options["webhook-secret"],
     healthPath: options["health-path"],
-  }, existingState);
-  const archiveBuffer = createArchiveBuffer(projectRoot);
-  const { Sandbox } = await importSandbox();
-
-  const sandboxId = options["sandbox-id"] || existingState?.sandboxId || null;
-  const sandbox = sandboxId
-    ? await Sandbox.connect(sandboxId, { timeoutMs: config.timeoutMs })
-    : await Sandbox.create({
-        timeoutMs: config.timeoutMs,
-        lifecycle: {
-          onTimeout: "pause",
-          autoResume: true,
-        },
-      });
-
-  const host = sandbox.getHost(config.port);
-  const webhookUrl = buildWebhookUrl(host, config.webhookPath);
-  const healthUrl = buildHealthUrl(host, config.healthPath);
-  const remoteEnv = buildRemoteEnv(
-    projectEnv,
-    config.remoteRoot,
-    webhookUrl,
-    config.webhookSecret,
-    config.port,
-    config.healthPath
-  );
-
-  await sandbox.files.write(config.archivePath, archiveBuffer);
-  await sandbox.commands.run(buildRemoteBootstrapCommand(config), {
-    envs: remoteEnv,
-    timeoutMs: 10 * 60 * 1000,
+    "sandbox-id": options["sandbox-id"],
   });
-  await sandbox.commands.run(buildRemoteStartCommand(config), {
-    envs: remoteEnv,
-    background: true,
-    timeoutMs: 10 * 60 * 1000,
-  });
-  await waitForHealth(healthUrl, 90 * 1000);
-
-  const state = buildStateRecord(projectRoot, sandbox.sandboxId, host, config);
-  savePocState(projectRoot, state);
 
   console.log(formatStateSummary(state));
-  console.log(`Health check passed: ${healthUrl}`);
+  console.log(`Health check passed: ${state.healthUrl}`);
 }
 
 async function status(options) {
   const projectRoot = projectRootFromOptions(options);
-  const state = loadPocState(projectRoot);
-  if (!state) {
-    throw new Error(`No local E2B webhook POC state found at ${resolve(projectRoot, ".superturtle", "e2b-webhook-poc.json")}.`);
-  }
-
-  const projectEnv = loadProjectEnv(projectRoot);
-  const { Sandbox } = await importSandbox();
-  const info = await lookupSandboxInfo(Sandbox, state.sandboxId);
+  const result = await getTeleportStatus(projectRoot);
+  const { state, info, health, webhookInfo } = result;
 
   console.log(formatStateSummary(state));
   console.log(`Sandbox state: ${info?.state || "unknown"}`);
-
-  if (info?.state === "paused") {
-    console.log("Health: skipped while paused");
-  } else {
-    try {
-      await waitForHealth(state.healthUrl, 5 * 1000);
-      console.log("Health: ok");
-    } catch (error) {
-      console.log(`Health: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  const webhookInfo = await getTelegramWebhookInfo(projectEnv.TELEGRAM_BOT_TOKEN);
+  console.log(`Health: ${health}`);
   if (webhookInfo?.result) {
     console.log(`Telegram webhook URL: ${webhookInfo.result.url || "<unset>"}`);
     console.log(`Telegram pending updates: ${String(webhookInfo.result.pending_update_count || 0)}`);
@@ -299,44 +109,19 @@ async function status(options) {
 
 async function pauseSandbox(options) {
   const projectRoot = projectRootFromOptions(options);
-  const state = loadPocState(projectRoot);
-  if (!state) {
-    throw new Error("No local E2B webhook POC state file found.");
-  }
-
-  const { Sandbox } = await importSandbox();
-  const info = await lookupSandboxInfo(Sandbox, state.sandboxId);
-  if (info?.state === "paused") {
-    console.log(`Sandbox already paused: ${state.sandboxId}`);
-    return;
-  }
-
-  const sandbox = await Sandbox.connect(state.sandboxId, { timeoutMs: state.timeoutMs || 60_000 });
-  await sandbox.pause();
+  const state = await pauseTeleportSandbox(projectRoot);
   console.log(`Paused sandbox: ${state.sandboxId}`);
 }
 
 async function resumeSandbox(options) {
   const projectRoot = projectRootFromOptions(options);
-  const state = loadPocState(projectRoot);
-  if (!state) {
-    throw new Error("No local E2B webhook POC state file found.");
-  }
-
-  const { Sandbox } = await importSandbox();
-  await Sandbox.connect(state.sandboxId, { timeoutMs: state.timeoutMs || 60_000 });
-  await waitForHealth(state.healthUrl, 90 * 1000);
+  const state = await resumeTeleportSandbox(projectRoot);
   console.log(`Resumed sandbox: ${state.sandboxId}`);
 }
 
 async function setWebhook(options) {
   const projectRoot = projectRootFromOptions(options);
-  const state = loadPocState(projectRoot);
-  if (!state) {
-    throw new Error("No local E2B webhook POC state file found.");
-  }
-  const projectEnv = loadProjectEnv(projectRoot);
-  await setTelegramWebhook(projectEnv.TELEGRAM_BOT_TOKEN, state.webhookUrl, state.webhookSecret, {
+  const { state } = await setRemoteWebhook(projectRoot, {
     dropPendingUpdates: options["drop-pending-updates"] === "true",
   });
   console.log(`Set Telegram webhook: ${state.webhookUrl}`);
@@ -344,8 +129,7 @@ async function setWebhook(options) {
 
 async function deleteWebhook(options) {
   const projectRoot = projectRootFromOptions(options);
-  const projectEnv = loadProjectEnv(projectRoot);
-  await deleteTelegramWebhook(projectEnv.TELEGRAM_BOT_TOKEN, {
+  await clearRemoteWebhook(projectRoot, {
     dropPendingUpdates: options["drop-pending-updates"] === "true",
   });
   console.log("Deleted Telegram webhook");
@@ -362,11 +146,7 @@ async function logs(options) {
     throw new Error(`Invalid --lines value: ${String(options.lines || 50)}`);
   }
 
-  const { Sandbox } = await importSandbox();
-  const sandbox = await Sandbox.connect(state.sandboxId, { timeoutMs: state.timeoutMs || 60_000 });
-  const result = await sandbox.commands.run(`tail -n ${lines} ${JSON.stringify(state.logPath)}`, {
-    timeoutMs: 30_000,
-  });
+  const result = await tailTeleportLogs(projectRoot, lines);
   process.stdout.write(result.stdout || "");
   if (result.stderr) {
     process.stderr.write(result.stderr);

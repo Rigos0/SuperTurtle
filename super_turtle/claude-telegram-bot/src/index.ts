@@ -18,6 +18,7 @@ import {
   TOKEN_PREFIX,
   IPC_DIR,
   SUPERTURTLE_DATA_DIR,
+  SUPERTURTLE_RUNTIME_ROLE,
 } from "./config";
 import { unlinkSync, readFileSync, existsSync, writeFileSync, openSync, closeSync, mkdirSync } from "fs";
 import {
@@ -34,6 +35,8 @@ import {
   handleDebug,
   handleRestart,
   handleStopCommand,
+  handleTeleport,
+  handleHome,
   handleText,
   handleVoice,
   handlePhoto,
@@ -85,7 +88,12 @@ import {
 } from "./conductor-snapshot";
 import { botLog, cronLog, eventLog } from "./logger";
 import { getSequentializationKey } from "./update-sequencing";
-import { startTelegramTransport } from "./telegram-transport";
+import { startTelegramTransport, type TelegramTransportConfig } from "./telegram-transport";
+import {
+  loadTeleportStateForCurrentProject,
+  TELEPORT_CONTROL_MESSAGE,
+  TELEPORT_REMOTE_ALLOWED_COMMANDS,
+} from "./teleport";
 
 // Re-export for any existing consumers
 export { bot };
@@ -496,6 +504,8 @@ const COMMAND_HANDLERS: Record<string, (ctx: Context) => Promise<void> | void> =
   turtles: handleSubturtle,
   cron: handleCron,
   debug: handleDebug,
+  teleport: handleTeleport,
+  home: handleHome,
   restart: handleRestart,
 };
 
@@ -511,10 +521,49 @@ export function matchBareCommand(text: string): string | null {
   return BARE_COMMAND_NAMES.has(normalized) ? normalized : null;
 }
 
+function getCommandNameFromText(text: string | undefined): string | null {
+  if (!text) return null;
+  if (text.startsWith("/")) {
+    const slashCommand = text
+      .trim()
+      .slice(1)
+      .split(/\s+/)[0]
+      ?.split("@")[0]
+      ?.toLowerCase();
+    return slashCommand || null;
+  }
+  return matchBareCommand(text);
+}
+
 // Register slash commands
 for (const [name, handler] of Object.entries(COMMAND_HANDLERS)) {
   bot.command(name, handler);
 }
+
+bot.use(async (ctx, next) => {
+  if (SUPERTURTLE_RUNTIME_ROLE !== "teleport-remote") {
+    await next();
+    return;
+  }
+
+  const commandName = getCommandNameFromText(ctx.message?.text);
+  if (!commandName) {
+    await next();
+    return;
+  }
+
+  if (commandName === "teleport") {
+    await ctx.reply("ℹ️ Already running in E2B webhook mode. Use /home to return ownership to your PC.");
+    return;
+  }
+
+  if (!TELEPORT_REMOTE_ALLOWED_COMMANDS.has(commandName)) {
+    await ctx.reply(TELEPORT_CONTROL_MESSAGE);
+    return;
+  }
+
+  await next();
+});
 
 // ============== Message Handlers ==============
 
@@ -893,11 +942,17 @@ botLog.info(
 );
 botLog.info("Starting bot...");
 
-if (!CLAUDE_CLI_AVAILABLE) {
+if (!CLAUDE_CLI_AVAILABLE && SUPERTURTLE_RUNTIME_ROLE !== "teleport-remote") {
   botLog.error(
     "Claude CLI is required for the meta-agent runtime. Install Claude Code or set CLAUDE_CLI_PATH."
   );
   process.exit(1);
+}
+
+if (SUPERTURTLE_RUNTIME_ROLE === "teleport-remote") {
+  botLog.warn(
+    "Starting in teleport-remote control mode. Text prompts and agent-driving commands are disabled."
+  );
 }
 
 mkdirSync(IPC_DIR, { recursive: true });
@@ -909,11 +964,17 @@ const botInfo = bot.botInfo;
 botLog.info({ username: botInfo.username }, `Bot started: @${botInfo.username}`);
 await syncTelegramCommands();
 
-if (process.env.TURTLE_GREETINGS !== "false" && ALLOWED_USERS.length > 0) {
+if (
+  SUPERTURTLE_RUNTIME_ROLE !== "teleport-remote" &&
+  process.env.TURTLE_GREETINGS !== "false" &&
+  ALLOWED_USERS.length > 0
+) {
   startTurtleGreetings(bot, ALLOWED_USERS[0]!);
   botLog.info("Turtle greetings enabled (8am/8pm Europe/Prague)");
 }
-startDashboardServer();
+if (SUPERTURTLE_RUNTIME_ROLE !== "teleport-remote") {
+  startDashboardServer();
+}
 
 // Check for pending restart message to update
 if (existsSync(RESTART_FILE)) {
@@ -937,38 +998,40 @@ if (existsSync(RESTART_FILE)) {
         }
       }
 
-      // Clean slate: reset driver sessions (stop any stale work from before restart)
-      // Preserve the active driver preference — it was already loaded from prefs by the constructor.
-      const savedDriver = session.activeDriver;
-      await resetAllDriverSessions({ stopRunning: true });
+      if (SUPERTURTLE_RUNTIME_ROLE !== "teleport-remote") {
+        // Clean slate: reset driver sessions (stop any stale work from before restart)
+        // Preserve the active driver preference — it was already loaded from prefs by the constructor.
+        const savedDriver = session.activeDriver;
+        await resetAllDriverSessions({ stopRunning: true });
 
-      // Auto-resume the most recent session for the active driver so the user
-      // doesn't lose their conversation context across restarts.
-      if (savedDriver === "codex" && CODEX_AVAILABLE) {
-        try {
-          const [ok] = await codexSession.resumeLast();
-          if (ok) {
-            botLog.info("Auto-resumed last Codex session after restart");
-          } else {
-            botLog.info("No Codex session to resume; keeping codex driver active");
+        // Auto-resume the most recent session for the active driver so the user
+        // doesn't lose their conversation context across restarts.
+        if (savedDriver === "codex" && CODEX_AVAILABLE) {
+          try {
+            const [ok] = await codexSession.resumeLast();
+            if (ok) {
+              botLog.info("Auto-resumed last Codex session after restart");
+            } else {
+              botLog.info("No Codex session to resume; keeping codex driver active");
+            }
+          } catch (err) {
+            botLog.warn({ err }, "Failed to auto-resume Codex session after restart; keeping codex driver active");
           }
-        } catch (err) {
-          botLog.warn({ err }, "Failed to auto-resume Codex session after restart; keeping codex driver active");
+          // Restore the codex driver regardless of whether resume succeeded —
+          // a fresh thread will be created on the next message if needed.
+          session.activeDriver = "codex";
+        } else if (savedDriver === "codex" && !CODEX_AVAILABLE) {
+          // Codex was active but is now unavailable — fall back to Claude
+          session.activeDriver = "claude";
+          botLog.warn("Codex was active but is unavailable after restart; falling back to Claude");
+        } else {
+          // savedDriver === "claude" (or unknown → default)
+          const [ok] = session.resumeLast();
+          if (ok) {
+            botLog.info("Auto-resumed last Claude session after restart");
+          }
+          // activeDriver stays "claude" — no need to set explicitly
         }
-        // Restore the codex driver regardless of whether resume succeeded —
-        // a fresh thread will be created on the next message if needed.
-        session.activeDriver = "codex";
-      } else if (savedDriver === "codex" && !CODEX_AVAILABLE) {
-        // Codex was active but is now unavailable — fall back to Claude
-        session.activeDriver = "claude";
-        botLog.warn("Codex was active but is unavailable after restart; falling back to Claude");
-      } else {
-        // savedDriver === "claude" (or unknown → default)
-        const [ok] = session.resumeLast();
-        if (ok) {
-          botLog.info("Auto-resumed last Claude session after restart");
-        }
-        // activeDriver stays "claude" — no need to set explicitly
       }
 
       // Send startup message with the same standardized overview format (same as /new)
@@ -983,12 +1046,20 @@ if (existsSync(RESTART_FILE)) {
   }
 }
 
-await runConductorMaintenancePass({ recoverInFlightWakeups: true });
+if (SUPERTURTLE_RUNTIME_ROLE !== "teleport-remote") {
+  await runConductorMaintenancePass({ recoverInFlightWakeups: true });
 
-// Start cron timer after boot-time recovery so recurring ticks never race startup maintenance.
-startCronTimer();
+  // Start cron timer after boot-time recovery so recurring ticks never race startup maintenance.
+  startCronTimer();
+}
 
-const transport = await startTelegramTransport(bot);
+const localTeleportState = loadTeleportStateForCurrentProject();
+const transportConfig: TelegramTransportConfig | undefined =
+  SUPERTURTLE_RUNTIME_ROLE === "local" && localTeleportState?.ownerMode === "remote"
+    ? { mode: "polling", clearWebhookOnStart: false }
+    : undefined;
+
+const transport = await startTelegramTransport(bot, transportConfig);
 
 // Graceful shutdown
 let shutdownInitiated = false;

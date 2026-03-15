@@ -14,9 +14,10 @@ The remote runtime model is:
 
 1. local SuperTurtle keeps using long polling
 2. `/teleport` provisions or resumes an E2B sandbox
-3. the sandbox starts the bot in webhook mode
+3. the sandbox starts a control-oriented bot runtime in webhook mode
 4. Telegram ownership flips only after the remote webhook is healthy
-5. local ownership is released only after the remote runtime is authoritative
+5. local polling keeps running but is non-authoritative while the webhook is active
+6. `/home` deletes the webhook and returns ownership to local polling
 
 ## Repo Boundary
 
@@ -79,14 +80,16 @@ The E2B sandbox is the remote runtime boundary.
 Required sandbox properties:
 
 - repo cloned or synced at a deterministic project root
-- bot can boot with the repo-bound project config
+- bot can boot in a control/runtime role with the repo-bound project config
 - bot can run Bun HTTP webhook transport
 - sandbox can receive environment-seeded secrets at startup
 - sandbox lifecycle supports start, pause, resume, and destroy
 
 Expected runtime env on the sandbox:
 
+- `SUPERTURTLE_RUNTIME_ROLE=teleport-remote`
 - `TELEGRAM_TRANSPORT=webhook`
+- `TELEGRAM_WEBHOOK_REGISTER=false`
 - `TELEGRAM_WEBHOOK_URL=<public webhook url>`
 - `TELEGRAM_WEBHOOK_SECRET=<secret token>`
 - repo-bound `.superturtle/.env` values needed for the bot
@@ -128,6 +131,7 @@ Remote lifecycle must be controllable from Telegram.
 The expected user model is:
 
 - `/teleport` starts or resumes the sandbox and flips Telegram to the webhook runtime
+- `/home` deletes the webhook and hands ownership back to local polling
 - a pause action pauses remote execution without losing continuity state
 - a resume action wakes the same sandbox or replacement sandbox and restores webhook ownership
 

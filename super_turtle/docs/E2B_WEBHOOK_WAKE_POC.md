@@ -42,7 +42,7 @@ What this does:
 - uploads the current repo working tree, excluding local runtime state
 - starts the existing Telegram bot in webhook mode inside the sandbox
 - waits for `GET /healthz`
-- saves local state to `.superturtle/e2b-webhook-poc.json`
+- saves local state to `.superturtle/teleport-state.json`
 
 The bot registers its own webhook on startup. The local `set-webhook` command is only for manual repair.
 

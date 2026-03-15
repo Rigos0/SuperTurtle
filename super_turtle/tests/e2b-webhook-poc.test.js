@@ -7,6 +7,7 @@ const {
   buildStateRecord,
   buildWebhookUrl,
   buildHealthUrl,
+  isMissingSandboxError,
   parseDotEnv,
 } = require("../bin/e2b-webhook-poc-lib.js");
 
@@ -47,7 +48,9 @@ CLAUDE_WORKING_DIR='/tmp/project'
     "/healthz"
   );
   assert.strictEqual(remoteEnv.CLAUDE_WORKING_DIR, "/home/user/project");
+  assert.strictEqual(remoteEnv.SUPERTURTLE_RUNTIME_ROLE, "teleport-remote");
   assert.strictEqual(remoteEnv.TELEGRAM_TRANSPORT, "webhook");
+  assert.strictEqual(remoteEnv.TELEGRAM_WEBHOOK_REGISTER, "false");
   assert.strictEqual(remoteEnv.TELEGRAM_WEBHOOK_URL, "https://sandbox.example/telegram/webhook/demo");
   assert.strictEqual(remoteEnv.TELEGRAM_WEBHOOK_SECRET, "secret-demo");
   assert.strictEqual(remoteEnv.PORT, "8787");
@@ -67,6 +70,7 @@ CLAUDE_WORKING_DIR='/tmp/project'
   });
   assert.strictEqual(state.webhookUrl, "https://host.example/telegram/webhook/demo");
   assert.strictEqual(state.healthUrl, "https://host.example/healthz");
+  assert.strictEqual(state.ownerMode, "local");
 
   assert.strictEqual(buildWebhookUrl("host.example", "/telegram/webhook/demo"), "https://host.example/telegram/webhook/demo");
   assert.strictEqual(buildHealthUrl("host.example", "healthz"), "https://host.example/healthz");
@@ -101,7 +105,16 @@ CLAUDE_WORKING_DIR='/tmp/project'
         "secret-demo",
         8787,
         "/healthz"
-      ),
+    ),
     /TELEGRAM_BOT_TOKEN/
+  );
+
+  assert.strictEqual(
+    isMissingSandboxError(Object.assign(new Error("Paused sandbox abc not found"), { name: "NotFoundError" })),
+    true
+  );
+  assert.strictEqual(
+    isMissingSandboxError(new Error("some other failure")),
+    false
   );
 })();
