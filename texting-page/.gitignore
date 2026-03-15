@@ -1,0 +1,4 @@
+node_modules/
+chat.db
+chat.db-wal
+chat.db-shm

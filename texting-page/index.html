@@ -357,29 +357,15 @@
     const sendBtn = document.getElementById('sendBtn');
     const typing = document.getElementById('typing');
 
-    const replies = [
-      "That's awesome!",
-      "Tell me more!",
-      "Haha nice one",
-      "I totally agree",
-      "Wait really? No way",
-      "Sounds good to me",
-      "Interesting... go on",
-      "Lol same",
-      "You're on fire today",
-      "Makes sense!",
-      "Oh wow, that's cool",
-      "Keep going, I'm listening",
-    ];
-
-    function getTime() {
-      return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    function formatTime(ts) {
+      const d = ts ? new Date(ts) : new Date();
+      return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     }
 
-    function addMessage(text, type) {
+    function addMessage(text, type, timestamp) {
       const div = document.createElement('div');
       div.className = `message ${type}`;
-      div.innerHTML = `${escapeHtml(text)} <span class="time">${getTime()}</span>`;
+      div.innerHTML = `${escapeHtml(text)} <span class="time">${formatTime(timestamp)}</span>`;
       chat.insertBefore(div, typing);
       scrollToBottom();
     }
@@ -396,26 +382,50 @@
       });
     }
 
-    function sendMessage() {
+    async function loadMessages() {
+      try {
+        const res = await fetch('/api/messages');
+        const messages = await res.json();
+        for (const msg of messages) {
+          const type = msg.sender === 'user' ? 'sent' : 'received';
+          addMessage(msg.text, type, msg.timestamp);
+        }
+      } catch (e) {
+        console.error('Failed to load messages:', e);
+      }
+    }
+
+    async function sendMessage() {
       const text = input.value.trim();
       if (!text) return;
       input.value = '';
       addMessage(text, 'sent');
 
-      // Show typing indicator after a short pause
+      // Show typing indicator
       const thinkDelay = 400 + Math.random() * 600;
       setTimeout(() => {
         typing.classList.add('visible');
         scrollToBottom();
+      }, thinkDelay);
 
-        // Send auto-reply
+      try {
+        const res = await fetch('/api/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+        const data = await res.json();
+
+        // Show bot reply after a short delay for natural feel
         const replyDelay = 800 + Math.random() * 1200;
         setTimeout(() => {
           typing.classList.remove('visible');
-          const reply = replies[Math.floor(Math.random() * replies.length)];
-          addMessage(reply, 'received');
+          addMessage(data.botReply.text, 'received');
         }, replyDelay);
-      }, thinkDelay);
+      } catch (e) {
+        console.error('Failed to send message:', e);
+        typing.classList.remove('visible');
+      }
     }
 
     sendBtn.addEventListener('click', sendMessage);
@@ -440,8 +450,8 @@
       });
     });
 
-    // Scroll to bottom on load
-    scrollToBottom();
+    // Load messages from DB on page load
+    loadMessages();
   </script>
 </body>
 </html>
