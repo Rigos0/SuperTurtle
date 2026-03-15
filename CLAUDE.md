@@ -63,9 +63,11 @@ Current direction:
 
 - E2B is the only remote runtime target for teleport
 - teleport transfer scope is repo-bound, not machine-bound
+- BYO E2B is the default product path for this cycle
 - local installs keep long polling and do not expose ports
 - remote E2B runtimes use webhooks after health-checked cutover
 - do not keep Azure, GCP, AWS, or provider-neutral VM abstractions in the active design
+- do not treat hosted managed login/provisioning as required for the main user path yet
 
 Current implementation status:
 
@@ -80,21 +82,20 @@ Current implementation focus:
 
 1. Keep the local polling <-> remote webhook ownership handoff reliable across repeated `/teleport` and `/home` cycles.
 2. Preserve the E2B auth/bootstrap path for Codex and Claude-related runtime setup.
-3. Expand the remote runtime from text-first POC toward broader SuperTurtle feature parity.
-4. Decide how much session continuity we want between local and remote runtimes versus treating remote as a fresh turtle.
-5. Keep teleport docs and operator runbooks in the dedicated files above instead of re-growing a stale task list here.
+3. Keep repeat `/teleport` fast by reusing a healthy sandbox instead of re-bootstrapping it.
+4. Keep the user project as the source of truth and sync the required runtime folders when remote freshness is needed.
+5. Expand the remote runtime from text-first POC toward broader SuperTurtle feature parity.
+6. Decide how much session continuity we want between local and remote runtimes versus treating remote as a fresh turtle.
+7. Keep teleport docs and operator runbooks in the dedicated files above instead of re-growing a stale task list here.
 
-Hosted npm-user backlog:
+Hosted managed-mode backlog:
 
-1. Make `superturtle login` provision one managed E2B sandbox per user through the hosted control plane.
+1. Keep hosted login/provisioning optional; do not block the main npm-user BYO-E2B flow on it.
 2. Build and maintain the managed E2B template from `super_turtle/e2b-template/`; the current published template name is `superturtle-managed-runtime`.
-3. Move `/teleport` off the current full bootstrap path so it mostly does resume, auth sync, project sync, readiness check, and webhook cutover.
-4. Treat npm-package users as the only supported hosted audience for this cycle; do not optimize for repo-clone/tinkerer flows yet.
-5. Keep the user project as the source of truth and sync it fresh on every `/teleport`, including current runtime folders such as `.superturtle`, `.subturtles`, and `-s/.superturtle`.
-6. Copy Claude and Codex credentials automatically from the local machine on first teleport and refresh them on later teleports without manual remote steps.
-7. Add remote runtime version checks so `/teleport` can self-update the managed sandbox to the local installed SuperTurtle package version before cutover.
-8. Add local npm-package update prompting so users are told when a newer SuperTurtle release exists without silently mutating their machine.
-9. Extend hosted status/session reporting so the CLI can show provisioning state, sandbox state, template version, and remote runtime version.
-10. Keep Telegram ownership fully abstracted for hosted users after `superturtle start`; they should not need to think about whether the PC or E2B currently owns updates.
+3. If we revive managed mode, provision one managed E2B sandbox per user through the hosted control plane.
+4. Copy Claude and Codex credentials automatically from the local machine on first teleport and refresh them on later teleports without manual remote steps.
+5. Add remote runtime version checks so `/teleport` can self-update the remote sandbox to the local installed SuperTurtle package version before cutover.
+6. Add local npm-package update prompting so users are told when a newer SuperTurtle release exists without silently mutating their machine.
+7. Extend hosted status/session reporting so the CLI can show provisioning state, sandbox state, template version, and remote runtime version.
 
 Keep any future task updates in the dedicated docs above rather than growing another stale task block here.

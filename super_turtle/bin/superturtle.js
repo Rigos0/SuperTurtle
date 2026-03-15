@@ -1597,6 +1597,13 @@ function logout() {
   console.log(`Removed local cloud session at ${path}`);
 }
 
+function printManagedAuthUnavailable(commandName) {
+  console.error(
+    `${commandName} is not enabled in this cycle. Use BYO E2B for teleport for now; hosted account commands will come back when managed mode is ready.`
+  );
+  process.exit(1);
+}
+
 // Dispatch command
 const command = process.argv[2];
 
@@ -1620,10 +1627,10 @@ switch (command) {
     logs();
     break;
   case "login":
-    login().catch((err) => { console.error(err instanceof Error ? err.message : err); process.exit(1); });
+    printManagedAuthUnavailable("superturtle login");
     break;
   case "whoami":
-    whoami().catch((err) => { console.error(err instanceof Error ? err.message : err); process.exit(1); });
+    printManagedAuthUnavailable("superturtle whoami");
     break;
   case "cloud":
     if (process.argv[3] === "claude") {
@@ -1663,12 +1670,7 @@ switch (command) {
     process.exit(1);
     break;
   case "logout":
-    try {
-      logout();
-    } catch (err) {
-      console.error(err instanceof Error ? err.message : err);
-      process.exit(1);
-    }
+    printManagedAuthUnavailable("superturtle logout");
     break;
   case "--version":
   case "-v":
@@ -1686,10 +1688,7 @@ Usage: superturtle <command>
 
 Commands:
   init      Set up superturtle in the bound project repo
-  login     Sign in to the hosted SuperTurtle control plane
-  whoami    Show the current hosted account identity
   cloud     Hosted cloud commands (status, resume, checkout, portal, claude)
-  logout    Remove the local hosted account session
   start     Launch the bot
   stop      Stop the bot and all SubTurtles
   status    Show bot and SubTurtle status
@@ -1711,8 +1710,6 @@ Logs:
   superturtle logs audit --no-follow -n 200
 
 Cloud:
-  superturtle login
-  superturtle whoami
   superturtle cloud status
   superturtle cloud resume
   superturtle cloud checkout
