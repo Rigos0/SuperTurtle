@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Messages</title>
+  <title>Chattr</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -24,6 +24,122 @@
       overflow: hidden;
     }
 
+    /* ── Navbar ── */
+    .navbar {
+      background: #12121a;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      height: 52px;
+      border-bottom: 1px solid #2a2a3a;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 100;
+    }
+
+    .navbar-brand {
+      font-weight: 600;
+      font-size: 18px;
+      letter-spacing: -0.4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .navbar-brand .brand-icon {
+      font-size: 20px;
+    }
+
+    .navbar-links {
+      display: flex;
+      gap: 4px;
+      list-style: none;
+    }
+
+    .navbar-links a {
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 8px;
+      transition: color 0.2s, background 0.2s;
+    }
+
+    .navbar-links a:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .navbar-links a.active {
+      color: #007aff;
+      background: rgba(0, 122, 255, 0.1);
+    }
+
+    .hamburger {
+      display: none;
+      background: none;
+      border: none;
+      color: #fff;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+
+    .hamburger:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .hamburger svg {
+      display: block;
+    }
+
+    .mobile-menu {
+      display: none;
+      position: absolute;
+      top: 52px;
+      left: 0;
+      right: 0;
+      background: #12121a;
+      border-bottom: 1px solid #2a2a3a;
+      padding: 8px 16px;
+      z-index: 99;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .mobile-menu.open {
+      display: flex;
+    }
+
+    .mobile-menu a {
+      color: #888;
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 500;
+      padding: 10px 12px;
+      border-radius: 8px;
+      transition: color 0.2s, background 0.2s;
+    }
+
+    .mobile-menu a:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .mobile-menu a.active {
+      color: #007aff;
+      background: rgba(0, 122, 255, 0.1);
+    }
+
+    @media (max-width: 600px) {
+      .navbar-links { display: none; }
+      .hamburger { display: block; }
+    }
+
+    /* ── Chat header ── */
     .header {
       background: #1a1a24;
       padding: 14px 20px;
@@ -200,17 +316,31 @@
   </style>
 </head>
 <body>
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <span class="brand-icon">💬</span> Chattr
+    </div>
+    <ul class="navbar-links">
+      <li><a href="#" class="active">Chats</a></li>
+      <li><a href="#">Contacts</a></li>
+      <li><a href="#">Settings</a></li>
+    </ul>
+    <button class="hamburger" id="hamburgerBtn" aria-label="Menu">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="#" class="active">Chats</a>
+      <a href="#">Contacts</a>
+      <a href="#">Settings</a>
+    </div>
+  </nav>
+
   <div class="header">
     <span class="avatar">T</span>
     Turtle
   </div>
 
   <div class="chat-container" id="chat">
-    <div class="message received">Hey! How's it going? <span class="time">9:41 AM</span></div>
-    <div class="message sent">Pretty good! Just working on some code. <span class="time">9:42 AM</span></div>
-    <div class="message received">Nice, what are you building? <span class="time">9:42 AM</span></div>
-    <div class="message sent">A texting UI that looks like this! <span class="time">9:43 AM</span></div>
-    <div class="message received">Ha, very meta. Looks clean though! <span class="time">9:43 AM</span></div>
     <div class="typing-indicator" id="typing"><span></span><span></span><span></span></div>
   </div>
 
@@ -294,6 +424,20 @@
         e.preventDefault();
         sendMessage();
       }
+    });
+
+    // Hamburger menu toggle
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+    hamburgerBtn.addEventListener('click', () => {
+      mobileMenu.classList.toggle('open');
+    });
+
+    // Close mobile menu when a link is tapped
+    mobileMenu.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => {
+        mobileMenu.classList.remove('open');
+      });
     });
 
     // Scroll to bottom on load
