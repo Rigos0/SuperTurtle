@@ -5,6 +5,13 @@ const os = require("os");
 const { dirname, join, resolve } = require("path");
 const crypto = require("crypto");
 const { spawnSync } = require("child_process");
+const {
+  fetchTeleportTarget,
+  mergeSessionSnapshot,
+  persistSessionIfChanged,
+  readSession,
+  resumeManagedInstance,
+} = require("./cloud.js");
 
 const TELEPORT_STATE_RELATIVE_PATH = join(".superturtle", "teleport-state.json");
 const LEGACY_POC_STATE_RELATIVE_PATH = join(".superturtle", "e2b-webhook-poc.json");
@@ -22,6 +29,7 @@ const DEFAULT_OWNER_MODE = "local";
 const DEFAULT_REMOTE_MODE = "control";
 const DEFAULT_REMOTE_CODEX_AUTH_PATH = join(".codex", "auth.json");
 const DEFAULT_REMOTE_PROJECT_ENV_PATH = join(".superturtle", ".env");
+const MANAGED_RUNTIME_MANIFEST_RELATIVE_PATH = join(".superturtle", "managed-runtime.json");
 const DEFAULT_CLAUDE_CREDENTIAL_PATHS = [
   join(".config", "claude-code", "credentials.json"),
   join(".claude", "credentials.json"),
@@ -307,6 +315,53 @@ function loadRuntimeEnv(projectRoot) {
   }
 }
 
+function getLocalRuntimeVersion() {
+  const packageJsonPath = resolve(__dirname, "..", "package.json");
+  try {
+    const parsed = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
+    if (parsed && typeof parsed.version === "string" && parsed.version.trim()) {
+      return parsed.version.trim();
+    }
+  } catch {}
+  return "0.0.0-dev";
+}
+
+async function resolveManagedTeleportTarget(env = process.env) {
+  let session = null;
+  try {
+    session = readSession(env);
+  } catch {
+    return null;
+  }
+  if (!session?.access_token) {
+    return null;
+  }
+
+  let activeSession = session;
+  if (
+    activeSession.instance?.state &&
+    ["stopped", "suspended"].includes(String(activeSession.instance.state))
+  ) {
+    const resumed = await resumeManagedInstance(activeSession, env);
+    activeSession = persistSessionIfChanged(
+      activeSession,
+      mergeSessionSnapshot(
+        resumed.session,
+        resumed.data
+      ),
+      env
+    );
+  }
+
+  const target = await fetchTeleportTarget(activeSession, env);
+  persistSessionIfChanged(
+    activeSession,
+    mergeSessionSnapshot(target.session, target.data),
+    env
+  );
+  return target.data;
+}
+
 function randomToken(length = 24) {
   return crypto.randomBytes(length).toString("hex");
 }
@@ -339,6 +394,9 @@ function buildPocConfig(projectRoot, options = {}, existingState = null) {
   );
   const remoteRoot = options.remoteRoot || existingState?.remoteRoot || `${DEFAULT_REMOTE_HOME}/${repoName}`;
   const remoteBotDir = `${remoteRoot}/super_turtle/claude-telegram-bot`;
+  const templateId = options.templateId || existingState?.templateId || null;
+  const templateVersion = options.templateVersion || existingState?.templateVersion || null;
+  const runtimeVersion = options.runtimeVersion || existingState?.runtimeVersion || getLocalRuntimeVersion();
   const webhookSecret = options.webhookSecret || existingState?.webhookSecret || randomToken(16);
   const remoteMode = options.remoteMode || existingState?.remoteMode || DEFAULT_REMOTE_MODE;
   if (remoteMode !== "control" && remoteMode !== "agent") {
@@ -367,6 +425,9 @@ function buildPocConfig(projectRoot, options = {}, existingState = null) {
     readyPath,
     remoteRoot,
     remoteBotDir,
+    templateId,
+    templateVersion,
+    runtimeVersion,
     remoteMode,
     remoteDriver,
     webhookSecret,
@@ -441,9 +502,13 @@ function buildStateRecord(projectRoot, sandboxId, host, config, ownerMode = DEFA
     version: 1,
     repoRoot: projectRoot,
     ownerMode,
+    managed: Boolean(config.templateId),
     remoteMode: config.remoteMode || DEFAULT_REMOTE_MODE,
     remoteDriver: config.remoteDriver || null,
     sandboxId,
+    templateId: config.templateId || null,
+    templateVersion: config.templateVersion || null,
+    runtimeVersion: config.runtimeVersion || null,
     host,
     port: config.port,
     timeoutMs: config.timeoutMs,
@@ -468,6 +533,10 @@ function formatStateSummary(state) {
     `Owner mode: ${state.ownerMode || DEFAULT_OWNER_MODE}`,
     `Remote mode: ${state.remoteMode || DEFAULT_REMOTE_MODE}`,
     `Sandbox: ${state.sandboxId}`,
+    `Managed target: ${state.managed ? "yes" : "no"}`,
+    `Template: ${state.templateId || "<unset>"}`,
+    `Template version: ${state.templateVersion || "<unset>"}`,
+    `Runtime version: ${state.runtimeVersion || "<unset>"}`,
     `Webhook URL: ${state.webhookUrl}`,
     `Health URL: ${state.healthUrl}`,
     `Ready URL: ${state.readyUrl}`,
@@ -485,23 +554,36 @@ function shellEscape(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
-function buildRemoteBootstrapCommand(config) {
+function buildRemoteBootstrapCommand(config, options = {}) {
   const bunInstallSnippet =
     "if ! command -v bun >/dev/null 2>&1; then " +
     "curl -fsSL https://bun.sh/install | bash >/tmp/superturtle-e2b-bun-install.log 2>&1; " +
     "fi; " +
     "export PATH=\"$HOME/.bun/bin:$PATH\"";
+  const shouldResetRemoteRoot = options.resetRemoteRoot !== false;
+  const shouldInstallDependencies = options.installDependencies !== false;
 
-  return [
+  const commands = [
     "set -euo pipefail",
     bunInstallSnippet,
-    `rm -rf ${shellEscape(config.remoteRoot)}`,
+  ];
+
+  if (shouldResetRemoteRoot) {
+    commands.push(`rm -rf ${shellEscape(config.remoteRoot)}`);
+  }
+
+  commands.push(
     `mkdir -p ${shellEscape(config.remoteRoot)}`,
     `tar -xzf ${shellEscape(config.archivePath)} -C ${shellEscape(config.remoteRoot)}`,
     `mkdir -p ${shellEscape(`${config.remoteRoot}/.superturtle`)}`,
-    `cd ${shellEscape(config.remoteBotDir)}`,
-    "bun install --frozen-lockfile || bun install",
-  ].join(" && ");
+    `cd ${shellEscape(config.remoteBotDir)}`
+  );
+
+  if (shouldInstallDependencies) {
+    commands.push("bun install --frozen-lockfile || bun install");
+  }
+
+  return commands.join(" && ");
 }
 
 function buildRemoteAuthFinalizeCommand(config) {
@@ -555,6 +637,53 @@ async function persistRemoteProjectEnv(sandbox, config, remoteEnv) {
   const remoteProjectEnvPath = `${config.remoteRoot}/${DEFAULT_REMOTE_PROJECT_ENV_PATH}`;
   await sandbox.files.write(remoteProjectEnvPath, serializeDotEnv(remoteEnv));
   return remoteProjectEnvPath;
+}
+
+function buildManagedRuntimeManifest(config) {
+  return {
+    runtime_version: config.runtimeVersion || null,
+    template_id: config.templateId || null,
+    template_version: config.templateVersion || null,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function persistManagedRuntimeManifest(sandbox, config) {
+  const manifestPath = `${config.remoteRoot}/${MANAGED_RUNTIME_MANIFEST_RELATIVE_PATH}`;
+  await sandbox.files.write(
+    manifestPath,
+    `${JSON.stringify(buildManagedRuntimeManifest(config), null, 2)}\n`
+  );
+  return manifestPath;
+}
+
+async function readRemoteManagedRuntimeManifest(sandbox, config) {
+  const manifestPath = `${config.remoteRoot}/${MANAGED_RUNTIME_MANIFEST_RELATIVE_PATH}`;
+  try {
+    const result = await sandbox.commands.run(
+      `cat ${shellEscape(manifestPath)}`,
+      { timeoutMs: 15_000 }
+    );
+    const text = String(result.stdout || "").trim();
+    if (!text) {
+      return null;
+    }
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function shouldRunFullBootstrap(config, remoteManifest) {
+  if (!remoteManifest || typeof remoteManifest !== "object") {
+    return true;
+  }
+  const runtimeVersion =
+    typeof remoteManifest.runtime_version === "string"
+      ? remoteManifest.runtime_version.trim()
+      : "";
+  return runtimeVersion !== String(config.runtimeVersion || "");
 }
 
 async function bootstrapRemoteDriverAuth(sandbox, config, remoteEnv, authBootstrap = {}) {

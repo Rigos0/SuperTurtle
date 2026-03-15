@@ -84,4 +84,17 @@ Current implementation focus:
 4. Decide how much session continuity we want between local and remote runtimes versus treating remote as a fresh turtle.
 5. Keep teleport docs and operator runbooks in the dedicated files above instead of re-growing a stale task list here.
 
+Hosted npm-user backlog:
+
+1. Make `superturtle login` provision one managed E2B sandbox per user through the hosted control plane.
+2. Build and maintain the managed E2B template from `super_turtle/e2b-template/`; the current published template name is `superturtle-managed-runtime`.
+3. Move `/teleport` off the current full bootstrap path so it mostly does resume, auth sync, project sync, readiness check, and webhook cutover.
+4. Treat npm-package users as the only supported hosted audience for this cycle; do not optimize for repo-clone/tinkerer flows yet.
+5. Keep the user project as the source of truth and sync it fresh on every `/teleport`, including current runtime folders such as `.superturtle`, `.subturtles`, and `-s/.superturtle`.
+6. Copy Claude and Codex credentials automatically from the local machine on first teleport and refresh them on later teleports without manual remote steps.
+7. Add remote runtime version checks so `/teleport` can self-update the managed sandbox to the local installed SuperTurtle package version before cutover.
+8. Add local npm-package update prompting so users are told when a newer SuperTurtle release exists without silently mutating their machine.
+9. Extend hosted status/session reporting so the CLI can show provisioning state, sandbox state, template version, and remote runtime version.
+10. Keep Telegram ownership fully abstracted for hosted users after `superturtle start`; they should not need to think about whether the PC or E2B currently owns updates.
+
 Keep any future task updates in the dedicated docs above rather than growing another stale task block here.

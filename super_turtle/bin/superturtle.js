@@ -268,6 +268,8 @@ function printManagedInstanceSummary(instance) {
   if (instance.provider) console.log(`Provider: ${instance.provider}`);
   if (instance.sandbox_id) console.log(`Sandbox: ${instance.sandbox_id}`);
   if (instance.template_id) console.log(`Template: ${instance.template_id}`);
+  if (instance.template_version) console.log(`Template version: ${instance.template_version}`);
+  if (instance.runtime_version) console.log(`Runtime version: ${instance.runtime_version}`);
   if (instance.state) console.log(`State: ${instance.state}`);
   if (instance.health_status) console.log(`Health: ${instance.health_status}`);
   if (instance.health_checked_at) console.log(`Health checked: ${instance.health_checked_at}`);
@@ -275,6 +277,7 @@ function printManagedInstanceSummary(instance) {
   if (instance.last_seen_at) console.log(`Last seen: ${instance.last_seen_at}`);
   if (instance.region) console.log(`Region: ${instance.region}`);
   if (instance.hostname) console.log(`Hostname: ${instance.hostname}`);
+  if (instance.project_root) console.log(`Project root: ${instance.project_root}`);
   if (instance.resume_requested_at) console.log(`Resume requested: ${instance.resume_requested_at}`);
 }
 
@@ -839,6 +842,7 @@ async function start() {
       k.startsWith("OPENAI_") ||
       k.startsWith("CLAUDE_") ||
       k.startsWith("CODEX_") ||
+      k.startsWith("E2B_") ||
       k.startsWith("META_") ||
       k.startsWith("DASHBOARD_") ||
       k.startsWith("AUDIT_LOG_") ||

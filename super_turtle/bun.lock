@@ -9,6 +9,7 @@
         "@grammyjs/runner": "^2.0.3",
         "@modelcontextprotocol/sdk": "^1.25.1",
         "@openai/codex-sdk": "0.105.0",
+        "e2b": "^2.14.1",
         "grammy": "^1.38.4",
         "openai": "^6.15.0",
         "pino": "^10.3.1",
