@@ -615,8 +615,6 @@ function validateTeleportTargetResponse(payload, context) {
     return {
       instance: response.instance,
       transport: response.transport,
-      ssh_target: response.ssh_target,
-      remote_root: response.remote_root,
       sandbox_id: response.sandbox_id,
       template_id: response.template_id,
       project_root: response.project_root,

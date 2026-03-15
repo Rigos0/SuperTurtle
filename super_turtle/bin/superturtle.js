@@ -266,12 +266,8 @@ function printManagedInstanceSummary(instance) {
 
   if (instance.id) console.log(`Instance: ${instance.id}`);
   if (instance.provider) console.log(`Provider: ${instance.provider}`);
-  if (instance.provider === "e2b") {
-    if (instance.sandbox_id) console.log(`Sandbox: ${instance.sandbox_id}`);
-    if (instance.template_id) console.log(`Template: ${instance.template_id}`);
-  } else if (instance.vm_name) {
-    console.log(`VM: ${instance.vm_name}`);
-  }
+  if (instance.sandbox_id) console.log(`Sandbox: ${instance.sandbox_id}`);
+  if (instance.template_id) console.log(`Template: ${instance.template_id}`);
   if (instance.state) console.log(`State: ${instance.state}`);
   if (instance.health_status) console.log(`Health: ${instance.health_status}`);
   if (instance.health_checked_at) console.log(`Health checked: ${instance.health_checked_at}`);

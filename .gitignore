@@ -44,6 +44,9 @@ super_turtle/state/runs.jsonl
 
 # Local review outputs
 reviews/
+!super_turtle/docs/reviews/
+super_turtle/docs/reviews/*
+!super_turtle/docs/reviews/README.md
 
 # Claude Code (local-only)
 .claude/settings.local.json

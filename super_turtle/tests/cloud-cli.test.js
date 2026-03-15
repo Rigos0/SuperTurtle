@@ -548,10 +548,11 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({
           instance: {
             id: "inst_123",
-            provider: "gcp",
+            provider: "e2b",
             state: "provisioning",
-            region: "us-central1",
-            hostname: "managed-123.internal",
+            region: "us-east-1",
+            sandbox_id: "sandbox_123",
+            template_id: "template_teleport_v1",
           },
           provisioning_job: {
             id: "job_123",
@@ -573,10 +574,11 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({
           instance: {
             id: "inst_123",
-            provider: "gcp",
+            provider: "e2b",
             state: "provisioning",
-            region: "us-central1",
-            hostname: "managed-123.internal",
+            region: "us-east-1",
+            sandbox_id: "sandbox_123",
+            template_id: "template_teleport_v1",
           },
           provisioning_job: {
             id: "job_123",
@@ -588,35 +590,15 @@ const server = http.createServer((req, res) => {
         }));
         return;
       }
-      if (statusMode === "e2b") {
-        res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({
-          instance: {
-            id: "inst_123",
-            provider: "e2b",
-            state: "running",
-            region: "us-east-1",
-            sandbox_id: "sandbox_123",
-            template_id: "template_teleport_v1",
-          },
-          provisioning_job: {
-            id: "job_123",
-            kind: "resume",
-            state: "succeeded",
-            attempt: 1,
-            updated_at: "2026-03-12T10:05:00Z",
-          },
-        }));
-        return;
-      }
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({
         instance: {
           id: "inst_123",
-          provider: "gcp",
+          provider: "e2b",
           state: "provisioning",
-          region: "us-central1",
-          hostname: "managed-123.internal",
+          region: "us-east-1",
+          sandbox_id: "sandbox_123",
+          template_id: "template_teleport_v1",
         },
         provisioning_job: {
           id: "job_123",
@@ -640,8 +622,11 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({
           instance: {
             id: "inst_123",
-            provider: "gcp",
+            provider: "e2b",
             state: "provisioning",
+            region: "us-east-1",
+            sandbox_id: "sandbox_123",
+            template_id: "template_teleport_v1",
           },
           provisioning_job: {
             id: "job_resume_123",
@@ -653,47 +638,15 @@ const server = http.createServer((req, res) => {
         }));
         return;
       }
-      if (resumeMode === "e2b") {
-        res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({
-          instance: {
-            id: "inst_123",
-            provider: "e2b",
-            state: "provisioning",
-            region: "us-east-1",
-            sandbox_id: "sandbox_123",
-            template_id: "template_teleport_v1",
-            resume_requested_at: "2026-03-12T10:06:00Z",
-          },
-          provisioning_job: {
-            id: "job_resume_123",
-            kind: "resume",
-            state: "queued",
-            attempt: 1,
-            updated_at: "2026-03-12T10:06:00Z",
-          },
-          audit_log: [
-            {
-              id: "audit_123",
-              actor_type: "user",
-              actor_id: "user_123",
-              action: "instance.resume_requested",
-              target_type: "managed_instance",
-              target_id: "inst_123",
-              created_at: "2026-03-12T10:06:00Z",
-            },
-          ],
-        }));
-        return;
-      }
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({
         instance: {
           id: "inst_123",
-          provider: "gcp",
+          provider: "e2b",
           state: "provisioning",
-          region: "us-central1",
-          hostname: "managed-123.internal",
+          region: "us-east-1",
+          sandbox_id: "sandbox_123",
+          template_id: "template_teleport_v1",
           resume_requested_at: "2026-03-12T10:01:00Z",
         },
         provisioning_job: {
@@ -1146,10 +1099,11 @@ server.listen(0, "127.0.0.1", async () => {
     const statusSession = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
     assert.deepStrictEqual(statusSession.instance, {
       id: "inst_123",
-      provider: "gcp",
+      provider: "e2b",
       state: "provisioning",
-      region: "us-central1",
-      hostname: "managed-123.internal",
+      region: "us-east-1",
+      sandbox_id: "sandbox_123",
+      template_id: "template_teleport_v1",
     });
     assert.deepStrictEqual(statusSession.provisioning_job, {
       id: "job_123",
@@ -1163,28 +1117,11 @@ server.listen(0, "127.0.0.1", async () => {
     const resumed = await runCli(["cloud", "resume"], postLoginEnv);
     assert.strictEqual(resumed.code, 0, resumed.stderr);
     assert.match(resumed.stdout, /Instance: inst_123/);
+    assert.match(resumed.stdout, /Provider: e2b/);
+    assert.match(resumed.stdout, /Sandbox: sandbox_123/);
+    assert.match(resumed.stdout, /Template: template_teleport_v1/);
     assert.match(resumed.stdout, /State: provisioning/);
     assert.match(resumed.stdout, /Provisioning: queued/);
-
-    statusMode = "e2b";
-    const e2bStatus = await runCli(["cloud", "status"], postLoginEnv);
-    assert.strictEqual(e2bStatus.code, 0, e2bStatus.stderr);
-    assert.match(e2bStatus.stdout, /Provider: e2b/);
-    assert.match(e2bStatus.stdout, /Sandbox: sandbox_123/);
-    assert.match(e2bStatus.stdout, /Template: template_teleport_v1/);
-    assert.match(e2bStatus.stdout, /State: running/);
-    assert.match(e2bStatus.stdout, /Provisioning: succeeded/);
-    statusMode = "normal";
-
-    resumeMode = "e2b";
-    const e2bResumed = await runCli(["cloud", "resume"], postLoginEnv);
-    assert.strictEqual(e2bResumed.code, 0, e2bResumed.stderr);
-    assert.match(e2bResumed.stdout, /Provider: e2b/);
-    assert.match(e2bResumed.stdout, /Sandbox: sandbox_123/);
-    assert.match(e2bResumed.stdout, /Template: template_teleport_v1/);
-    assert.match(e2bResumed.stdout, /Resume requested: 2026-03-12T10:06:00Z/);
-    assert.match(e2bResumed.stdout, /Provisioning: queued/);
-    resumeMode = "normal";
 
     const checkout = await runCli(["cloud", "checkout"], postLoginEnv);
     assert.strictEqual(checkout.code, 0, checkout.stderr);
@@ -1202,10 +1139,11 @@ server.listen(0, "127.0.0.1", async () => {
     const resumedSession = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
     assert.deepStrictEqual(resumedSession.instance, {
       id: "inst_123",
-      provider: "gcp",
+      provider: "e2b",
       state: "provisioning",
-      region: "us-central1",
-      hostname: "managed-123.internal",
+      region: "us-east-1",
+      sandbox_id: "sandbox_123",
+      template_id: "template_teleport_v1",
       resume_requested_at: "2026-03-12T10:01:00Z",
     });
     assert.deepStrictEqual(resumedSession.provisioning_job, {
@@ -1834,8 +1772,9 @@ server.listen(0, "127.0.0.1", async () => {
         instance: {
           id: "inst_123",
           state: "running",
-          region: "us-central1",
-          hostname: "managed-123.internal",
+          region: "us-east-1",
+          sandbox_id: "sandbox_123",
+          template_id: "template_teleport_v1",
         },
         provisioning_job: {
           state: "succeeded",
@@ -1968,8 +1907,9 @@ server.listen(0, "127.0.0.1", async () => {
         instance: {
           id: "inst_123",
           state: "running",
-          region: "us-central1",
-          hostname: "managed-123.internal",
+          region: "us-east-1",
+          sandbox_id: "sandbox_123",
+          template_id: "template_teleport_v1",
         },
         provisioning_job: {
           state: "succeeded",
@@ -2049,8 +1989,9 @@ server.listen(0, "127.0.0.1", async () => {
         instance: {
           id: "inst_123",
           state: "running",
-          region: "us-central1",
-          hostname: "managed-123.internal",
+          region: "us-east-1",
+          sandbox_id: "sandbox_123",
+          template_id: "template_teleport_v1",
         },
         provisioning_job: {
           state: "succeeded",
@@ -2077,8 +2018,9 @@ server.listen(0, "127.0.0.1", async () => {
         instance: {
           id: "inst_123",
           state: "running",
-          region: "us-central1",
-          hostname: "managed-123.internal",
+          region: "us-east-1",
+          sandbox_id: "sandbox_123",
+          template_id: "template_teleport_v1",
         },
         provisioning_job: {
           state: "succeeded",
