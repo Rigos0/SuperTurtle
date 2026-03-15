@@ -34,6 +34,7 @@ import {
 } from "../deferred-queue";
 import { consumeHandledStopReply, handleStop } from "./stop";
 import { eventLog, streamLog } from "../logger";
+import { isTeleportRemoteRuntime, getTeleportRemoteUnsupportedMessage } from "../teleport";
 
 const voiceLog = streamLog.child({ handler: "voice" });
 
@@ -59,6 +60,11 @@ export async function handleVoice(ctx: Context): Promise<void> {
       chat_id: chatId,
     });
     await ctx.reply("Unauthorized. Contact the bot owner for access.");
+    return;
+  }
+
+  if (isTeleportRemoteRuntime()) {
+    await ctx.reply(getTeleportRemoteUnsupportedMessage());
     return;
   }
 

@@ -15,10 +15,12 @@ import {
   CODEX_AVAILABLE,
   CODEX_CLI_AVAILABLE,
   CODEX_USER_ENABLED,
+  SUPERTURTLE_REMOTE_MODE,
   TOKEN_PREFIX,
   IPC_DIR,
   SUPERTURTLE_DATA_DIR,
   SUPERTURTLE_RUNTIME_ROLE,
+  getCodexUnavailableReason,
 } from "./config";
 import { unlinkSync, readFileSync, existsSync, writeFileSync, openSync, closeSync, mkdirSync } from "fs";
 import {
@@ -90,10 +92,13 @@ import { botLog, cronLog, eventLog } from "./logger";
 import { getSequentializationKey } from "./update-sequencing";
 import { startTelegramTransport, type TelegramTransportConfig } from "./telegram-transport";
 import {
+  getTeleportRemoteUnsupportedMessage,
+  isTeleportRemoteAgentMode,
+  isTeleportRemoteControlMode,
   loadTeleportStateForCurrentProject,
   reconcileTeleportOwnershipForCurrentProject,
-  TELEPORT_CONTROL_MESSAGE,
-  TELEPORT_REMOTE_ALLOWED_COMMANDS,
+  TELEPORT_REMOTE_AGENT_ALLOWED_COMMANDS,
+  TELEPORT_REMOTE_CONTROL_ALLOWED_COMMANDS,
 } from "./teleport";
 
 // Re-export for any existing consumers
@@ -558,8 +563,12 @@ bot.use(async (ctx, next) => {
     return;
   }
 
-  if (!TELEPORT_REMOTE_ALLOWED_COMMANDS.has(commandName)) {
-    await ctx.reply(TELEPORT_CONTROL_MESSAGE);
+  const allowedCommands = isTeleportRemoteAgentMode()
+    ? TELEPORT_REMOTE_AGENT_ALLOWED_COMMANDS
+    : TELEPORT_REMOTE_CONTROL_ALLOWED_COMMANDS;
+
+  if (!allowedCommands.has(commandName)) {
+    await ctx.reply(getTeleportRemoteUnsupportedMessage());
     return;
   }
 
@@ -950,10 +959,20 @@ if (!CLAUDE_CLI_AVAILABLE && SUPERTURTLE_RUNTIME_ROLE !== "teleport-remote") {
   process.exit(1);
 }
 
-if (SUPERTURTLE_RUNTIME_ROLE === "teleport-remote") {
+if (isTeleportRemoteControlMode()) {
   botLog.warn(
     "Starting in teleport-remote control mode. Text prompts and agent-driving commands are disabled."
   );
+}
+if (isTeleportRemoteAgentMode()) {
+  if (!CODEX_AVAILABLE) {
+    botLog.error(
+      `Remote agent mode requires Codex inside E2B. ${getCodexUnavailableReason() || "Codex is unavailable."}`
+    );
+    process.exit(1);
+  }
+  session.activeDriver = "codex";
+  botLog.info("Starting in teleport-remote agent mode with Codex as the active driver");
 }
 
 mkdirSync(IPC_DIR, { recursive: true });
@@ -1084,7 +1103,18 @@ const transportConfig: TelegramTransportConfig | undefined =
         }
     : undefined;
 
-const transport = await startTelegramTransport(bot, transportConfig);
+const transport = await startTelegramTransport(bot, transportConfig, {
+  getReadiness: async () => {
+    if (isTeleportRemoteAgentMode() && !CODEX_AVAILABLE) {
+      return {
+        ok: false,
+        status: 503,
+        body: `remote-agent-codex-unavailable: ${getCodexUnavailableReason() || "Codex is unavailable."}`,
+      };
+    }
+    return { ok: true, status: 200, body: "ok" };
+  },
+});
 
 // Graceful shutdown
 let shutdownInitiated = false;

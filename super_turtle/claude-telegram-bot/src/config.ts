@@ -77,6 +77,7 @@ export type ClaudeEffortLevel = "low" | "medium" | "high";
 export type CodexEffortLevel = "minimal" | "low" | "medium" | "high" | "xhigh";
 export type MainProvider = "claude" | "codex";
 export type SuperTurtleRuntimeRole = "local" | "teleport-remote";
+export type SuperTurtleRemoteMode = "control" | "agent";
 
 const DEFAULT_CLAUDE_MODEL_FALLBACK = "claude-opus-4-6";
 const DEFAULT_CLAUDE_EFFORT_FALLBACK: ClaudeEffortLevel = "high";
@@ -160,6 +161,15 @@ export const SUPERTURTLE_RUNTIME_ROLE: SuperTurtleRuntimeRole = (() => {
     `Invalid SUPERTURTLE_RUNTIME_ROLE="${value}". Falling back to "local".`
   );
   return "local";
+})();
+export const SUPERTURTLE_REMOTE_MODE: SuperTurtleRemoteMode = (() => {
+  const value = process.env.SUPERTURTLE_REMOTE_MODE?.trim().toLowerCase();
+  if (!value) return "control";
+  if (value === "control" || value === "agent") return value;
+  configLog.warn(
+    `Invalid SUPERTURTLE_REMOTE_MODE="${value}". Falling back to "control".`
+  );
+  return "control";
 })();
 
 // Derived paths — package code vs user runtime data

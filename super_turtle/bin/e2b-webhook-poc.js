@@ -67,6 +67,7 @@ Common options:
   --port <port>               Remote bot port (default: 3000)
   --timeout-ms <ms>           Sandbox timeout before auto-pause
   --remote-root <path>        Remote project root (default: /home/user/<repo>)
+  --remote-mode <mode>        Remote runtime mode: control | agent
   --webhook-path <path>       Telegram webhook path inside the sandbox
   --webhook-secret <secret>   Telegram webhook secret token
   --drop-pending-updates      Apply Telegram drop_pending_updates when changing webhook
@@ -80,24 +81,27 @@ async function launch(options) {
     port: options.port,
     timeoutMs: options["timeout-ms"],
     remoteRoot: options["remote-root"],
+    remoteMode: options["remote-mode"],
     webhookPath: options["webhook-path"],
     webhookSecret: options["webhook-secret"],
     healthPath: options["health-path"],
+    readyPath: options["ready-path"],
     "sandbox-id": options["sandbox-id"],
   });
 
   console.log(formatStateSummary(state));
-  console.log(`Health check passed: ${state.healthUrl}`);
+  console.log(`Ready check passed: ${state.readyUrl || state.healthUrl}`);
 }
 
 async function status(options) {
   const projectRoot = projectRootFromOptions(options);
   const result = await getTeleportStatus(projectRoot);
-  const { state, info, health, webhookInfo } = result;
+  const { state, info, health, readiness, webhookInfo } = result;
 
   console.log(formatStateSummary(state));
   console.log(`Sandbox state: ${info?.state || "unknown"}`);
   console.log(`Health: ${health}`);
+  console.log(`Readiness: ${readiness}`);
   if (webhookInfo?.result) {
     console.log(`Telegram webhook URL: ${webhookInfo.result.url || "<unset>"}`);
     console.log(`Telegram pending updates: ${String(webhookInfo.result.pending_update_count || 0)}`);

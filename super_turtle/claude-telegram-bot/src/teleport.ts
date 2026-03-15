@@ -1,14 +1,21 @@
-import { WORKING_DIR } from "./config";
+import {
+  SUPERTURTLE_REMOTE_MODE,
+  SUPERTURTLE_RUNTIME_ROLE,
+  WORKING_DIR,
+} from "./config";
 
 const teleportLib = require("../../bin/e2b-webhook-poc-lib.js");
 
 export type TeleportOwnerMode = "local" | "remote";
 export type RuntimeRole = "local" | "teleport-remote";
+export type RemoteMode = "control" | "agent";
 
 export type TeleportState = {
   version: number;
   repoRoot: string;
   ownerMode?: TeleportOwnerMode;
+  remoteMode?: RemoteMode;
+  remoteDriver?: "codex" | null;
   sandboxId: string;
   host: string;
   port: number;
@@ -20,6 +27,8 @@ export type TeleportState = {
   webhookUrl: string;
   healthPath: string;
   healthUrl: string;
+  readyPath?: string;
+  readyUrl?: string;
   logPath: string;
   pidPath: string;
   archivePath: string;
@@ -28,8 +37,10 @@ export type TeleportState = {
 
 export const TELEPORT_CONTROL_MESSAGE =
   "This remote teleport runtime is control-only. Use /home to return Telegram ownership to your PC.";
+export const TELEPORT_AGENT_TEXT_ONLY_MESSAGE =
+  "This remote SuperTurtle currently supports text chat only. Use /home to return to the full local runtime on your PC.";
 
-export const TELEPORT_REMOTE_ALLOWED_COMMANDS = new Set([
+export const TELEPORT_REMOTE_CONTROL_ALLOWED_COMMANDS = new Set([
   "home",
   "status",
   "looplogs",
@@ -37,9 +48,38 @@ export const TELEPORT_REMOTE_ALLOWED_COMMANDS = new Set([
   "debug",
   "restart",
 ]);
+export const TELEPORT_REMOTE_AGENT_ALLOWED_COMMANDS = new Set([
+  "home",
+  "status",
+  "looplogs",
+  "pinologs",
+  "debug",
+  "restart",
+  "stop",
+]);
 
-export async function launchTeleportRuntimeForCurrentProject(): Promise<TeleportState> {
-  return teleportLib.launchTeleportRuntime(WORKING_DIR);
+export function isTeleportRemoteRuntime(): boolean {
+  return SUPERTURTLE_RUNTIME_ROLE === "teleport-remote";
+}
+
+export function isTeleportRemoteControlMode(): boolean {
+  return isTeleportRemoteRuntime() && SUPERTURTLE_REMOTE_MODE === "control";
+}
+
+export function isTeleportRemoteAgentMode(): boolean {
+  return isTeleportRemoteRuntime() && SUPERTURTLE_REMOTE_MODE === "agent";
+}
+
+export function getTeleportRemoteUnsupportedMessage(): string {
+  return isTeleportRemoteControlMode()
+    ? TELEPORT_CONTROL_MESSAGE
+    : TELEPORT_AGENT_TEXT_ONLY_MESSAGE;
+}
+
+export async function launchTeleportRuntimeForCurrentProject(
+  options: { remoteMode?: RemoteMode; remoteDriver?: "codex" } = {}
+): Promise<TeleportState> {
+  return teleportLib.launchTeleportRuntime(WORKING_DIR, options);
 }
 
 export async function activateTeleportOwnershipForCurrentProject(): Promise<{

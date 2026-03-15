@@ -30,6 +30,7 @@ export type TelegramTransportConfig =
       port: number;
       secretToken: string | null;
       healthPath: string;
+      readyPath: string;
       registerWebhook: boolean;
     };
 
@@ -70,6 +71,9 @@ type StartTelegramTransportDependencies = {
   serve?: (options: ServeOptions) => WebhookServerLike;
   setInterval?: SetIntervalLike;
   clearInterval?: ClearIntervalLike;
+  getReadiness?: () =>
+    | Promise<{ ok: boolean; status?: number; body?: string }>
+    | { ok: boolean; status?: number; body?: string };
 };
 
 export type TelegramTransportHandle = {
@@ -138,6 +142,7 @@ export function resolveTelegramTransportConfig(
     port: parsePort(env.PORT || env.TELEGRAM_WEBHOOK_PORT),
     secretToken: env.TELEGRAM_WEBHOOK_SECRET?.trim() || null,
     healthPath: env.TELEGRAM_WEBHOOK_HEALTH_PATH?.trim() || "/healthz",
+    readyPath: env.TELEGRAM_WEBHOOK_READY_PATH?.trim() || "/readyz",
     registerWebhook: parseBoolean(env.TELEGRAM_WEBHOOK_REGISTER, true),
   };
 }
@@ -145,12 +150,22 @@ export function resolveTelegramTransportConfig(
 export async function handleTelegramWebhookRequest(
   request: Request,
   bot: TelegramBotLike,
-  config: Extract<TelegramTransportConfig, { mode: "webhook" }>
+  config: Extract<TelegramTransportConfig, { mode: "webhook" }>,
+  dependencies: Pick<StartTelegramTransportDependencies, "getReadiness"> = {}
 ): Promise<Response> {
   const pathname = new URL(request.url).pathname;
 
   if (request.method === "GET" && pathname === config.healthPath) {
     return new Response("ok", { status: 200 });
+  }
+
+  if (request.method === "GET" && pathname === config.readyPath) {
+    const readiness = dependencies.getReadiness
+      ? await dependencies.getReadiness()
+      : { ok: true, status: 200, body: "ok" };
+    return new Response(readiness.body || (readiness.ok ? "ok" : "not ready"), {
+      status: readiness.ok ? readiness.status || 200 : readiness.status || 503,
+    });
   }
 
   if (pathname !== config.path) {
@@ -421,7 +436,9 @@ export async function startTelegramTransport(
     port: config.port,
     hostname: config.host,
     fetch(request) {
-      return handleTelegramWebhookRequest(request, bot, config);
+      return handleTelegramWebhookRequest(request, bot, config, {
+        getReadiness: dependencies.getReadiness,
+      });
     },
   });
 

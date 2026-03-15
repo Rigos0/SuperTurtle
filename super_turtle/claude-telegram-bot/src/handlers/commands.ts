@@ -21,6 +21,7 @@ import {
   BOT_DIR,
   TOKEN_PREFIX,
   DEFAULT_CODEX_EFFORT,
+  SUPERTURTLE_REMOTE_MODE,
   SUPERTURTLE_RUNTIME_ROLE,
   getCodexUnavailableReason,
 } from "../config";
@@ -68,7 +69,7 @@ const LOCAL_TELEGRAM_COMMANDS = [
   { command: "restart", description: "Restart the bot" },
 ] as const;
 
-const TELEPORT_REMOTE_COMMANDS = [
+const TELEPORT_REMOTE_CONTROL_COMMANDS = [
   { command: "home", description: "Return Telegram control to your PC" },
   { command: "status", description: "Show detailed status" },
   { command: "looplogs", description: "Show main loop logs" },
@@ -76,10 +77,16 @@ const TELEPORT_REMOTE_COMMANDS = [
   { command: "debug", description: "Show debug state" },
   { command: "restart", description: "Restart the bot" },
 ] as const;
+const TELEPORT_REMOTE_AGENT_COMMANDS = [
+  { command: "stop", description: "Stop current work" },
+  ...TELEPORT_REMOTE_CONTROL_COMMANDS,
+] as const;
 
 export const TELEGRAM_COMMANDS: readonly BotCommand[] =
   SUPERTURTLE_RUNTIME_ROLE === "teleport-remote"
-    ? TELEPORT_REMOTE_COMMANDS
+    ? SUPERTURTLE_REMOTE_MODE === "agent"
+      ? TELEPORT_REMOTE_AGENT_COMMANDS
+      : TELEPORT_REMOTE_CONTROL_COMMANDS
     : LOCAL_TELEGRAM_COMMANDS;
 
 /**
@@ -87,14 +94,24 @@ export const TELEGRAM_COMMANDS: readonly BotCommand[] =
  */
 export function getCommandLines(): string[] {
   if (SUPERTURTLE_RUNTIME_ROLE === "teleport-remote") {
-    return [
-      `/home - Return control to PC`,
-      `/status - Detailed status`,
-      `/looplogs - Main loop logs`,
-      `/pinologs - Pino logs`,
-      `/debug - Debug state`,
-      `/restart - Restart the bot`,
-    ];
+    return SUPERTURTLE_REMOTE_MODE === "agent"
+      ? [
+          `/stop - Stop current work`,
+          `/home - Return control to PC`,
+          `/status - Detailed status`,
+          `/looplogs - Main loop logs`,
+          `/pinologs - Pino logs`,
+          `/debug - Debug state`,
+          `/restart - Restart the bot`,
+        ]
+      : [
+          `/home - Return control to PC`,
+          `/status - Detailed status`,
+          `/looplogs - Main loop logs`,
+          `/pinologs - Pino logs`,
+          `/debug - Debug state`,
+          `/restart - Restart the bot`,
+        ];
   }
   const switchLine = CODEX_AVAILABLE
     ? `/switch - Claude ↔ Codex`
@@ -505,7 +522,10 @@ export async function handleTeleport(ctx: Context): Promise<void> {
 
   const progress = await ctx.reply("🌀 Teleporting to E2B...");
   try {
-    const state = await launchTeleportRuntimeForCurrentProject();
+    const state = await launchTeleportRuntimeForCurrentProject({
+      remoteMode: "agent",
+      remoteDriver: "codex",
+    });
     await activateTeleportOwnershipForCurrentProject();
     await ctx.reply(
       `✅ Teleported to E2B.\nSandbox: ${state.sandboxId}\nWebhook: ${state.webhookUrl}\nLocal bot stays running but Telegram is now routed to the remote runtime.`

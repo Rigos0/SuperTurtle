@@ -23,6 +23,7 @@ import { getDriverAuditType, isActiveDriverSessionActive, runMessageWithActiveDr
 import { StreamingState, createStatusCallback } from "./streaming";
 import { eventLog, streamLog } from "../logger";
 import { consumeHandledStopReply } from "./stop";
+import { getTeleportRemoteUnsupportedMessage, isTeleportRemoteRuntime } from "../teleport";
 
 const audioLog = streamLog.child({ handler: "audio" });
 
@@ -64,6 +65,11 @@ export async function processAudioFile(
   chatId: number,
   requestId?: string
 ): Promise<void> {
+  if (isTeleportRemoteRuntime()) {
+    await ctx.reply(getTeleportRemoteUnsupportedMessage());
+    return;
+  }
+
   if (!TRANSCRIPTION_AVAILABLE) {
     await ctx.reply(
       "Voice transcription is not configured. Set OPENAI_API_KEY in .env"
@@ -191,6 +197,11 @@ export async function handleAudio(ctx: Context): Promise<void> {
       chat_id: chatId,
     });
     await ctx.reply("Unauthorized. Contact the bot owner for access.");
+    return;
+  }
+
+  if (isTeleportRemoteRuntime()) {
+    await ctx.reply(getTeleportRemoteUnsupportedMessage());
     return;
   }
 

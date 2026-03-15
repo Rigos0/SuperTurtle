@@ -22,6 +22,7 @@ import { StreamingState, createStatusCallback } from "./streaming";
 import { createMediaGroupBuffer, handleProcessingError } from "./media-group";
 import { isAudioFile, processAudioFile } from "./audio";
 import { eventLog, streamLog } from "../logger";
+import { getTeleportRemoteUnsupportedMessage, isTeleportRemoteRuntime } from "../teleport";
 
 const documentLog = streamLog.child({ handler: "document" });
 
@@ -470,6 +471,11 @@ export async function handleDocument(ctx: Context): Promise<void> {
       chat_id: chatId,
     });
     await ctx.reply("Unauthorized. Contact the bot owner for access.");
+    return;
+  }
+
+  if (isTeleportRemoteRuntime()) {
+    await ctx.reply(getTeleportRemoteUnsupportedMessage());
     return;
   }
 

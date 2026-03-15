@@ -36,6 +36,7 @@ describe("resolveTelegramTransportConfig", () => {
       port: 8787,
       secretToken: "secret-token",
       healthPath: "/healthz",
+      readyPath: "/readyz",
       registerWebhook: true,
     });
   });
@@ -218,6 +219,7 @@ describe("startTelegramTransport", () => {
       port: 8787,
       secretToken: "secret-token",
       healthPath: "/healthz",
+      readyPath: "/readyz",
       registerWebhook: true,
     };
 
@@ -240,6 +242,9 @@ describe("startTelegramTransport", () => {
       },
       config,
       {
+        getReadiness() {
+          return { ok: true, status: 200, body: "ready" };
+        },
         serve({ hostname, port, fetch }) {
           served.push({ hostname, port });
           serverFetch = fetch;
@@ -266,6 +271,11 @@ describe("startTelegramTransport", () => {
     );
     expect(healthResponse.status).toBe(200);
     expect(await healthResponse.text()).toBe("ok");
+    const readyResponse = await serverFetch!(
+      new Request("http://127.0.0.1:8787/readyz", { method: "GET" })
+    );
+    expect(readyResponse.status).toBe(200);
+    expect(await readyResponse.text()).toBe("ready");
 
     const unauthorizedResponse = await serverFetch!(
       new Request("http://127.0.0.1:8787/telegram/webhook", {
@@ -320,6 +330,7 @@ describe("startTelegramTransport", () => {
         port: 8787,
         secretToken: "secret-token",
         healthPath: "/healthz",
+        readyPath: "/readyz",
         registerWebhook: false,
       },
       {
@@ -338,6 +349,10 @@ describe("startTelegramTransport", () => {
       new Request("http://127.0.0.1:8787/healthz", { method: "GET" })
     );
     expect(healthResponse.status).toBe(200);
+    const readyResponse = await serverFetch!(
+      new Request("http://127.0.0.1:8787/readyz", { method: "GET" })
+    );
+    expect(readyResponse.status).toBe(200);
     await transport.stop();
   });
 
@@ -483,10 +498,52 @@ describe("handleTelegramWebhookRequest", () => {
         port: 8787,
         secretToken: "secret-token",
         healthPath: "/healthz",
+        readyPath: "/readyz",
         registerWebhook: true,
       }
     );
 
     expect(response.status).toBe(400);
+  });
+
+  it("reports failed readiness checks with 503", async () => {
+    const response = await handleTelegramWebhookRequest(
+      new Request("http://127.0.0.1:8787/readyz", {
+        method: "GET",
+      }),
+      {
+        api: {
+          async deleteWebhook() {},
+          async getWebhookInfo() {
+            return { url: "https://example.test/telegram/webhook" };
+          },
+          async setWebhook() {},
+        },
+        async handleUpdate() {},
+      },
+      {
+        mode: "webhook",
+        publicUrl: "https://example.test/telegram/webhook",
+        path: "/telegram/webhook",
+        host: "0.0.0.0",
+        port: 8787,
+        secretToken: "secret-token",
+        healthPath: "/healthz",
+        readyPath: "/readyz",
+        registerWebhook: true,
+      },
+      {
+        getReadiness() {
+          return {
+            ok: false,
+            status: 503,
+            body: "remote-agent-codex-unavailable",
+          };
+        },
+      }
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.text()).toBe("remote-agent-codex-unavailable");
   });
 });

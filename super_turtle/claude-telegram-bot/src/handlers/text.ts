@@ -4,7 +4,7 @@
 
 import type { Context, NextFunction } from "grammy";
 import { session } from "../session";
-import { ALLOWED_USERS, SUPERTURTLE_RUNTIME_ROLE } from "../config";
+import { ALLOWED_USERS } from "../config";
 import { getCurrentDriver } from "../drivers/registry";
 import { isAuthorized, rateLimiter } from "../security";
 import {
@@ -37,7 +37,7 @@ import {
   preemptBackgroundRunForUserPriority,
   runMessageWithActiveDriver,
 } from "./driver-routing";
-import { TELEPORT_CONTROL_MESSAGE } from "../teleport";
+import { TELEPORT_CONTROL_MESSAGE, isTeleportRemoteControlMode } from "../teleport";
 
 export interface HandleTextOptions {
   silent?: boolean;
@@ -105,7 +105,7 @@ export async function handleText(
     messageTruncated: message.length > 500,
   });
 
-  if (SUPERTURTLE_RUNTIME_ROLE === "teleport-remote") {
+  if (isTeleportRemoteControlMode()) {
     if (!silent) {
       await ctx.reply(TELEPORT_CONTROL_MESSAGE);
     }

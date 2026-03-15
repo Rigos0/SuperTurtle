@@ -48,8 +48,9 @@ The bot registers its own webhook on startup. The local `set-webhook` command is
 
 Important:
 
-- this helper does not install or authenticate Claude Code inside the sandbox
-- the remote runtime still needs the normal bot prerequisites if you want full message handling, not just transport/wake verification
+- the remote runtime setup is documented in `super_turtle/docs/E2B_REMOTE_RUNTIME_SETUP.md`
+- the helper now seeds remote `.superturtle/.env`, Claude token reuse, and Codex auth before starting the bot
+- if no local or existing sandbox Codex auth is available, remote agent launch should fail before Telegram cutover
 
 ## Pause and wake
 
