@@ -6,7 +6,7 @@
 
 import { homedir, platform } from "os";
 import { resolve, dirname } from "path";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmdirSync } from "fs";
 import type { McpServerConfig } from "./types";
 import { logger } from "./logger";
 import { TOKEN_PREFIX } from "./token-prefix";
@@ -172,10 +172,53 @@ export const SUPERTURTLE_REMOTE_MODE: SuperTurtleRemoteMode = (() => {
   return "control";
 })();
 
+function migrateLegacyRuntimeLayout(projectRoot: string): void {
+  const dataDir = `${projectRoot}/.superturtle`;
+  const subturtlesDir = `${dataDir}/subturtles`;
+  const legacySubturtlesDir = `${projectRoot}/.subturtles`;
+  const teleportDir = `${dataDir}/teleport`;
+  const legacyTeleportDir = `${projectRoot}/-s/.superturtle/teleport`;
+
+  mkdirSync(dataDir, { recursive: true });
+
+  if (existsSync(legacySubturtlesDir)) {
+    if (existsSync(subturtlesDir)) {
+      throw new Error(
+        `Cannot migrate legacy SubTurtle workspaces because both ${legacySubturtlesDir} and ${subturtlesDir} exist.`
+      );
+    }
+    mkdirSync(dirname(subturtlesDir), { recursive: true });
+    renameSync(legacySubturtlesDir, subturtlesDir);
+  }
+
+  if (existsSync(legacyTeleportDir)) {
+    if (existsSync(teleportDir)) {
+      throw new Error(
+        `Cannot migrate legacy teleport runtime files because both ${legacyTeleportDir} and ${teleportDir} exist.`
+      );
+    }
+    mkdirSync(dirname(teleportDir), { recursive: true });
+    renameSync(legacyTeleportDir, teleportDir);
+    try {
+      rmdirSync(`${projectRoot}/-s/.superturtle`);
+    } catch {}
+    try {
+      rmdirSync(`${projectRoot}/-s`);
+    } catch {}
+  }
+}
+
+if (!IS_TEST_ENV) {
+  migrateLegacyRuntimeLayout(WORKING_DIR);
+}
+
 // Derived paths — package code vs user runtime data
 export const CTL_PATH = `${SUPER_TURTLE_DIR}/subturtle/ctl`;
 export const BOT_DIR = `${SUPER_TURTLE_DIR}/claude-telegram-bot`;
 export const SUPERTURTLE_DATA_DIR = `${WORKING_DIR}/.superturtle`;
+export const SUPERTURTLE_SUBTURTLES_DIR = `${SUPERTURTLE_DATA_DIR}/subturtles`;
+export const SUPERTURTLE_SUBTURTLE_ARCHIVE_DIR = `${SUPERTURTLE_SUBTURTLES_DIR}/.archive`;
+export const SUPERTURTLE_TELEPORT_DIR = `${SUPERTURTLE_DATA_DIR}/teleport`;
 export const CODEX_USER_ENABLED =
   (process.env.CODEX_ENABLED || "false").toLowerCase() === "true";
 export const CODEX_ENABLED = CODEX_USER_ENABLED;

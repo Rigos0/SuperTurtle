@@ -1,6 +1,12 @@
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
-import { CTL_PATH, SUPERTURTLE_DATA_DIR, WORKING_DIR } from "../config";
+import {
+  CTL_PATH,
+  SUPERTURTLE_DATA_DIR,
+  SUPERTURTLE_SUBTURTLE_ARCHIVE_DIR,
+  SUPERTURTLE_SUBTURTLES_DIR,
+  WORKING_DIR,
+} from "../config";
 import { listPendingMetaAgentInboxItems } from "../conductor-inbox";
 import { loadPendingWakeups, loadWorkerStates } from "../conductor-supervisor";
 import { getPreparedSnapshotCount } from "../cron-supervision-queue";
@@ -101,7 +107,7 @@ function readConductorWorkerState(name: string): ConductorWorkerLaneState | null
 function isArchivedConductorState(state: ConductorWorkerLaneState | null): boolean {
   if (!state) return false;
   if (state.lifecycle_state === "archived") return true;
-  return typeof state.workspace === "string" && state.workspace.includes("/.subturtles/.archive/");
+  return typeof state.workspace === "string" && state.workspace.includes(`${SUPERTURTLE_SUBTURTLE_ARCHIVE_DIR}/`);
 }
 
 export function buildCronJobView(job: ReturnType<typeof getJobs>[number]): CronJobView {
@@ -162,7 +168,7 @@ async function prepareDashboardTurtles(
     sourceTurtles.map(async (turtle) => {
       const rawConductorState = readConductorWorkerState(turtle.name);
       const conductorState = isArchivedConductorState(rawConductorState) ? null : rawConductorState;
-      const workspacePath = conductorState?.workspace || `${WORKING_DIR}/.subturtles/${turtle.name}`;
+      const workspacePath = conductorState?.workspace || `${SUPERTURTLE_SUBTURTLES_DIR}/${turtle.name}`;
       const statePath = `${workspacePath}/CLAUDE.md`;
       const [elapsed, backlogItems] = await Promise.all([
         hasElapsedValue(turtle)

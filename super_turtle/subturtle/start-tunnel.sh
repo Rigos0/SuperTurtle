@@ -55,7 +55,7 @@ fi
 # Keep both project/workspace paths inside repository root to avoid accidental
 # serving or writing outside the agent workspace tree.
 if [[ ! -d "$PROJECT_DIR" ]]; then
-  ARCHIVE_PROJECT_DIR="${ROOT_DIR}/.subturtles/.archive/${PROJECT_DIR}"
+  ARCHIVE_PROJECT_DIR="${ROOT_DIR}/.superturtle/subturtles/.archive/${PROJECT_DIR}"
   if [[ -d "$ARCHIVE_PROJECT_DIR" ]]; then
     echo "[start-tunnel] INFO: project-dir '${PROJECT_DIR}' not found in cwd; using archived workspace '${ARCHIVE_PROJECT_DIR}'."
     PROJECT_DIR="$ARCHIVE_PROJECT_DIR"

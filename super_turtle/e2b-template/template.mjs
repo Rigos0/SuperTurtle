@@ -23,8 +23,8 @@ const manifestScript = [
 
 const bootstrapCommands = [
   "set -euo pipefail",
-  "mkdir -p /opt/superturtle /home/user/.bun/bin /home/user/.local/bin /home/user/.codex /home/user/.claude /home/user/.superturtle /home/user/.subturtles /home/user/workspace",
-  "chown -R user:user /opt/superturtle /home/user/.bun /home/user/.local /home/user/.codex /home/user/.claude /home/user/.superturtle /home/user/.subturtles /home/user/workspace",
+  "mkdir -p /opt/superturtle /home/user/.bun/bin /home/user/.local/bin /home/user/.codex /home/user/.claude /home/user/.superturtle /home/user/.superturtle/subturtles /home/user/workspace",
+  "chown -R user:user /opt/superturtle /home/user/.bun /home/user/.local /home/user/.codex /home/user/.claude /home/user/.superturtle /home/user/.superturtle/subturtles /home/user/workspace",
   "printf '%s\n' 'export PATH=\"$HOME/.local/bin:$HOME/.bun/bin:$PATH\"' >/etc/profile.d/superturtle-path.sh",
   "chmod 644 /etc/profile.d/superturtle-path.sh",
   "if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then ln -sf \"$(command -v fdfind)\" /usr/local/bin/fd; fi",

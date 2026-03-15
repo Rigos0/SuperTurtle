@@ -16,7 +16,7 @@ describe("/subturtle", () => {
   it("shows parsed sub state and root summary instead of raw task text", async () => {
     const workdir = WORKING_DIR;
     const turtleName = "test-sub-ux";
-    const turtleDir = join(workdir, ".subturtles", turtleName);
+    const turtleDir = join(workdir, ".superturtle/subturtles", turtleName);
     mkdirSync(turtleDir, { recursive: true });
     const rootStatePath = join(workdir, "CLAUDE.md");
     const hadRootState = existsSync(rootStatePath);

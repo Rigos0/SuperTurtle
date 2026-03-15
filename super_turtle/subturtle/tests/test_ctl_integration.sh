@@ -52,7 +52,7 @@ set_project_paths() {
   CONDUCTOR_EVENTS_FILE="${RUN_STATE_DIR}/events.jsonl"
   CONDUCTOR_WORKERS_DIR="${RUN_STATE_DIR}/workers"
   CONDUCTOR_WAKEUPS_DIR="${RUN_STATE_DIR}/wakeups"
-  SUBTURTLES_DIR="${PROJECT_DIR}/.subturtles"
+  SUBTURTLES_DIR="${PROJECT_DIR}/.superturtle/subturtles"
   ARCHIVE_DIR="${SUBTURTLES_DIR}/.archive"
 }
 

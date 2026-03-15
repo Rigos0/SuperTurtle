@@ -25,7 +25,7 @@ source_subturtle_module "commands.sh"
 SUPER_TURTLE_DIR="${SUPER_TURTLE_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 # PROJECT_DIR: the user's working directory (data/state)
 PROJECT_DIR="${SUPER_TURTLE_PROJECT_DIR:-${CLAUDE_WORKING_DIR:-$(cd "${SCRIPT_DIR}/../.." && pwd)}}"
-SUBTURTLES_DIR="${PROJECT_DIR}/.subturtles"
+SUBTURTLES_DIR="${PROJECT_DIR}/.superturtle/subturtles"
 DEFAULT_TIMEOUT="1h"
 CRON_JOBS_FILE="${PROJECT_DIR}/.superturtle/cron-jobs.json"
 RUN_STATE_DIR="${PROJECT_DIR}/.superturtle/state"
@@ -43,6 +43,8 @@ fi
 # Support both monorepo imports (`super_turtle.*`) and packaged imports
 # (`subturtle`, `state`) by exposing both the package root and its parent.
 export PYTHONPATH="${SUPER_TURTLE_DIR}:${SUPER_TURTLE_DIR%/*}${PYTHONPATH:+:$PYTHONPATH}"
+
+migrate_legacy_runtime_layout "$PROJECT_DIR"
 
 usage() {
   echo "Usage: ./super_turtle/subturtle/ctl <command> [name] [options]"
@@ -64,7 +66,7 @@ usage() {
   echo "  status [name]                        Check if running + time remaining"
   echo "  logs   [name]                        Tail a SubTurtle's log"
   echo "  list   [--archived]                 List active SubTurtles (default) or archived SubTurtles"
-  echo "  archive <name>                      Archive a stopped SubTurtle to .subturtles/.archive/<name>/"
+  echo "  archive <name>                      Archive a stopped SubTurtle to .superturtle/subturtles/.archive/<name>/"
   echo "  gc [--max-age DURATION]             Archive stopped SubTurtles older than max age (default: 1d)"
   echo "  reschedule-cron <name> <interval>   Update recurring cron interval (e.g. 1m, 5m)"
   echo ""
@@ -74,7 +76,7 @@ usage() {
   echo "IMPORTANT: CLAUDE.md must exist in the workspace before starting."
   echo "The meta agent writes it — ctl does NOT auto-seed from root."
   echo ""
-  echo "Each SubTurtle gets its own workspace at .subturtles/<name>/ with"
+  echo "Each SubTurtle gets its own workspace at .superturtle/subturtles/<name>/ with"
   echo "its own CLAUDE.md, AGENTS.md symlink, PID file, and log file."
   exit 1
 }

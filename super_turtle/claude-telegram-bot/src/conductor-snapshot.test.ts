@@ -40,7 +40,7 @@ describe("loadConductorSnapshotContext", () => {
   it("summarizes canonical worker state, recent events, and worker wakeups", () => {
     const baseDir = makeTempDir();
     const stateDir = join(baseDir, ".superturtle", "state");
-    const workspace = join(baseDir, ".subturtles", "worker-a");
+    const workspace = join(baseDir, ".superturtle/subturtles", "worker-a");
     mkdirSync(workspace, { recursive: true });
 
     writeJson(join(stateDir, "workers", "worker-a.json"), {

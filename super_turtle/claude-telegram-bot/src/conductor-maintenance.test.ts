@@ -28,7 +28,7 @@ describe("runConductorMaintenance", () => {
   it("recovers pending terminal work, cleans stale cron once, and stays idempotent on repeat runs", async () => {
     const baseDir = makeStateDir();
     const stateDir = join(baseDir, ".superturtle", "state");
-    const archivedWorkspace = join(baseDir, ".subturtles", ".archive", "worker-recover");
+    const archivedWorkspace = join(baseDir, ".superturtle/subturtles", ".archive", "worker-recover");
     mkdirSync(join(stateDir, "workers"), { recursive: true });
     mkdirSync(join(stateDir, "wakeups"), { recursive: true });
     mkdirSync(archivedWorkspace, { recursive: true });
@@ -63,7 +63,7 @@ Recover completed worker
       worker_name: "worker-orphan",
       run_id: "run-orphan",
       lifecycle_state: "running",
-      workspace: join(baseDir, ".subturtles", "worker-orphan"),
+      workspace: join(baseDir, ".superturtle/subturtles", "worker-orphan"),
       cron_job_id: "cron-orphan",
       current_task: "Clean stale cron",
       metadata: {},
@@ -149,7 +149,7 @@ Recover completed worker
   it("requeues in-flight processing wakeups during startup recovery and replays them once", async () => {
     const baseDir = makeStateDir();
     const stateDir = join(baseDir, ".superturtle", "state");
-    const archivedWorkspace = join(baseDir, ".subturtles", ".archive", "worker-processing");
+    const archivedWorkspace = join(baseDir, ".superturtle/subturtles", ".archive", "worker-processing");
     mkdirSync(join(stateDir, "workers"), { recursive: true });
     mkdirSync(join(stateDir, "wakeups"), { recursive: true });
     mkdirSync(archivedWorkspace, { recursive: true });
@@ -281,7 +281,7 @@ Replay in-flight completion
       worker_name: "worker-reused",
       run_id: "run-new",
       lifecycle_state: "running",
-      workspace: join(baseDir, ".subturtles", "worker-reused"),
+      workspace: join(baseDir, ".superturtle/subturtles", "worker-reused"),
       cron_job_id: "cron-new",
       current_task: "Current reused run",
       metadata: {},

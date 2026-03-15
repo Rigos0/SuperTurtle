@@ -40,7 +40,7 @@ def _assert_imports_succeed(tmp_path, pythonpath_root: Path, module_names: list[
 
 
 def test_yolo_prompt_allows_rewriting_blocked_backlog_items() -> None:
-    prompt = subturtle_prompts.YOLO_PROMPT.format(state_file=".subturtles/demo/CLAUDE.md")
+    prompt = subturtle_prompts.YOLO_PROMPT.format(state_file=".superturtle/subturtles/demo/CLAUDE.md")
 
     assert "If it is blocked, too vague, or not feasible with the current repo/context, rewrite the backlog" in prompt
     assert "move `<- current` to the next actionable item" in prompt
@@ -48,7 +48,7 @@ def test_yolo_prompt_allows_rewriting_blocked_backlog_items() -> None:
 
 
 def test_slow_loop_prompts_allow_blocked_item_replanning() -> None:
-    prompts = subturtle_prompts.build_prompts(".subturtles/demo/CLAUDE.md")
+    prompts = subturtle_prompts.build_prompts(".superturtle/subturtles/demo/CLAUDE.md")
 
     assert "plan the smallest\n  actionable unblocker or backlog rewrite needed to restore forward progress" in prompts["planner"]
     assert "rewrite it\n     into concrete unblocker tasks" in prompts["groomer"]
@@ -56,7 +56,7 @@ def test_slow_loop_prompts_allow_blocked_item_replanning() -> None:
 
 
 def test_main_dispatches_to_run_loop(monkeypatch, tmp_path) -> None:
-    state_dir = tmp_path / ".subturtles" / "worker-cli"
+    state_dir = tmp_path / ".superturtle/subturtles" / "worker-cli"
     state_dir.mkdir(parents=True)
     called = {}
 
@@ -165,7 +165,7 @@ def test_run_yolo_loop_retries_on_oserror(monkeypatch, tmp_path, capsys) -> None
 def test_run_yolo_loop_marks_failure_pending_after_max_consecutive_failures(
     monkeypatch, tmp_path, capsys
 ) -> None:
-    state_dir = tmp_path / ".subturtles" / "worker-max-failures"
+    state_dir = tmp_path / ".superturtle/subturtles" / "worker-max-failures"
     state_dir.mkdir(parents=True)
     (state_dir / "CLAUDE.md").write_text(
         "# Current task\n\nRecover from repeated agent failures <- current\n",
@@ -301,7 +301,7 @@ def test_extract_current_task_ignores_current_marker(tmp_path) -> None:
 
 
 def test_resolve_state_ref_uses_relative_path_under_project_root(monkeypatch, tmp_path) -> None:
-    state_dir = tmp_path / ".subturtles" / "worker-1"
+    state_dir = tmp_path / ".superturtle/subturtles" / "worker-1"
     state_dir.mkdir(parents=True)
     state_file = state_dir / "CLAUDE.md"
     state_file.write_text("# Current task\n\nTest task\n", encoding="utf-8")
@@ -310,7 +310,7 @@ def test_resolve_state_ref_uses_relative_path_under_project_root(monkeypatch, tm
     resolved_file, state_ref = subturtle_statefile.resolve_state_ref(state_dir, "worker-1")
 
     assert resolved_file == state_file
-    assert state_ref == ".subturtles/worker-1/CLAUDE.md"
+    assert state_ref == ".superturtle/subturtles/worker-1/CLAUDE.md"
 
 
 def test_should_stop_detects_stop_directive(tmp_path, capsys) -> None:
@@ -325,7 +325,7 @@ def test_should_stop_detects_stop_directive(tmp_path, capsys) -> None:
 
 
 def test_record_completion_pending_writes_state_event_and_wakeup(tmp_path) -> None:
-    state_dir = tmp_path / ".subturtles" / "worker-2"
+    state_dir = tmp_path / ".superturtle/subturtles" / "worker-2"
     project_dir = tmp_path
     state_dir.mkdir(parents=True)
     (state_dir / "CLAUDE.md").write_text(
@@ -364,7 +364,7 @@ def test_record_completion_pending_writes_state_event_and_wakeup(tmp_path) -> No
 
 
 def test_record_checkpoint_updates_worker_state_and_event(monkeypatch, tmp_path) -> None:
-    state_dir = tmp_path / ".subturtles" / "worker-3"
+    state_dir = tmp_path / ".superturtle/subturtles" / "worker-3"
     project_dir = tmp_path
     state_dir.mkdir(parents=True)
     (state_dir / "CLAUDE.md").write_text(
@@ -406,7 +406,7 @@ def test_record_checkpoint_updates_worker_state_and_event(monkeypatch, tmp_path)
 
 
 def test_run_loop_records_fatal_error_as_failure_pending(monkeypatch, tmp_path) -> None:
-    state_dir = tmp_path / ".subturtles" / "worker-4"
+    state_dir = tmp_path / ".superturtle/subturtles" / "worker-4"
     state_dir.mkdir(parents=True)
     (state_dir / "CLAUDE.md").write_text(
         "# Current task\n\nRecover from fatal worker error <- current\n",

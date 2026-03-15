@@ -48,6 +48,9 @@ const PACKAGE_ROOT = resolve(__dirname, "..");
 const BOT_DIR = resolve(PACKAGE_ROOT, "claude-telegram-bot");
 const TEMPLATES_DIR = resolve(PACKAGE_ROOT, "templates");
 const RUNTIME_OWNERSHIP_AGENT_PATH = resolve(PACKAGE_ROOT, "bin", "runtime-ownership-agent.js");
+const SUPERTURTLE_DIRNAME = ".superturtle";
+const SUPERTURTLE_SUBTURTLES_RELATIVE_PATH = join(SUPERTURTLE_DIRNAME, "subturtles");
+const SUPERTURTLE_TELEPORT_RELATIVE_PATH = join(SUPERTURTLE_DIRNAME, "teleport");
 const PROJECT_CONFIG_RELATIVE_PATH = join(".superturtle", "project.json");
 const PROJECT_ENV_RELATIVE_PATH = join(".superturtle", ".env");
 
@@ -128,8 +131,55 @@ function ensureSafeRepoRoot(repoRoot) {
   );
 }
 
+function removeDirIfEmpty(path) {
+  try {
+    fs.rmdirSync(path);
+  } catch {}
+}
+
+function getRuntimeLayoutPaths(projectRoot) {
+  return {
+    dataDir: resolve(projectRoot, SUPERTURTLE_DIRNAME),
+    subturtlesDir: resolve(projectRoot, SUPERTURTLE_SUBTURTLES_RELATIVE_PATH),
+    legacySubturtlesDir: resolve(projectRoot, ".subturtles"),
+    teleportDir: resolve(projectRoot, SUPERTURTLE_TELEPORT_RELATIVE_PATH),
+    legacyTeleportDir: resolve(projectRoot, "-s", ".superturtle", "teleport"),
+    legacyTeleportParentDir: resolve(projectRoot, "-s", ".superturtle"),
+    legacyTeleportRootDir: resolve(projectRoot, "-s"),
+  };
+}
+
+function migrateLegacyRuntimeLayout(projectRoot) {
+  const paths = getRuntimeLayoutPaths(projectRoot);
+  fs.mkdirSync(paths.dataDir, { recursive: true });
+
+  if (fs.existsSync(paths.legacySubturtlesDir)) {
+    if (fs.existsSync(paths.subturtlesDir)) {
+      throw new Error(
+        `Cannot migrate legacy SubTurtle workspaces: both ${paths.legacySubturtlesDir} and ${paths.subturtlesDir} exist.`
+      );
+    }
+    fs.mkdirSync(dirname(paths.subturtlesDir), { recursive: true });
+    fs.renameSync(paths.legacySubturtlesDir, paths.subturtlesDir);
+  }
+
+  if (fs.existsSync(paths.legacyTeleportDir)) {
+    if (fs.existsSync(paths.teleportDir)) {
+      throw new Error(
+        `Cannot migrate legacy teleport runtime files: both ${paths.legacyTeleportDir} and ${paths.teleportDir} exist.`
+      );
+    }
+    fs.mkdirSync(dirname(paths.teleportDir), { recursive: true });
+    fs.renameSync(paths.legacyTeleportDir, paths.teleportDir);
+    removeDirIfEmpty(paths.legacyTeleportParentDir);
+    removeDirIfEmpty(paths.legacyTeleportRootDir);
+  }
+
+  return paths;
+}
+
 function writeProjectBinding(projectRoot, initCwd, options = {}) {
-  const dataDir = resolve(projectRoot, ".superturtle");
+  const dataDir = resolve(projectRoot, SUPERTURTLE_DIRNAME);
   const configPath = resolve(dataDir, "project.json");
   fs.mkdirSync(dataDir, { recursive: true });
   const payload = {
@@ -555,7 +605,7 @@ async function init() {
   }
 
   ensureSafeRepoRoot(projectRoot);
-  const dataDir = resolve(projectRoot, ".superturtle");
+  const { dataDir } = migrateLegacyRuntimeLayout(projectRoot);
 
   blank();
   console.log(`  \u{1F422} ${c.bold("superturtle")} ${c.dim("v" + getVersion())}`);
@@ -693,7 +743,6 @@ async function init() {
     const content = fs.readFileSync(projectGitignore, "utf-8");
     const additions = [];
     if (!content.includes(".superturtle/")) additions.push(".superturtle/");
-    if (!content.includes(".subturtles/")) additions.push(".subturtles/");
     if (additions.length > 0) {
       fs.appendFileSync(projectGitignore, "\n# superturtle\n" + additions.join("\n") + "\n");
       ok(".gitignore");
@@ -719,6 +768,7 @@ async function start() {
   checkTmux();
 
   const cwd = getBoundProjectRoot(process.cwd());
+  migrateLegacyRuntimeLayout(cwd);
   const projectEnv = loadProjectEnv(cwd);
 
   if (!projectEnv) {
@@ -912,6 +962,7 @@ async function start() {
 
 async function stop() {
   const cwd = getBoundProjectRoot(process.cwd());
+  migrateLegacyRuntimeLayout(cwd);
   const projectEnv = loadProjectEnv(cwd) || {};
   const tmuxSession = resolveTmuxSession(cwd, { ...process.env, ...projectEnv });
   const leaseState = readCloudLeaseState(cwd);
@@ -968,6 +1019,7 @@ async function stop() {
 
 function status() {
   const cwd = getBoundProjectRoot(process.cwd());
+  migrateLegacyRuntimeLayout(cwd);
   const projectEnv = loadProjectEnv(cwd) || {};
   const env = { ...process.env, ...projectEnv };
   const tmuxSession = resolveTmuxSession(cwd, env);
@@ -1006,6 +1058,7 @@ function status() {
 function doctor() {
   checkTmux();
   const cwd = getBoundProjectRoot(process.cwd());
+  migrateLegacyRuntimeLayout(cwd);
   const projectEnv = loadProjectEnv(cwd) || {};
   const env = { ...process.env, ...projectEnv };
   const tmuxSession = resolveTmuxSession(cwd, env);
@@ -1101,6 +1154,7 @@ function parseLogsArgs(args) {
 
 function logs() {
   const cwd = getBoundProjectRoot(process.cwd());
+  migrateLegacyRuntimeLayout(cwd);
   const projectEnv = loadProjectEnv(cwd) || {};
   const env = { ...process.env, ...projectEnv };
   const logPaths = getLogPaths(cwd, env);

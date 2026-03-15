@@ -60,7 +60,7 @@ describe("recoverPendingWorkerWakeups", () => {
   it("recreates a missing completion wakeup from completion_pending worker state", async () => {
     const baseDir = makeStateDir();
     const stateDir = join(baseDir, ".superturtle", "state");
-    const archiveWorkspace = join(baseDir, ".subturtles", ".archive", "worker-recover-complete");
+    const archiveWorkspace = join(baseDir, ".superturtle/subturtles", ".archive", "worker-recover-complete");
     mkdirSync(join(stateDir, "workers"), { recursive: true });
     mkdirSync(join(stateDir, "wakeups"), { recursive: true });
     mkdirSync(archiveWorkspace, { recursive: true });
@@ -141,7 +141,7 @@ Recover missing completion wakeup
   it("recreates a missing fatal-error wakeup from failure_pending worker state", () => {
     const baseDir = makeStateDir();
     const stateDir = join(baseDir, ".superturtle", "state");
-    const workspace = join(baseDir, ".subturtles", "worker-recover-failure");
+    const workspace = join(baseDir, ".superturtle/subturtles", "worker-recover-failure");
     mkdirSync(join(stateDir, "workers"), { recursive: true });
     mkdirSync(join(stateDir, "wakeups"), { recursive: true });
     mkdirSync(workspace, { recursive: true });
@@ -196,7 +196,7 @@ Recover missing completion wakeup
   it("ignores stale wakeups from a previous run when recovering the current run", () => {
     const baseDir = makeStateDir();
     const stateDir = join(baseDir, ".superturtle", "state");
-    const workspace = join(baseDir, ".subturtles", "worker-reused");
+    const workspace = join(baseDir, ".superturtle/subturtles", "worker-reused");
     mkdirSync(join(stateDir, "workers"), { recursive: true });
     mkdirSync(join(stateDir, "wakeups"), { recursive: true });
     mkdirSync(workspace, { recursive: true });
@@ -264,7 +264,7 @@ describe("recoverProcessingWakeups", () => {
       worker_name: "worker-processing",
       run_id: "run-processing",
       lifecycle_state: "completion_pending",
-      workspace: join(baseDir, ".subturtles", "worker-processing"),
+      workspace: join(baseDir, ".superturtle/subturtles", "worker-processing"),
       cron_job_id: "cron-processing",
       current_task: "Recover in-flight wakeup",
       metadata: {},
@@ -327,7 +327,7 @@ describe("cleanupStaleRecurringSubturtleCron", () => {
       worker_name: "worker-stale-cron",
       run_id: "run-stale-cron",
       lifecycle_state: "running",
-      workspace: join(baseDir, ".subturtles", "worker-stale-cron"),
+      workspace: join(baseDir, ".superturtle/subturtles", "worker-stale-cron"),
       cron_job_id: "cron-stale-cron",
       current_task: "Verify stale cron cleanup",
       metadata: {},
@@ -375,7 +375,7 @@ describe("processPendingConductorWakeups", () => {
   it("reconciles completion wakeups directly from canonical state", async () => {
     const baseDir = makeStateDir();
     const stateDir = join(baseDir, ".superturtle", "state");
-    const archiveWorkspace = join(baseDir, ".subturtles", ".archive", "worker-done");
+    const archiveWorkspace = join(baseDir, ".superturtle/subturtles", ".archive", "worker-done");
     mkdirSync(join(stateDir, "workers"), { recursive: true });
     mkdirSync(join(stateDir, "wakeups"), { recursive: true });
     mkdirSync(archiveWorkspace, { recursive: true });
@@ -477,7 +477,7 @@ Ship the shipped thing
   it("reconciles fatal worker wakeups into a failed state", async () => {
     const baseDir = makeStateDir();
     const stateDir = join(baseDir, ".superturtle", "state");
-    const workspace = join(baseDir, ".subturtles", "worker-failed");
+    const workspace = join(baseDir, ".superturtle/subturtles", "worker-failed");
     mkdirSync(join(stateDir, "workers"), { recursive: true });
     mkdirSync(join(stateDir, "wakeups"), { recursive: true });
     mkdirSync(workspace, { recursive: true });
@@ -569,7 +569,7 @@ Recover from a bad crash <- current
   it("does not mutate a new run when delivering a stale wakeup from an older run with the same worker name", async () => {
     const baseDir = makeStateDir();
     const stateDir = join(baseDir, ".superturtle", "state");
-    const currentWorkspace = join(baseDir, ".subturtles", "worker-reused");
+    const currentWorkspace = join(baseDir, ".superturtle/subturtles", "worker-reused");
     mkdirSync(join(stateDir, "workers"), { recursive: true });
     mkdirSync(join(stateDir, "wakeups"), { recursive: true });
     mkdirSync(currentWorkspace, { recursive: true });
@@ -655,8 +655,8 @@ New run task
   it("preserves multi-worker inbox delivery across recovery until an interactive turn acknowledges it", async () => {
     const baseDir = makeStateDir();
     const stateDir = join(baseDir, ".superturtle", "state");
-    const archivedWorkspace = join(baseDir, ".subturtles", ".archive", "worker-finished");
-    const failedWorkspace = join(baseDir, ".subturtles", "worker-crashed");
+    const archivedWorkspace = join(baseDir, ".superturtle/subturtles", ".archive", "worker-finished");
+    const failedWorkspace = join(baseDir, ".superturtle/subturtles", "worker-crashed");
     mkdirSync(join(stateDir, "workers"), { recursive: true });
     mkdirSync(join(stateDir, "wakeups"), { recursive: true });
     mkdirSync(archivedWorkspace, { recursive: true });
@@ -806,7 +806,7 @@ describe("processSilentSubturtleSupervision", () => {
   it("emits deterministic milestone wakeups without removing recurring cron", async () => {
     const baseDir = makeStateDir();
     const stateDir = join(baseDir, ".superturtle", "state");
-    const workspace = join(baseDir, ".subturtles", "worker-milestone");
+    const workspace = join(baseDir, ".superturtle/subturtles", "worker-milestone");
     mkdirSync(join(stateDir, "workers"), { recursive: true });
     mkdirSync(join(stateDir, "wakeups"), { recursive: true });
     mkdirSync(workspace, { recursive: true });
@@ -938,7 +938,7 @@ Ship milestone worker
   it("emits deterministic stuck wakeups after repeated no-progress checks", async () => {
     const baseDir = makeStateDir();
     const stateDir = join(baseDir, ".superturtle", "state");
-    const workspace = join(baseDir, ".subturtles", "worker-stuck");
+    const workspace = join(baseDir, ".superturtle/subturtles", "worker-stuck");
     mkdirSync(join(stateDir, "workers"), { recursive: true });
     mkdirSync(join(stateDir, "wakeups"), { recursive: true });
     mkdirSync(workspace, { recursive: true });

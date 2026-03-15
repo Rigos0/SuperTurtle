@@ -243,7 +243,7 @@ function enqueueTestMessage(chatId: number, text: string, enqueuedAt: number): v
 
 describe("GET /api/subturtles", () => {
   const testTurtleName = "__test_archived_lane_state__";
-  const testDir = join(WORKING_DIR, ".subturtles", testTurtleName);
+  const testDir = join(WORKING_DIR, ".superturtle/subturtles", testTurtleName);
   const workerStateDir = join(SUPERTURTLE_DATA_DIR, "state", "workers");
   const workerStatePath = join(workerStateDir, `${testTurtleName}.json`);
 
@@ -265,7 +265,7 @@ describe("GET /api/subturtles", () => {
       JSON.stringify({
         worker_name: testTurtleName,
         lifecycle_state: "archived",
-        workspace: join(WORKING_DIR, ".subturtles", ".archive", testTurtleName),
+        workspace: join(WORKING_DIR, ".superturtle/subturtles", ".archive", testTurtleName),
         loop_type: "slow",
         current_task: "archived task from stale state",
         created_at: "2026-03-08T12:00:00Z",
@@ -362,9 +362,9 @@ describe("GET /api/subturtles/:name/logs", () => {
     expect(body.error).toBe("SubTurtle not found");
   });
 
-  // Test with a real log file in the .subturtles directory
+  // Test with a real log file in the .superturtle/subturtles directory
   const testTurtleName = "__test_logs_turtle__";
-  const testDir = join(WORKING_DIR, ".subturtles", testTurtleName);
+  const testDir = join(WORKING_DIR, ".superturtle/subturtles", testTurtleName);
 
   beforeAll(() => {
     mkdirSync(testDir, { recursive: true });
@@ -495,7 +495,7 @@ describe("GET /api/processes", () => {
 
   it("keeps stopped subturtles as stopped and formats elapsed as 0s", async () => {
     const testTurtleName = "__test_stopped_status_turtle__";
-    const testDir = join(WORKING_DIR, ".subturtles", testTurtleName);
+    const testDir = join(WORKING_DIR, ".superturtle/subturtles", testTurtleName);
     mkdirSync(testDir, { recursive: true });
     writeFileSync(join(testDir, "CLAUDE.md"), "# Current task\nCheck stopped formatting\n");
 

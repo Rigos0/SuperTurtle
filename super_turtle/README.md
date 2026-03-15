@@ -72,7 +72,7 @@ You (Telegram) → Meta Agent → SubTurtles (parallel workers)
                      ↓
               plans, delegates, supervises
                      ↓
-              CLAUDE.md · .subturtles/ · git history
+              CLAUDE.md · .superturtle/subturtles/ · git history
 ```
 
 - **Meta Agent** — plans, delegates, supervises (the bot itself)

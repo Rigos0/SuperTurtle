@@ -33,7 +33,7 @@ class ConductorStateStoreTests(unittest.TestCase):
                 lifecycle_state="running",
                 updated_by="supervisor",
                 run_id="run-123",
-                workspace=".subturtles/alpha-run",
+                workspace=".superturtle/subturtles/alpha-run",
                 loop_type="yolo-codex",
                 pid=12345,
                 timeout_seconds=3600,

@@ -15,7 +15,7 @@ There are two layers:
    - **yolo-codex** — Same as yolo but uses Codex. Cheapest option for straightforward code tasks. **Only when Codex is available.**
    - **yolo-codex-spark** — Same as yolo-codex but forces Codex Spark for faster iterations. **Only when Codex is available.**
 
-Multiple SubTurtles can run concurrently on different tasks. Each gets its own workspace at `.subturtles/<name>/` with its own CLAUDE.md state file, AGENTS.md symlink, PID, and logs. They all run from the repo root so they see the full codebase.
+Multiple SubTurtles can run concurrently on different tasks. Each gets its own workspace at `.superturtle/subturtles/<name>/` with its own CLAUDE.md state file, AGENTS.md symlink, PID, and logs. They all run from the repo root so they see the full codebase.
 
 ## How you work
 
@@ -47,7 +47,7 @@ You're a player-coach — you can both code directly and delegate to SubTurtles.
 **Always allowed to edit directly (no judgment needed):**
 - `CLAUDE.md` (root project state)
 - `{{SUPER_TURTLE_DIR}}/meta/META_SHARED.md` (your own instructions)
-- `.subturtles/<name>/CLAUDE.md` (SubTurtle state files, before spawning)
+- `.superturtle/subturtles/<name>/CLAUDE.md` (SubTurtle state files, before spawning)
 - `{{DATA_DIR}}/cron-jobs.json` (cron scheduling recovery/debug only; normal scheduling should use `ctl spawn` or the `CronCreate` / `CronDelete` tools)
 - Temporary files in `/tmp/`
 - Scripts and templates in `{{SUPER_TURTLE_DIR}}/` (your own tooling)
@@ -86,7 +86,7 @@ The meta agent decides whether to do research itself or spawn a SubTurtle dedica
 There are two levels of state:
 
 - **Root `CLAUDE.md`** (symlinked as `AGENTS.md`) — the project-level state that you (the meta agent) maintain. This is what the human sees.
-- **`.subturtles/<name>/CLAUDE.md`** — each SubTurtle's own state file. You (the meta agent) write this **before** spawning the SubTurtle, scoped to that SubTurtle's specific job. The SubTurtle reads/writes only its own copy.
+- **`.superturtle/subturtles/<name>/CLAUDE.md`** — each SubTurtle's own state file. You (the meta agent) write this **before** spawning the SubTurtle, scoped to that SubTurtle's specific job. The SubTurtle reads/writes only its own copy.
 
 The state file structure (same at both levels):
 
@@ -248,7 +248,7 @@ When frontend work needs visual QA, use the screenshot helper script:
 - Engine: **Playwright CLI** (`npx playwright screenshot`) — headless Chromium, no GUI or macOS permissions needed
 - Basic usage:
   - `bash {{SUPER_TURTLE_DIR}}/subturtle/browser-screenshot.sh http://localhost:3000`
-  - `bash {{SUPER_TURTLE_DIR}}/subturtle/browser-screenshot.sh "$TUNNEL_URL" ".subturtles/<name>/screenshots/home.png"`
+  - `bash {{SUPER_TURTLE_DIR}}/subturtle/browser-screenshot.sh "$TUNNEL_URL" ".superturtle/subturtles/<name>/screenshots/home.png"`
   - `bash {{SUPER_TURTLE_DIR}}/subturtle/browser-screenshot.sh http://localhost:3000 --viewport 1440x900`
 - Defaults:
   - Output path omitted -> writes to `.tmp/screenshots/screenshot-<timestamp>.png`
@@ -286,7 +286,7 @@ Important split:
 2. Compare the current checkpoint signature, completed backlog count, and task summary against prior supervisor metadata.
 3. Emit `🚀 Milestone` only when deterministic progress crossed a reporting threshold, currently new completed backlog items after the baseline check.
 4. Emit `⚠️ Stuck` only when there has been no meaningful progress across 2+ silent checks.
-5. Attach the current `.subturtles/<name>/.tunnel-url` to a milestone update when present, but do not treat the URL alone as a milestone.
+5. Attach the current `.superturtle/subturtles/<name>/.tunnel-url` to a milestone update when present, but do not treat the URL alone as a milestone.
 6. Route resulting notable updates through Telegram plus the durable inbox without turning them into fake chat messages in session history.
 
 **The conductor should only notify the user when there is actual news:**
@@ -334,7 +334,7 @@ Latest: <what just shipped>
 When a SubTurtle finishes its chunk and there's more work on the roadmap:
 1. Stop the SubTurtle with `{{CTL_PATH}} stop <name>` (this also removes its auto-registered cron job).
 2. Update root CLAUDE.md — move completed items, advance the roadmap.
-3. Write a new `.subturtles/<name>/CLAUDE.md` for the next chunk of work.
+3. Write a new `.superturtle/subturtles/<name>/CLAUDE.md` for the next chunk of work.
 4. Spawn a fresh SubTurtle.
 5. No manual cron scheduling needed — `ctl spawn` auto-registers supervision for the new run.
 6. Report to the human what shipped and what's starting next.
@@ -389,7 +389,7 @@ Use quota signals to keep the system autonomous and cost-efficient without askin
 ## Checking progress
 
 1. Run `{{CTL_PATH}} list` to see all SubTurtles and their current tasks.
-2. Read a SubTurtle's state file (`.subturtles/<name>/CLAUDE.md`) for detailed backlog status.
+2. Read a SubTurtle's state file (`.superturtle/subturtles/<name>/CLAUDE.md`) for detailed backlog status.
 3. Check `git log --oneline -20` to see recent commits.
 4. Check SubTurtle logs (`{{CTL_PATH}} logs [name]`) if something seems stuck.
 
@@ -430,7 +430,7 @@ This keeps completion autonomous while preserving watchdog and cron supervision 
 
 Timeout durations: `30m`, `1h`, `2h`, `4h`. When a SubTurtle times out, the watchdog sends SIGTERM → waits 5s → SIGKILL, and logs the event.
 
-Each SubTurtle's workspace lives at `.subturtles/<name>/` and contains:
+Each SubTurtle's workspace lives at `.superturtle/subturtles/<name>/` and contains:
 - `CLAUDE.md` — the SubTurtle's own task state (written by meta agent before spawn)
 - `AGENTS.md` → symlink to its CLAUDE.md
 - `subturtle.pid` — process ID

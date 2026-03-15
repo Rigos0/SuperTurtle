@@ -23,6 +23,7 @@ import {
   DEFAULT_CODEX_EFFORT,
   SUPERTURTLE_REMOTE_MODE,
   SUPERTURTLE_RUNTIME_ROLE,
+  SUPERTURTLE_SUBTURTLES_DIR,
   getCodexUnavailableReason,
 } from "../config";
 import { getContextReport } from "../context-command";
@@ -430,7 +431,7 @@ export function parseCtlListOutput(output: string): ListedSubTurtle[] {
 
 export async function getSubTurtleElapsed(name: string): Promise<string> {
   try {
-    const metaPath = `${WORKING_DIR}/.subturtles/${name}/subturtle.meta`;
+    const metaPath = `${SUPERTURTLE_SUBTURTLES_DIR}/${name}/subturtle.meta`;
     const metaText = await Bun.file(metaPath).text();
     const spawnedAtMatch = metaText.match(/^SPAWNED_AT=(\d+)$/m);
     if (!spawnedAtMatch?.[1]) return "unknown";
@@ -1992,7 +1993,7 @@ export async function handleSubturtle(ctx: Context): Promise<void> {
     readClaudeStateSummary(rootStatePath),
     Promise.all(
       turtles.map(async (turtle) => {
-        const statePath = `${WORKING_DIR}/.subturtles/${turtle.name}/CLAUDE.md`;
+        const statePath = `${SUPERTURTLE_SUBTURTLES_DIR}/${turtle.name}/CLAUDE.md`;
         const summary = await readClaudeStateSummary(statePath);
         return [turtle.name, summary] as const;
       })

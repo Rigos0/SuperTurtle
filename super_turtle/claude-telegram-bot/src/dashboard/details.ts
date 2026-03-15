@@ -1,6 +1,6 @@
 import { existsSync, lstatSync, readFileSync, readlinkSync } from "fs";
 import { join } from "path";
-import { SUPERTURTLE_DATA_DIR, WORKING_DIR } from "../config";
+import { SUPERTURTLE_DATA_DIR, SUPERTURTLE_SUBTURTLES_DIR, WORKING_DIR } from "../config";
 import {
   getSubTurtleElapsed,
   readClaudeBacklogItems,
@@ -108,7 +108,7 @@ export async function buildSubturtleDetail(name: string): Promise<SubturtleDetai
 
   const elapsed = turtle.status === "running" ? await getSubTurtleElapsed(name) : "0s";
   const workerState = readFullWorkerState(name);
-  const workspaceDir = (workerState?.workspace as string) || `${WORKING_DIR}/.subturtles/${name}`;
+  const workspaceDir = (workerState?.workspace as string) || `${SUPERTURTLE_SUBTURTLES_DIR}/${name}`;
 
   const claudeMdPath = join(workspaceDir, "CLAUDE.md");
   const metaPath = join(workspaceDir, "subturtle.meta");
@@ -186,8 +186,8 @@ export async function buildSubturtleLogs(
   name: string,
   lineCount?: number
 ): Promise<SubturtleLogsResponse | null> {
-  const logPath = `${WORKING_DIR}/.subturtles/${name}/subturtle.log`;
-  const pidPath = `${WORKING_DIR}/.subturtles/${name}/subturtle.pid`;
+  const logPath = `${SUPERTURTLE_SUBTURTLES_DIR}/${name}/subturtle.log`;
+  const pidPath = `${SUPERTURTLE_SUBTURTLES_DIR}/${name}/subturtle.pid`;
 
   const pidExists = await Bun.file(pidPath).exists();
   const logExists = await Bun.file(logPath).exists();
@@ -240,7 +240,7 @@ async function buildProcessExtra(p: ProcessView): Promise<DriverExtra | Subturtl
   }
 
   const name = p.id.replace(/^subturtle-/, "");
-  const statePath = `${WORKING_DIR}/.subturtles/${name}/CLAUDE.md`;
+  const statePath = `${SUPERTURTLE_SUBTURTLES_DIR}/${name}/CLAUDE.md`;
   const backlog = await readClaudeBacklogItems(statePath);
   const backlogDone = backlog.filter((item) => item.done).length;
   const backlogCurrent =
@@ -284,7 +284,7 @@ export async function buildCurrentJobDetail(id: string): Promise<JobDetailRespon
   if (job.ownerType === "subturtle") {
     const name = job.ownerId.replace(/^subturtle-/, "");
     logsLink = `/api/subturtles/${encodeURIComponent(name)}/logs`;
-    const statePath = `${WORKING_DIR}/.subturtles/${name}/CLAUDE.md`;
+    const statePath = `${SUPERTURTLE_SUBTURTLES_DIR}/${name}/CLAUDE.md`;
     const backlog = await readClaudeBacklogItems(statePath);
     const backlogDone = backlog.filter((item) => item.done).length;
     const backlogCurrent =

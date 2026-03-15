@@ -17,6 +17,10 @@ const TELEPORT_STATE_RELATIVE_PATH = join(".superturtle", "teleport-state.json")
 const LEGACY_POC_STATE_RELATIVE_PATH = join(".superturtle", "e2b-webhook-poc.json");
 const PROJECT_CONFIG_RELATIVE_PATH = join(".superturtle", "project.json");
 const PROJECT_ENV_RELATIVE_PATH = join(".superturtle", ".env");
+const LEGACY_SUBTURTLES_RELATIVE_PATH = ".subturtles";
+const SUBTURTLES_RELATIVE_PATH = join(".superturtle", "subturtles");
+const TELEPORT_RUNTIME_RELATIVE_PATH = join(".superturtle", "teleport");
+const LEGACY_TELEPORT_RUNTIME_RELATIVE_PATH = join("-s", ".superturtle", "teleport");
 const DEFAULT_PORT = 3000;
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_HEALTH_PATH = "/healthz";
@@ -96,6 +100,43 @@ function getBoundProjectRoot(startDir) {
   }
 
   return normalizeExistingPath(startDir);
+}
+
+function removeDirIfEmpty(pathname) {
+  try {
+    fs.rmdirSync(pathname);
+  } catch {}
+}
+
+function migrateLegacyRuntimeLayout(projectRoot) {
+  const subturtlesDir = resolve(projectRoot, SUBTURTLES_RELATIVE_PATH);
+  const legacySubturtlesDir = resolve(projectRoot, LEGACY_SUBTURTLES_RELATIVE_PATH);
+  const teleportDir = resolve(projectRoot, TELEPORT_RUNTIME_RELATIVE_PATH);
+  const legacyTeleportDir = resolve(projectRoot, LEGACY_TELEPORT_RUNTIME_RELATIVE_PATH);
+
+  fs.mkdirSync(resolve(projectRoot, ".superturtle"), { recursive: true });
+
+  if (fs.existsSync(legacySubturtlesDir)) {
+    if (fs.existsSync(subturtlesDir)) {
+      throw new Error(
+        `Cannot migrate legacy SubTurtle workspaces because both ${legacySubturtlesDir} and ${subturtlesDir} exist.`
+      );
+    }
+    fs.mkdirSync(dirname(subturtlesDir), { recursive: true });
+    fs.renameSync(legacySubturtlesDir, subturtlesDir);
+  }
+
+  if (fs.existsSync(legacyTeleportDir)) {
+    if (fs.existsSync(teleportDir)) {
+      throw new Error(
+        `Cannot migrate legacy teleport runtime files because both ${legacyTeleportDir} and ${teleportDir} exist.`
+      );
+    }
+    fs.mkdirSync(dirname(teleportDir), { recursive: true });
+    fs.renameSync(legacyTeleportDir, teleportDir);
+    removeDirIfEmpty(resolve(projectRoot, "-s", ".superturtle"));
+    removeDirIfEmpty(resolve(projectRoot, "-s"));
+  }
 }
 
 function getStateFilePath(projectRoot) {
@@ -298,6 +339,7 @@ function buildLocalAuthBootstrap(projectEnv = {}) {
 }
 
 function loadProjectEnv(projectRoot) {
+  migrateLegacyRuntimeLayout(projectRoot);
   const envPath = resolve(projectRoot, PROJECT_ENV_RELATIVE_PATH);
   if (!fs.existsSync(envPath)) {
     throw new Error(`Missing project env file at ${envPath}. Run 'superturtle init' first.`);
@@ -724,7 +766,7 @@ async function bootstrapRemoteDriverAuth(sandbox, config, remoteEnv, authBootstr
 }
 
 function createArchiveBuffer(projectRoot) {
-  const { spawnSync } = require("child_process");
+  migrateLegacyRuntimeLayout(projectRoot);
   const tarArgs = [
     "-czf",
     "-",
@@ -732,8 +774,11 @@ function createArchiveBuffer(projectRoot) {
     "--exclude=.env",
     "--exclude=node_modules",
     "--exclude=.venv",
-    "--exclude=.subturtles",
-    "--exclude=.superturtle",
+    "--exclude=.superturtle/.env",
+    "--exclude=.superturtle/e2b-webhook-poc.json",
+    "--exclude=.superturtle/teleport-state.json",
+    "--exclude=.superturtle/cloud-runtime-lease.json",
+    "--exclude=.superturtle/logs",
     "--exclude=*.log",
     ".",
   ];

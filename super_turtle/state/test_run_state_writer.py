@@ -71,9 +71,9 @@ class RunStateWriterTests(unittest.TestCase):
 
     def test_refresh_handoff_from_conductor_renders_live_workers_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
-            live_workspace = Path(tmp_dir) / ".subturtles" / "alpha"
+            live_workspace = Path(tmp_dir) / ".superturtle/subturtles" / "alpha"
             live_workspace.mkdir(parents=True)
-            missing_workspace = Path(tmp_dir) / ".subturtles" / "ghost"
+            missing_workspace = Path(tmp_dir) / ".superturtle/subturtles" / "ghost"
 
             self.assertEqual(
                 main(
@@ -175,7 +175,7 @@ class RunStateWriterTests(unittest.TestCase):
 
     def test_refresh_handoff_from_conductor_renders_archived_completed_workers_in_recent_updates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
-            archive_workspace = Path(tmp_dir) / ".subturtles" / ".archive" / "omega"
+            archive_workspace = Path(tmp_dir) / ".superturtle/subturtles" / ".archive" / "omega"
             archive_workspace.mkdir(parents=True)
 
             self.assertEqual(
@@ -283,7 +283,7 @@ class RunStateWriterTests(unittest.TestCase):
                         "--run-id",
                         "run-123",
                         "--workspace",
-                        ".subturtles/gamma-run",
+                        ".superturtle/subturtles/gamma-run",
                         "--checkpoint-json",
                         '{"commit_sha":"abc123"}',
                     ]
@@ -448,7 +448,7 @@ class RunStateWriterTests(unittest.TestCase):
                         "--run-id",
                         "run-new",
                         "--workspace",
-                        ".subturtles/epsilon-run",
+                        ".superturtle/subturtles/epsilon-run",
                         "--loop-type",
                         "yolo-codex",
                         "--current-task",
@@ -466,7 +466,7 @@ class RunStateWriterTests(unittest.TestCase):
             parsed = json.loads(worker_path.read_text(encoding="utf-8"))
             self.assertEqual(parsed["run_id"], "run-new")
             self.assertEqual(parsed["lifecycle_state"], "running")
-            self.assertEqual(parsed["workspace"], ".subturtles/epsilon-run")
+            self.assertEqual(parsed["workspace"], ".superturtle/subturtles/epsilon-run")
             self.assertEqual(parsed["current_task"], "New task")
             self.assertEqual(parsed["created_at"], "2026-03-08T10:00:00Z")
             self.assertIsNone(parsed["cron_job_id"])

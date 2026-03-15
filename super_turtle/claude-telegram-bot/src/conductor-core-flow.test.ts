@@ -36,7 +36,7 @@ describe("conductor core flow scenarios", () => {
   it("covers the single-worker happy path from silent baseline through completion and inbox ack", async () => {
     const baseDir = makeStateDir();
     const stateDir = join(baseDir, ".superturtle", "state");
-    const workspace = join(baseDir, ".subturtles", "worker-happy");
+    const workspace = join(baseDir, ".superturtle/subturtles", "worker-happy");
     mkdirSync(join(stateDir, "workers"), { recursive: true });
     mkdirSync(join(stateDir, "wakeups"), { recursive: true });
     mkdirSync(workspace, { recursive: true });
@@ -232,9 +232,9 @@ Ship worker happy
   it("keeps parallel workers isolated when milestone, completion, and failure events land together", async () => {
     const baseDir = makeStateDir();
     const stateDir = join(baseDir, ".superturtle", "state");
-    const milestoneWorkspace = join(baseDir, ".subturtles", "worker-parallel-a");
-    const completionWorkspace = join(baseDir, ".subturtles", "worker-parallel-b");
-    const failureWorkspace = join(baseDir, ".subturtles", "worker-parallel-c");
+    const milestoneWorkspace = join(baseDir, ".superturtle/subturtles", "worker-parallel-a");
+    const completionWorkspace = join(baseDir, ".superturtle/subturtles", "worker-parallel-b");
+    const failureWorkspace = join(baseDir, ".superturtle/subturtles", "worker-parallel-c");
     mkdirSync(join(stateDir, "workers"), { recursive: true });
     mkdirSync(join(stateDir, "wakeups"), { recursive: true });
     mkdirSync(milestoneWorkspace, { recursive: true });
@@ -479,7 +479,7 @@ Advance worker A
   it("reconciles timeout wakeups as a first-class terminal flow", async () => {
     const baseDir = makeStateDir();
     const stateDir = join(baseDir, ".superturtle", "state");
-    const workspace = join(baseDir, ".subturtles", "worker-timeout");
+    const workspace = join(baseDir, ".superturtle/subturtles", "worker-timeout");
     mkdirSync(join(stateDir, "workers"), { recursive: true });
     mkdirSync(join(stateDir, "wakeups"), { recursive: true });
     mkdirSync(workspace, { recursive: true });

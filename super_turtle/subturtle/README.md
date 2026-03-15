@@ -22,7 +22,7 @@ bash super_turtle/subturtle/browser-screenshot.sh http://localhost:3000
 # Save a specific artifact for SubTurtle milestone proof
 bash super_turtle/subturtle/browser-screenshot.sh \
   "$TUNNEL_URL" \
-  ".subturtles/my-task/screenshots/home.png"
+  ".superturtle/subturtles/my-task/screenshots/home.png"
 
 # Custom viewport size
 bash super_turtle/subturtle/browser-screenshot.sh \

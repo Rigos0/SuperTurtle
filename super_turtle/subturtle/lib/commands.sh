@@ -396,7 +396,7 @@ interval_ms = int(sys.argv[3])
 ctl_path = sys.argv[4] if len(sys.argv) > 4 else "./super_turtle/subturtle/ctl"
 prompt = (
     f"[SILENT CHECK-IN] Check SubTurtle {name}: run `{ctl_path} status {name}`, "
-    f"inspect `.subturtles/{name}/CLAUDE.md`, and review `git log --oneline -10`.\n"
+    f"inspect `.superturtle/subturtles/{name}/CLAUDE.md`, and review `git log --oneline -10`.\n"
     "Rules: Do NOT message the user unless one of these conditions is met:\n"
     f"- 🎉 SubTurtle completed all backlog items -> stop SubTurtle {name} and report what shipped\n"
     f"- ⚠️ SubTurtle appears stuck (no meaningful progress for 30+ minutes across repeated supervision checks) -> stop it, diagnose, and report\n"

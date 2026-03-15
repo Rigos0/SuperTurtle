@@ -80,7 +80,7 @@ describe("subturtle callback actions", () => {
 
   it("renders SubTurtle state details for subturtle_logs callbacks", async () => {
     const turtleName = "callback-sub-1";
-    const turtleDir = join(WORKING_DIR, ".subturtles", turtleName);
+    const turtleDir = join(WORKING_DIR, ".superturtle/subturtles", turtleName);
     const statePath = join(turtleDir, "CLAUDE.md");
     mkdirSync(turtleDir, { recursive: true });
     writeFileSync(

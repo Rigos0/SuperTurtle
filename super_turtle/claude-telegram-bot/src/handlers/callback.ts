@@ -13,9 +13,10 @@ import {
   CODEX_AVAILABLE,
   CODEX_CLI_AVAILABLE,
   CODEX_USER_ENABLED,
-  WORKING_DIR,
   CTL_PATH,
   IPC_DIR,
+  SUPERTURTLE_SUBTURTLES_DIR,
+  WORKING_DIR,
 } from "../config";
 import { isAuthorized } from "../security";
 import {
@@ -521,7 +522,7 @@ async function handleSubturtleLogsCallback(
   }
 
   try {
-    const turtleStatePath = `${WORKING_DIR}/.subturtles/${name}/CLAUDE.md`;
+    const turtleStatePath = `${SUPERTURTLE_SUBTURTLES_DIR}/${name}/CLAUDE.md`;
     const [turtleSummary, turtleBacklog] = await Promise.all([
       readClaudeStateSummary(turtleStatePath),
       readClaudeBacklogItems(turtleStatePath),
