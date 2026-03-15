@@ -2,6 +2,8 @@ import { run } from "@grammyjs/runner";
 import { logger } from "./logger";
 
 const transportLog = logger.child({ module: "telegram-transport" });
+const HANDLED_WEBHOOK_CONFLICT_GRACE_MS = 30_000;
+let lastHandledWebhookConflictAt = 0;
 
 export type TelegramTransportMode = "polling" | "webhook" | "standby";
 
@@ -259,6 +261,13 @@ function isTelegramWebhookConflict(error: unknown): boolean {
   return code === 409 && description.toLowerCase().includes("setwebhook");
 }
 
+export function shouldSuppressHandledWebhookConflict(error: unknown): boolean {
+  if (!isTelegramWebhookConflict(error)) {
+    return false;
+  }
+  return Date.now() - lastHandledWebhookConflictAt <= HANDLED_WEBHOOK_CONFLICT_GRACE_MS;
+}
+
 function rethrowTransportError(error: unknown): void {
   queueMicrotask(() => {
     throw error instanceof Error ? error : new Error(String(error));
@@ -287,12 +296,39 @@ async function createStandbyTransport(
   let checkPromise: Promise<void> | null = null;
   let intervalHandle: IntervalHandle | null = null;
 
+  const ensureWatching = () => {
+    if (stopped || runner || intervalHandle !== null) {
+      return;
+    }
+    intervalHandle = setIntervalFn(() => {
+      void checkWebhookOwnership().catch((error) => {
+        transportLog.warn({ err: error }, "Failed to reconcile Telegram standby ownership");
+      });
+    }, intervalMs);
+  };
+
   const beginPolling = async () => {
     if (stopped || runner) {
       return;
     }
     await config.onResumePolling?.();
     runner = startPollingRunner(bot);
+    const runnerTask = runner.task?.();
+    if (runnerTask) {
+      void runnerTask.catch(async (error) => {
+        if (!isTelegramWebhookConflict(error)) {
+          rethrowTransportError(error);
+          return;
+        }
+
+        lastHandledWebhookConflictAt = Date.now();
+        transportLog.info(
+          "Telegram standby transport handed resumed polling back to standby after webhook cutover"
+        );
+        runner = null;
+        ensureWatching();
+      });
+    }
     if (intervalHandle !== null) {
       clearIntervalFn(intervalHandle);
       intervalHandle = null;
@@ -339,13 +375,7 @@ async function createStandbyTransport(
     transportLog.warn({ err: error }, "Initial standby ownership check failed; continuing to watch");
   }
 
-  if (!runner) {
-    intervalHandle = setIntervalFn(() => {
-      void checkWebhookOwnership().catch((error) => {
-        transportLog.warn({ err: error }, "Failed to reconcile Telegram standby ownership");
-      });
-    }, intervalMs);
-  }
+  ensureWatching();
 
   return {
     mode: "standby",
@@ -391,6 +421,7 @@ export async function startTelegramTransport(
           }
 
           transportLog.info("Telegram polling transport handed off to standby after webhook cutover");
+          lastHandledWebhookConflictAt = Date.now();
           fallbackTransport = await createStandbyTransport(bot, standbyConfig, dependencies);
         } catch (standbyError) {
           rethrowTransportError(standbyError);

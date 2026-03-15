@@ -90,7 +90,11 @@ import {
 } from "./conductor-snapshot";
 import { botLog, cronLog, eventLog } from "./logger";
 import { getSequentializationKey } from "./update-sequencing";
-import { startTelegramTransport, type TelegramTransportConfig } from "./telegram-transport";
+import {
+  shouldSuppressHandledWebhookConflict,
+  startTelegramTransport,
+  type TelegramTransportConfig,
+} from "./telegram-transport";
 import {
   getTeleportRemoteUnsupportedMessage,
   isTeleportRemoteAgentMode,
@@ -1140,6 +1144,13 @@ process.on("uncaughtException", (error) => {
 });
 
 process.on("unhandledRejection", (reason) => {
+  if (shouldSuppressHandledWebhookConflict(reason)) {
+    botLog.warn(
+      { err: reason },
+      "Suppressing handled Telegram webhook cutover conflict after standby handoff"
+    );
+    return;
+  }
   botLog.fatal({ err: reason }, "Unhandled promise rejection");
   eventLog.error(
     { eventType: "process_unhandled_rejection", error: summarizeCronError(reason) },

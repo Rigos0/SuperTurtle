@@ -35,6 +35,8 @@ export type TeleportState = {
   updatedAt: string;
 };
 
+const HOME_RETURN_GRACE_MS = 30_000;
+
 export const TELEPORT_CONTROL_MESSAGE =
   "This remote teleport runtime is control-only. Use /home to return Telegram ownership to your PC.";
 export const TELEPORT_AGENT_TEXT_ONLY_MESSAGE =
@@ -102,4 +104,20 @@ export async function reconcileTeleportOwnershipForCurrentProject(): Promise<Tel
 
 export function loadTeleportStateForCurrentProject(): TeleportState | null {
   return teleportLib.loadPocState(WORKING_DIR);
+}
+
+export function recentlyReturnedHome(
+  state: TeleportState | null,
+  nowMs: number = Date.now()
+): boolean {
+  if (!state || state.ownerMode !== "local" || !state.updatedAt) {
+    return false;
+  }
+
+  const updatedAtMs = Date.parse(state.updatedAt);
+  if (!Number.isFinite(updatedAtMs)) {
+    return false;
+  }
+
+  return nowMs - updatedAtMs >= 0 && nowMs - updatedAtMs <= HOME_RETURN_GRACE_MS;
 }

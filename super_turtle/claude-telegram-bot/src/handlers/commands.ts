@@ -41,6 +41,7 @@ import {
   loadTeleportStateForCurrentProject,
   reconcileTeleportOwnershipForCurrentProject,
   releaseTeleportOwnershipForCurrentProject,
+  recentlyReturnedHome,
 } from "../teleport";
 
 // Canonical main-loop log written by live.sh (tmux + caffeinate + run-loop).
@@ -82,12 +83,34 @@ const TELEPORT_REMOTE_AGENT_COMMANDS = [
   ...TELEPORT_REMOTE_CONTROL_COMMANDS,
 ] as const;
 
-export const TELEGRAM_COMMANDS: readonly BotCommand[] =
-  SUPERTURTLE_RUNTIME_ROLE === "teleport-remote"
-    ? SUPERTURTLE_REMOTE_MODE === "agent"
+export function getTelegramCommandsForRuntime(
+  runtimeRole: "local" | "teleport-remote" = SUPERTURTLE_RUNTIME_ROLE,
+  remoteMode: "control" | "agent" = SUPERTURTLE_REMOTE_MODE
+): readonly BotCommand[] {
+  if (runtimeRole === "teleport-remote") {
+    return remoteMode === "agent"
       ? TELEPORT_REMOTE_AGENT_COMMANDS
-      : TELEPORT_REMOTE_CONTROL_COMMANDS
-    : LOCAL_TELEGRAM_COMMANDS;
+      : TELEPORT_REMOTE_CONTROL_COMMANDS;
+  }
+  return LOCAL_TELEGRAM_COMMANDS;
+}
+
+export const TELEGRAM_COMMANDS: readonly BotCommand[] =
+  getTelegramCommandsForRuntime();
+
+async function syncTelegramCommandsFromCommand(
+  ctx: Context,
+  runtimeRole: "local" | "teleport-remote",
+  remoteMode: "control" | "agent" = SUPERTURTLE_REMOTE_MODE
+): Promise<void> {
+  try {
+    await ctx.api.setMyCommands([
+      ...getTelegramCommandsForRuntime(runtimeRole, remoteMode),
+    ]);
+  } catch (error) {
+    cmdLog.warn({ err: error, runtimeRole, remoteMode }, "Failed to refresh Telegram slash commands");
+  }
+}
 
 /**
  * Shared command list for display in /new and /status, and new_session bot-control.
@@ -527,6 +550,7 @@ export async function handleTeleport(ctx: Context): Promise<void> {
       remoteDriver: "codex",
     });
     await activateTeleportOwnershipForCurrentProject();
+    await syncTelegramCommandsFromCommand(ctx, "teleport-remote", "agent");
     await ctx.reply(
       `✅ Teleported to E2B.\nSandbox: ${state.sandboxId}\nWebhook: ${state.webhookUrl}\nLocal bot stays running but Telegram is now routed to the remote runtime.`
     );
@@ -551,6 +575,10 @@ export async function handleHome(ctx: Context): Promise<void> {
   }
 
   if (SUPERTURTLE_RUNTIME_ROLE !== "teleport-remote") {
+    if (recentlyReturnedHome(loadTeleportStateForCurrentProject())) {
+      await ctx.reply("✅ Telegram ownership already returned to the local polling turtle.");
+      return;
+    }
     await ctx.reply("ℹ️ This turtle is already local. Use /teleport to move Telegram ownership to E2B.");
     return;
   }
@@ -558,6 +586,7 @@ export async function handleHome(ctx: Context): Promise<void> {
   const progress = await ctx.reply("🏠 Returning Telegram ownership to your PC...");
   try {
     await releaseTeleportOwnershipForCurrentProject();
+    await syncTelegramCommandsFromCommand(ctx, "local");
     await ctx.reply(
       "✅ Telegram ownership returned to the local polling turtle. This remote sandbox is still running, but it no longer owns updates."
     );

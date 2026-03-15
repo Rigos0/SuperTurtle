@@ -55,6 +55,8 @@ Teleport planning on `teleport-v2.0` now lives in:
 
 - `super_turtle/docs/REPO_BOUND_TELEPORT_SPEC.md`
 - `super_turtle/docs/TELEGRAM_WEBHOOK_POC.md`
+- `super_turtle/docs/E2B_WEBHOOK_WAKE_POC.md`
+- `super_turtle/docs/E2B_REMOTE_RUNTIME_SETUP.md`
 - `super_turtle/docs/reviews/README.md`
 
 Current direction:
@@ -65,14 +67,21 @@ Current direction:
 - remote E2B runtimes use webhooks after health-checked cutover
 - do not keep Azure, GCP, AWS, or provider-neutral VM abstractions in the active design
 
-Current implementation focus from the spec:
+Current implementation status:
 
-1. Add a persisted bound-repo config for the installation.
-2. Define the repo safety validator.
-3. Define the first version of `.superturtle/teleport-manifest.json`.
-4. Define the E2B sandbox runtime contract used by teleport.
-5. Split transfer logic into repo sync plus runtime handoff bundle.
-6. Make `/teleport` perform webhook cutover only after remote health verification.
-7. Support pause/resume semantics from Telegram against the remote sandbox lifecycle.
+- local SuperTurtle starts in polling mode on the PC
+- `/teleport` launches or reuses one E2B sandbox, waits for remote readiness, and flips Telegram to webhook delivery
+- local polling hands off to standby on webhook cutover and resumes after `/home`
+- remote E2B runtime currently supports text chat plus control commands
+- remote agent mode is Codex-first and uses sandbox-local auth/bootstrap
+- Telegram webhook traffic can wake a paused E2B sandbox and the bot can continue on the same sandbox
+
+Current implementation focus:
+
+1. Keep the local polling <-> remote webhook ownership handoff reliable across repeated `/teleport` and `/home` cycles.
+2. Preserve the E2B auth/bootstrap path for Codex and Claude-related runtime setup.
+3. Expand the remote runtime from text-first POC toward broader SuperTurtle feature parity.
+4. Decide how much session continuity we want between local and remote runtimes versus treating remote as a fresh turtle.
+5. Keep teleport docs and operator runbooks in the dedicated files above instead of re-growing a stale task list here.
 
 Keep any future task updates in the dedicated docs above rather than growing another stale task block here.

@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   handleTelegramWebhookRequest,
   resolveTelegramTransportConfig,
+  shouldSuppressHandledWebhookConflict,
   startTelegramTransport,
   type TelegramTransportConfig,
 } from "./telegram-transport";
@@ -197,6 +198,12 @@ describe("startTelegramTransport", () => {
     expect(standbyOnConflictCalls).toBe(1);
     expect(resumedPollingStarts).toBe(1);
     expect(intervalCallbacks).toHaveLength(0);
+    expect(
+      shouldSuppressHandledWebhookConflict({
+        error_code: 409,
+        description: "Conflict: terminated by setWebhook request",
+      })
+    ).toBe(true);
 
     await transport.stop();
     expect(firstRunnerStopped).toBe(false);
@@ -422,6 +429,90 @@ describe("startTelegramTransport", () => {
 
     await transport.stop();
     expect(runnerStopped).toBe(true);
+  });
+
+  it("can re-enter standby after polling resumes and a second webhook cutover happens", async () => {
+    const webhookInfos = [
+      { url: "https://remote.test/telegram/webhook" },
+      { url: "" },
+      { url: "https://remote.test/telegram/webhook" },
+    ];
+    const intervalCallbacks: Array<() => void> = [];
+    const taskRejects: Array<(error: unknown) => void> = [];
+    let pollingStarts = 0;
+
+    const transport = await startTelegramTransport(
+      {
+        api: {
+          async deleteWebhook() {
+            throw new Error("deleteWebhook should not be called in standby mode");
+          },
+          async getWebhookInfo() {
+            return webhookInfos.shift() ?? { url: "" };
+          },
+          async setWebhook() {
+            throw new Error("setWebhook should not be called in standby mode");
+          },
+        },
+        async handleUpdate() {},
+      },
+      {
+        mode: "standby",
+        expectedRemoteWebhookUrl: "https://remote.test/telegram/webhook",
+        checkIntervalMs: 1500,
+      },
+      {
+        startPollingRunner() {
+          pollingStarts += 1;
+          let rejectTask: ((error: unknown) => void) | null = null;
+          const taskPromise = new Promise<void>((_, reject) => {
+            rejectTask = reject;
+          });
+          taskRejects.push(rejectTask!);
+          return {
+            isRunning() {
+              return true;
+            },
+            stop() {},
+            task() {
+              return taskPromise;
+            },
+          };
+        },
+        setInterval(callback: () => void) {
+          intervalCallbacks.push(callback);
+          return intervalCallbacks.length as unknown as ReturnType<typeof setInterval>;
+        },
+        clearInterval() {},
+      }
+    );
+
+    expect(intervalCallbacks).toHaveLength(1);
+
+    intervalCallbacks[0]!();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(pollingStarts).toBe(1);
+
+    taskRejects[0]!({
+      error_code: 409,
+      description: "Conflict: terminated by setWebhook request",
+      message: "Call to 'getUpdates' failed! (409: Conflict: terminated by setWebhook request)",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(intervalCallbacks).toHaveLength(2);
+    intervalCallbacks[1]!();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(pollingStarts).toBe(1);
+    expect(
+      shouldSuppressHandledWebhookConflict({
+        error_code: 409,
+        description: "Conflict: terminated by setWebhook request",
+      })
+    ).toBe(true);
+
+    await transport.stop();
   });
 
   it("stays idle in standby when a different webhook owns Telegram", async () => {

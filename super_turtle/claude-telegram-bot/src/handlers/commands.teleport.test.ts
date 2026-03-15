@@ -6,6 +6,7 @@ type ReplyRecord = {
 
 function makeCtx(messageText: string) {
   const replies: ReplyRecord[] = [];
+  const setMyCommandsCalls: Array<Array<{ command: string; description: string }>> = [];
   return {
     ctx: {
       from: { id: 123 },
@@ -13,6 +14,9 @@ function makeCtx(messageText: string) {
       message: { text: messageText },
       api: {
         async deleteMessage() {},
+        async setMyCommands(commands: Array<{ command: string; description: string }>) {
+          setMyCommandsCalls.push(commands);
+        },
       },
       reply: async (text: string) => {
         replies.push({ text });
@@ -23,6 +27,7 @@ function makeCtx(messageText: string) {
       },
     },
     replies,
+    setMyCommandsCalls,
   };
 }
 
@@ -49,6 +54,7 @@ async function loadCommandsModuleForRole(
       "restart",
     ]),
     loadTeleportStateForCurrentProject: () => null,
+    recentlyReturnedHome: () => false,
     reconcileTeleportOwnershipForCurrentProject: async () => null,
     launchTeleportRuntimeForCurrentProject: async () => ({
       sandboxId: "sbx_123",
@@ -76,11 +82,12 @@ afterEach(() => {
 describe("teleport commands", () => {
   it("launches remote ownership from the local runtime", async () => {
     const { handleTeleport } = await loadCommandsModuleForRole("local", {});
-    const { ctx, replies } = makeCtx("/teleport");
+    const { ctx, replies, setMyCommandsCalls } = makeCtx("/teleport");
 
     await handleTeleport(ctx as never);
 
     expect(replies.some((reply) => reply.text.includes("✅ Teleported to E2B."))).toBe(true);
+    expect(setMyCommandsCalls.at(-1)?.map((entry) => entry.command)).toContain("home");
   });
 
   it("returns an already-remote message when teleport is called from E2B", async () => {
@@ -96,11 +103,12 @@ describe("teleport commands", () => {
 
   it("releases webhook ownership from the remote runtime", async () => {
     const { handleHome } = await loadCommandsModuleForRole("teleport-remote", {});
-    const { ctx, replies } = makeCtx("/home");
+    const { ctx, replies, setMyCommandsCalls } = makeCtx("/home");
 
     await handleHome(ctx as never);
 
     expect(replies.some((reply) => reply.text.includes("✅ Telegram ownership returned"))).toBe(true);
+    expect(setMyCommandsCalls.at(-1)?.map((entry) => entry.command)).toContain("teleport");
   });
 
   it("reports that local runtime is already home", async () => {
@@ -111,6 +119,23 @@ describe("teleport commands", () => {
 
     expect(replies).toEqual([
       { text: "ℹ️ This turtle is already local. Use /teleport to move Telegram ownership to E2B." },
+    ]);
+  });
+
+  it("treats a just-finished remote return as already completed on local /home", async () => {
+    const { handleHome } = await loadCommandsModuleForRole("local", {
+      recentlyReturnedHome: () => true,
+      loadTeleportStateForCurrentProject: () => ({
+        ownerMode: "local",
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+    const { ctx, replies } = makeCtx("/home");
+
+    await handleHome(ctx as never);
+
+    expect(replies).toEqual([
+      { text: "✅ Telegram ownership already returned to the local polling turtle." },
     ]);
   });
 });
