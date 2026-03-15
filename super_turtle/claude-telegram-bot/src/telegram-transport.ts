@@ -9,6 +9,12 @@ export type TelegramTransportConfig =
   | {
       mode: "polling";
       clearWebhookOnStart?: boolean;
+      standbyOnConflict?:
+        | (() =>
+            | Promise<Extract<TelegramTransportConfig, { mode: "standby" }> | null>
+            | Extract<TelegramTransportConfig, { mode: "standby" }>
+            | null)
+        | null;
     }
   | {
       mode: "standby";
@@ -42,6 +48,7 @@ type TelegramBotLike = {
 type PollingRunnerLike = {
   isRunning(): boolean;
   stop(): void;
+  task?(): Promise<void> | undefined;
 };
 
 type WebhookServerLike = {
@@ -216,6 +223,130 @@ function normalizeWebhookUrl(info: unknown): string {
   return "";
 }
 
+function isTelegramWebhookConflict(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const maybeError = error as {
+    error_code?: unknown;
+    description?: unknown;
+    message?: unknown;
+  };
+  const code = maybeError.error_code;
+  const description =
+    typeof maybeError.description === "string"
+      ? maybeError.description
+      : typeof maybeError.message === "string"
+        ? maybeError.message
+        : "";
+
+  return code === 409 && description.toLowerCase().includes("setwebhook");
+}
+
+function rethrowTransportError(error: unknown): void {
+  queueMicrotask(() => {
+    throw error instanceof Error ? error : new Error(String(error));
+  });
+}
+
+async function createStandbyTransport(
+  bot: TelegramBotLike,
+  config: Extract<TelegramTransportConfig, { mode: "standby" }>,
+  dependencies: StartTelegramTransportDependencies = {}
+): Promise<TelegramTransportHandle> {
+  transportLog.info(
+    {
+      expectedRemoteWebhookUrl: config.expectedRemoteWebhookUrl || null,
+      checkIntervalMs: config.checkIntervalMs ?? 5000,
+    },
+    "Starting Telegram standby transport"
+  );
+
+  const startPollingRunner = dependencies.startPollingRunner || defaultStartPollingRunner;
+  const setIntervalFn = dependencies.setInterval || defaultSetInterval;
+  const clearIntervalFn = dependencies.clearInterval || defaultClearInterval;
+  const intervalMs = Math.max(1000, config.checkIntervalMs ?? 5000);
+  let runner: PollingRunnerLike | null = null;
+  let stopped = false;
+  let checkPromise: Promise<void> | null = null;
+  let intervalHandle: IntervalHandle | null = null;
+
+  const beginPolling = async () => {
+    if (stopped || runner) {
+      return;
+    }
+    await config.onResumePolling?.();
+    runner = startPollingRunner(bot);
+    if (intervalHandle !== null) {
+      clearIntervalFn(intervalHandle);
+      intervalHandle = null;
+    }
+    transportLog.info("Telegram standby transport resumed polling");
+  };
+
+  const checkWebhookOwnership = async () => {
+    if (stopped || runner || checkPromise) {
+      return checkPromise;
+    }
+
+    checkPromise = (async () => {
+      const currentUrl = normalizeWebhookUrl(await bot.api.getWebhookInfo());
+      if (!currentUrl) {
+        await beginPolling();
+        return;
+      }
+
+      if (
+        config.expectedRemoteWebhookUrl &&
+        currentUrl !== config.expectedRemoteWebhookUrl
+      ) {
+        transportLog.warn(
+          {
+            currentUrl,
+            expectedRemoteWebhookUrl: config.expectedRemoteWebhookUrl,
+          },
+          "Telegram standby transport saw unexpected webhook owner; staying idle"
+        );
+      }
+    })();
+
+    try {
+      await checkPromise;
+    } finally {
+      checkPromise = null;
+    }
+  };
+
+  try {
+    await checkWebhookOwnership();
+  } catch (error) {
+    transportLog.warn({ err: error }, "Initial standby ownership check failed; continuing to watch");
+  }
+
+  if (!runner) {
+    intervalHandle = setIntervalFn(() => {
+      void checkWebhookOwnership().catch((error) => {
+        transportLog.warn({ err: error }, "Failed to reconcile Telegram standby ownership");
+      });
+    }, intervalMs);
+  }
+
+  return {
+    mode: "standby",
+    stop() {
+      stopped = true;
+      if (intervalHandle !== null) {
+        clearIntervalFn(intervalHandle);
+        intervalHandle = null;
+      }
+      if (runner?.isRunning()) {
+        runner.stop();
+      }
+    },
+  };
+}
+
 export async function startTelegramTransport(
   bot: TelegramBotLike,
   config: TelegramTransportConfig = resolveTelegramTransportConfig(),
@@ -228,9 +359,36 @@ export async function startTelegramTransport(
     }
 
     const runner = (dependencies.startPollingRunner || defaultStartPollingRunner)(bot);
+    let fallbackTransport: TelegramTransportHandle | null = null;
+    const runnerTask = runner.task?.();
+    if (runnerTask) {
+      void runnerTask.catch(async (error) => {
+        if (!config.standbyOnConflict || !isTelegramWebhookConflict(error)) {
+          rethrowTransportError(error);
+          return;
+        }
+
+        try {
+          const standbyConfig = await config.standbyOnConflict();
+          if (!standbyConfig) {
+            rethrowTransportError(error);
+            return;
+          }
+
+          transportLog.info("Telegram polling transport handed off to standby after webhook cutover");
+          fallbackTransport = await createStandbyTransport(bot, standbyConfig, dependencies);
+        } catch (standbyError) {
+          rethrowTransportError(standbyError);
+        }
+      });
+    }
+
     return {
       mode: "polling",
       stop() {
+        if (fallbackTransport) {
+          return fallbackTransport.stop();
+        }
         if (runner.isRunning()) {
           runner.stop();
         }
@@ -239,96 +397,7 @@ export async function startTelegramTransport(
   }
 
   if (config.mode === "standby") {
-    transportLog.info(
-      {
-        expectedRemoteWebhookUrl: config.expectedRemoteWebhookUrl || null,
-        checkIntervalMs: config.checkIntervalMs ?? 5000,
-      },
-      "Starting Telegram standby transport"
-    );
-
-    const startPollingRunner = dependencies.startPollingRunner || defaultStartPollingRunner;
-    const setIntervalFn = dependencies.setInterval || defaultSetInterval;
-    const clearIntervalFn = dependencies.clearInterval || defaultClearInterval;
-    const intervalMs = Math.max(1000, config.checkIntervalMs ?? 5000);
-    let runner: PollingRunnerLike | null = null;
-    let stopped = false;
-    let checkPromise: Promise<void> | null = null;
-    let intervalHandle: IntervalHandle | null = null;
-
-    const beginPolling = async () => {
-      if (stopped || runner) {
-        return;
-      }
-      await config.onResumePolling?.();
-      runner = startPollingRunner(bot);
-      if (intervalHandle !== null) {
-        clearIntervalFn(intervalHandle);
-        intervalHandle = null;
-      }
-      transportLog.info("Telegram standby transport resumed polling");
-    };
-
-    const checkWebhookOwnership = async () => {
-      if (stopped || runner || checkPromise) {
-        return checkPromise;
-      }
-
-      checkPromise = (async () => {
-        const currentUrl = normalizeWebhookUrl(await bot.api.getWebhookInfo());
-        if (!currentUrl) {
-          await beginPolling();
-          return;
-        }
-
-        if (
-          config.expectedRemoteWebhookUrl &&
-          currentUrl !== config.expectedRemoteWebhookUrl
-        ) {
-          transportLog.warn(
-            {
-              currentUrl,
-              expectedRemoteWebhookUrl: config.expectedRemoteWebhookUrl,
-            },
-            "Telegram standby transport saw unexpected webhook owner; staying idle"
-          );
-        }
-      })();
-
-      try {
-        await checkPromise;
-      } finally {
-        checkPromise = null;
-      }
-    };
-
-    try {
-      await checkWebhookOwnership();
-    } catch (error) {
-      transportLog.warn({ err: error }, "Initial standby ownership check failed; continuing to watch");
-    }
-
-    if (!runner) {
-      intervalHandle = setIntervalFn(() => {
-        void checkWebhookOwnership().catch((error) => {
-          transportLog.warn({ err: error }, "Failed to reconcile Telegram standby ownership");
-        });
-      }, intervalMs);
-    }
-
-    return {
-      mode: "standby",
-      stop() {
-        stopped = true;
-        if (intervalHandle !== null) {
-          clearIntervalFn(intervalHandle);
-          intervalHandle = null;
-        }
-        if (runner?.isRunning()) {
-          runner.stop();
-        }
-      },
-    };
+    return createStandbyTransport(bot, config, dependencies);
   }
 
   transportLog.info(

@@ -1055,15 +1055,33 @@ if (SUPERTURTLE_RUNTIME_ROLE !== "teleport-remote") {
 }
 
 const localTeleportState = loadTeleportStateForCurrentProject();
+const buildLocalStandbyConfig = (): Extract<TelegramTransportConfig, { mode: "standby" }> => {
+  const state = loadTeleportStateForCurrentProject();
+  return {
+    mode: "standby",
+    expectedRemoteWebhookUrl: state?.ownerMode === "remote" ? state.webhookUrl : state?.webhookUrl || null,
+    onResumePolling: async () => {
+      await reconcileTeleportOwnershipForCurrentProject();
+    },
+  };
+};
+
 const transportConfig: TelegramTransportConfig | undefined =
-  SUPERTURTLE_RUNTIME_ROLE === "local" && localTeleportState?.ownerMode === "remote"
-    ? {
-        mode: "standby",
-        expectedRemoteWebhookUrl: localTeleportState.webhookUrl,
-        onResumePolling: async () => {
-          await reconcileTeleportOwnershipForCurrentProject();
-        },
-      }
+  SUPERTURTLE_RUNTIME_ROLE === "local"
+    ? localTeleportState?.ownerMode === "remote"
+      ? buildLocalStandbyConfig()
+      : {
+          mode: "polling",
+          clearWebhookOnStart: true,
+          standbyOnConflict: async () => {
+            await reconcileTeleportOwnershipForCurrentProject();
+            const state = loadTeleportStateForCurrentProject();
+            if (state?.ownerMode !== "remote") {
+              return null;
+            }
+            return buildLocalStandbyConfig();
+          },
+        }
     : undefined;
 
 const transport = await startTelegramTransport(bot, transportConfig);

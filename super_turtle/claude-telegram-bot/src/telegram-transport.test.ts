@@ -117,6 +117,90 @@ describe("startTelegramTransport", () => {
     await transport.stop();
   });
 
+  it("hands polling off to standby after a webhook conflict", async () => {
+    const intervalCallbacks: Array<() => void> = [];
+    let firstRunnerStopped = false;
+    let resumedPollingStarts = 0;
+    let standbyOnConflictCalls = 0;
+    let taskReject: ((error: unknown) => void) | null = null;
+
+    const transport = await startTelegramTransport(
+      {
+        api: {
+          async deleteWebhook() {},
+          async getWebhookInfo() {
+            return { url: "" };
+          },
+          async setWebhook() {
+            throw new Error("setWebhook should not be called in polling mode");
+          },
+        },
+        async handleUpdate() {},
+      },
+      {
+        mode: "polling",
+        clearWebhookOnStart: true,
+        standbyOnConflict: async () => {
+          standbyOnConflictCalls += 1;
+          return {
+            mode: "standby",
+            expectedRemoteWebhookUrl: "https://remote.test/telegram/webhook",
+          };
+        },
+      },
+      {
+        startPollingRunner() {
+          if (!taskReject) {
+            let rejectTask: ((error: unknown) => void) | null = null;
+            const taskPromise = new Promise<void>((_, reject) => {
+              rejectTask = reject;
+            });
+            taskReject = rejectTask;
+            return {
+              isRunning() {
+                return true;
+              },
+              stop() {
+                firstRunnerStopped = true;
+              },
+              task() {
+                return taskPromise;
+              },
+            };
+          }
+
+          resumedPollingStarts += 1;
+          return {
+            isRunning() {
+              return true;
+            },
+            stop() {},
+          };
+        },
+        setInterval(callback: () => void) {
+          intervalCallbacks.push(callback);
+          return intervalCallbacks.length as unknown as ReturnType<typeof setInterval>;
+        },
+        clearInterval() {},
+      }
+    );
+
+    expect(taskReject).not.toBeNull();
+    taskReject!({
+      error_code: 409,
+      description: "Conflict: terminated by setWebhook request",
+      message: "Call to 'getUpdates' failed! (409: Conflict: terminated by setWebhook request)",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(standbyOnConflictCalls).toBe(1);
+    expect(resumedPollingStarts).toBe(1);
+    expect(intervalCallbacks).toHaveLength(0);
+
+    await transport.stop();
+    expect(firstRunnerStopped).toBe(false);
+  });
+
   it("starts webhook mode and serves updates through Bun HTTP", async () => {
     const handledUpdates: unknown[] = [];
     const served: Array<{ hostname: string; port: number }> = [];
