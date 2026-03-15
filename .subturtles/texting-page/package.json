@@ -1,0 +1,7 @@
+{
+  "name": "texting-page",
+  "private": true,
+  "scripts": {
+    "dev": "npx serve -p 3000 -s"
+  }
+}

@@ -1,5 +1,5 @@
 # Current task
-Start a dev server for the texting page and expose it via cloudflared tunnel.
+Final visual polish, test, and commit.
 
 # End goal with specs
 A simple, self-contained webpage that looks and feels like a texting/messaging app:
@@ -24,5 +24,5 @@ Tech: plain HTML + CSS + vanilla JS in a single index.html file served by a simp
 - [x] Add JS logic: send button + Enter key sends message, appends bubble to chat, auto-scrolls to bottom
 - [x] Add mock auto-reply system: canned responses appear after 1-2s delay with typing indicator
 - [x] Make layout mobile-responsive: flexbox, viewport meta, touch-friendly input sizing
-- [ ] Start dev server + cloudflared tunnel, write URL to .tunnel-url <- current
-- [ ] Final visual polish, test, and commit
+- [x] Start dev server + cloudflared tunnel, write URL to .tunnel-url
+- [ ] Final visual polish, test, and commit <- current
