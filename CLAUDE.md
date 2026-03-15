@@ -51,27 +51,28 @@ git checkout dev && git merge main
 
 ## Current planning references
 
-The old dashboard/conductor task block in this file was stale and has been removed.
-
-Current planning for teleport on `dev` now lives in:
+Teleport planning on `teleport-v2.0` now lives in:
 
 - `super_turtle/docs/REPO_BOUND_TELEPORT_SPEC.md`
-- `super_turtle/docs/VM_TELEPORT_REFERENCE.md`
+- `super_turtle/docs/TELEGRAM_WEBHOOK_POC.md`
+- `super_turtle/docs/reviews/README.md`
 
 Current direction:
 
-- VM-backed teleport is the preferred runtime direction for `dev`
+- E2B is the only remote runtime target for teleport
 - teleport transfer scope is repo-bound, not machine-bound
-- reuse the existing manual VM teleport behavior and runtime handoff primitives
-- do not treat E2B sandbox code as the target architecture for v1
+- local installs keep long polling and do not expose ports
+- remote E2B runtimes use webhooks after health-checked cutover
+- do not keep Azure, GCP, AWS, or provider-neutral VM abstractions in the active design
 
 Current implementation focus from the spec:
 
 1. Add a persisted bound-repo config for the installation.
 2. Define the repo safety validator.
 3. Define the first version of `.superturtle/teleport-manifest.json`.
-4. Define the provider-neutral VM provisioning contract and adapter boundary.
+4. Define the E2B sandbox runtime contract used by teleport.
 5. Split transfer logic into repo sync plus runtime handoff bundle.
-6. Make VM teleport use this repo-bound contract end to end.
+6. Make `/teleport` perform webhook cutover only after remote health verification.
+7. Support pause/resume semantics from Telegram against the remote sandbox lifecycle.
 
-Keep any future task updates in the dedicated docs above rather than growing another large stale task block here.
+Keep any future task updates in the dedicated docs above rather than growing another stale task block here.
