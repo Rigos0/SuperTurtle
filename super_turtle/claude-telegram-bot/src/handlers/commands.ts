@@ -1791,6 +1791,10 @@ export async function handleSubturtle(ctx: Context): Promise<void> {
     return;
   }
 
+  // Check if a specific SubTurtle name was given (e.g. "/sub texting-page")
+  const messageText = ctx.message?.text || "";
+  const argName = messageText.split(/\s+/).slice(1).join(" ").trim();
+
   // Run ctl list command
   const ctlPath = CTL_PATH;
   const proc = Bun.spawnSync([ctlPath, "list"], {
@@ -1814,6 +1818,19 @@ export async function handleSubturtle(ctx: Context): Promise<void> {
     await ctx.reply("📋 <b>SubTurtles</b>\n\nNo SubTurtles found", { parse_mode: "HTML" });
     return;
   }
+
+  // If a specific name was given, show that SubTurtle's detail view directly
+  if (argName) {
+    const match = turtles.find((t) => t.name === argName);
+    if (!match) {
+      await ctx.reply(`❌ SubTurtle <b>${escapeHtml(argName)}</b> not found`, { parse_mode: "HTML" });
+      return;
+    }
+    await replySubturtleDetail(ctx, match, false);
+    return;
+  }
+
+  const runningTurtles = turtles.filter((t) => t.status === "running");
 
   const rootStatePath = `${WORKING_DIR}/CLAUDE.md`;
   const [rootSummary, turtleStateEntries] = await Promise.all([
@@ -1843,7 +1860,6 @@ export async function handleSubturtle(ctx: Context): Promise<void> {
   for (const turtle of turtles) {
     const stateSummary = turtleStateMap.get(turtle.name) || null;
 
-    // Format the turtle info line
     let statusEmoji = turtle.status === "running" ? "🟢" : "⚫";
     let timeStr = "";
     if (turtle.timeRemaining) {
@@ -1865,27 +1881,91 @@ export async function handleSubturtle(ctx: Context): Promise<void> {
       messageLines.push(`   📌 ${convertMarkdownToHtml(truncateText(backlogSummary, 140))}`);
     }
 
-    // Add buttons for running turtles
-    if (turtle.status === "running") {
-      keyboard.push([
-        {
-          text: "📋 State",
-          callback_data: `subturtle_logs:${turtle.name}`,
-        },
-        {
-          text: "🛑 Stop",
-          callback_data: `subturtle_stop:${turtle.name}`,
-        },
-      ]);
-    }
     if (turtle.tunnelUrl) {
       messageLines.push(`   🔗 ${escapeHtml(turtle.tunnelUrl)}`);
+    }
+  }
+
+  // 1 running SubTurtle → show 4 action buttons directly
+  // 2+ running → show name-selection buttons so user picks one first
+  if (runningTurtles.length === 1) {
+    const name = runningTurtles[0]!.name;
+    keyboard.push([
+      { text: "📋 State", callback_data: `subturtle_logs:${name}` },
+      { text: "🛑 Stop", callback_data: `subturtle_stop:${name}` },
+    ]);
+    keyboard.push([
+      { text: "📝 Backlog", callback_data: `sub_bl:${name}:0` },
+      { text: "📜 Logs", callback_data: `sub_lg:${name}:0` },
+    ]);
+  } else if (runningTurtles.length > 1) {
+    for (const turtle of runningTurtles) {
+      keyboard.push([
+        { text: `🐢 ${turtle.name}`, callback_data: `sub_pick:${turtle.name}` },
+      ]);
     }
   }
 
   await ctx.reply(messageLines.join("\n"), {
     parse_mode: "HTML",
     reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined,
+  });
+}
+
+/**
+ * Show a single SubTurtle's detail view with action buttons.
+ * Used by /sub <name> and sub_pick:{name} callback.
+ * showMenu: whether to show the "↩ Menu" button (true when picking from multiple).
+ */
+export async function replySubturtleDetail(
+  ctx: Context,
+  turtle: ListedSubTurtle,
+  showMenu: boolean
+): Promise<void> {
+  const statePath = `${WORKING_DIR}/.subturtles/${turtle.name}/CLAUDE.md`;
+  const summary = await readClaudeStateSummary(statePath);
+
+  const statusEmoji = turtle.status === "running" ? "🟢" : "⚫";
+  let timeStr = "";
+  if (turtle.timeRemaining) {
+    const suffix = turtle.timeRemaining === "OVERDUE" || turtle.timeRemaining === "no timeout"
+      ? ""
+      : " left";
+    timeStr = ` • ${turtle.timeRemaining}${suffix}`;
+  }
+
+  const taskSource = summary?.currentTask || turtle.task || "No current task";
+  const lines: string[] = [
+    `${statusEmoji} <b>${escapeHtml(turtle.name)}</b>${escapeHtml(timeStr)}`,
+    `🧩 ${convertMarkdownToHtml(taskSource)}`,
+  ];
+
+  if (summary) {
+    lines.push(`📌 ${convertMarkdownToHtml(formatBacklogSummary(summary))}`);
+  }
+
+  if (turtle.tunnelUrl) {
+    lines.push(`🔗 ${escapeHtml(turtle.tunnelUrl)}`);
+  }
+
+  const keyboard: Array<Array<{ text: string; callback_data: string }>> = [
+    [
+      { text: "📋 State", callback_data: `subturtle_logs:${turtle.name}` },
+      { text: "🛑 Stop", callback_data: `subturtle_stop:${turtle.name}` },
+    ],
+    [
+      { text: "📝 Backlog", callback_data: `sub_bl:${turtle.name}:0` },
+      { text: "📜 Logs", callback_data: `sub_lg:${turtle.name}:0` },
+    ],
+  ];
+
+  if (showMenu) {
+    keyboard.push([{ text: "↩ Menu", callback_data: "sub_menu" }]);
+  }
+
+  await ctx.reply(lines.join("\n"), {
+    parse_mode: "HTML",
+    reply_markup: { inline_keyboard: keyboard },
   });
 }
 
