@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Messages</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0b0b0f;
+      color: #fff;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .header {
+      background: #1a1a24;
+      padding: 14px 20px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 17px;
+      border-bottom: 1px solid #2a2a3a;
+      flex-shrink: 0;
+      letter-spacing: -0.3px;
+    }
+
+    .header .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #00c896, #007aff);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    .chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 16px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .message {
+      max-width: 78%;
+      padding: 10px 14px;
+      border-radius: 18px;
+      font-size: 15px;
+      line-height: 1.45;
+      word-wrap: break-word;
+      animation: messageIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+    }
+
+    .message.sent {
+      align-self: flex-end;
+      background: #007aff;
+      color: #fff;
+      border-bottom-right-radius: 6px;
+    }
+
+    .message.received {
+      align-self: flex-start;
+      background: #2a2a3a;
+      color: #e8e8ed;
+      border-bottom-left-radius: 6px;
+    }
+
+    .message .time {
+      font-size: 11px;
+      opacity: 0.5;
+      margin-top: 4px;
+      display: block;
+    }
+
+    .message.sent .time {
+      text-align: right;
+    }
+
+    .typing-indicator {
+      align-self: flex-start;
+      background: #2a2a3a;
+      padding: 12px 18px;
+      border-radius: 18px;
+      border-bottom-left-radius: 6px;
+      display: none;
+      gap: 5px;
+      animation: messageIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .typing-indicator.visible {
+      display: flex;
+    }
+
+    .typing-indicator span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #666;
+      animation: typingDot 1.4s infinite;
+    }
+
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+    .input-bar {
+      padding: 10px 12px;
+      background: #1a1a24;
+      border-top: 1px solid #2a2a3a;
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      flex-shrink: 0;
+      padding-bottom: max(10px, env(safe-area-inset-bottom));
+    }
+
+    .input-bar input {
+      flex: 1;
+      background: #2a2a3a;
+      border: 1px solid #3a3a4a;
+      border-radius: 22px;
+      padding: 11px 18px;
+      color: #fff;
+      font-size: 15px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-bar input::placeholder {
+      color: #666;
+    }
+
+    .input-bar input:focus {
+      border-color: #007aff;
+    }
+
+    .input-bar button {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: none;
+      background: #007aff;
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, transform 0.1s;
+      flex-shrink: 0;
+    }
+
+    .input-bar button:hover {
+      background: #0066d6;
+    }
+
+    .input-bar button:active {
+      transform: scale(0.92);
+    }
+
+    @keyframes messageIn {
+      from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes typingDot {
+      0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+      30% { opacity: 1; transform: translateY(-4px); }
+    }
+
+    @media (max-width: 600px) {
+      .message { max-width: 85%; }
+      .header { padding: 12px 16px; font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span class="avatar">T</span>
+    Turtle
+  </div>
+
+  <div class="chat-container" id="chat">
+    <div class="message received">Hey! How's it going? <span class="time">9:41 AM</span></div>
+    <div class="message sent">Pretty good! Just working on some code. <span class="time">9:42 AM</span></div>
+    <div class="message received">Nice, what are you building? <span class="time">9:42 AM</span></div>
+    <div class="message sent">A texting UI that looks like this! <span class="time">9:43 AM</span></div>
+    <div class="message received">Ha, very meta. Looks clean though! <span class="time">9:43 AM</span></div>
+    <div class="typing-indicator" id="typing"><span></span><span></span><span></span></div>
+  </div>
+
+  <div class="input-bar">
+    <input type="text" id="msgInput" placeholder="Message" autocomplete="off">
+    <button id="sendBtn" aria-label="Send">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+
+  <script>
+    const chat = document.getElementById('chat');
+    const input = document.getElementById('msgInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const typing = document.getElementById('typing');
+
+    const replies = [
+      "That's awesome!",
+      "Tell me more!",
+      "Haha nice one",
+      "I totally agree",
+      "Wait really? No way",
+      "Sounds good to me",
+      "Interesting... go on",
+      "Lol same",
+      "You're on fire today",
+      "Makes sense!",
+      "Oh wow, that's cool",
+      "Keep going, I'm listening",
+    ];
+
+    function getTime() {
+      return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+
+    function addMessage(text, type) {
+      const div = document.createElement('div');
+      div.className = `message ${type}`;
+      div.innerHTML = `${escapeHtml(text)} <span class="time">${getTime()}</span>`;
+      chat.insertBefore(div, typing);
+      scrollToBottom();
+    }
+
+    function escapeHtml(text) {
+      const d = document.createElement('div');
+      d.textContent = text;
+      return d.innerHTML;
+    }
+
+    function scrollToBottom() {
+      requestAnimationFrame(() => {
+        chat.scrollTop = chat.scrollHeight;
+      });
+    }
+
+    function sendMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      addMessage(text, 'sent');
+
+      // Show typing indicator after a short pause
+      const thinkDelay = 400 + Math.random() * 600;
+      setTimeout(() => {
+        typing.classList.add('visible');
+        scrollToBottom();
+
+        // Send auto-reply
+        const replyDelay = 800 + Math.random() * 1200;
+        setTimeout(() => {
+          typing.classList.remove('visible');
+          const reply = replies[Math.floor(Math.random() * replies.length)];
+          addMessage(reply, 'received');
+        }, replyDelay);
+      }, thinkDelay);
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // Scroll to bottom on load
+    scrollToBottom();
+  </script>
+</body>
+</html>
