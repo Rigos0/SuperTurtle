@@ -113,6 +113,143 @@ describe("subturtle callback actions", () => {
   });
 });
 
+describe("backlog pagination", () => {
+  it("shows first page of backlog with Next button", async () => {
+    const turtleName = "backlog-test";
+    const turtleDir = join(WORKING_DIR, ".subturtles", turtleName);
+    mkdirSync(turtleDir, { recursive: true });
+
+    // Create a backlog with 8 items (more than one page of 5)
+    const items = Array.from({ length: 8 }, (_, i) =>
+      i < 3 ? `- [x] Done item ${i + 1}` : `- [ ] Todo item ${i + 1}`
+    );
+    writeFileSync(
+      join(turtleDir, "CLAUDE.md"),
+      ["## Current Task", "Working on stuff.", "", "## Backlog", ...items].join("\n")
+    );
+
+    const { ctx, callbackAnswers, edits } = makeCallbackCtx(`sub_bl:${turtleName}:0`);
+
+    try {
+      await handleCallback(ctx);
+    } finally {
+      rmSync(turtleDir, { recursive: true, force: true });
+    }
+
+    expect(callbackAnswers).toEqual([""]);
+    expect(edits).toHaveLength(1);
+    const text = edits[0]!.text;
+    expect(text).toContain(`Backlog for ${turtleName}`);
+    expect(text).toContain("3/8 done");
+    expect(text).toContain("page 1/2");
+    expect(text).toContain("Done item 1");
+    expect(text).toContain("Todo item 5");
+    // Should NOT contain items from page 2
+    expect(text).not.toContain("Todo item 6");
+
+    // Should have a Next button but no Prev button, plus a Menu button
+    const keyboard = (edits[0]!.extra as any)?.reply_markup?.inline_keyboard;
+    expect(keyboard).toHaveLength(2);
+    expect(keyboard[0].some((b: any) => b.text === "▶ Next")).toBe(true);
+    expect(keyboard[0].some((b: any) => b.text === "◀ Prev")).toBe(false);
+    expect(keyboard[1].some((b: any) => b.text === "↩ Menu")).toBe(true);
+  });
+
+  it("shows second page with Prev button", async () => {
+    const turtleName = "backlog-page2";
+    const turtleDir = join(WORKING_DIR, ".subturtles", turtleName);
+    mkdirSync(turtleDir, { recursive: true });
+
+    const items = Array.from({ length: 8 }, (_, i) => `- [ ] Item ${i + 1}`);
+    writeFileSync(
+      join(turtleDir, "CLAUDE.md"),
+      ["## Current Task", "Working.", "", "## Backlog", ...items].join("\n")
+    );
+
+    const { ctx, callbackAnswers, edits } = makeCallbackCtx(`sub_bl:${turtleName}:1`);
+
+    try {
+      await handleCallback(ctx);
+    } finally {
+      rmSync(turtleDir, { recursive: true, force: true });
+    }
+
+    expect(edits).toHaveLength(1);
+    const text = edits[0]!.text;
+    expect(text).toContain("page 2/2");
+    expect(text).toContain("Item 6");
+    expect(text).not.toContain("Item 5");
+
+    const keyboard = (edits[0]!.extra as any)?.reply_markup?.inline_keyboard;
+    expect(keyboard[0].some((b: any) => b.text === "◀ Prev")).toBe(true);
+    expect(keyboard[0].some((b: any) => b.text === "▶ Next")).toBe(false);
+  });
+
+  it("returns toast when backlog is empty", async () => {
+    const turtleName = "backlog-empty";
+    const turtleDir = join(WORKING_DIR, ".subturtles", turtleName);
+    mkdirSync(turtleDir, { recursive: true });
+
+    writeFileSync(
+      join(turtleDir, "CLAUDE.md"),
+      ["## Current Task", "No backlog here."].join("\n")
+    );
+
+    const { ctx, callbackAnswers, edits } = makeCallbackCtx(`sub_bl:${turtleName}:0`);
+
+    try {
+      await handleCallback(ctx);
+    } finally {
+      rmSync(turtleDir, { recursive: true, force: true });
+    }
+
+    expect(callbackAnswers).toEqual(["No backlog items"]);
+    expect(edits).toHaveLength(0);
+  });
+});
+
+describe("log pagination", () => {
+  it("shows most recent log lines on page 0 with Older button", async () => {
+    const turtleName = "logs-test";
+    const turtleDir = join(WORKING_DIR, ".subturtles", turtleName);
+    mkdirSync(turtleDir, { recursive: true });
+
+    // Create 50 log lines (more than one page of 30)
+    const logLines = Array.from({ length: 50 }, (_, i) => `[2025-01-01] Log line ${i + 1}`);
+    writeFileSync(join(turtleDir, "subturtle.log"), logLines.join("\n"));
+
+    const { ctx, callbackAnswers, edits } = makeCallbackCtx(`sub_lg:${turtleName}:0`);
+
+    try {
+      await handleCallback(ctx);
+    } finally {
+      rmSync(turtleDir, { recursive: true, force: true });
+    }
+
+    expect(callbackAnswers).toEqual([""]);
+    expect(edits).toHaveLength(1);
+    const text = edits[0]!.text;
+    expect(text).toContain(`Logs for ${turtleName}`);
+    expect(text).toContain("page 1/2");
+    // Page 0 should show the newest lines (21-50)
+    expect(text).toContain("Log line 50");
+    expect(text).toContain("Log line 21");
+    expect(text).not.toContain("Log line 20");
+
+    const keyboard = (edits[0]!.extra as any)?.reply_markup?.inline_keyboard;
+    expect(keyboard[0].some((b: any) => b.text === "◀ Older")).toBe(true);
+    expect(keyboard[0].some((b: any) => b.text === "▶ Newer")).toBe(false);
+  });
+
+  it("returns toast when log file is missing", async () => {
+    const { ctx, callbackAnswers, edits } = makeCallbackCtx("sub_lg:nonexistent:0");
+    await handleCallback(ctx);
+
+    expect(callbackAnswers).toEqual(["Log file not found"]);
+    expect(edits).toHaveLength(0);
+  });
+});
+
 // Pinologs level-filtering integration tests removed — they pass in isolation
 // but fail in the full suite due to deep Bun mock.module() leaks that require
 // 3+ contaminating files to trigger.  The feature is simple, stable, and still
