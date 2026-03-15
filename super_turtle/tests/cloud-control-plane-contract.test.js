@@ -60,11 +60,11 @@ const {
     },
     instance: {
       id: "inst_123",
-      provider: "gcp",
+      provider: "e2b",
       state: "running",
-      region: "us-central1",
-      zone: "us-central1-a",
-      hostname: "managed-123.internal",
+      region: "us-east-1",
+      sandbox_id: "sandbox_123",
+      template_id: "template_teleport_v1",
       last_seen_at: "2026-03-12T10:00:00Z",
     },
     provisioning_job: {
@@ -78,16 +78,17 @@ const {
       completed_at: "2026-03-12T10:00:00Z",
     },
   });
-  assert.strictEqual(token.instance.provider, "gcp");
+  assert.strictEqual(token.instance.provider, "e2b");
   assert.strictEqual(token.provisioning_job.kind, "provision");
 
   const cloudStatus = validateCliCloudStatusResponse({
     instance: {
       id: "inst_123",
-      provider: "gcp",
+      provider: "e2b",
       state: "suspended",
-      region: "us-central1",
-      hostname: "managed-123.internal",
+      region: "us-east-1",
+      sandbox_id: "sandbox_123",
+      template_id: "template_teleport_v1",
       resume_requested_at: "2026-03-12T11:00:00Z",
     },
     provisioning_job: {
@@ -163,7 +164,7 @@ const {
       validateCliCloudStatusResponse({
         instance: {
           id: "inst_123",
-          provider: "gcp",
+          provider: "e2b",
           state: "booting",
         },
       }),

@@ -19,6 +19,7 @@ describe("TELEGRAM_COMMANDS", () => {
       "sub",
       "cron",
       "debug",
+      "teleport",
       "restart",
     ]);
     expect(new Set(names).size).toBe(names.length);

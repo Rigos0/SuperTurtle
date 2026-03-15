@@ -5,9 +5,11 @@
   "scripts": {
     "test:pack": "bash tests/npm-package-smoke.sh",
     "test:init-safe": "bash tests/init-non-destructive.sh",
-    "test:init-git-binding": "bash tests/init-git-binding.sh"
+    "test:init-git-binding": "bash tests/init-git-binding.sh",
+    "test:e2b-webhook-poc": "node tests/e2b-webhook-poc.test.js"
   },
   "dependencies": {
+    "@e2b/code-interpreter": "^2.0.0",
     "@grammyjs/runner": "^2.0.3",
     "@modelcontextprotocol/sdk": "^1.25.1",
     "@openai/codex-sdk": "0.105.0",

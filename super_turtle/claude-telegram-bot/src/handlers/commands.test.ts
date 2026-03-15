@@ -146,6 +146,7 @@ describe("getCommandLines", () => {
       "/resume",
       "/sub",
       "/cron",
+      "/teleport",
     ]) {
       expect(commands).toContain(expected);
     }
@@ -796,6 +797,7 @@ describe("handlers with mock Context", () => {
     expect(replies[0]!.text).toContain("/new - Fresh session");
     expect(replies[0]!.text).toContain("/status - Detailed status");
     expect(replies[0]!.text).toContain("/cron - Scheduled jobs");
+    expect(replies[0]!.text).toContain("/teleport - Move control to E2B");
     expect(stopTypingCalls).toBe(1);
     expect(sessionKillCalls).toBe(1);
     expect(codexKillCalls).toBe(1);

@@ -66,7 +66,7 @@ global.fetch = async function patchedFetch(url, options = {}) {
 
   if (String(url).endsWith("/v1/cli/cloud/status")) {
     return new Response(JSON.stringify({
-      instance: { id: "inst_123", provider: "gcp", state: "running" },
+      instance: { id: "inst_123", provider: "e2b", state: "running" },
       provisioning_job: { id: "job_123", kind: "provision", state: "succeeded", updated_at: "2026-03-12T10:00:00Z" },
     }), {
       status: 200,
@@ -76,7 +76,7 @@ global.fetch = async function patchedFetch(url, options = {}) {
 
   if (String(url).endsWith("/v1/cli/cloud/instance/resume")) {
     return new Response(JSON.stringify({
-      instance: { id: "inst_123", provider: "gcp", state: "provisioning", resume_requested_at: "2026-03-12T10:00:00Z" },
+      instance: { id: "inst_123", provider: "e2b", state: "provisioning", resume_requested_at: "2026-03-12T10:00:00Z" },
       provisioning_job: { id: "job_456", kind: "resume", state: "queued", attempt: 1, updated_at: "2026-03-12T10:00:01Z" },
     }), {
       status: 200,

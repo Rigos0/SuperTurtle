@@ -20,6 +20,7 @@ import { getDriverAuditType, isActiveDriverSessionActive, runMessageWithActiveDr
 import { StreamingState, createStatusCallback } from "./streaming";
 import { createMediaGroupBuffer, handleProcessingError } from "./media-group";
 import { eventLog, streamLog } from "../logger";
+import { getTeleportRemoteUnsupportedMessage, isTeleportRemoteRuntime } from "../teleport";
 
 const photoLog = streamLog.child({ handler: "photo" });
 
@@ -151,6 +152,11 @@ export async function handlePhoto(ctx: Context): Promise<void> {
       chat_id: chatId,
     });
     await ctx.reply("Unauthorized. Contact the bot owner for access.");
+    return;
+  }
+
+  if (isTeleportRemoteRuntime()) {
+    await ctx.reply(getTeleportRemoteUnsupportedMessage());
     return;
   }
 

@@ -51,27 +51,37 @@ git checkout dev && git merge main
 
 ## Current planning references
 
-The old dashboard/conductor task block in this file was stale and has been removed.
-
-Current planning for teleport on `dev` now lives in:
+Teleport planning on `teleport-v2.0` now lives in:
 
 - `super_turtle/docs/REPO_BOUND_TELEPORT_SPEC.md`
-- `super_turtle/docs/VM_TELEPORT_REFERENCE.md`
+- `super_turtle/docs/TELEGRAM_WEBHOOK_POC.md`
+- `super_turtle/docs/E2B_WEBHOOK_WAKE_POC.md`
+- `super_turtle/docs/E2B_REMOTE_RUNTIME_SETUP.md`
+- `super_turtle/docs/reviews/README.md`
 
 Current direction:
 
-- VM-backed teleport is the preferred runtime direction for `dev`
+- E2B is the only remote runtime target for teleport
 - teleport transfer scope is repo-bound, not machine-bound
-- reuse the existing manual VM teleport behavior and runtime handoff primitives
-- do not treat E2B sandbox code as the target architecture for v1
+- local installs keep long polling and do not expose ports
+- remote E2B runtimes use webhooks after health-checked cutover
+- do not keep Azure, GCP, AWS, or provider-neutral VM abstractions in the active design
 
-Current implementation focus from the spec:
+Current implementation status:
 
-1. Add a persisted bound-repo config for the installation.
-2. Define the repo safety validator.
-3. Define the first version of `.superturtle/teleport-manifest.json`.
-4. Define the provider-neutral VM provisioning contract and adapter boundary.
-5. Split transfer logic into repo sync plus runtime handoff bundle.
-6. Make VM teleport use this repo-bound contract end to end.
+- local SuperTurtle starts in polling mode on the PC
+- `/teleport` launches or reuses one E2B sandbox, waits for remote readiness, and flips Telegram to webhook delivery
+- local polling hands off to standby on webhook cutover and resumes after `/home`
+- remote E2B runtime currently supports text chat plus control commands
+- remote agent mode is Codex-first and uses sandbox-local auth/bootstrap
+- Telegram webhook traffic can wake a paused E2B sandbox and the bot can continue on the same sandbox
 
-Keep any future task updates in the dedicated docs above rather than growing another large stale task block here.
+Current implementation focus:
+
+1. Keep the local polling <-> remote webhook ownership handoff reliable across repeated `/teleport` and `/home` cycles.
+2. Preserve the E2B auth/bootstrap path for Codex and Claude-related runtime setup.
+3. Expand the remote runtime from text-first POC toward broader SuperTurtle feature parity.
+4. Decide how much session continuity we want between local and remote runtimes versus treating remote as a fresh turtle.
+5. Keep teleport docs and operator runbooks in the dedicated files above instead of re-growing a stale task list here.
+
+Keep any future task updates in the dedicated docs above rather than growing another stale task block here.

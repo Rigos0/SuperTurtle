@@ -1,249 +1,141 @@
-# Repo-Bound Teleport Spec
+# Repo-Bound E2B Teleport Spec
 
 ## Status
 
-Draft v1 product/runtime spec for VM-backed teleport on `dev`.
+Active product/runtime spec for `teleport-v2.0`.
 
-## Problem
+## Decision
 
-Teleport and sync become unsafe if SuperTurtle treats "wherever the user happened to start it" as the transfer scope.
+Teleport is now E2B-only.
 
-Examples of bad outcomes:
+There is no active Azure, GCP, AWS, or generic VM target in this branch.
 
-- a user runs SuperTurtle from `$HOME`
-- a user keeps unrelated personal files next to the project
-- a user starts the bot from a subdirectory inside a large monorepo
-- a user installs `superturtle` globally and expects the whole machine to be portable
+The remote runtime model is:
 
-The product must define a strict project boundary.
+1. local SuperTurtle keeps using long polling
+2. `/teleport` provisions or resumes an E2B sandbox
+3. the sandbox starts a control-oriented bot runtime in webhook mode
+4. Telegram ownership flips only after the remote webhook is healthy
+5. local polling keeps running but is non-authoritative while the webhook is active
+6. `/home` deletes the webhook and returns ownership to local polling
 
-## Core Decision
+## Repo Boundary
 
 Each SuperTurtle installation is bound to exactly one Git repository.
 
-That bound repository is the only code/content scope eligible for teleport sync.
-
-Teleport never means "copy this machine." It means:
-
-1. sync the bound repository
-2. transfer the SuperTurtle runtime handoff bundle
-3. start the destination
-4. flip ownership only after destination health is verified
-
-## User Model
-
-SuperTurtle is attached to a project, not to an arbitrary working directory.
-
-The user experience should be:
-
-- install SuperTurtle
-- bind it to a repo
-- run/start/status/teleport against that repo
-
-If the user wants to operate on a different project, they need a different SuperTurtle binding.
-
-## Install Modes
-
-Two install modes are supported:
-
-### 1. Normal user install
-
-- install the launcher via `npm`
-- use the launcher to bind SuperTurtle to one repo
-
-Example:
-
-```bash
-npm install -g superturtle
-superturtle bind /path/to/repo
-```
-
-### 2. Developer install
-
-- clone the full source repo
-- run the same launcher/runtime from source
-- bind that install to one repo
-
-Example:
-
-```bash
-git clone <repo>
-cd agentic
-node super_turtle/bin/superturtle.js bind /path/to/project-repo
-```
-
-The runtime contract is the same in both modes: one installation, one bound repo.
-
-## Bound Repo Rules
-
-The bound repo is the nearest Git root for the chosen project path.
+That bound repository is the only sync scope eligible for teleport.
 
 Rules:
 
-1. Teleport only works when SuperTurtle has an explicit bound repo.
-2. The sync root is the bound repo root, not the current subdirectory.
+1. Teleport only works when a bound repo exists.
+2. The sync root is the repo root, not the current shell directory.
 3. Nothing above the repo root is ever synced.
 4. Nothing outside the repo root is ever synced.
-5. Binding must be refused for clearly unsafe roots:
-   - `/`
-   - the user's home directory
-   - any path explicitly marked as unsafe by policy
+5. Binding must be refused for unsafe roots such as `/` or the user's home directory.
 6. Teleport must fail closed if the bound repo cannot be resolved.
 
-## Transfer Scope
+## Transfer Model
 
-Teleport moves two distinct things:
+Teleport moves two things:
 
 ### 1. Repo content
 
-This is the continuously synced or pre-cutover synced project content inside the bound repo.
+Default inclusion:
 
-Default inclusion rule:
+- Git-tracked files inside the bound repo
 
-- include Git-tracked files inside the bound repo
-
-Default exclusion rule:
-
-- exclude files and directories that are rebuildable, machine-local, or secret
-
-Default exclusions:
+Default exclusion:
 
 - `.git/`
 - `node_modules/`
 - `.venv/`
-- package-manager caches
+- caches
 - build outputs
 - logs
-- editor temp files
 - `.env`
 - machine-local credential files
 
-### 2. Runtime handoff state
-
-This is not generic repo sync. It is an explicit SuperTurtle continuity bundle.
-
-Examples:
-
-- selected `.superturtle` runtime state
-- queue or handoff artifacts
-- session continuity metadata needed for teleport semantics
-
-This bundle is transferred atomically at teleport time, not mirrored as part of the background repo sync loop.
-
-## Untracked Files
-
-Git defines the boundary, but not every important file is necessarily tracked.
-
-Policy:
-
-- tracked files are included by default
-- untracked files are excluded by default
-- specific untracked files may be included only through an explicit allowlist manifest
-
-That manifest should live inside the bound repo and be human-reviewable.
-
-Candidate path:
+Untracked files stay excluded unless explicitly allowlisted in:
 
 ```text
 .superturtle/teleport-manifest.json
 ```
 
-The manifest is for safe project-local extras, not for secrets or large caches.
+### 2. Runtime handoff bundle
 
-## Dependencies And Environment
-
-Dependencies should not be synced as raw directories.
-
-Policy:
-
-- rebuild dependencies on the VM from lockfiles
-- keep dependency installation reproducible
-- treat secrets as separately injected runtime inputs, not synced files
+This is the continuity state required to keep the bot session coherent across cutover.
 
 Examples:
 
-- `bun install --frozen-lockfile`
-- Python environment recreation from the declared lock/setup path
-- secrets loaded from operator-managed environment or a secrets manager
+- selected `.superturtle` runtime state
+- session continuity metadata
+- queue/handoff artifacts needed for ownership transfer
 
-This avoids trying to mirror `node_modules`, venvs, package caches, or local auth files.
+This bundle is transferred atomically at teleport time, not mirrored continuously.
 
-## VM Runtime Layout
+## Remote Runtime Contract
 
-The VM should host the same bound repo concept at a fixed remote path.
+The E2B sandbox is the remote runtime boundary.
 
-Example:
+Required sandbox properties:
 
-```text
-/home/superturtle/project
-```
+- repo cloned or synced at a deterministic project root
+- bot can boot in a control/runtime role with the repo-bound project config
+- bot can run Bun HTTP webhook transport
+- sandbox can receive environment-seeded secrets at startup
+- sandbox lifecycle supports start, pause, resume, and destroy
 
-Important property:
+Expected runtime env on the sandbox:
 
-- local path and remote path may differ
-- repo identity is logical, not path-equal
-- sync is always repo-root to repo-root
+- `SUPERTURTLE_RUNTIME_ROLE=teleport-remote`
+- `TELEGRAM_TRANSPORT=webhook`
+- `TELEGRAM_WEBHOOK_REGISTER=false`
+- `TELEGRAM_WEBHOOK_URL=<public webhook url>`
+- `TELEGRAM_WEBHOOK_SECRET=<secret token>`
+- repo-bound `.superturtle/.env` values needed for the bot
 
-## VM Provisioning Abstraction
-
-VM-backed teleport should not bind the product to one cloud provider's API shape.
-
-The portability boundary should be:
-
-- teleport/runtime code consumes a provider-neutral managed-VM contract
-- provider-specific code lives behind a provisioning adapter
-- the control plane persists logical managed-instance state separately from provider-native identifiers
-
-Recommended provider-neutral lifecycle:
-
-- provision
-- resume or start
-- stop or suspend
-- reprovision
-- delete
-- resolve teleport target
-- report health and readiness
-
-Recommended provider-neutral managed instance fields:
-
-- `provider`
-- `provider_instance_id`
-- `region`
-- `state`
-- `ssh_target`
-- `remote_root`
-- opaque provider metadata for provider-only internals
-
-Rules:
-
-1. Teleport must never call Azure, GCP, AWS, etc. APIs directly.
-2. Teleport should only consume the resolved managed target plus health/readiness state from the control plane.
-3. Provider adapters may differ internally, but they must produce the same control-plane contract for teleport.
-4. V1 may ship with a single provider adapter first, but the interface must be stable enough to add a second provider without rewriting teleport semantics.
-
-Current code contract:
-
-- `../superturtle-web/src/features/cloud/providers/contracts.ts`
-
-## Ownership And Safety
+## Ownership And Cutover
 
 Repo sync alone is not teleport.
 
-Teleport still requires:
+Teleport requires:
 
-1. source runtime is idle
+1. source runtime is idle or explicitly paused
 2. runtime handoff bundle is exported
-3. destination repo content is in sync
+3. destination repo content is present
 4. destination dependencies are healthy
-5. destination runtime starts successfully
-6. ownership flips only after health verification
-7. source stops only after the destination is authoritative
+5. destination webhook endpoint is live
+6. Telegram webhook is switched to the destination
+7. destination health is rechecked after webhook registration
+8. source polling ownership is released only after destination verification
 
 Rollback requirement:
 
-- if destination start or verification fails, ownership must stay with the source
-- repo sync must not delete or overwrite files outside the bound repo
-- return-to-local must never perform destructive whole-machine sync
+- if sandbox startup fails, local ownership stays authoritative
+- if webhook registration fails, local polling stays authoritative
+- if post-cutover health fails, revert ownership rather than leaving Telegram detached
+
+## Telegram Transport Policy
+
+Transport is mode-specific, not global:
+
+- local development/runtime: long polling
+- remote E2B runtime: webhooks
+
+This keeps local installs from exposing ports while allowing cloud sandboxes to receive Telegram updates directly.
+
+## Pause/Resume Policy
+
+Remote lifecycle must be controllable from Telegram.
+
+The expected user model is:
+
+- `/teleport` starts or resumes the sandbox and flips Telegram to the webhook runtime
+- `/home` deletes the webhook and hands ownership back to local polling
+- a pause action pauses remote execution without losing continuity state
+- a resume action wakes the same sandbox or replacement sandbox and restores webhook ownership
+
+Precise Telegram commands can evolve, but the sandbox lifecycle contract must support this flow.
 
 ## Non-Goals
 
@@ -251,28 +143,26 @@ Teleport is not:
 
 - whole-machine backup
 - home-directory replication
-- generic bidirectional sync for arbitrary folders
+- generic folder sync
 - secret replication
-- dependency-folder mirroring
+- dependency-directory mirroring
+- multi-provider cloud orchestration
 
-## Practical Product Consequences
+## Practical Consequences
 
 This spec implies:
 
-1. `superturtle` needs an explicit bind/init concept.
-2. `start`, `status`, and `teleport` should resolve through the bound repo, not through the current shell directory alone.
-3. Teleport should be refused for unsafe repo roots.
-4. VM teleport should operate on repo content plus the explicit handoff bundle.
-5. VM provisioning should sit behind a provider-neutral adapter owned by the control plane.
-6. Any future background sync layer should be repo-scoped.
+1. `init` persists the bound repo root.
+2. `start` and `status` resolve through the bound repo.
+3. teleport code should assume E2B, not a generic provider abstraction.
+4. webhook cutover is part of teleport correctness, not an optional extra.
+5. any remote pause/resume semantics must map to E2B sandbox lifecycle operations.
 
-## Recommended Next Implementation Steps
+## Near-Term Implementation Focus
 
-1. Add a persisted "bound repo" config for the installation.
+1. Keep the persisted bound-repo config.
 2. Define the repo safety validator.
-3. Define the first version of `.superturtle/teleport-manifest.json`.
-4. Define the provider-neutral VM provisioning contract and adapter boundary.
-5. Split transfer logic into:
-   - repo sync
-   - runtime handoff bundle
-6. Make VM teleport use this repo-bound contract end to end.
+3. Define `.superturtle/teleport-manifest.json`.
+4. Define the E2B sandbox handoff contract.
+5. Implement `/teleport` ownership cutover using webhook health checks.
+6. Implement pause/resume control from Telegram against the sandbox lifecycle.

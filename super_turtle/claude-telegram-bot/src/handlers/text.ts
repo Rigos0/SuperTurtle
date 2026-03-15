@@ -37,6 +37,7 @@ import {
   preemptBackgroundRunForUserPriority,
   runMessageWithActiveDriver,
 } from "./driver-routing";
+import { TELEPORT_CONTROL_MESSAGE, isTeleportRemoteControlMode } from "../teleport";
 
 export interface HandleTextOptions {
   silent?: boolean;
@@ -103,6 +104,13 @@ export async function handleText(
         : message,
     messageTruncated: message.length > 500,
   });
+
+  if (isTeleportRemoteControlMode()) {
+    if (!silent) {
+      await ctx.reply(TELEPORT_CONTROL_MESSAGE);
+    }
+    return;
+  }
 
   // 1.5. Bare "stop" — interrupt the foreground run/queue only.
   if (isStopIntent(message)) {
