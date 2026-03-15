@@ -52,6 +52,9 @@ describe("startTelegramTransport", () => {
           async deleteWebhook(options) {
             deleteWebhookCalls.push(options);
           },
+          async getWebhookInfo() {
+            return { url: "" };
+          },
           async setWebhook() {
             throw new Error("setWebhook should not be called in polling mode");
           },
@@ -87,6 +90,9 @@ describe("startTelegramTransport", () => {
         api: {
           async deleteWebhook(options) {
             deleteWebhookCalls.push(options);
+          },
+          async getWebhookInfo() {
+            return { url: "" };
           },
           async setWebhook() {
             throw new Error("setWebhook should not be called in polling mode");
@@ -136,6 +142,9 @@ describe("startTelegramTransport", () => {
         api: {
           async deleteWebhook() {
             throw new Error("deleteWebhook should not be called in webhook mode");
+          },
+          async getWebhookInfo() {
+            return { url: config.publicUrl };
           },
           async setWebhook(url, options) {
             setWebhookCall = { url, options };
@@ -210,6 +219,9 @@ describe("startTelegramTransport", () => {
           async deleteWebhook() {
             throw new Error("deleteWebhook should not be called in webhook mode");
           },
+          async getWebhookInfo() {
+            return { url: "https://example.test/telegram/webhook" };
+          },
           async setWebhook() {
             setWebhookCalled = true;
           },
@@ -244,6 +256,119 @@ describe("startTelegramTransport", () => {
     expect(healthResponse.status).toBe(200);
     await transport.stop();
   });
+
+  it("keeps the local bot alive in standby until the webhook is cleared", async () => {
+    const webhookInfos = [
+      { url: "https://remote.test/telegram/webhook" },
+      { url: "" },
+    ];
+    const intervalCallbacks: Array<() => void> = [];
+    let resumeCalls = 0;
+    let pollingStarts = 0;
+    let runnerStopped = false;
+
+    const transport = await startTelegramTransport(
+      {
+        api: {
+          async deleteWebhook() {
+            throw new Error("deleteWebhook should not be called in standby mode");
+          },
+          async getWebhookInfo() {
+            return webhookInfos.shift() ?? { url: "" };
+          },
+          async setWebhook() {
+            throw new Error("setWebhook should not be called in standby mode");
+          },
+        },
+        async handleUpdate() {},
+      },
+      {
+        mode: "standby",
+        expectedRemoteWebhookUrl: "https://remote.test/telegram/webhook",
+        checkIntervalMs: 1500,
+        async onResumePolling() {
+          resumeCalls += 1;
+        },
+      },
+      {
+        startPollingRunner() {
+          pollingStarts += 1;
+          return {
+            isRunning() {
+              return true;
+            },
+            stop() {
+              runnerStopped = true;
+            },
+          };
+        },
+        setInterval(callback: () => void) {
+          intervalCallbacks.push(callback);
+          return intervalCallbacks.length as unknown as ReturnType<typeof setInterval>;
+        },
+        clearInterval() {},
+      }
+    );
+
+    expect(transport.mode).toBe("standby");
+    expect(pollingStarts).toBe(0);
+    expect(resumeCalls).toBe(0);
+    expect(intervalCallbacks).toHaveLength(1);
+
+    intervalCallbacks[0]!();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(resumeCalls).toBe(1);
+    expect(pollingStarts).toBe(1);
+
+    await transport.stop();
+    expect(runnerStopped).toBe(true);
+  });
+
+  it("stays idle in standby when a different webhook owns Telegram", async () => {
+    let pollingStarted = false;
+
+    const transport = await startTelegramTransport(
+      {
+        api: {
+          async deleteWebhook() {
+            throw new Error("deleteWebhook should not be called in standby mode");
+          },
+          async getWebhookInfo() {
+            return { url: "https://someone-else.test/webhook" };
+          },
+          async setWebhook() {
+            throw new Error("setWebhook should not be called in standby mode");
+          },
+        },
+        async handleUpdate() {},
+      },
+      {
+        mode: "standby",
+        expectedRemoteWebhookUrl: "https://remote.test/telegram/webhook",
+      },
+      {
+        startPollingRunner() {
+          pollingStarted = true;
+          return {
+            isRunning() {
+              return true;
+            },
+            stop() {},
+          };
+        },
+        setInterval() {
+          return 1 as unknown as ReturnType<typeof setInterval>;
+        },
+        clearInterval() {},
+      }
+    );
+
+    expect(transport.mode).toBe("standby");
+    expect(pollingStarted).toBe(false);
+
+    await transport.stop();
+  });
 });
 
 describe("handleTelegramWebhookRequest", () => {
@@ -259,6 +384,9 @@ describe("handleTelegramWebhookRequest", () => {
       {
         api: {
           async deleteWebhook() {},
+          async getWebhookInfo() {
+            return { url: "https://example.test/telegram/webhook" };
+          },
           async setWebhook() {},
         },
         async handleUpdate() {},

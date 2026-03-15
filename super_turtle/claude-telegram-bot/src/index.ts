@@ -91,6 +91,7 @@ import { getSequentializationKey } from "./update-sequencing";
 import { startTelegramTransport, type TelegramTransportConfig } from "./telegram-transport";
 import {
   loadTeleportStateForCurrentProject,
+  reconcileTeleportOwnershipForCurrentProject,
   TELEPORT_CONTROL_MESSAGE,
   TELEPORT_REMOTE_ALLOWED_COMMANDS,
 } from "./teleport";
@@ -1056,7 +1057,13 @@ if (SUPERTURTLE_RUNTIME_ROLE !== "teleport-remote") {
 const localTeleportState = loadTeleportStateForCurrentProject();
 const transportConfig: TelegramTransportConfig | undefined =
   SUPERTURTLE_RUNTIME_ROLE === "local" && localTeleportState?.ownerMode === "remote"
-    ? { mode: "polling", clearWebhookOnStart: false }
+    ? {
+        mode: "standby",
+        expectedRemoteWebhookUrl: localTeleportState.webhookUrl,
+        onResumePolling: async () => {
+          await reconcileTeleportOwnershipForCurrentProject();
+        },
+      }
     : undefined;
 
 const transport = await startTelegramTransport(bot, transportConfig);
