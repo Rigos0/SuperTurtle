@@ -2,7 +2,8 @@
 
 Date: 2026-03-16
 Branch: `unify-superturtle-layout`
-Baseline: `main...HEAD` plus local unstaged deletion of `.subturtles/teleport-provider-registry/CLAUDE.md`
+Baseline: `main...HEAD`
+Worktree status at review time: no additional local unstaged changes
 
 ## Diff triage
 
@@ -60,25 +61,25 @@ Highest-risk review order:
 
 ## Findings so far
 
-1. Medium: Claude credential bootstrap can copy the wrong value into the remote runtime.
+1. High: Local startup can steal Telegram ownership from an active remote sandbox if the cached teleport state is stale.
+   - Files: `super_turtle/claude-telegram-bot/src/index.ts:1080-1108`, `super_turtle/claude-telegram-bot/src/telegram-transport.ts:401-405`, `super_turtle/claude-telegram-bot/src/teleport.ts:140-145`, `super_turtle/bin/e2b-webhook-poc-lib.js:1194-1207`
+   - The local runtime chooses between polling and standby from `loadTeleportStateForCurrentProject()` before it asks Telegram who currently owns the bot.
+   - If that state file says `ownerMode !== "remote"`, startup goes straight into polling mode and `startTelegramTransport()` immediately calls `deleteWebhook({ drop_pending_updates: true })`.
+   - The only reconciliation hook exposed through `reconcileTeleportOwnershipForCurrentProject()` repairs the `remote -> local` direction; when cached state is stale in the opposite direction it simply returns the stale local record without querying for or restoring remote ownership.
+   - Operational impact: after a crash, manual state edit, or any missed state write on `/teleport`, restarting the local bot can clear the live remote webhook and drop pending updates before the remote sandbox has a chance to continue serving Telegram traffic.
+
+2. Medium: Claude credential bootstrap can copy the wrong value into the remote runtime.
    - File: `super_turtle/bin/e2b-webhook-poc-lib.js:221-252`
    - `extractTokenFromCredentialPayload()` walks every string in the parsed credential payload and returns the first non-empty one, regardless of key name.
    - I verified locally that a realistic payload like `{"claudeAiOauth":{"account":{"emailAddress":"user@example.com"},"accessToken":"claude-real-token"}}` resolves to `user@example.com`, not the token.
    - That value is then fed through `discoverClaudeAccessToken()` and `buildRemoteEnv()`, so `/teleport` can seed `CLAUDE_CODE_OAUTH_TOKEN` with an email or username and break remote auth bootstrap.
    - This is a regression relative to the existing token-specific extractors in `super_turtle/bin/superturtle.js:1241-1270` and `super_turtle/claude-telegram-bot/src/handlers/commands.ts:1155-1181`.
 
-2. Medium: Healthy sandbox reuse skips auth refresh, so repeat teleports can strand the remote runtime on stale or missing credentials.
+3. Medium: Healthy sandbox reuse skips auth refresh, so repeat teleports can strand the remote runtime on stale or missing credentials.
    - Files: `super_turtle/bin/e2b-webhook-poc-lib.js:741-764`, `super_turtle/bin/e2b-webhook-poc-lib.js:967-1046`, `super_turtle/bin/e2b-webhook-poc-lib.js:1077-1082`
    - `launchTeleportRuntime()` computes fresh local auth bootstrap data up front, but if the existing sandbox is healthy and `shouldRunFullBootstrap()` returns false, it exits before `persistRemoteProjectEnv()` and `bootstrapRemoteDriverAuth()` run.
    - Because the reuse check only compares runtime version, remote mode, and remote driver, later local credential fixes or token refreshes are never propagated to the reused sandbox.
    - Operational impact: a sandbox created before `codex login`/Claude auth was fixed can remain permanently unusable across fast `/teleport` cycles unless the operator forces a full reprovision.
-
-3. High: Local startup can steal Telegram ownership from an active remote sandbox if the cached teleport state is stale.
-   - Files: `super_turtle/claude-telegram-bot/src/index.ts:1080-1108`, `super_turtle/claude-telegram-bot/src/telegram-transport.ts:401-405`, `super_turtle/claude-telegram-bot/src/teleport.ts:140-145`, `super_turtle/bin/e2b-webhook-poc-lib.js:1194-1207`
-   - The local runtime chooses between polling and standby from `loadTeleportStateForCurrentProject()` before it asks Telegram who currently owns the bot.
-   - If that state file says `ownerMode !== "remote"`, startup goes straight into polling mode and `startTelegramTransport()` immediately calls `deleteWebhook({ drop_pending_updates: true })`.
-   - The only reconciliation hook exposed through `reconcileTeleportOwnershipForCurrentProject()` repairs the `remote -> local` direction; when cached state is stale in the opposite direction it simply returns the stale local record without querying for or restoring remote ownership.
-   - Operational impact: after a crash, manual state edit, or any missed state write on `/teleport`, restarting the local bot can clear the live remote webhook and drop pending updates before the remote sandbox has a chance to continue serving Telegram traffic.
 
 ## Test coverage assessment
 

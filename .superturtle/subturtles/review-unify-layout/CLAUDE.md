@@ -1,5 +1,5 @@
 # Current task
-Write `super_turtle/docs/reviews/review-unify-layout-2026-03-16.md` with prioritized findings and clear file references.
+All backlog items are complete. Append loop stop control and halt this subturtle.
 
 # End goal with specs
 - Review `git diff main...HEAD` plus local unstaged changes without modifying product code unless a review artifact is needed.
@@ -24,4 +24,7 @@ Write `super_turtle/docs/reviews/review-unify-layout-2026-03-16.md` with priorit
 - [x] Review `super_turtle/claude-telegram-bot/src/index.ts`, `super_turtle/claude-telegram-bot/src/telegram-transport.ts`, `super_turtle/claude-telegram-bot/src/teleport.ts`, and `super_turtle/claude-telegram-bot/src/config.ts`
 - [x] Review the touched tests to confirm coverage for new behavior and identify missing cases
 - [x] Inspect the local deletion of `.subturtles/teleport-provider-registry/CLAUDE.md` for migration/regression risk; keeping the tracked legacy file reproduces a startup migration failure because `.subturtles/` collides with the tracked `.superturtle/subturtles/` tree
-- [ ] Write `super_turtle/docs/reviews/review-unify-layout-2026-03-16.md` with prioritized findings and clear file references <- current
+- [x] Write `super_turtle/docs/reviews/review-unify-layout-2026-03-16.md` with prioritized findings and clear file references
+
+## Loop Control
+STOP
