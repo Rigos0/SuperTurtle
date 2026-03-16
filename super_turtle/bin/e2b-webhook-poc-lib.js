@@ -29,6 +29,11 @@ const DEFAULT_REMOTE_HOME = "/home/user";
 const DEFAULT_LOG_PATH = "/tmp/superturtle-e2b-bot.log";
 const DEFAULT_PID_PATH = "/tmp/superturtle-e2b-bot.pid";
 const DEFAULT_ARCHIVE_PATH = "/tmp/superturtle-e2b-project.tgz";
+const DEFAULT_TEMPLATE_NAME =
+  process.env.SUPERTURTLE_E2B_TEMPLATE_NAME?.trim() || "superturtle-managed-runtime";
+const DEFAULT_TEMPLATE_CHANNEL =
+  process.env.SUPERTURTLE_E2B_TEMPLATE_CHANNEL?.trim() || "latest";
+const DEFAULT_TEMPLATE_REF = `${DEFAULT_TEMPLATE_NAME}:${DEFAULT_TEMPLATE_CHANNEL}`;
 const DEFAULT_OWNER_MODE = "local";
 const DEFAULT_REMOTE_MODE = "control";
 const DEFAULT_REMOTE_CODEX_AUTH_PATH = join(".codex", "auth.json");
@@ -436,8 +441,14 @@ function buildPocConfig(projectRoot, options = {}, existingState = null) {
   );
   const remoteRoot = options.remoteRoot || existingState?.remoteRoot || `${DEFAULT_REMOTE_HOME}/${repoName}`;
   const remoteBotDir = `${remoteRoot}/super_turtle/claude-telegram-bot`;
-  const templateId = options.templateId || existingState?.templateId || null;
-  const templateVersion = options.templateVersion || existingState?.templateVersion || null;
+  const templateId =
+    options.templateId ||
+    existingState?.templateId ||
+    DEFAULT_TEMPLATE_REF;
+  const templateVersion =
+    options.templateVersion ||
+    existingState?.templateVersion ||
+    DEFAULT_TEMPLATE_CHANNEL;
   const runtimeVersion = options.runtimeVersion || existingState?.runtimeVersion || getLocalRuntimeVersion();
   const webhookSecret = options.webhookSecret || existingState?.webhookSecret || randomToken(16);
   const remoteMode = options.remoteMode || existingState?.remoteMode || DEFAULT_REMOTE_MODE;
@@ -617,6 +628,7 @@ function buildRemoteBootstrapCommand(config, options = {}) {
   commands.push(
     `mkdir -p ${shellEscape(config.remoteRoot)}`,
     `tar -xzf ${shellEscape(config.archivePath)} -C ${shellEscape(config.remoteRoot)}`,
+    `rm -f ${shellEscape(config.archivePath)}`,
     `mkdir -p ${shellEscape(`${config.remoteRoot}/.superturtle`)}`,
     `cd ${shellEscape(config.remoteBotDir)}`
   );
@@ -883,6 +895,23 @@ async function waitForReady(url, timeoutMs) {
   return waitForHttpReady(url, timeoutMs, "readiness");
 }
 
+async function ensureTeleportTargetReady(projectRoot, state) {
+  const { Sandbox } = await importSandbox();
+  const sandbox = await Sandbox.connect(state.sandboxId, {
+    timeoutMs: state.timeoutMs || DEFAULT_TIMEOUT_MS,
+  });
+  const readyUrl = state.readyUrl || state.healthUrl;
+  await waitForReady(readyUrl, 15 * 1000);
+
+  const nextState = buildStateRecord(projectRoot, sandbox.sandboxId, sandbox.getHost(state.port), {
+    ...state,
+    readyPath: state.readyPath || DEFAULT_READY_PATH,
+    healthPath: state.healthPath || DEFAULT_HEALTH_PATH,
+  }, state.ownerMode || DEFAULT_OWNER_MODE);
+  savePocState(projectRoot, nextState);
+  return nextState;
+}
+
 async function lookupSandboxInfo(Sandbox, sandboxId) {
   const paginator = await Sandbox.list();
   while (paginator.hasNext) {
@@ -931,7 +960,16 @@ async function launchTeleportRuntime(projectRoot, options = {}) {
   const authBootstrap = buildLocalAuthBootstrap(projectEnv);
   const { Sandbox } = await importSandbox();
 
-  const sandboxId = options["sandbox-id"] || existingState?.sandboxId || null;
+  const canReuseExistingSandbox =
+    Boolean(options["sandbox-id"]) ||
+    Boolean(
+      existingState?.sandboxId &&
+      existingState?.templateId &&
+      existingState.templateId === config.templateId
+    );
+  const sandboxId =
+    options["sandbox-id"] ||
+    (canReuseExistingSandbox ? existingState?.sandboxId || null : null);
   let sandbox = null;
   if (sandboxId) {
     try {
@@ -943,7 +981,7 @@ async function launchTeleportRuntime(projectRoot, options = {}) {
     }
   }
   if (!sandbox) {
-    sandbox = await Sandbox.create({
+    sandbox = await Sandbox.create(config.templateId, {
       timeoutMs: config.timeoutMs,
       lifecycle: {
         onTimeout: "pause",
@@ -981,23 +1019,29 @@ async function launchTeleportRuntime(projectRoot, options = {}) {
     }
   }
 
+  const bootstrapConfig = {
+    ...config,
+    archivePath:
+      options.archivePath ||
+      `/tmp/superturtle-e2b-project-${randomToken(6)}.tgz`,
+  };
   const archiveBuffer = createArchiveBuffer(projectRoot);
-  await sandbox.files.write(config.archivePath, archiveBuffer);
-  await sandbox.commands.run(buildRemoteBootstrapCommand(config), {
+  await sandbox.files.write(bootstrapConfig.archivePath, archiveBuffer);
+  await sandbox.commands.run(buildRemoteBootstrapCommand(bootstrapConfig), {
     envs: remoteEnv,
     timeoutMs: 10 * 60 * 1000,
   });
-  await persistRemoteProjectEnv(sandbox, config, remoteEnv);
-  await bootstrapRemoteDriverAuth(sandbox, config, remoteEnv, authBootstrap);
-  await sandbox.commands.run(buildRemoteStartCommand(config), {
+  await persistRemoteProjectEnv(sandbox, bootstrapConfig, remoteEnv);
+  await bootstrapRemoteDriverAuth(sandbox, bootstrapConfig, remoteEnv, authBootstrap);
+  await sandbox.commands.run(buildRemoteStartCommand(bootstrapConfig), {
     envs: remoteEnv,
     background: true,
     timeoutMs: 10 * 60 * 1000,
   });
   await waitForReady(readyUrl, 90 * 1000);
-  await persistManagedRuntimeManifest(sandbox, config);
+  await persistManagedRuntimeManifest(sandbox, bootstrapConfig);
 
-  const state = buildStateRecord(projectRoot, sandbox.sandboxId, host, config, DEFAULT_OWNER_MODE);
+  const state = buildStateRecord(projectRoot, sandbox.sandboxId, host, bootstrapConfig, DEFAULT_OWNER_MODE);
   savePocState(projectRoot, state);
   return state;
 }
@@ -1033,8 +1077,9 @@ async function getTeleportStatus(projectRoot) {
 }
 
 async function setRemoteWebhook(projectRoot, options = {}) {
-  const state = requireProjectState(projectRoot);
+  const existingState = requireProjectState(projectRoot);
   const runtimeEnv = loadRuntimeEnv(projectRoot);
+  const state = await ensureTeleportTargetReady(projectRoot, existingState);
   await setTelegramWebhook(runtimeEnv.TELEGRAM_BOT_TOKEN, state.webhookUrl, state.webhookSecret, {
     dropPendingUpdates: Boolean(options.dropPendingUpdates),
   });
@@ -1153,6 +1198,7 @@ module.exports = {
   deleteTelegramWebhook,
   getTeleportStatus,
   importSandbox,
+  ensureTeleportTargetReady,
   launchTeleportRuntime,
   loadPocState,
   loadProjectEnv,

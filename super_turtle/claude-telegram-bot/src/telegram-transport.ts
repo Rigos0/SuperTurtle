@@ -323,7 +323,7 @@ async function createStandbyTransport(
 
         lastHandledWebhookConflictAt = Date.now();
         transportLog.info(
-          "Telegram standby transport handed resumed polling back to standby after webhook cutover"
+          "Telegram standby transport handed polling back to standby after webhook cutover"
         );
         runner = null;
         ensureWatching();

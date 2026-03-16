@@ -69,6 +69,10 @@ async function loadCommandsModuleForRole(
     releaseTeleportOwnershipForCurrentProject: async () => ({
       state: null,
     }),
+    pauseTeleportSandboxForCurrentProject: async () => ({
+      sandboxId: "sbx_123",
+      webhookUrl: "https://example.test/telegram/webhook/demo",
+    }),
     ...teleportOverrides,
   }));
 
@@ -102,13 +106,24 @@ describe("teleport commands", () => {
   });
 
   it("releases webhook ownership from the remote runtime", async () => {
-    const { handleHome } = await loadCommandsModuleForRole("teleport-remote", {});
+    const pauseCalls: string[] = [];
+    const { handleHome } = await loadCommandsModuleForRole("teleport-remote", {
+      pauseTeleportSandboxForCurrentProject: async () => {
+        pauseCalls.push("pause");
+        return {
+          sandboxId: "sbx_123",
+          webhookUrl: "https://example.test/telegram/webhook/demo",
+        };
+      },
+    });
     const { ctx, replies, setMyCommandsCalls } = makeCtx("/home");
 
     await handleHome(ctx as never);
 
     expect(replies.some((reply) => reply.text.includes("✅ Telegram ownership returned"))).toBe(true);
+    expect(replies.some((reply) => reply.text.includes("pausing now"))).toBe(true);
     expect(setMyCommandsCalls.at(-1)?.map((entry) => entry.command)).toContain("teleport");
+    expect(pauseCalls).toEqual(["pause"]);
   });
 
   it("reports that local runtime is already home", async () => {

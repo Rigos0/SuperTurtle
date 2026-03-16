@@ -98,6 +98,10 @@ export async function releaseTeleportOwnershipForCurrentProject(): Promise<{
   return teleportLib.clearRemoteWebhook(WORKING_DIR);
 }
 
+export async function pauseTeleportSandboxForCurrentProject(): Promise<TeleportState> {
+  return teleportLib.pauseTeleportSandbox(WORKING_DIR);
+}
+
 export async function reconcileTeleportOwnershipForCurrentProject(): Promise<TeleportState | null> {
   return teleportLib.reconcileTeleportOwnership(WORKING_DIR);
 }

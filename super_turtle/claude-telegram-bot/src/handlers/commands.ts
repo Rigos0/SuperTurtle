@@ -40,6 +40,7 @@ import {
   activateTeleportOwnershipForCurrentProject,
   launchTeleportRuntimeForCurrentProject,
   loadTeleportStateForCurrentProject,
+  pauseTeleportSandboxForCurrentProject,
   reconcileTeleportOwnershipForCurrentProject,
   releaseTeleportOwnershipForCurrentProject,
   recentlyReturnedHome,
@@ -588,8 +589,13 @@ export async function handleHome(ctx: Context): Promise<void> {
     await releaseTeleportOwnershipForCurrentProject();
     await syncTelegramCommandsFromCommand(ctx, "local");
     await ctx.reply(
-      "✅ Telegram ownership returned to the local polling turtle. This remote sandbox is still running, but it no longer owns updates."
+      "✅ Telegram ownership returned to the local polling turtle. The remote sandbox no longer owns updates and is pausing now."
     );
+    try {
+      await pauseTeleportSandboxForCurrentProject();
+    } catch (error) {
+      cmdLog.warn({ err: error }, "Failed to pause teleport sandbox after /home");
+    }
   } catch (error) {
     cmdLog.error({ err: error }, "Home command failed");
     await ctx.reply(`❌ Failed to return home: ${String(error).slice(0, 200)}`);

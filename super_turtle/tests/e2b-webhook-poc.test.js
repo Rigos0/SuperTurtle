@@ -49,6 +49,8 @@ CLAUDE_WORKING_DIR='/tmp/project'
   assert.strictEqual(config.timeoutMs, 123000);
   assert.strictEqual(config.webhookPath, "/telegram/webhook/demo");
   assert.strictEqual(config.remoteRoot, "/home/user/project");
+  assert.strictEqual(config.templateId, "superturtle-managed-runtime:latest");
+  assert.strictEqual(config.templateVersion, "latest");
 
   const remoteEnv = buildRemoteEnv(
     {
@@ -83,6 +85,8 @@ CLAUDE_WORKING_DIR='/tmp/project'
   const state = buildStateRecord("/Users/example/project", "sandbox_123", "host.example", {
     port: 8787,
     timeoutMs: 123000,
+    templateId: "superturtle-managed-runtime:latest",
+    templateVersion: "latest",
     remoteMode: "agent",
     remoteDriver: "codex",
     remoteRoot: "/home/user/project",
@@ -99,6 +103,7 @@ CLAUDE_WORKING_DIR='/tmp/project'
   assert.strictEqual(state.healthUrl, "https://host.example/healthz");
   assert.strictEqual(state.readyUrl, "https://host.example/readyz");
   assert.strictEqual(state.ownerMode, "local");
+  assert.strictEqual(state.managed, true);
   assert.strictEqual(state.remoteMode, "agent");
   assert.strictEqual(state.remoteDriver, "codex");
 
@@ -126,6 +131,7 @@ CLAUDE_WORKING_DIR='/tmp/project'
     pidPath: "/tmp/superturtle-e2b-bot.pid",
   });
   assert.match(bootstrapCommand, /curl -fsSL https:\/\/bun\.sh\/install/);
+  assert.match(bootstrapCommand, /rm -f '\/tmp\/project\.tgz'/);
   assert.match(bootstrapCommand, /bun install --frozen-lockfile \|\| bun install/);
   assert.doesNotMatch(bootstrapCommand, /bun run src\/index\.ts/);
 
