@@ -57,3 +57,18 @@ Highest-risk review order:
 - Second pass: `super_turtle/claude-telegram-bot/src/index.ts`, `super_turtle/claude-telegram-bot/src/telegram-transport.ts`, `super_turtle/claude-telegram-bot/src/teleport.ts`, `super_turtle/claude-telegram-bot/src/config.ts`
 - Third pass: touched tests for the new cloud, transport, teleport, and migration behavior
 - Final pass: local deletion of `.subturtles/teleport-provider-registry/CLAUDE.md` and final findings write-up
+
+## Findings so far
+
+1. Medium: Claude credential bootstrap can copy the wrong value into the remote runtime.
+   - File: `super_turtle/bin/e2b-webhook-poc-lib.js:221-252`
+   - `extractTokenFromCredentialPayload()` walks every string in the parsed credential payload and returns the first non-empty one, regardless of key name.
+   - I verified locally that a realistic payload like `{"claudeAiOauth":{"account":{"emailAddress":"user@example.com"},"accessToken":"claude-real-token"}}` resolves to `user@example.com`, not the token.
+   - That value is then fed through `discoverClaudeAccessToken()` and `buildRemoteEnv()`, so `/teleport` can seed `CLAUDE_CODE_OAUTH_TOKEN` with an email or username and break remote auth bootstrap.
+   - This is a regression relative to the existing token-specific extractors in `super_turtle/bin/superturtle.js:1241-1270` and `super_turtle/claude-telegram-bot/src/handlers/commands.ts:1155-1181`.
+
+2. Medium: Healthy sandbox reuse skips auth refresh, so repeat teleports can strand the remote runtime on stale or missing credentials.
+   - Files: `super_turtle/bin/e2b-webhook-poc-lib.js:741-764`, `super_turtle/bin/e2b-webhook-poc-lib.js:967-1046`, `super_turtle/bin/e2b-webhook-poc-lib.js:1077-1082`
+   - `launchTeleportRuntime()` computes fresh local auth bootstrap data up front, but if the existing sandbox is healthy and `shouldRunFullBootstrap()` returns false, it exits before `persistRemoteProjectEnv()` and `bootstrapRemoteDriverAuth()` run.
+   - Because the reuse check only compares runtime version, remote mode, and remote driver, later local credential fixes or token refreshes are never propagated to the reused sandbox.
+   - Operational impact: a sandbox created before `codex login`/Claude auth was fixed can remain permanently unusable across fast `/teleport` cycles unless the operator forces a full reprovision.

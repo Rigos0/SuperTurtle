@@ -1,5 +1,5 @@
 # Current task
-Review `super_turtle/bin/cloud.js`, `super_turtle/bin/cloud-control-plane-contract.js`, `super_turtle/bin/e2b-webhook-poc-lib.js`, and `super_turtle/bin/runtime-ownership-agent.js` for correctness, regressions, and operational risk, using the diff triage captured in `super_turtle/docs/reviews/review-unify-layout-2026-03-16.md`.
+Review `super_turtle/claude-telegram-bot/src/index.ts`, `super_turtle/claude-telegram-bot/src/telegram-transport.ts`, `super_turtle/claude-telegram-bot/src/teleport.ts`, and `super_turtle/claude-telegram-bot/src/config.ts` for correctness, regressions, and operational risk, using the diff triage captured in `super_turtle/docs/reviews/review-unify-layout-2026-03-16.md`.
 
 # End goal with specs
 - Review `git diff main...HEAD` plus local unstaged changes without modifying product code unless a review artifact is needed.
@@ -20,8 +20,8 @@ Review `super_turtle/bin/cloud.js`, `super_turtle/bin/cloud-control-plane-contra
 
 # Backlog
 - [x] Read `git diff --stat main...HEAD` and map the highest-risk files first
-- [ ] Review `super_turtle/bin/cloud.js`, `super_turtle/bin/cloud-control-plane-contract.js`, `super_turtle/bin/e2b-webhook-poc-lib.js`, and `super_turtle/bin/runtime-ownership-agent.js` <- current
-- [ ] Review `super_turtle/claude-telegram-bot/src/index.ts`, `super_turtle/claude-telegram-bot/src/telegram-transport.ts`, `super_turtle/claude-telegram-bot/src/teleport.ts`, and `super_turtle/claude-telegram-bot/src/config.ts`
+- [x] Review `super_turtle/bin/cloud.js`, `super_turtle/bin/cloud-control-plane-contract.js`, `super_turtle/bin/e2b-webhook-poc-lib.js`, and `super_turtle/bin/runtime-ownership-agent.js`
+- [ ] Review `super_turtle/claude-telegram-bot/src/index.ts`, `super_turtle/claude-telegram-bot/src/telegram-transport.ts`, `super_turtle/claude-telegram-bot/src/teleport.ts`, and `super_turtle/claude-telegram-bot/src/config.ts` <- current
 - [ ] Review the touched tests to confirm coverage for new behavior and identify missing cases
 - [ ] Inspect the local deletion of `.subturtles/teleport-provider-registry/CLAUDE.md` for migration/regression risk
 - [ ] Write `super_turtle/docs/reviews/review-unify-layout-2026-03-16.md` with prioritized findings and clear file references
