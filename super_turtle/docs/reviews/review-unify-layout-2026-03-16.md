@@ -79,3 +79,19 @@ Highest-risk review order:
    - If that state file says `ownerMode !== "remote"`, startup goes straight into polling mode and `startTelegramTransport()` immediately calls `deleteWebhook({ drop_pending_updates: true })`.
    - The only reconciliation hook exposed through `reconcileTeleportOwnershipForCurrentProject()` repairs the `remote -> local` direction; when cached state is stale in the opposite direction it simply returns the stale local record without querying for or restoring remote ownership.
    - Operational impact: after a crash, manual state edit, or any missed state write on `/teleport`, restarting the local bot can clear the live remote webhook and drop pending updates before the remote sandbox has a chance to continue serving Telegram traffic.
+
+## Test coverage assessment
+
+Coverage that looks meaningful:
+
+- `super_turtle/claude-telegram-bot/src/telegram-transport.test.ts` exercises the new polling, webhook, and standby modes, including webhook secret enforcement, bad JSON handling, readiness failures, and repeated 409 handoff loops.
+- `super_turtle/claude-telegram-bot/src/handlers/commands.teleport.test.ts`, `super_turtle/claude-telegram-bot/src/handlers/text.remote.test.ts`, and `super_turtle/claude-telegram-bot/src/handlers/voice.remote.test.ts` cover the main remote-control happy paths: `/teleport`, `/home`, remote text gating, and text-only media rejection.
+- `super_turtle/tests/cloud-session-durability.test.js`, the related cloud session race tests, and `super_turtle/tests/runtime-ownership-agent.test.js` meaningfully cover the new hosted session persistence and runtime lease release mechanics.
+- `super_turtle/tests/runtime-layout-migration.sh` confirms that invoking `subturtle/ctl` migrates legacy `.subturtles/` and `-s/.superturtle/teleport/` data into the new `.superturtle/` layout.
+
+Important missing cases:
+
+- No test drives the startup decision in `super_turtle/claude-telegram-bot/src/index.ts:1080-1110` with a stale local teleport state and an already-active remote webhook. Current transport tests cover the lower-level standby/polling machinery, but nothing asserts that boot picks standby before `deleteWebhook()` in the stale-state case that caused finding 3.
+- `super_turtle/tests/e2b-webhook-poc.test.js` only checks `extractTokenFromCredentialPayload()` with a minimal payload containing nothing except `accessToken`. It does not cover realistic Claude credential JSON that also includes account metadata, so the regression in finding 1 would pass the current suite.
+- The same E2B test file covers `shouldRunFullBootstrap()` only as a pure helper and never exercises `launchTeleportRuntime()`'s healthy-sandbox reuse branch. There is no assertion that reused sandboxes still refresh `.superturtle/.env` or remote driver auth, so the regression in finding 2 would also pass unnoticed.
+- `super_turtle/tests/runtime-layout-migration.sh` only covers the clean rename path. It does not cover the explicit conflict failures in `migrateLegacyRuntimeLayout()` when both legacy and new destinations already exist, which is the highest-risk migration edge case.
