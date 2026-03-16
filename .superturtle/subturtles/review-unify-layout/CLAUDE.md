@@ -1,5 +1,5 @@
 # Current task
-Inspect the local deletion of `.subturtles/teleport-provider-registry/CLAUDE.md` for migration/regression risk.
+Write `super_turtle/docs/reviews/review-unify-layout-2026-03-16.md` with prioritized findings and clear file references.
 
 # End goal with specs
 - Review `git diff main...HEAD` plus local unstaged changes without modifying product code unless a review artifact is needed.
@@ -23,5 +23,5 @@ Inspect the local deletion of `.subturtles/teleport-provider-registry/CLAUDE.md`
 - [x] Review `super_turtle/bin/cloud.js`, `super_turtle/bin/cloud-control-plane-contract.js`, `super_turtle/bin/e2b-webhook-poc-lib.js`, and `super_turtle/bin/runtime-ownership-agent.js`
 - [x] Review `super_turtle/claude-telegram-bot/src/index.ts`, `super_turtle/claude-telegram-bot/src/telegram-transport.ts`, `super_turtle/claude-telegram-bot/src/teleport.ts`, and `super_turtle/claude-telegram-bot/src/config.ts`
 - [x] Review the touched tests to confirm coverage for new behavior and identify missing cases
-- [ ] Inspect the local deletion of `.subturtles/teleport-provider-registry/CLAUDE.md` for migration/regression risk <- current
-- [ ] Write `super_turtle/docs/reviews/review-unify-layout-2026-03-16.md` with prioritized findings and clear file references
+- [x] Inspect the local deletion of `.subturtles/teleport-provider-registry/CLAUDE.md` for migration/regression risk; keeping the tracked legacy file reproduces a startup migration failure because `.subturtles/` collides with the tracked `.superturtle/subturtles/` tree
+- [ ] Write `super_turtle/docs/reviews/review-unify-layout-2026-03-16.md` with prioritized findings and clear file references <- current
