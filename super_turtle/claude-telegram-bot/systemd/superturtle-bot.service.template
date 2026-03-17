@@ -20,8 +20,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/USERNAME/projects/agentic/super_turtle/claude-telegram-bot
-ExecStart=/home/USERNAME/.bun/bin/bun run /home/USERNAME/projects/agentic/super_turtle/claude-telegram-bot/src/index.ts
+WorkingDirectory=/home/USERNAME/projects/agentic
+ExecStart=/bin/bash -lc 'cd /home/USERNAME/projects/agentic && exec "${SUPERTURTLE_BIN:-superturtle}" service run'
 Restart=always
 RestartSec=5
 
@@ -29,7 +29,11 @@ RestartSec=5
 Environment=TELEGRAM_BOT_TOKEN=your-bot-token-here
 Environment=TELEGRAM_ALLOWED_USERS=123456789
 Environment=CLAUDE_WORKING_DIR=/home/USERNAME/projects/agentic
+Environment=SUPERTURTLE_BIN=superturtle
 Environment=PATH=/home/USERNAME/.local/bin:/home/USERNAME/.bun/bin:/usr/local/bin:/usr/bin:/bin
+
+# For source checkouts without the npm package, replace SUPERTURTLE_BIN with:
+# Environment=SUPERTURTLE_BIN=/home/USERNAME/projects/agentic/super_turtle/bin/superturtle.js
 
 # Optional environment variables
 # Environment=OPENAI_API_KEY=sk-...

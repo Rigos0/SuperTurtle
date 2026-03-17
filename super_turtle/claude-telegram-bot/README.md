@@ -202,7 +202,7 @@ cp launchagent/com.claude-telegram-ts.plist.template ~/Library/LaunchAgents/com.
 launchctl load ~/Library/LaunchAgents/com.claude-telegram-ts.plist
 ```
 
-The bot will start automatically on login and restart if it crashes.
+The service template now runs `superturtle service run`, which is the non-`tmux` foreground runner intended for `launchd`, `systemd`, and managed sandboxes.
 
 **Prevent sleep:** To keep the bot running when your Mac is idle, go to **System Settings → Battery → Options** and enable **"Prevent automatic sleeping when the display is off"** (when on power adapter).
 
@@ -215,12 +215,12 @@ tail -f /tmp/claude-telegram-bot-ts.err   # stderr
 
 ## Monitor Background Bot
 
-Use the live launcher so the bot always runs in one visible terminal (`tmux`) and multiple starts just re-attach.
-`bun run start` appends the caffeinated run-loop output to `/tmp/claude-telegram-bot-ts.log`; Telegram `/looplogs` tails this same file.
+Use the interactive launcher when you want one visible `tmux` session and immediate attach.
+`superturtle start` now creates or reuses the session and attaches right away.
 
 ```bash
 # Start or re-attach the same terminal session
-bun run start
+superturtle start
 # /restart keeps using this same tmux terminal session
 
 # Attach later from another terminal

@@ -5,14 +5,15 @@
  *
  * Commands:
  *   superturtle init    — scaffold .superturtle/ config in the bound project repo
- *   superturtle start   — launch the bot (requires Bun + tmux)
+ *   superturtle start   — interactive tmux launcher/attach
+ *   superturtle service run — foreground service runner
  *   superturtle stop    — stop bot + all SubTurtles
  *   superturtle status  — show bot and SubTurtle status
  *   superturtle doctor  — full process + log observability snapshot
  *   superturtle logs    — tail loop/pino/audit logs
  */
 
-const { execSync, spawnSync } = require("child_process");
+const { execSync, spawn, spawnSync } = require("child_process");
 const { resolve, dirname, basename, join } = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -47,10 +48,10 @@ const {
 const PACKAGE_ROOT = resolve(__dirname, "..");
 const BOT_DIR = resolve(PACKAGE_ROOT, "claude-telegram-bot");
 const TEMPLATES_DIR = resolve(PACKAGE_ROOT, "templates");
-const RUNTIME_OWNERSHIP_AGENT_PATH = resolve(PACKAGE_ROOT, "bin", "runtime-ownership-agent.js");
 const SUPERTURTLE_DIRNAME = ".superturtle";
 const SUPERTURTLE_SUBTURTLES_RELATIVE_PATH = join(SUPERTURTLE_DIRNAME, "subturtles");
 const SUPERTURTLE_TELEPORT_RELATIVE_PATH = join(SUPERTURTLE_DIRNAME, "teleport");
+const SUPERTURTLE_SERVICE_PID_RELATIVE_PATH = join(SUPERTURTLE_DIRNAME, "service.pid");
 const PROJECT_CONFIG_RELATIVE_PATH = join(".superturtle", "project.json");
 const PROJECT_ENV_RELATIVE_PATH = join(".superturtle", ".env");
 
@@ -284,6 +285,61 @@ function clearCloudLeaseState(cwd) {
   return path;
 }
 
+function getServicePidPath(cwd) {
+  return resolve(cwd, SUPERTURTLE_SERVICE_PID_RELATIVE_PATH);
+}
+
+function readServicePid(cwd) {
+  const path = getServicePidPath(cwd);
+  if (!fs.existsSync(path)) {
+    return null;
+  }
+
+  const raw = fs.readFileSync(path, "utf-8").trim();
+  if (!/^\d+$/.test(raw)) {
+    return null;
+  }
+
+  return Number.parseInt(raw, 10);
+}
+
+function writeServicePid(cwd, pid) {
+  const path = getServicePidPath(cwd);
+  fs.mkdirSync(dirname(path), { recursive: true });
+  fs.writeFileSync(path, `${pid}\n`, "utf-8");
+  return path;
+}
+
+function clearServicePid(cwd) {
+  const path = getServicePidPath(cwd);
+  try {
+    fs.unlinkSync(path);
+  } catch {}
+  return path;
+}
+
+function isPidRunning(pid) {
+  return Number.isInteger(pid) && pid > 0 && spawnSync("kill", ["-0", String(pid)], { stdio: "ignore" }).status === 0;
+}
+
+function signalPid(pid, signal = "TERM") {
+  return spawnSync("kill", [`-${signal}`, String(pid)], { stdio: "ignore" });
+}
+
+function getRuntimeOwnerType(env) {
+  return env.SUPERTURTLE_RUNTIME_ROLE === "teleport-remote" || env.TELEGRAM_TRANSPORT === "webhook"
+    ? "cloud"
+    : "local";
+}
+
+function buildRuntimeIdForEnv(env) {
+  return buildRuntimeId(getRuntimeOwnerType(env));
+}
+
+function serviceModeLabel(env) {
+  return env.SUPERTURTLE_TMUX_SESSION ? "tmux" : "service";
+}
+
 function buildRuntimeId(kind = "local") {
   const host = sanitizeName(os.hostname(), "host");
   return `${kind}-${host}-${Date.now().toString(36)}-${process.pid}`;
@@ -496,13 +552,20 @@ function checkBun() {
 }
 
 function checkTmux() {
-  try {
-    execSync("tmux -V", { stdio: "pipe" });
-    ok("tmux");
-    return true;
-  } catch {
+  if (!hasTmux()) {
     fail("tmux not found — brew install tmux");
     process.exit(1);
+  }
+  ok("tmux");
+  return true;
+}
+
+function hasTmux() {
+  try {
+    execSync("tmux -V", { stdio: "pipe" });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -763,9 +826,45 @@ async function init() {
   blank();
 }
 
-async function start() {
+function shouldPassEnvKey(k) {
+  return (
+    k.startsWith("TELEGRAM_") ||
+    k.startsWith("OPENAI_") ||
+    k.startsWith("CLAUDE_") ||
+    k.startsWith("CODEX_") ||
+    k.startsWith("E2B_") ||
+    k.startsWith("META_") ||
+    k.startsWith("DASHBOARD_") ||
+    k.startsWith("AUDIT_LOG_") ||
+    k.startsWith("RATE_LIMIT_") ||
+    k.startsWith("THINKING_") ||
+    k.startsWith("TRANSCRIPTION_") ||
+    k.startsWith("TURTLE_") ||
+    k.startsWith("DEFAULT_") ||
+    k === "ALLOWED_PATHS" ||
+    k === "LOG_LEVEL"
+  );
+}
+
+function terminateChildProcessGroup(child, signal = "SIGTERM") {
+  if (!child || child.exitCode !== null || child.killed) {
+    return;
+  }
+
+  try {
+    if (process.platform !== "win32" && Number.isInteger(child.pid) && child.pid > 0) {
+      process.kill(-child.pid, signal);
+      return;
+    }
+  } catch {}
+
+  try {
+    child.kill(signal);
+  } catch {}
+}
+
+async function serviceRun() {
   checkBun();
-  checkTmux();
 
   const cwd = getBoundProjectRoot(process.cwd());
   migrateLegacyRuntimeLayout(cwd);
@@ -776,32 +875,73 @@ async function start() {
     process.exit(1);
   }
 
-  // Set environment
   const env = {
     ...process.env,
     ...projectEnv,
     SUPER_TURTLE_DIR: PACKAGE_ROOT,
     CLAUDE_WORKING_DIR: cwd,
   };
-  const tmuxSession = resolveTmuxSession(cwd, env);
   const logPaths = getLogPaths(cwd, env);
+  const existingPid = readServicePid(cwd);
 
-  // Check if tmux session already exists
-  const tmuxCheck = spawnSync("tmux", ["has-session", "-t", tmuxSession], { stdio: "pipe" });
-  if (tmuxCheck.status === 0) {
-    console.log(`Bot is already running. Attaching to tmux session '${tmuxSession}'...`);
-    const attach = spawnSync("tmux", ["attach-session", "-t", tmuxSession], { stdio: "inherit" });
-    exitFromSpawn(attach, "tmux attach-session");
-    return;
+  if (existingPid && existingPid !== process.pid && isPidRunning(existingPid)) {
+    console.error(`Refusing to start service runner: another SuperTurtle service is already running (PID ${existingPid}).`);
+    process.exit(1);
   }
 
-  const staleLeaseState = readCloudLeaseState(cwd);
-  if (staleLeaseState) {
-    clearCloudLeaseState(cwd);
-  }
+  writeServicePid(cwd, process.pid);
 
-  let leaseClaim = null;
   let currentSession = null;
+  let leaseClaim = null;
+  let child = null;
+  let shuttingDown = false;
+  let consecutiveHeartbeatFailures = 0;
+
+  const cleanupLease = async () => {
+    if (leaseClaim?.lease?.lease_id && leaseClaim.runtimeId && currentSession?.access_token) {
+      try {
+        await releaseRuntimeLease(
+          currentSession,
+          {
+            lease_id: leaseClaim.lease.lease_id,
+            lease_epoch: leaseClaim.lease.lease_epoch,
+            runtime_id: leaseClaim.runtimeId,
+          },
+          env
+        );
+      } catch (error) {
+        if (!isRetryableCloudError(error)) {
+          console.error(
+            `Warning: failed to release hosted runtime ownership: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
+    }
+    clearCloudLeaseState(cwd);
+  };
+
+  const shutdown = async (signal = "SIGTERM") => {
+    if (shuttingDown) {
+      return;
+    }
+    shuttingDown = true;
+    terminateChildProcessGroup(child, signal);
+    await cleanupLease();
+    clearServicePid(cwd);
+  };
+
+  process.on("SIGINT", () => {
+    shutdown("SIGINT").finally(() => process.exit(0));
+  });
+  process.on("SIGTERM", () => {
+    shutdown("SIGTERM").finally(() => process.exit(0));
+  });
+  process.on("SIGHUP", () => {
+    shutdown("SIGHUP").finally(() => process.exit(0));
+  });
+  process.on("exit", () => {
+    clearServicePid(cwd);
+  });
 
   try {
     currentSession = readSession();
@@ -811,19 +951,20 @@ async function start() {
   }
 
   if (currentSession?.access_token) {
-    const runtimeId = buildRuntimeId("local");
+    const runtimeId = buildRuntimeIdForEnv(env);
     try {
       const claimResult = await claimRuntimeLease(
         currentSession,
         {
           runtime_id: runtimeId,
-          owner_type: "local",
+          owner_type: getRuntimeOwnerType(env),
           owner_hostname: os.hostname(),
           owner_pid: process.pid,
           ttl_seconds: 45,
           metadata: {
+            mode: serviceModeLabel(env),
             project: basename(cwd),
-            tmux_session: tmuxSession,
+            tmux_session: env.SUPERTURTLE_TMUX_SESSION || null,
           },
         },
         env
@@ -840,7 +981,7 @@ async function start() {
         control_plane: leaseClaim.controlPlane,
         lease: leaseClaim.lease,
         runtime_id: runtimeId,
-        tmux_session: tmuxSession,
+        tmux_session: env.SUPERTURTLE_TMUX_SESSION || null,
       });
     } catch (error) {
       if (error && typeof error === "object" && error.session) {
@@ -853,90 +994,197 @@ async function start() {
         console.error(
           `Refusing to start: another linked runtime currently owns this bot identity (${formatLeaseOwner(payload.lease)}).`
         );
+        clearServicePid(cwd);
         process.exit(1);
       }
 
       if (isRetryableCloudError(error)) {
         console.error(
-          `Warning: control plane could not verify runtime ownership. Starting locally anyway because ownership could not be checked (${error.message || String(error)}).`
+          `Warning: control plane could not verify runtime ownership. Starting anyway because ownership could not be checked (${error.message || String(error)}).`
         );
       } else {
         console.error(
           `Failed to claim hosted runtime ownership: ${error instanceof Error ? error.message : String(error)}`
         );
+        clearServicePid(cwd);
         process.exit(1);
       }
     }
   }
 
-  const ownershipAgentCmd = leaseClaim
-    ? `node "${RUNTIME_OWNERSHIP_AGENT_PATH}" --tmux-session "${tmuxSession}" --runtime-id "${leaseClaim.runtimeId}" --lease-id "${leaseClaim.lease.lease_id}" --lease-epoch "${leaseClaim.lease.lease_epoch}" --lease-file "${getCloudLeaseStatePath(cwd)}" &`
-    : "";
+  const serviceEnv = {
+    ...env,
+    SUPERTURTLE_RUN_LOOP: "1",
+    SUPERTURTLE_LOOP_LOG_PATH: logPaths.loop,
+    SUPERTURTLE_RESTART_ON_CRASH: env.SUPERTURTLE_RESTART_ON_CRASH || "1",
+  };
 
-  // Start bot in a new tmux session
-  const cmd =
-    `cd "${BOT_DIR}"` +
+  fs.mkdirSync(dirname(logPaths.loop), { recursive: true });
+  fs.closeSync(fs.openSync(logPaths.loop, "a"));
+
+  const serviceCommand =
+    `set -o pipefail` +
+    ` && cd "${BOT_DIR}"` +
     ` && export CLAUDE_WORKING_DIR="${cwd}"` +
     ` && export SUPER_TURTLE_DIR="${PACKAGE_ROOT}"` +
     ` && export SUPERTURTLE_RUN_LOOP=1` +
     ` && export SUPERTURTLE_LOOP_LOG_PATH="${logPaths.loop}"` +
-    ` && export SUPERTURTLE_TMUX_SESSION="${tmuxSession}"` +
-    (ownershipAgentCmd ? ` && ${ownershipAgentCmd}` : "") +
-    ` && ./run-loop.sh 2>&1 | tee -a "${logPaths.loop}"`;
+    ` && export SUPERTURTLE_RESTART_ON_CRASH="${serviceEnv.SUPERTURTLE_RESTART_ON_CRASH}"` +
+    ` && exec ./run-loop.sh 2>&1 | tee -a "${logPaths.loop}"`;
 
-  console.log("Starting Super Turtle bot...");
-
-  function shouldPassEnvKey(k) {
-    return (
-      k.startsWith("TELEGRAM_") ||
-      k.startsWith("OPENAI_") ||
-      k.startsWith("CLAUDE_") ||
-      k.startsWith("CODEX_") ||
-      k.startsWith("E2B_") ||
-      k.startsWith("META_") ||
-      k.startsWith("DASHBOARD_") ||
-      k.startsWith("AUDIT_LOG_") ||
-      k.startsWith("RATE_LIMIT_") ||
-      k.startsWith("THINKING_") ||
-      k.startsWith("TRANSCRIPTION_") ||
-      k.startsWith("TURTLE_") ||
-      k.startsWith("DEFAULT_") ||
-      k === "ALLOWED_PATHS" ||
-      k === "LOG_LEVEL"
-    );
+  console.log(`Starting SuperTurtle ${serviceModeLabel(env)} runner...`);
+  console.log(`Loop log: ${logPaths.loop}`);
+  if (leaseClaim) {
+    console.log(`Hosted runtime ownership: ${leaseClaim.lease.lease_id} epoch ${leaseClaim.lease.lease_epoch}`);
   }
 
-  const startProc = spawnSync("tmux", [
-    "new-session", "-d", "-s", tmuxSession,
-    "-e", `SUPER_TURTLE_DIR=${PACKAGE_ROOT}`,
-    "-e", `CLAUDE_WORKING_DIR=${cwd}`,
-    "-e", `SUPERTURTLE_TMUX_SESSION=${tmuxSession}`,
-    ...Object.entries(env)
-      .filter(([k]) => shouldPassEnvKey(k))
-      .map(([k, v]) => ["-e", `${k}=${v}`])
-      .flat(),
-    cmd,
-  ], { stdio: "pipe" });
+  child = spawn("bash", ["-lc", serviceCommand], {
+    cwd: BOT_DIR,
+    detached: process.platform !== "win32",
+    env: serviceEnv,
+    stdio: "inherit",
+  });
+
+  const heartbeatLoop = async () => {
+    if (!leaseClaim || !currentSession?.access_token || shuttingDown || !child || child.exitCode !== null) {
+      return;
+    }
+
+    try {
+      const result = await heartbeatRuntimeLease(
+        currentSession,
+        {
+          lease_id: leaseClaim.lease.lease_id,
+          lease_epoch: leaseClaim.lease.lease_epoch,
+          runtime_id: leaseClaim.runtimeId,
+          ttl_seconds: 45,
+        },
+        env
+      );
+      currentSession = persistSessionIfChanged(currentSession, result.session, env);
+      consecutiveHeartbeatFailures = 0;
+    } catch (error) {
+      if (error && typeof error === "object" && error.session) {
+        currentSession = persistSessionIfChanged(currentSession, error.session, env);
+      }
+
+      const status = error && typeof error === "object" ? error.status : undefined;
+      const payload = error && typeof error === "object" ? error.payload : null;
+
+      if (status === 409) {
+        const owner = payload && typeof payload === "object" ? payload.lease : null;
+        console.error(
+          `Hosted runtime ownership lost to another runtime${owner?.runtime_id ? ` (${owner.runtime_id})` : ""}; stopping.`
+        );
+        await shutdown("SIGTERM");
+        process.exit(1);
+      }
+
+      if (status === 401 || status === 403) {
+        console.error(`Hosted session rejected (${status}); stopping.`);
+        await shutdown("SIGTERM");
+        process.exit(1);
+      }
+
+      if (!isRetryableCloudError(error)) {
+        console.error(`Non-retryable runtime lease error: ${error instanceof Error ? error.message : String(error)}`);
+        await shutdown("SIGTERM");
+        process.exit(1);
+      }
+
+      consecutiveHeartbeatFailures += 1;
+      console.error(
+        `Transient runtime lease heartbeat failure ${consecutiveHeartbeatFailures}/3: ${error instanceof Error ? error.message : String(error)}`
+      );
+      if (consecutiveHeartbeatFailures >= 3) {
+        console.error("Runtime lease heartbeat failed repeatedly; stopping.");
+        await shutdown("SIGTERM");
+        process.exit(1);
+      }
+    }
+  };
+
+  const heartbeatTimer = leaseClaim ? setInterval(() => void heartbeatLoop(), 15_000) : null;
+  if (heartbeatTimer) {
+    heartbeatTimer.unref();
+  }
+
+  await new Promise((resolveChild) => {
+    child.on("exit", (code, signal) => {
+      resolveChild({ code, signal });
+    });
+  }).then(async ({ code, signal }) => {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+    }
+    await cleanupLease();
+    clearServicePid(cwd);
+    if (!shuttingDown && signal) {
+      process.exit(1);
+    }
+    process.exit(typeof code === "number" ? code : 1);
+  });
+}
+
+async function start() {
+  checkBun();
+  checkTmux();
+
+  const cwd = getBoundProjectRoot(process.cwd());
+  migrateLegacyRuntimeLayout(cwd);
+  const projectEnv = loadProjectEnv(cwd);
+
+  if (!projectEnv) {
+    console.error("No .superturtle/.env found. Run 'superturtle init' first.");
+    process.exit(1);
+  }
+
+  const env = {
+    ...process.env,
+    ...projectEnv,
+    SUPER_TURTLE_DIR: PACKAGE_ROOT,
+    CLAUDE_WORKING_DIR: cwd,
+  };
+  const tmuxSession = resolveTmuxSession(cwd, env);
+  const logPaths = getLogPaths(cwd, env);
+
+  const tmuxCheck = spawnSync("tmux", ["has-session", "-t", tmuxSession], { stdio: "pipe" });
+  if (tmuxCheck.status === 0) {
+    console.log(`Bot is already running. Attaching to tmux session '${tmuxSession}'...`);
+    const attachExisting = spawnSync("tmux", ["attach-session", "-t", tmuxSession], { stdio: "inherit" });
+    exitFromSpawn(attachExisting, "tmux attach-session");
+    return;
+  }
+
+  const serviceCmd = `${JSON.stringify(process.execPath)} ${JSON.stringify(__filename)} service run`;
+  console.log("Starting Super Turtle bot...");
+
+  const startProc = spawnSync(
+    "tmux",
+    [
+      "new-session",
+      "-d",
+      "-s",
+      tmuxSession,
+      "-e",
+      `SUPER_TURTLE_DIR=${PACKAGE_ROOT}`,
+      "-e",
+      `CLAUDE_WORKING_DIR=${cwd}`,
+      "-e",
+      `SUPERTURTLE_TMUX_SESSION=${tmuxSession}`,
+      ...Object.entries(env)
+        .filter(([k]) => shouldPassEnvKey(k))
+        .map(([k, v]) => ["-e", `${k}=${v}`])
+        .flat(),
+      serviceCmd,
+    ],
+    { stdio: "pipe" }
+  );
   exitFromSpawn(startProc, "tmux new-session");
 
-  // Give tmux a moment; if the command crashes immediately, surface that now.
   spawnSync("sleep", ["0.3"], { stdio: "pipe" });
   const aliveCheck = spawnSync("tmux", ["has-session", "-t", tmuxSession], { stdio: "pipe" });
   if (aliveCheck.status !== 0) {
-    if (leaseClaim && currentSession?.access_token) {
-      try {
-        await releaseRuntimeLease(
-          currentSession,
-          {
-            lease_id: leaseClaim.lease.lease_id,
-            lease_epoch: leaseClaim.lease.lease_epoch,
-            runtime_id: leaseClaim.runtimeId,
-          },
-          env
-        );
-      } catch {}
-      clearCloudLeaseState(cwd);
-    }
     console.error(`Bot session '${tmuxSession}' exited immediately.`);
     if (fs.existsSync(logPaths.loop)) {
       console.error(`Last log lines from ${logPaths.loop}:`);
@@ -952,12 +1200,9 @@ async function start() {
   }
 
   console.log(`Bot started in tmux session '${tmuxSession}'.`);
-  console.log(`Attach: tmux attach -t ${tmuxSession}`);
   console.log(`Loop log: ${logPaths.loop}`);
-  if (leaseClaim) {
-    console.log(`Hosted runtime ownership: ${leaseClaim.lease.lease_id} epoch ${leaseClaim.lease.lease_epoch}`);
-  }
-  console.log("Now message your bot in Telegram!");
+  const attach = spawnSync("tmux", ["attach-session", "-t", tmuxSession], { stdio: "inherit" });
+  exitFromSpawn(attach, "tmux attach-session");
 }
 
 async function stop() {
@@ -966,12 +1211,22 @@ async function stop() {
   const projectEnv = loadProjectEnv(cwd) || {};
   const tmuxSession = resolveTmuxSession(cwd, { ...process.env, ...projectEnv });
   const leaseState = readCloudLeaseState(cwd);
+  const servicePid = readServicePid(cwd);
+  let stopped = false;
 
-  // Kill tmux session
-  const tmuxCheck = spawnSync("tmux", ["has-session", "-t", tmuxSession], { stdio: "pipe" });
-  if (tmuxCheck.status === 0) {
+  const tmuxCheck = hasTmux() ? spawnSync("tmux", ["has-session", "-t", tmuxSession], { stdio: "pipe" }) : null;
+  if (tmuxCheck?.status === 0) {
     spawnSync("tmux", ["kill-session", "-t", tmuxSession], { stdio: "pipe" });
-    console.log("Bot stopped.");
+    stopped = true;
+  }
+
+  if (servicePid && isPidRunning(servicePid)) {
+    signalPid(servicePid, "TERM");
+    stopped = true;
+  }
+
+  if (stopped) {
+    console.log("Bot stop requested.");
   } else {
     console.log("Bot is not running.");
   }
@@ -1001,11 +1256,14 @@ async function stop() {
     }
   }
 
+  if (!servicePid || !isPidRunning(servicePid)) {
+    clearServicePid(cwd);
+  }
+
   // Stop SubTurtles
   const ctlPath = resolve(PACKAGE_ROOT, "subturtle", "ctl");
   if (fs.existsSync(ctlPath)) {
     const proc = spawnSync(ctlPath, ["stopall"], {
-      cwd: process.cwd(),
       cwd,
       env: { ...process.env, SUPER_TURTLE_PROJECT_DIR: cwd },
       stdio: "pipe",
@@ -1024,11 +1282,14 @@ function status() {
   const env = { ...process.env, ...projectEnv };
   const tmuxSession = resolveTmuxSession(cwd, env);
   const logPaths = getLogPaths(cwd, env);
+  const servicePid = readServicePid(cwd);
+  const serviceRunning = servicePid && isPidRunning(servicePid);
 
-  // Check tmux session
-  const tmuxCheck = spawnSync("tmux", ["has-session", "-t", tmuxSession], { stdio: "pipe" });
-  if (tmuxCheck.status === 0) {
+  const tmuxCheck = hasTmux() ? spawnSync("tmux", ["has-session", "-t", tmuxSession], { stdio: "pipe" }) : null;
+  if (tmuxCheck?.status === 0) {
     console.log(`Bot: running (${tmuxSession})`);
+  } else if (serviceRunning) {
+    console.log(`Bot: running (service pid ${servicePid})`);
   } else {
     console.log(`Bot: stopped (${tmuxSession})`);
   }
@@ -1056,7 +1317,6 @@ function status() {
 }
 
 function doctor() {
-  checkTmux();
   const cwd = getBoundProjectRoot(process.cwd());
   migrateLegacyRuntimeLayout(cwd);
   const projectEnv = loadProjectEnv(cwd) || {};
@@ -1064,13 +1324,15 @@ function doctor() {
   const tmuxSession = resolveTmuxSession(cwd, env);
   const logPaths = getLogPaths(cwd, env);
   const ctlPath = resolve(PACKAGE_ROOT, "subturtle", "ctl");
+  const servicePid = readServicePid(cwd);
+  const serviceRunning = servicePid && isPidRunning(servicePid);
 
   console.log(`Project: ${cwd}`);
   console.log(`Token prefix: ${logPaths.tokenPrefix}`);
   console.log(`Session: ${tmuxSession}`);
 
-  const tmuxCheck = spawnSync("tmux", ["has-session", "-t", tmuxSession], { stdio: "pipe" });
-  if (tmuxCheck.status === 0) {
+  const tmuxCheck = hasTmux() ? spawnSync("tmux", ["has-session", "-t", tmuxSession], { stdio: "pipe" }) : null;
+  if (tmuxCheck?.status === 0) {
     console.log("Bot process: running");
     const details = spawnSync(
       "tmux",
@@ -1079,6 +1341,9 @@ function doctor() {
     );
     const infoLine = details.stdout?.toString().trim();
     if (infoLine) console.log(`  ${infoLine}`);
+  } else if (serviceRunning) {
+    console.log("Bot process: running");
+    console.log(`  service pid=${servicePid}`);
   } else {
     console.log("Bot process: stopped");
   }
@@ -1108,7 +1373,9 @@ function doctor() {
   console.log(`  superturtle logs loop`);
   console.log(`  superturtle logs pino --pretty`);
   console.log(`  superturtle logs audit`);
-  console.log(`  tmux attach -t ${tmuxSession}`);
+  if (tmuxCheck?.status === 0) {
+    console.log(`  tmux attach -t ${tmuxSession}`);
+  }
 }
 
 function parseLogsArgs(args) {
@@ -1668,6 +1935,14 @@ switch (command) {
   case "start":
     start().catch((err) => { console.error(err instanceof Error ? err.message : err); process.exit(1); });
     break;
+  case "service":
+    if (process.argv[3] === "run") {
+      serviceRun().catch((err) => { console.error(err instanceof Error ? err.message : err); process.exit(1); });
+      break;
+    }
+    console.error("Usage: superturtle service run");
+    process.exit(1);
+    break;
   case "stop":
     stop().catch((err) => { console.error(err instanceof Error ? err.message : err); process.exit(1); });
     break;
@@ -1743,7 +2018,8 @@ Usage: superturtle <command>
 Commands:
   init      Set up superturtle in the bound project repo
   cloud     Hosted cloud commands (status, resume, checkout, portal, claude)
-  start     Launch the bot
+  start     Launch the interactive tmux session and attach immediately
+  service   Foreground service commands
   stop      Stop the bot and all SubTurtles
   status    Show bot and SubTurtle status
   doctor    Full process + log observability snapshot
@@ -1762,6 +2038,9 @@ Logs:
   superturtle logs loop
   superturtle logs pino --pretty
   superturtle logs audit --no-follow -n 200
+
+Service:
+  superturtle service run
 
 Cloud:
   superturtle cloud status

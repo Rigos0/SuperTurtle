@@ -7,16 +7,14 @@
 
     <key>ProgramArguments</key>
     <array>
-        <!-- Update this path to your bun installation -->
-        <string>/Users/USERNAME/.bun/bin/bun</string>
-        <string>run</string>
-        <!-- Update this path to your bot installation -->
-        <string>/Users/USERNAME/Dev/claude-telegram-bot-ts/src/index.ts</string>
+        <string>/bin/bash</string>
+        <string>-lc</string>
+        <string>cd /Users/USERNAME/Dev/agentic &amp;&amp; exec "${SUPERTURTLE_BIN:-superturtle}" service run</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <!-- Update this path to your bot installation -->
-    <string>/Users/USERNAME/Dev/claude-telegram-bot-ts</string>
+    <!-- Update this path to your repo root -->
+    <string>/Users/USERNAME/Dev/agentic</string>
 
     <key>EnvironmentVariables</key>
     <dict>
@@ -30,7 +28,11 @@
 
         <!-- Recommended: Working directory for Claude -->
         <key>CLAUDE_WORKING_DIR</key>
-        <string>/Users/USERNAME/Dev</string>
+        <string>/Users/USERNAME/Dev/agentic</string>
+
+        <!-- Optional: Global npm binary or source checkout launcher -->
+        <key>SUPERTURTLE_BIN</key>
+        <string>superturtle</string>
 
         <!-- Optional: For voice transcription -->
         <key>OPENAI_API_KEY</key>
@@ -52,6 +54,9 @@
         <key>PATH</key>
         <string>/Users/USERNAME/.bun/bin:/Users/USERNAME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     </dict>
+
+    <!-- For source checkouts without the npm package, replace SUPERTURTLE_BIN with:
+         /Users/USERNAME/Dev/agentic/super_turtle/bin/superturtle.js -->
 
     <!-- Restart automatically if it crashes -->
     <key>KeepAlive</key>

@@ -23,6 +23,10 @@ superturtle init
 superturtle start
 ```
 
+For normal local use, `superturtle start` is the command that makes the bot run continuously. Use `superturtle stop` to stop it.
+
+Do not manually run both `start` and `service run`. `service run` is the internal foreground runner used by `launchd`, `systemd`, and cloud-managed runtimes.
+
 For agents and CI, init runs non-interactively with flags:
 
 ```bash
@@ -138,8 +142,38 @@ You should run Super Turtle in a sandboxed or dedicated environment (VM, contain
 git clone https://github.com/Rigos0/superturtle.git
 cd superturtle
 npx superturtle init          # installs deps, creates .superturtle/.env, prompts for tokens
-cd super_turtle/claude-telegram-bot
-bun run start
+node super_turtle/bin/superturtle.js start
+```
+
+If you have the npm package installed globally but want to run the source version from this repo while developing, do not use bare `superturtle`, because that will hit the global install.
+
+Use:
+
+```bash
+cd /Users/Richard.Mladek/Documents/projects/agentic
+node super_turtle/bin/superturtle.js start
+```
+
+To stop the local runner from the source checkout:
+
+```bash
+cd /Users/Richard.Mladek/Documents/projects/agentic
+node super_turtle/bin/superturtle.js stop
+```
+
+`node super_turtle/bin/superturtle.js service run` still exists, but it is internal plumbing for `launchd`, `systemd`, and E2B. It is not the normal manual developer flow.
+
+If you need to wire a supervisor to the source checkout, use:
+
+```bash
+cd /Users/Richard.Mladek/Documents/projects/agentic
+node super_turtle/bin/superturtle.js service run
+```
+
+If you wire `launchd` or `systemd` to the source checkout, set `SUPERTURTLE_BIN` to:
+
+```bash
+/Users/Richard.Mladek/Documents/projects/agentic/super_turtle/bin/superturtle.js
 ```
 
 ## Star History
