@@ -78,6 +78,7 @@ export type CodexEffortLevel = "minimal" | "low" | "medium" | "high" | "xhigh";
 export type MainProvider = "claude" | "codex";
 export type SuperTurtleRuntimeRole = "local" | "teleport-remote";
 export type SuperTurtleRemoteMode = "control" | "agent";
+export type SuperTurtleRemoteDriver = MainProvider;
 
 const DEFAULT_CLAUDE_MODEL_FALLBACK = "claude-opus-4-6";
 const DEFAULT_CLAUDE_EFFORT_FALLBACK: ClaudeEffortLevel = "high";
@@ -146,8 +147,9 @@ export const DEFAULT_CODEX_EFFORT = parseDefaultEffort(
   DEFAULT_CODEX_EFFORT_FALLBACK,
   VALID_CODEX_EFFORTS
 );
+const rawMainProvider = process.env.MAIN_PROVIDER?.trim().toLowerCase();
 export const MAIN_PROVIDER: MainProvider = (() => {
-  const value = process.env.MAIN_PROVIDER?.trim().toLowerCase();
+  const value = rawMainProvider;
   if (!value) return "claude";
   if (value === "claude" || value === "codex") return value;
   configLog.warn(`Invalid MAIN_PROVIDER="${value}". Falling back to "claude".`);
@@ -171,6 +173,22 @@ export const SUPERTURTLE_REMOTE_MODE: SuperTurtleRemoteMode = (() => {
   );
   return "control";
 })();
+export const SUPERTURTLE_REMOTE_DRIVER: SuperTurtleRemoteDriver | null = (() => {
+  const value = process.env.SUPERTURTLE_REMOTE_DRIVER?.trim().toLowerCase();
+  if (!value) return null;
+  if (value === "claude" || value === "codex") return value;
+  configLog.warn(
+    `Invalid SUPERTURTLE_REMOTE_DRIVER="${value}". Ignoring explicit remote driver override.`
+  );
+  return null;
+})();
+export const CONFIGURED_REMOTE_AGENT_DRIVER: SuperTurtleRemoteDriver =
+  SUPERTURTLE_REMOTE_DRIVER
+  // Preserve legacy /teleport behavior: remote agent runtimes without an
+  // explicit driver still default to Codex unless MAIN_PROVIDER was set.
+  || (rawMainProvider === "claude" || rawMainProvider === "codex"
+    ? rawMainProvider
+    : "codex");
 
 function migrateLegacyRuntimeLayout(projectRoot: string): void {
   const dataDir = `${projectRoot}/.superturtle`;

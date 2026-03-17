@@ -12,6 +12,7 @@ import {
   ALLOWED_USERS,
   RESTART_FILE,
   CLAUDE_CLI_AVAILABLE,
+  CONFIGURED_REMOTE_AGENT_DRIVER,
   CODEX_AVAILABLE,
   CODEX_CLI_AVAILABLE,
   CODEX_USER_ENABLED,
@@ -95,6 +96,7 @@ import {
   startTelegramTransport,
   type TelegramTransportConfig,
 } from "./telegram-transport";
+import { resolveRemoteAgentDriverDecision } from "./remote-agent-driver";
 import {
   getTeleportRemoteUnsupportedMessage,
   isTeleportRemoteAgentMode,
@@ -948,11 +950,12 @@ botLog.info({ allowedUsers: ALLOWED_USERS.length }, `Allowed users: ${ALLOWED_US
 botLog.info(
   {
     claudeCli: CLAUDE_CLI_AVAILABLE,
+    remoteAgentDriver: CONFIGURED_REMOTE_AGENT_DRIVER,
     codexPref: CODEX_USER_ENABLED,
     codexCli: CODEX_CLI_AVAILABLE,
     codexAvailable: CODEX_AVAILABLE,
   },
-  `Driver capabilities: claude_cli=${CLAUDE_CLI_AVAILABLE} codex_pref=${CODEX_USER_ENABLED} codex_cli=${CODEX_CLI_AVAILABLE} codex_available=${CODEX_AVAILABLE}`
+  `Driver capabilities: claude_cli=${CLAUDE_CLI_AVAILABLE} remote_agent_driver=${CONFIGURED_REMOTE_AGENT_DRIVER} codex_pref=${CODEX_USER_ENABLED} codex_cli=${CODEX_CLI_AVAILABLE} codex_available=${CODEX_AVAILABLE}`
 );
 botLog.info("Starting bot...");
 
@@ -969,14 +972,18 @@ if (isTeleportRemoteControlMode()) {
   );
 }
 if (isTeleportRemoteAgentMode()) {
-  if (!CODEX_AVAILABLE) {
-    botLog.error(
-      `Remote agent mode requires Codex inside E2B. ${getCodexUnavailableReason() || "Codex is unavailable."}`
-    );
+  const remoteAgentDecision = resolveRemoteAgentDriverDecision({
+    driver: CONFIGURED_REMOTE_AGENT_DRIVER,
+    claudeCliAvailable: CLAUDE_CLI_AVAILABLE,
+    codexAvailable: CODEX_AVAILABLE,
+    codexUnavailableReason: getCodexUnavailableReason(),
+  });
+  if (!remoteAgentDecision.ok) {
+    botLog.error(remoteAgentDecision.errorMessage);
     process.exit(1);
   }
-  session.activeDriver = "codex";
-  botLog.info("Starting in teleport-remote agent mode with Codex as the active driver");
+  session.activeDriver = remoteAgentDecision.driver;
+  botLog.info(remoteAgentDecision.startupMessage);
 }
 
 mkdirSync(IPC_DIR, { recursive: true });
@@ -1109,12 +1116,20 @@ const transportConfig: TelegramTransportConfig | undefined =
 
 const transport = await startTelegramTransport(bot, transportConfig, {
   getReadiness: async () => {
-    if (isTeleportRemoteAgentMode() && !CODEX_AVAILABLE) {
-      return {
-        ok: false,
-        status: 503,
-        body: `remote-agent-codex-unavailable: ${getCodexUnavailableReason() || "Codex is unavailable."}`,
-      };
+    if (isTeleportRemoteAgentMode()) {
+      const remoteAgentDecision = resolveRemoteAgentDriverDecision({
+        driver: CONFIGURED_REMOTE_AGENT_DRIVER,
+        claudeCliAvailable: CLAUDE_CLI_AVAILABLE,
+        codexAvailable: CODEX_AVAILABLE,
+        codexUnavailableReason: getCodexUnavailableReason(),
+      });
+      if (!remoteAgentDecision.ok) {
+        return {
+          ok: false,
+          status: 503,
+          body: remoteAgentDecision.readinessBody,
+        };
+      }
     }
     return { ok: true, status: 200, body: "ok" };
   },

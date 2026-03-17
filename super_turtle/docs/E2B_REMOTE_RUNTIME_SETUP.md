@@ -77,5 +77,5 @@ That path expects the generated `.superturtle/.env` to exist.
 
 ## Notes
 
-- Remote agent mode is currently Codex-first. Claude is bootstrapped so the sandbox is prepared for the next slice, but the active remote text path still targets Codex.
+- Remote agent mode now honors the configured remote driver. Managed onboarding can start either Codex or Claude Code; `/teleport` still defaults to Codex unless it passes an explicit remote driver override.
 - The sandbox remains stateful and resumable, so once auth is seeded it should stay available across pause/resume on the same sandbox.
