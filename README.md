@@ -143,38 +143,13 @@ git clone https://github.com/Rigos0/superturtle.git
 cd superturtle
 npx superturtle init          # installs deps, creates .superturtle/.env, prompts for tokens
 node super_turtle/bin/superturtle.js start
-```
-
-If you have the npm package installed globally but want to run the source version from this repo while developing, do not use bare `superturtle`, because that will hit the global install.
-
-Use:
-
-```bash
-cd /Users/Richard.Mladek/Documents/projects/agentic
-node super_turtle/bin/superturtle.js start
-```
-
-To stop the local runner from the source checkout:
-
-```bash
-cd /Users/Richard.Mladek/Documents/projects/agentic
+# stop later:
 node super_turtle/bin/superturtle.js stop
 ```
 
-`node super_turtle/bin/superturtle.js service run` still exists, but it is internal plumbing for `launchd`, `systemd`, and E2B. It is not the normal manual developer flow.
+If you have the npm package installed globally, use the explicit `node super_turtle/bin/superturtle.js ...` form while developing this repo so you run the source version, not the global install.
 
-If you need to wire a supervisor to the source checkout, use:
-
-```bash
-cd /Users/Richard.Mladek/Documents/projects/agentic
-node super_turtle/bin/superturtle.js service run
-```
-
-If you wire `launchd` or `systemd` to the source checkout, set `SUPERTURTLE_BIN` to:
-
-```bash
-/Users/Richard.Mladek/Documents/projects/agentic/super_turtle/bin/superturtle.js
-```
+For `launchd`, `systemd`, and E2B supervisors, use `node super_turtle/bin/superturtle.js service run`.
 
 ## Star History
 
