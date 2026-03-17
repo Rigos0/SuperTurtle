@@ -1,8 +1,8 @@
-# Managed Cloud Hosted Implementation Review - 2026-03-17
+# Review: Managed Cloud Hosted Implementation
 
-## Scope Map
+Status: In progress. This pass covered lifecycle, ownership, and status handling in the managed control-plane/runtime flow.
 
-This pass only mapped the hosted managed-cloud commit stack and the highest-risk review surfaces. Findings are still pending.
+## Scope Covered
 
 Reviewed commits in `../superturtle-web`:
 
@@ -14,62 +14,36 @@ Reviewed commits in `../superturtle-web`:
 - `a92b92f` Clarify managed cloud sign-in flow wording
 - `8ba07c2` Add managed cloud onboarding and status tests
 
-## Highest-Risk Files
+Primary files reviewed in this pass:
 
-1. Ownership and lifecycle status
+- `../superturtle-web/src/features/cloud/controllers/managed-control-plane.ts`
+- `../superturtle-web/src/features/cloud/controllers/managed-runtime.ts`
+- `../superturtle-web/src/features/cloud/controllers/managed-telegram-ownership.ts`
+- `../superturtle-web/src/features/cloud/controllers/managed-telegram-repair.ts`
 
-   Start with `../superturtle-web/src/features/cloud/controllers/managed-runtime.ts:34-183`.
-   This is the main hosted status and resume entry point. It now folds live Telegram ownership checks into status, auto-triggers repair during resume, gates repair deduplication through provisioning jobs, and maps the public status payload.
+## Findings
 
-2. Live Telegram ownership checks
+### High: `/v1/cli/cloud/instance/repair` can overlap an active provision or resume job
 
-   Review `../superturtle-web/src/features/cloud/controllers/managed-telegram-ownership.ts:24-87`.
-   This code decrypts the stored bot token and reaches out to Telegram on the status path. The key risks are stale or missing ownership state, error handling that could hide a broken control plane, and any mismatch between `expected_webhook_url` and the actual sandbox host.
+`repairManagedInstance()` always calls `repairManagedInstanceInternal()`, which loads the active job across `provision`, `resume`, and `repair` kinds, but only deduplicates when the active job itself is `repair`. That means a manual repair request can run concurrently with an in-flight provision or resume and both paths can mutate the same `managed_instances` row, connect/create sandboxes, and write conflicting job/audit state.
 
-3. Ownership repair flow
+References:
+- `../superturtle-web/src/features/cloud/controllers/managed-runtime.ts:168`
+- `../superturtle-web/src/features/cloud/controllers/managed-runtime.ts:268`
+- `../superturtle-web/src/features/cloud/controllers/managed-runtime.ts:286`
 
-   Review `../superturtle-web/src/features/cloud/controllers/managed-telegram-repair.ts:90-252` together with `../superturtle-web/src/app/v1/cli/cloud/instance/repair/route.ts:1-47`.
-   This is the most operationally sensitive path in the stack: it can resume or recreate an E2B sandbox, rewrite runtime files, reinstall provider credentials, restart the runtime, move the Telegram webhook, and mutate persisted health and audit state.
+Why it matters:
+- A concurrent `repair` can race the normal lifecycle worker and leave the instance pointing at the wrong sandbox or with misleading `health_status` / `provisioning_job` output.
+- The current tests only cover `getManagedCloudStatus()` and do not exercise `repairManagedInstance()` against an already-running non-repair job.
 
-4. Onboarding and webhook takeover flow
+### High: any `Sandbox.connect()` failure silently provisions a replacement sandbox
 
-   Review `../superturtle-web/src/features/cloud/controllers/managed-onboarding.ts:168-330`.
-   The critical areas are takeover confirmation, stale-webhook checks, ordering of side effects, runtime bootstrap diagnostics, and the persisted managed-instance fields written after success.
+`connectOrCreateSandbox()` catches every error from `Sandbox.connect(existingSandboxId)` and falls through to `Sandbox.create(...)` without distinguishing "sandbox not found" from transient E2B/API failures. The new repair path calls this helper before deciding whether ownership repair is needed, so a temporary reconnect failure can create a second sandbox, repoint Telegram to it, and orphan the original runtime.
 
-5. Sandbox lifecycle and entitlement authority
+References:
+- `../superturtle-web/src/features/cloud/controllers/managed-control-plane.ts:142`
+- `../superturtle-web/src/features/cloud/controllers/managed-telegram-repair.ts:108`
 
-   Review `../superturtle-web/src/features/cloud/controllers/managed-control-plane.ts:26-100` and `../superturtle-web/src/features/cloud/controllers/managed-control-plane.ts:142-182`.
-   This is where hosted mode provisions or resumes the E2B sandbox, derives the sandbox host, updates managed-instance health fields, and enforces managed entitlement checks.
-
-6. Runtime contract files written into the sandbox
-
-   Review `../superturtle-web/src/features/cloud/controllers/managed-runtime-manifest.ts:19-53` and `../superturtle-web/src/features/cloud/controllers/managed-public-surface.ts:26-96`.
-   These define the remote runtime metadata and the narrow public HTTP surface contract that onboarding and repair both depend on.
-
-7. Deprecated surface shutdown
-
-   Review `../superturtle-web/src/features/cloud/controllers/managed-surface-disabled.ts:1-24` plus the disabled routes under `../superturtle-web/src/app/v1/cli/teleport/target/route.ts`, `../superturtle-web/src/app/v1/machine/register/route.ts`, `../superturtle-web/src/app/v1/machine/heartbeat/route.ts`, and `../superturtle-web/src/app/v1/cli/runtime/lease/*`.
-   These are lower complexity than the ownership flows, but they are security-sensitive because they retire the old machine-owned control surfaces.
-
-## Test Inventory Added In This Stack
-
-- `../superturtle-web/src/features/cloud/controllers/managed-runtime.test.ts`
-  Covers hosted status payload shape, provisioning-job selection, and ownership snapshots.
-- `../superturtle-web/src/features/cloud/controllers/managed-onboarding.test.ts`
-  Covers provisioning-step reporting plus webhook takeover confirmation and stale-confirmation rejection.
-- `../superturtle-web/src/features/cloud/controllers/managed-telegram-ownership.test.ts`
-  Covers managed, external, missing, not-configured, and lookup-failure ownership states.
-- `../superturtle-web/src/features/cloud/controllers/managed-telegram-repair.test.ts`
-  Covers repair-on-drift, no-op repair when ownership is already correct, and provider-credential expiry on auth failure.
-- `../superturtle-web/src/features/cloud/controllers/managed-runtime-manifest.test.ts`
-  Covers manifest contents and version extraction.
-- `../superturtle-web/src/features/cloud/controllers/managed-public-surface.test.ts`
-  Covers endpoint derivation and env-contract generation.
-- `../superturtle-web/src/features/cloud/controllers/managed-surface-disabled.test.ts`
-  Covers the 410 disabled-surface responses for retired machine and lease endpoints.
-
-## Review Order For Next Passes
-
-1. `managed-runtime.ts` + `managed-telegram-ownership.ts` + `managed-telegram-repair.ts`
-2. `managed-onboarding.ts` + `managed-public-surface.ts` + `managed-runtime-manifest.ts`
-3. Disabled routes and the changed test files
+Why it matters:
+- This can duplicate billable sandboxes and split runtime state across two environments.
+- Because the fallback is silent, operators only see the final repaired host, not the reconnect failure that triggered an unintended reprovision.
