@@ -105,6 +105,31 @@ const Pulse: React.FC<{ color: string; size?: number }> = ({ color, size = 10 })
   );
 };
 
+const TypingDots: React.FC<{ color?: string }> = ({ color = c.muted }) => {
+  const frame = useCurrentFrame();
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: space(1) }}>
+      {[0, 1, 2].map((dot) => {
+        const wave = Math.sin(frame * 0.22 - dot * 0.9);
+        return (
+          <div
+            key={dot}
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: 999,
+              background: color,
+              opacity: 0.35 + ((wave + 1) / 2) * 0.65,
+              transform: `translateY(${-wave * 4}px)`,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+};
+
 /* ── base canvas ─────────────────────────────────── */
 
 const Canvas: React.FC<{ children: React.ReactNode; dark?: boolean }> = ({ children, dark }) => (
@@ -225,18 +250,21 @@ const HeroScene: React.FC = () => {
 
 const ChatScene: React.FC = () => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
 
   // Timing
-  const userMsgAppear = 6;
-  const replyStart = 22;
-  const codeBlockStart = 50;
-  const statusStart = 82;
+  const userMsgAppear = 8;
+  const typingStart = 24;
+  const replyStart = 40;
+  const codeBlockStart = 66;
+  const statusStart = 96;
 
   // Streaming reply text
-  const replyFull = "Setting up the project structure and building your landing page...";
-  const replyChars = Math.max(0, Math.floor((frame - replyStart) * 0.7));
+  const replyFull = "On it. I'm scaffolding the hero, features, and pricing sections now.";
+  const replyChars = Math.max(0, Math.floor((frame - replyStart) * 1.55));
   const replyText = replyFull.slice(0, replyChars);
+  const typingActive = frame >= typingStart && frame < replyStart;
+  const headerStatusColor = typingActive ? c.tgBlue : c.green;
+  const headerStatusText = typingActive ? "typing..." : "online";
 
   // Streaming code
   const codeLines = [
@@ -249,6 +277,25 @@ const ChatScene: React.FC = () => {
 
   return (
     <Canvas>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "linear-gradient(180deg, rgba(232,244,255,0.92) 0%, rgba(248,251,255,0.98) 54%, rgba(243,246,250,1) 100%)",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          opacity: 0.32,
+          backgroundImage:
+            "radial-gradient(rgba(59,130,246,0.14) 1.5px, transparent 1.5px), radial-gradient(rgba(196,97,60,0.08) 1px, transparent 1px)",
+          backgroundPosition: "0 0, 16px 16px",
+          backgroundSize: "32px 32px",
+        }}
+      />
       <FloatingTurtle x={920} y={100} size={40} delay={8} rotation={12} opacity={0.07} />
       <FloatingTurtle x={50} y={1640} size={36} delay={16} rotation={-10} opacity={0.06} />
 
@@ -258,7 +305,7 @@ const ChatScene: React.FC = () => {
           inset: 0,
           display: "flex",
           flexDirection: "column",
-          padding: `${space(10)}px ${space(6)}px ${space(8)}px`,
+          padding: `${space(8)}px ${space(4)}px ${space(6)}px`,
         }}
       >
         {/* Chat header */}
@@ -267,7 +314,12 @@ const ChatScene: React.FC = () => {
             display: "flex",
             alignItems: "center",
             gap: space(2),
+            padding: `${space(2)}px ${space(3)}px`,
             marginBottom: space(4),
+            borderRadius: 28,
+            background: "rgba(255,255,255,0.78)",
+            border: "1px solid rgba(255,255,255,0.72)",
+            boxShadow: "0 12px 36px rgba(17,24,39,0.06)",
             opacity: cl(frame, 0, 8, 0, 1),
           }}
         >
@@ -289,138 +341,216 @@ const ChatScene: React.FC = () => {
             <div style={{ fontSize: 22, fontWeight: 700 }}>SuperTurtle</div>
             <div
               style={{
-                fontSize: 14,
-                color: c.green,
+                fontSize: 15,
+                color: headerStatusColor,
                 fontWeight: 600,
                 display: "flex",
                 alignItems: "center",
                 gap: space(1),
               }}
             >
-              <Pulse color={c.green} size={6} />
-              Online
+              <Pulse color={headerStatusColor} size={6} />
+              {headerStatusText}
             </div>
           </div>
         </div>
 
         {/* Chat thread */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: space(2), justifyContent: "center" }}>
-          {/* User message — right aligned, blue */}
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            padding: `0 ${space(1)}px`,
+          }}
+        >
           <div
             style={{
-              alignSelf: "flex-end",
-              maxWidth: "82%",
-              opacity: cl(frame, userMsgAppear, userMsgAppear + 8, 0, 1),
-              transform: `translateY(${ease(frame, userMsgAppear, userMsgAppear + 10, 16, 0)}px)`,
+              alignSelf: "center",
+              marginBottom: space(3),
+              padding: `${space(1)}px ${space(2)}px`,
+              borderRadius: 999,
+              background: "rgba(255,255,255,0.84)",
+              border: `1px solid ${c.border}`,
+              color: c.muted,
+              fontSize: 14,
+              fontWeight: 600,
+              letterSpacing: 0.2,
+              opacity: cl(frame, 2, 10, 0, 1),
             }}
           >
-            <div
-              style={{
-                background: c.tgBlue,
-                color: "#fff",
-                borderRadius: "22px 22px 4px 22px",
-                padding: `${space(2)}px ${space(3)}px`,
-                fontSize: 22,
-                lineHeight: 1.4,
-                fontWeight: 500,
-              }}
-            >
-              Build me a landing page for SuperTurtle with hero, features section, and pricing
-            </div>
-            <div style={{ textAlign: "right", marginTop: space(1), fontSize: 13, color: c.dim }}>
-              You
-            </div>
+            Today
           </div>
 
-          {/* Bot reply — left aligned, white */}
           <div
             style={{
-              alignSelf: "flex-start",
-              maxWidth: "88%",
-              opacity: cl(frame, replyStart - 2, replyStart + 6, 0, 1),
-              transform: `translateY(${ease(frame, replyStart - 2, replyStart + 8, 16, 0)}px)`,
+              display: "flex",
+              flexDirection: "column",
+              gap: space(3),
             }}
           >
+            {/* User message — right aligned, blue */}
             <div
               style={{
-                background: c.card,
-                border: `1px solid ${c.border}`,
-                borderRadius: "22px 22px 22px 4px",
-                padding: `${space(2)}px ${space(3)}px`,
-                boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                alignSelf: "flex-end",
+                maxWidth: "78%",
+                opacity: cl(frame, userMsgAppear, userMsgAppear + 8, 0, 1),
+                transform: `translateY(${ease(frame, userMsgAppear, userMsgAppear + 10, 20, 0)}px)`,
               }}
             >
-              {/* Streaming text */}
-              <div style={{ fontSize: 21, lineHeight: 1.45, color: c.text, minHeight: 30 }}>
-                {replyText}
-                {replyChars < replyFull.length && (
-                  <span style={{ opacity: Math.sin(frame * 0.3) > 0 ? 1 : 0, color: c.accent }}>|</span>
-                )}
-              </div>
-
-              {/* Code file list — appears after text */}
-              {frame >= codeBlockStart && (
+              <div
+                style={{
+                  background: "linear-gradient(180deg, #2aabee 0%, #1d9dd9 100%)",
+                  color: "#fff",
+                  borderRadius: "26px 26px 10px 26px",
+                  padding: `${space(2)}px ${space(3)}px`,
+                  fontSize: 22,
+                  lineHeight: 1.38,
+                  fontWeight: 500,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: space(1),
+                  boxShadow: "0 10px 24px rgba(29,157,217,0.18)",
+                }}
+              >
+                <div>Build me a landing page for SuperTurtle with hero, features, and pricing.</div>
                 <div
                   style={{
-                    marginTop: space(2),
-                    borderRadius: 14,
-                    background: c.dark,
-                    padding: `${space(2)}px ${space(3)}px`,
-                    opacity: cl(frame, codeBlockStart, codeBlockStart + 8, 0, 1),
-                  }}
-                >
-                  {codeLines.slice(0, codeProgress).map((line, i) => (
-                    <div
-                      key={line}
-                      style={{
-                        fontFamily: monoFont,
-                        fontSize: 16,
-                        color: i < codeProgress - 1 ? c.green : "#a1a1aa",
-                        lineHeight: 2,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: space(1),
-                        opacity: cl(frame, codeBlockStart + i * 8, codeBlockStart + i * 8 + 6, 0, 1),
-                      }}
-                    >
-                      <span style={{ color: i < codeProgress - 1 ? c.green : c.dim }}>
-                        {i < codeProgress - 1 ? "✓" : "▸"}
-                      </span>
-                      {line}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Status badge */}
-              {frame >= statusStart && (
-                <div
-                  style={{
-                    marginTop: space(2),
+                    alignSelf: "flex-end",
                     display: "flex",
                     alignItems: "center",
                     gap: space(1),
-                    opacity: cl(frame, statusStart, statusStart + 8, 0, 1),
+                    fontSize: 13,
+                    color: "rgba(255,255,255,0.74)",
+                    fontWeight: 600,
                   }}
                 >
-                  <Pulse color={c.green} size={8} />
-                  <span style={{ fontSize: 15, fontWeight: 600, color: c.green }}>4 files created</span>
-                  <span style={{ fontSize: 15, color: c.dim }}>in 12s</span>
+                  <span>9:41 AM</span>
+                  <span style={{ letterSpacing: -1 }}>✓✓</span>
                 </div>
-              )}
+              </div>
             </div>
+
+            {/* Typing indicator */}
+            {typingActive && (
+              <div
+                style={{
+                  alignSelf: "flex-start",
+                  maxWidth: "36%",
+                  opacity:
+                    cl(frame, typingStart, typingStart + 6, 0, 1) *
+                    cl(frame, replyStart - 4, replyStart, 1, 0),
+                  transform: `translateY(${ease(frame, typingStart, typingStart + 10, 16, 0)}px)`,
+                }}
+              >
+                <div
+                  style={{
+                    background: "rgba(255,255,255,0.94)",
+                    border: `1px solid ${c.border}`,
+                    borderRadius: "26px 26px 26px 10px",
+                    padding: `${space(2)}px ${space(3)}px`,
+                    boxShadow: "0 8px 24px rgba(15,23,42,0.06)",
+                  }}
+                >
+                  <TypingDots color="#90a4b8" />
+                </div>
+              </div>
+            )}
+
+            {/* Bot reply — left aligned, white */}
             <div
               style={{
-                marginTop: space(1),
-                fontSize: 13,
-                color: c.dim,
-                display: "flex",
-                alignItems: "center",
-                gap: space(1),
+                alignSelf: "flex-start",
+                maxWidth: "84%",
+                opacity: cl(frame, replyStart, replyStart + 6, 0, 1),
+                transform: `translateY(${ease(frame, replyStart, replyStart + 10, 18, 0)}px)`,
               }}
             >
-              <Img src={staticFile("robot-turtle.png")} style={{ width: 16, height: 16 }} />
-              SuperTurtle
+              <div
+                style={{
+                  background: "rgba(255,255,255,0.96)",
+                  border: `1px solid ${c.border}`,
+                  borderRadius: "26px 26px 26px 10px",
+                  padding: `${space(2)}px ${space(3)}px`,
+                  boxShadow: "0 10px 28px rgba(15,23,42,0.06)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: space(2),
+                }}
+              >
+                {/* Streaming text */}
+                <div style={{ fontSize: 21, lineHeight: 1.45, color: c.text, minHeight: 62 }}>
+                  {replyText}
+                  {replyChars < replyFull.length && (
+                    <span style={{ opacity: Math.sin(frame * 0.3) > 0 ? 1 : 0, color: c.accent }}>|</span>
+                  )}
+                </div>
+
+                {/* Code file list — appears after text */}
+                {frame >= codeBlockStart && (
+                  <div
+                    style={{
+                      borderRadius: 18,
+                      background: "#111827",
+                      padding: `${space(2)}px ${space(3)}px`,
+                      opacity: cl(frame, codeBlockStart, codeBlockStart + 8, 0, 1),
+                      border: "1px solid rgba(255,255,255,0.06)",
+                    }}
+                  >
+                    {codeLines.slice(0, codeProgress).map((line, i) => (
+                      <div
+                        key={line}
+                        style={{
+                          fontFamily: monoFont,
+                          fontSize: 16,
+                          color: i < codeProgress - 1 ? c.green : "#cbd5e1",
+                          lineHeight: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: space(1),
+                          opacity: cl(frame, codeBlockStart + i * 8, codeBlockStart + i * 8 + 6, 0, 1),
+                        }}
+                      >
+                        <span style={{ color: i < codeProgress - 1 ? c.green : "#64748b" }}>
+                          {i < codeProgress - 1 ? "✓" : "▸"}
+                        </span>
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Status badge */}
+                {frame >= statusStart && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: space(1),
+                      opacity: cl(frame, statusStart, statusStart + 8, 0, 1),
+                    }}
+                  >
+                    <Pulse color={c.green} size={8} />
+                    <span style={{ fontSize: 15, fontWeight: 600, color: c.green }}>4 files created</span>
+                    <span style={{ fontSize: 15, color: c.dim }}>in 12s</span>
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    alignSelf: "flex-end",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: space(1),
+                    fontSize: 13,
+                    color: c.dim,
+                    fontWeight: 600,
+                  }}
+                >
+                  <span>9:42 AM</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
