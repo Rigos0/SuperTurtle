@@ -28,6 +28,9 @@ while true; do
     if [ "$EXIT_CODE" -eq 0 ]; then
         echo "[run-loop] Bot exited with code 0 — restarting in 1s..."
         sleep 1
+    elif [ "${SUPERTURTLE_RESTART_ON_CRASH:-0}" = "1" ]; then
+        echo "[run-loop] Bot exited with code $EXIT_CODE — restarting in 3s because SUPERTURTLE_RESTART_ON_CRASH=1."
+        sleep 3
     else
         echo "[run-loop] Bot exited with code $EXIT_CODE — stopping."
         exit "$EXIT_CODE"

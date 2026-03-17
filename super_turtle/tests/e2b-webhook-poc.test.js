@@ -222,7 +222,9 @@ CLAUDE_WORKING_DIR='/tmp/project'
     pidPath: "/tmp/superturtle-e2b-bot.pid",
   });
   assert.match(startCommand, /echo \$\$ > '\/tmp\/superturtle-e2b-bot\.pid'/);
-  assert.match(startCommand, /exec bun run src\/index\.ts/);
+  assert.match(startCommand, /export CLAUDE_WORKING_DIR='\/home\/user\/project'/);
+  assert.match(startCommand, /export SUPERTURTLE_RESTART_ON_CRASH=1/);
+  assert.match(startCommand, /exec \.\/run-loop\.sh/);
 
   assert.throws(
     () =>

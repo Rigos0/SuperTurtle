@@ -22,6 +22,7 @@ venv/
 
 # Node
 node_modules/
+super_turtle/*.tgz
 
 # OS
 .DS_Store

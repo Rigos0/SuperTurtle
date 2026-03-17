@@ -676,10 +676,13 @@ function buildRemoteStartCommand(config) {
     "set -euo pipefail",
     "export PATH=\"$HOME/.bun/bin:$PATH\"",
     `cd ${shellEscape(config.remoteBotDir)}`,
+    "chmod +x ./run-loop.sh",
     `if [ -f ${shellEscape(config.pidPath)} ]; then kill "$(cat ${shellEscape(config.pidPath)})" >/dev/null 2>&1 || true; rm -f ${shellEscape(config.pidPath)}; fi`,
     `: > ${shellEscape(config.logPath)}`,
+    `export CLAUDE_WORKING_DIR=${shellEscape(config.remoteRoot)}`,
+    "export SUPERTURTLE_RESTART_ON_CRASH=1",
     `echo $$ > ${shellEscape(config.pidPath)}`,
-    `exec bun run src/index.ts >> ${shellEscape(config.logPath)} 2>&1`,
+    `exec ./run-loop.sh >> ${shellEscape(config.logPath)} 2>&1`,
   ].join(" && ");
 }
 
