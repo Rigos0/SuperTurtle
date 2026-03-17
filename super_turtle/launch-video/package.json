@@ -1,0 +1,22 @@
+{
+  "name": "@superturtle/launch-video",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Remotion launch video package for SuperTurtle.",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts TeleportLaunchVideo out/teleport-launch.mp4",
+    "render:phone": "remotion render src/index.ts TeleportLaunchVideoPhone out/teleport-launch-phone.mp4",
+    "render:still": "remotion still src/index.ts LaunchVideoThumbnail out/launch-thumbnail.png"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.436",
+    "@remotion/google-fonts": "4.0.436",
+    "@remotion/media": "4.0.436",
+    "@remotion/transitions": "4.0.436",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.436",
+    "zod": "^4.2.1"
+  }
+}
