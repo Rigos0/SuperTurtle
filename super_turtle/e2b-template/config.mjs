@@ -35,9 +35,23 @@ function parsePositiveInt(rawValue, fallback) {
   return parsed;
 }
 
-const runtimeVersion = packageJson.version;
+function deriveRuntimeVersion(packageVersion, installSpec) {
+  const trimmed = String(installSpec || "").trim();
+  const atIndex = trimmed.lastIndexOf("@");
+  if (atIndex > 0 && atIndex < trimmed.length - 1) {
+    const candidate = trimmed.slice(atIndex + 1).trim();
+    if (/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(candidate)) {
+      return candidate;
+    }
+  }
+  return packageVersion;
+}
+
 const templateName =
   process.env.SUPERTURTLE_E2B_TEMPLATE_NAME?.trim() || "superturtle-managed-runtime";
+const runtimeInstallSpec =
+  process.env.SUPERTURTLE_RUNTIME_INSTALL_SPEC?.trim() || `superturtle@${packageJson.version}`;
+const runtimeVersion = deriveRuntimeVersion(packageJson.version, runtimeInstallSpec);
 const templateVersionTag =
   process.env.SUPERTURTLE_E2B_TEMPLATE_VERSION?.trim() || `v${runtimeVersion}`;
 const templateChannelTag =
@@ -51,8 +65,6 @@ const bunVersion = process.env.SUPERTURTLE_E2B_BUN_VERSION?.trim() || "1.3.5";
 const claudeCodeVersion =
   process.env.SUPERTURTLE_CLAUDE_CODE_VERSION?.trim() || "2.1.76";
 const codexInstallSpec = process.env.SUPERTURTLE_CODEX_INSTALL_SPEC?.trim() || "@openai/codex";
-const runtimeInstallSpec =
-  process.env.SUPERTURTLE_RUNTIME_INSTALL_SPEC?.trim() || `superturtle@${runtimeVersion}`;
 const cpuCount = parsePositiveInt(process.env.SUPERTURTLE_E2B_TEMPLATE_CPU, 2);
 const memoryMB = parsePositiveInt(process.env.SUPERTURTLE_E2B_TEMPLATE_MEMORY_MB, 2048);
 
@@ -71,4 +83,3 @@ export const templateConfig = {
   cpuCount,
   memoryMB,
 };
-
