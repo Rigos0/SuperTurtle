@@ -1,7 +1,8 @@
 # Current task
-Remove or isolate remaining assumptions in `../superturtle-web` that managed cloud depends on local-PC state, following the findings in `super_turtle/docs/reviews/review-managed-cloud-hosted-audit-2026-03-17.md`.
+Unblock managed-cloud hosted work from the current split-repo loop setup so a future iteration can change `../superturtle-web` and persist this state file without violating the one-commit requirement.
 
 Progress note: managed onboarding now writes sandbox-local `.superturtle/managed-runtime.json`, so template/runtime metadata no longer depends solely on the local-style `.superturtle/project.json` contract.
+Progress note: `agentic` and `../superturtle-web` are separate git repositories, so the current loop instructions cannot produce one commit containing both hosted code changes and this SubTurtle state update.
 
 # End goal with specs
 - Implement the hosted managed cloud plane in `../superturtle-web` to match `super_turtle/docs/managed-cloud-plane-spec.md`.
@@ -25,7 +26,8 @@ Progress note: managed onboarding now writes sandbox-local `.superturtle/managed
 # Backlog
 - [x] Audit `../superturtle-web/src/features/cloud/controllers/` and related hosted runtime code against the new managed-cloud spec
 - [x] Implement the first managed-cloud code changes needed for hosted-authoritative lifecycle and ownership
-- [ ] Remove or isolate assumptions that managed mode depends on local-PC state <- current
+- [ ] Unblock cross-repo managed-cloud iterations so hosted code changes in `../superturtle-web` and SubTurtle state updates can be recorded without violating the one-commit loop contract <- current
+- [ ] Remove or isolate assumptions that managed mode depends on local-PC state (unblock: either move the loop state file into `../superturtle-web` or explicitly allow coordinated commits across both repos)
 - [ ] Enforce or document the narrow sandbox public-surface model in hosted code and tests
 - [ ] Update managed status/reporting surfaces to match the cloud-only hosted model
 - [ ] Add or update tests for provisioning, takeover confirmation, and managed status semantics
