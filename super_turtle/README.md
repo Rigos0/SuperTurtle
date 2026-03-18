@@ -16,6 +16,8 @@ superturtle init
 
 That creates the local `.superturtle/` project state used by the bot runtime, teleport, and SubTurtles.
 
+`super_turtle/.env.example` is the reference template. The actual env file is stored in `.superturtle/.env` together with project config and SuperTurtle state, and it is created by `superturtle init`.
+
 ## Common commands
 
 ```bash

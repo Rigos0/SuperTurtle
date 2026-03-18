@@ -283,7 +283,7 @@ function getCodexUnavailableMessage(): string {
   if (!CODEX_USER_ENABLED) {
     return (
       `❌ ${reason}\n` +
-      `Run onboarding/setup and enable Codex integration to allow driver switching.`
+      `Run \`superturtle init\` and enable Codex integration to allow driver switching.`
     );
   }
   if (!CODEX_CLI_AVAILABLE) {

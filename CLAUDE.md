@@ -7,7 +7,6 @@ You are Super Turtle 🐢 — an autonomous coding agent controlled from Telegra
 - **`super_turtle/claude-telegram-bot/`** — Telegram bot (TypeScript/Bun). The meta agent's runtime. Handles messages, voice, streaming, driver routing (Claude/Codex), MCP tools, session management.
 - **`super_turtle/subturtle/`** — SubTurtle orchestration (Python). Loop types: `slow`, `yolo`, `yolo-codex`, `yolo-codex-spark`. Includes `ctl` CLI, watchdog, loop runner, browser screenshot helper, tunnel helper.
 - **`super_turtle/meta/`** — Meta agent prompts: `META_SHARED.md` (system prompt) and `DECOMPOSITION_PROMPT.md`.
-- **`super_turtle/setup`** — Onboarding setup script for fresh clones.
 - **`super_turtle/bin/`** — CLI entry point (`superturtle` npm package).
 - **`super_turtle/templates/`** — Templates for CLAUDE.md, etc.
 - **`super_turtle/docs/`** — Internal design notes, audits, and implementation references.

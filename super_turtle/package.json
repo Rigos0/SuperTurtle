@@ -7,6 +7,7 @@
     "test:pack": "bash tests/npm-package-smoke.sh",
     "test:init-safe": "bash tests/init-non-destructive.sh",
     "test:init-git-binding": "bash tests/init-git-binding.sh",
+    "test:legacy-env-import": "bash tests/legacy-env-import.sh",
     "test:e2b-webhook-poc": "node tests/e2b-webhook-poc.test.js"
   },
   "dependencies": {
@@ -29,6 +30,7 @@
     "superturtle": "bin/superturtle.js"
   },
   "files": [
+    ".env.example",
     "__init__.py",
     "bin/",
     "claude-telegram-bot/src/**/*.ts",
@@ -62,7 +64,6 @@
     "state/*.py",
     "templates/",
     "templates/.claude/",
-    "setup",
     "LICENSE"
   ],
   "engines": {

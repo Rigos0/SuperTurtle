@@ -179,6 +179,25 @@ function migrateLegacyRuntimeLayout(projectRoot) {
   return paths;
 }
 
+function importLegacyProjectEnv(projectRoot) {
+  const envPath = resolve(projectRoot, PROJECT_ENV_RELATIVE_PATH);
+  if (fs.existsSync(envPath)) {
+    return { envPath, imported: false };
+  }
+
+  const legacyEnvPath = resolve(BOT_DIR, ".env");
+  if (!fs.existsSync(legacyEnvPath)) {
+    return { envPath, imported: false };
+  }
+
+  fs.mkdirSync(dirname(envPath), { recursive: true });
+  fs.copyFileSync(legacyEnvPath, envPath);
+  console.log(
+    `[superturtle] Imported legacy env from ${legacyEnvPath} to ${envPath}. Legacy file left in place.`
+  );
+  return { envPath, imported: true };
+}
+
 function writeProjectBinding(projectRoot, initCwd, options = {}) {
   const dataDir = resolve(projectRoot, SUPERTURTLE_DIRNAME);
   const configPath = resolve(dataDir, "project.json");
@@ -195,7 +214,7 @@ function writeProjectBinding(projectRoot, initCwd, options = {}) {
 }
 
 function loadProjectEnv(cwd) {
-  const envPath = resolve(cwd, ".superturtle", ".env");
+  const { envPath } = importLegacyProjectEnv(cwd);
   if (!fs.existsSync(envPath)) return null;
   const parsed = {};
   const envContent = fs.readFileSync(envPath, "utf-8");
@@ -669,6 +688,7 @@ async function init() {
 
   ensureSafeRepoRoot(projectRoot);
   const { dataDir } = migrateLegacyRuntimeLayout(projectRoot);
+  const { imported: importedLegacyEnv } = importLegacyProjectEnv(projectRoot);
 
   blank();
   console.log(`  \u{1F422} ${c.bold("superturtle")} ${c.dim("v" + getVersion())}`);
@@ -765,7 +785,10 @@ async function init() {
     fs.writeFileSync(envPath, envContent);
     ok(".superturtle/.env");
   } else {
-    ok(".superturtle/.env " + c.dim("(exists)"));
+    const status = importedLegacyEnv
+      ? "(imported from legacy claude-telegram-bot/.env; legacy file kept)"
+      : "(exists)";
+    ok(".superturtle/.env " + c.dim(status));
   }
 
   // --- CLAUDE.md ---

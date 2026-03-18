@@ -125,7 +125,7 @@ OPENAI_API_KEY=<optional_openai_api_key>   # For voice transcription
 E2B_API_KEY=<optional_e2b_api_key>         # Required for BYO-E2B /teleport
 ```
 
-`.superturtle/.env` is gitignored. The starter template lives at `templates/.env.example` in the package. Keep real credentials only in local env files.
+`super_turtle/.env.example` is the reference template in the repo. The actual env file is `.superturtle/.env`, which is gitignored and created by `superturtle init` together with the rest of the project-local SuperTurtle state. Keep real credentials only in local env files.
 
 **Finding your Telegram user ID:** Message [@userinfobot](https://t.me/userinfobot) on Telegram.
 
