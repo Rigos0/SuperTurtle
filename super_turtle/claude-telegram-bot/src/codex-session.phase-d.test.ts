@@ -122,4 +122,27 @@ describe("CodexSession Phase D", () => {
 
     await codex.kill();
   });
+
+  it("force-reset clears stuck Codex run state without dropping the linked thread", () => {
+    const codex = new CodexSession();
+
+    let aborted = false;
+    const abortController = new AbortController();
+    abortController.signal.addEventListener("abort", () => {
+      aborted = true;
+    });
+
+    (codex as any).abortController = abortController;
+    (codex as any).isQueryRunning = true;
+    (codex as any)._isProcessing = true;
+    (codex as any).stopRequested = true;
+    (codex as any).thread = { id: "thread-keep" };
+    (codex as any).threadId = "thread-keep";
+
+    codex.forceResetRunState();
+
+    expect(aborted).toBe(true);
+    expect(codex.isRunning).toBe(false);
+    expect(codex.isActive).toBe(true);
+  });
 });

@@ -19,6 +19,8 @@ export interface DriverMessageInput {
 }
 
 const MAX_RETRIES = 1;
+const STOP_SETTLE_TIMEOUT_MS = 300;
+const STOP_SETTLE_POLL_MS = 25;
 let backgroundRunDepth = 0;
 let backgroundRunPreempted = false;
 let executingDriverId: DriverId | null = null;
@@ -205,6 +207,26 @@ export function isAnyDriverRunning(): boolean {
   return session.isRunning || codexSession.isRunning;
 }
 
+async function waitForDriversToBecomeIdle(timeoutMs = STOP_SETTLE_TIMEOUT_MS): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!isAnyDriverRunning()) {
+      return true;
+    }
+    await Bun.sleep(STOP_SETTLE_POLL_MS);
+  }
+  return !isAnyDriverRunning();
+}
+
+function forceResetStuckDriverState(): void {
+  if (session.isRunning) {
+    session.forceResetRunState();
+  }
+  if (codexSession.isRunning) {
+    codexSession.forceResetRunState();
+  }
+}
+
 export async function preemptBackgroundRunForUserPriority(): Promise<boolean> {
   if (!isBackgroundRunActive()) {
     return false;
@@ -222,10 +244,34 @@ export async function preemptBackgroundRunForUserPriority(): Promise<boolean> {
 export async function stopActiveDriverQuery(): Promise<"stopped" | "pending" | false> {
   const current = getCurrentDriver();
   const currentResult = await current.stop();
-  if (currentResult) {
-    return currentResult;
+  let stopResult = currentResult;
+
+  if (!stopResult) {
+    const fallbackDriverId: DriverId = session.activeDriver === "codex" ? "claude" : "codex";
+    stopResult = await getDriver(fallbackDriverId).stop();
   }
 
-  const fallbackDriverId: DriverId = session.activeDriver === "codex" ? "claude" : "codex";
-  return getDriver(fallbackDriverId).stop();
+  if (!stopResult) {
+    return false;
+  }
+
+  if (stopResult === "pending") {
+    return stopResult;
+  }
+
+  const idle = await waitForDriversToBecomeIdle();
+  if (!idle) {
+    routingLog.warn(
+      {
+        activeDriver: session.activeDriver,
+        stopResult,
+        claudeRunning: session.isRunning,
+        codexRunning: codexSession.isRunning,
+      },
+      "Driver stop did not settle; force-resetting stuck run state"
+    );
+    forceResetStuckDriverState();
+  }
+
+  return stopResult;
 }

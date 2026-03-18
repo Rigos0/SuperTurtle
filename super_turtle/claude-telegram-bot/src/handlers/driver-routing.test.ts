@@ -12,6 +12,8 @@ async function loadDriverRoutingModule(): Promise<DriverRoutingModule> {
 const claudeDriver = getDriver("claude");
 const codexDriver = getDriver("codex");
 const originalSessionDriver = session.activeDriver;
+const originalBunSleep = Bun.sleep;
+const originalDateNow = Date.now;
 
 // Re-assert the real driver registry before each test.
 // Other test files may contaminate it via mock.module() + incomplete mock.restore().
@@ -27,6 +29,10 @@ afterEach(() => {
   session.activeDriver = originalSessionDriver;
   (codexSession as unknown as { isQueryRunning: boolean }).isQueryRunning = false;
   (session as unknown as { _isProcessing: boolean })._isProcessing = false;
+  (session as unknown as { isQueryRunning: boolean }).isQueryRunning = false;
+  (session as unknown as { activeProcess: { kill: () => void } | null }).activeProcess = null;
+  Bun.sleep = originalBunSleep;
+  Date.now = originalDateNow;
   mock.restore();
 });
 
@@ -95,6 +101,35 @@ describe("driver routing", () => {
       endBackgroundRun();
       claudeDriver.stop = originalClaudeStop;
       (session as unknown as { isQueryRunning: boolean }).isQueryRunning = false;
+    }
+  });
+
+  it("force-resets stale running state when a stop never settles", async () => {
+    const { stopActiveDriverQuery, isAnyDriverRunning } = await loadDriverRoutingModule();
+    const originalClaudeStop = claudeDriver.stop;
+    const killMock = mock(() => {});
+    let now = 0;
+
+    Bun.sleep = (async () => {}) as typeof Bun.sleep;
+    Date.now = () => {
+      now += 100;
+      return now;
+    };
+
+    session.activeDriver = "claude";
+    (session as unknown as { isQueryRunning: boolean }).isQueryRunning = true;
+    (session as unknown as { activeProcess: { kill: () => void } | null }).activeProcess = {
+      kill: killMock,
+    };
+    claudeDriver.stop = async () => "stopped";
+
+    try {
+      const result = await stopActiveDriverQuery();
+      expect(result).toBe("stopped");
+      expect(killMock).toHaveBeenCalledTimes(1);
+      expect(isAnyDriverRunning()).toBe(false);
+    } finally {
+      claudeDriver.stop = originalClaudeStop;
     }
   });
 });

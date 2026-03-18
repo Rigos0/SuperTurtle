@@ -974,6 +974,25 @@ export class CodexSession {
     return this.stopRequested;
   }
 
+  /**
+   * Force-clear any stuck foreground run state without discarding the linked
+   * thread. Used as a last-resort recovery path when abort/stop did not
+   * unwind the Codex SDK turn cleanly.
+   */
+  forceResetRunState(): void {
+    try {
+      this.abortController?.abort();
+    } catch {
+      // Ignore abort errors during forced cleanup.
+    }
+    this.abortController = null;
+    this.isQueryRunning = false;
+    this._isProcessing = false;
+    this.stopRequested = false;
+    this.queryStarted = null;
+    codexLog.warn("Force-reset Codex run state");
+  }
+
   private async ensureInitialized(chatId?: number): Promise<void> {
     const requestedChatId =
       typeof chatId === "number" && Number.isFinite(chatId) ? String(chatId) : null;
@@ -1563,6 +1582,7 @@ ${messageToSend}`;
       }
       throw error;
     } finally {
+      this.abortController = null;
       this.isQueryRunning = false;
       this._isProcessing = false;
       this.queryStarted = null;
@@ -1833,12 +1853,17 @@ ${messageToSend}`;
    * Kill the session (clear thread).
    */
   async kill(): Promise<void> {
+    this.forceResetRunState();
+
     // Persist the linked thread before clearing so /resume remains stable
     // across driver switches and explicit resets.
     await this.saveSession();
     this.thread = null;
     this.threadId = null;
     this.systemPromptPrepended = false;
+    this.codex = null;
+    this.usingExistingMcpConfig = false;
+    this.programmaticMcpChatId = null;
 
     // Clear thread linkage but keep user model preferences.
     await saveCodexPrefs({

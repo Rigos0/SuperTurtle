@@ -474,6 +474,28 @@ export class ClaudeSession {
     }
   }
 
+  /**
+   * Force-clear any stuck foreground run state without discarding the linked
+   * session. Used as a last-resort recovery path when a stop request does not
+   * unwind the normal handler lifecycle.
+   */
+  forceResetRunState(): void {
+    this.stopTyping();
+    try {
+      this.activeProcess?.kill();
+    } catch {
+      // Ignore subprocess teardown errors during forced cleanup.
+    }
+    this.activeProcess = null;
+    this.isQueryRunning = false;
+    this._isProcessing = false;
+    this.stopRequested = false;
+    this._wasInterruptedByNewMessage = false;
+    this.queryStarted = null;
+    this.currentTool = null;
+    claudeLog.warn("Force-reset Claude run state");
+  }
+
   get isActive(): boolean {
     return this.sessionId !== null;
   }
@@ -1176,6 +1198,8 @@ export class ClaudeSession {
    * Kill the current session (clear session_id).
    */
   async kill(): Promise<void> {
+    this.forceResetRunState();
+
     // Persist the linked session before clearing so /resume remains stable
     // across driver switches and explicit resets.
     await this.saveSession();
