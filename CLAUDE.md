@@ -136,7 +136,7 @@ We are redesigning the weak parts:
 - [ ] Typecheck and commit
 - [ ] Lock the conductor behind a 15-path core-flow matrix that matches real user behavior
 - [ ] Fill any remaining matrix gaps, especially true switch-command/manual Telegram validation with multiple live SubTurtles
-- [ ] Add conductor state retention/gc so `.superturtle/state/` does not grow forever: prune old sent wakeups, acknowledged inbox items, stale archived worker records, and rotate/archive `events.jsonl`
+- [x] Add conductor state retention/gc so `.superturtle/state/` does not grow forever: prune old sent wakeups, acknowledged inbox items, stale archived worker records, and rotate/archive `events.jsonl`
 
 ## Notes
 - Multi-instance audit: `docs/audits/multi-instance-isolation.md`

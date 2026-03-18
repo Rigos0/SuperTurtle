@@ -890,6 +890,46 @@ do_gc() {
   done
 }
 
+do_gc_state() {
+  local max_age_str="7d"
+  local dry_run=""
+  local verbose=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --max-age)
+        max_age_str="${2:?missing duration for --max-age}"
+        shift 2
+        ;;
+      --dry-run)
+        dry_run="--dry-run"
+        shift
+        ;;
+      --verbose)
+        verbose="--verbose"
+        shift
+        ;;
+      *)
+        echo "ERROR: unknown option for gc-state: $1" >&2
+        echo "Usage: ./super_turtle/subturtle/ctl gc-state [--max-age DURATION] [--dry-run] [--verbose]" >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  # Use same duration parsing as ctl
+  local max_age_seconds
+  max_age_seconds="$(parse_duration "$max_age_str")" || exit 1
+
+  # Delegate to Python script
+  # Note: PYTHONPATH is already set in ctl
+  "$PYTHON" "${SUPER_TURTLE_DIR}/state/conductor_gc.py" \
+    --state-dir "$RUN_STATE_DIR" \
+    --max-age "${max_age_seconds}s" \
+    $dry_run \
+    $verbose
+}
+
 do_list() {
   local show_archived=0
   while [[ $# -gt 0 ]]; do

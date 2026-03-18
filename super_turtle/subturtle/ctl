@@ -66,7 +66,9 @@ usage() {
   echo "  list   [--archived]                 List active SubTurtles (default) or archived SubTurtles"
   echo "  archive <name>                      Archive a stopped SubTurtle to .subturtles/.archive/<name>/"
   echo "  gc [--max-age DURATION]             Archive stopped SubTurtles older than max age (default: 1d)"
+  echo "  gc-state [--max-age DURATION]       Prune old conductor state (wakeups, inbox, etc) (default: 7d)"
   echo "  reschedule-cron <name> <interval>   Update recurring cron interval (e.g. 1m, 5m)"
+
   echo ""
   echo "Timeout durations: 30m, 1h, 2h, 4h, etc. Default: ${DEFAULT_TIMEOUT}"
   echo "SubTurtles auto-terminate when their timeout expires."
@@ -121,6 +123,7 @@ case "$CMD" in
     do_archive "$1"
     ;;
   gc)     do_gc "$@" ;;
+  gc-state) do_gc_state "$@" ;;
   reschedule-cron)
     if [[ $# -ne 2 ]]; then
       echo "Usage: ./super_turtle/subturtle/ctl reschedule-cron <name> <interval>" >&2
