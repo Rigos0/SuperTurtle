@@ -206,21 +206,58 @@ def _run_single_agent_loop(
     _finalize_loop(state_dir, name, project_dir, iteration, stopped_by_directive)
 
 
+def _codex_available() -> bool:
+    """Return True when the codex CLI is on PATH and has remaining quota."""
+    if shutil.which("codex") is None:
+        return False
+    # Quick dry-run to verify quota isn't exhausted.
+    try:
+        probe = subprocess.run(
+            ["codex", "exec", "--yolo", "echo ok"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        # OpenAI returns exit 1 with "usage limit" in stderr/stdout when exhausted.
+        combined = (probe.stdout or "") + (probe.stderr or "")
+        if "usage limit" in combined.lower() or "429" in combined:
+            return False
+        return probe.returncode == 0
+    except Exception:
+        return False
+
+
 def run_slow_loop(state_dir: Path, name: str, skills: list[str] | None = None) -> None:
-    """Slow loop: Plan -> Groom -> Execute -> Review. 4 agent calls per iteration."""
+    """Slow loop: Plan -> Groom -> Execute -> Review. 4 agent calls per iteration.
+
+    When Codex is unavailable (missing CLI or exhausted quota), the execution
+    phase falls back to Claude so the loop can complete without OpenAI credits.
+    """
     if skills is None:
         skills = []
     _require_cli(name, "claude")
-    _require_cli(name, "codex")
 
     state_file, state_ref = _resolve_state_ref(state_dir, name)
     prompt_bundle = prompts.build_prompts(state_ref)
 
-    _log_loop_start(name, "slow loop: plan -> groom -> execute -> review", state_ref, skills)
-
     add_dirs = _skill_dirs(skills)
     claude = Claude(add_dirs=add_dirs)
-    codex = Codex(add_dirs=add_dirs)
+
+    use_codex = _codex_available()
+    if use_codex:
+        executor = Codex(add_dirs=add_dirs)
+        executor_label = "codex"
+    else:
+        executor = claude
+        executor_label = "claude (codex unavailable)"
+
+    _log_loop_start(
+        name,
+        f"slow loop: plan(claude) -> groom(claude) -> execute({executor_label}) -> review(claude)",
+        state_ref,
+        skills,
+    )
+
     project_dir = Path.cwd()
     iteration = 0
     consecutive_failures = 0
@@ -240,7 +277,7 @@ def run_slow_loop(state_dir: Path, name: str, skills: list[str] | None = None) -
             )
             claude.execute(prompt_bundle["groomer"].format(stats=stats, plan=plan))
 
-            codex.execute(prompt_bundle["executor"].format(plan=plan))
+            executor.execute(prompt_bundle["executor"].format(plan=plan))
 
             claude.execute(prompt_bundle["reviewer"].format(plan=plan))
             _record_checkpoint(state_dir, name, project_dir, "slow", iteration)
