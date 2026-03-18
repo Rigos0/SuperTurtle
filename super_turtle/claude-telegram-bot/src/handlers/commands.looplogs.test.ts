@@ -153,7 +153,7 @@ describe("/looplogs", () => {
 
       expect(replies).toHaveLength(1);
       expect(replies[0]).toContain(`Cannot read main loop log at ${MAIN_LOOP_LOG_PATH}`);
-      expect(replies[0]).toContain("bun run start");
+      expect(replies[0]).toContain("superturtle start");
     });
   });
 });

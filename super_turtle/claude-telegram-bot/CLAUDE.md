@@ -5,10 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-bun run start      # Canonical start: tmux + caffeinate + run-loop (single visible terminal session)
-bun run dev        # Run with auto-reload (--watch)
-bun run typecheck  # Run TypeScript type checking
-bun install        # Install dependencies
+node ../bin/superturtle.js start  # Preferred in this repo: source CLI entrypoint
+bun run start                     # Bot-folder-only manual tmux launcher
+bun run dev                       # Run with auto-reload (--watch)
+bun run typecheck                 # Run TypeScript type checking
+bun install                       # Install dependencies
 ```
 
 ## Architecture
@@ -79,7 +80,7 @@ MCP servers defined in `mcp-config.ts`.
 
 **Type checking**: Run `bun run typecheck` periodically while editing TypeScript files. Fix any type errors before committing.
 
-**After code changes**: If running manually, use `bun run start` and keep that terminal as the canonical live view; re-running the command re-attaches to the same `tmux` session. `/restart` must stay in the same terminal session (run-loop respawn), not detached.
+**After code changes**: In this repo, prefer `node ../bin/superturtle.js start` and keep that terminal as the canonical live view; re-running the command re-attaches to the same `tmux` session. If you are intentionally running only this folder, `bun run start` is the equivalent manual path. `/restart` must stay in the same terminal session (run-loop respawn), not detached.
 
 ## Standalone Build
 

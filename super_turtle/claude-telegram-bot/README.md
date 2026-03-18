@@ -5,7 +5,7 @@
 
 **Turn [Claude Code](https://claude.com/product/claude-code) into your personal assistant, accessible from anywhere via Telegram.**
 
-For the full Super Turtle project, use the root setup flow first (AI-guided via `CLAUDE.md`/`AGENTS.md`).
+For the full Super Turtle project, initialize the repo first with `superturtle init` (AI-guided via `CLAUDE.md`/`AGENTS.md`).
 
 Send text, voice, photos, documents, audio, and video. See responses and tools usage in real-time.
 
@@ -51,6 +51,8 @@ If you are only working on this bot module directly:
 
 ```bash
 npx superturtle init   # installs deps, creates .superturtle/.env, prompts for tokens
+node ../bin/superturtle.js start   # preferred in this repo: runs the source CLI entrypoint
+# or, for bot-folder-only manual runs:
 bun run start
 ```
 
@@ -223,14 +225,14 @@ Use the interactive launcher when you want one visible `tmux` session and immedi
 superturtle start
 # /restart keeps using this same tmux terminal session
 
-# Attach later from another terminal
-tmux attach -t superturtle-bot
+# Show status and the active tmux session name
+superturtle status
 
-# Session status
-tmux has-session -t superturtle-bot && echo "running" || echo "stopped"
+# Attach later from another terminal using the session name shown above
+tmux attach -t <session-name>
 
 # Stop bot completely
-tmux kill-session -t superturtle-bot
+superturtle stop
 ```
 
 **Shell aliases:** If running as a service, these aliases make it easy to manage the bot (add to `~/.zshrc` or `~/.bashrc`):

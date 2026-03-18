@@ -750,7 +750,7 @@ export async function handleLooplogs(ctx: Context): Promise<void> {
       : "";
     await ctx.reply(
       `❌ Cannot read main loop log at ${result.path}. ` +
-        `Start the bot with 'bun run start' and retry.\n${reason}${tried}`
+        `Start the bot with 'superturtle start' (or 'node super_turtle/bin/superturtle.js start' in this repo) and retry.\n${reason}${tried}`
     );
     return;
   }
