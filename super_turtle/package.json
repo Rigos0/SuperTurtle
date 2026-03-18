@@ -30,7 +30,6 @@
     "superturtle": "bin/superturtle.js"
   },
   "files": [
-    ".env.example",
     "__init__.py",
     "bin/",
     "claude-telegram-bot/src/**/*.ts",

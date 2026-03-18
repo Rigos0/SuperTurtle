@@ -36,7 +36,6 @@ require_file "state/run_state_writer.py"
 require_file "state/__init__.py"
 require_file "meta/META_SHARED.md"
 require_file "claude-telegram-bot/src/index.ts"
-require_file ".env.example"
 require_file "README.md"
 require_file "LICENSE"
 
