@@ -631,15 +631,6 @@ function parseInitFlags() {
   return flags;
 }
 
-function pickAvailablePath(basePath) {
-  if (!fs.existsSync(basePath)) return basePath;
-  let suffix = 2;
-  while (fs.existsSync(`${basePath}-${suffix}`)) {
-    suffix += 1;
-  }
-  return `${basePath}-${suffix}`;
-}
-
 function copyDirFiltered(sourceDir, targetDir) {
   fs.mkdirSync(targetDir, { recursive: true });
   const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
@@ -815,10 +806,7 @@ async function init() {
   // --- .claude templates ---
   const claudeTemplateDir = resolve(TEMPLATES_DIR, ".claude");
   if (fs.existsSync(claudeTemplateDir)) {
-    let targetClaudeDir = resolve(projectRoot, ".claude");
-    if (fs.existsSync(targetClaudeDir)) {
-      targetClaudeDir = pickAvailablePath(resolve(projectRoot, ".superturtle-claude"));
-    }
+    const targetClaudeDir = resolve(projectRoot, ".claude");
     copyDirFiltered(claudeTemplateDir, targetClaudeDir);
     ok(targetClaudeDir.replace(projectRoot + "/", ""));
   }

@@ -86,13 +86,13 @@ if [[ "$(cat "${PROJECT_DIR}/.claude/custom-user-file.txt")" != "KEEP THIS" ]]; 
   exit 1
 fi
 
-if [[ ! -d "${PROJECT_DIR}/.superturtle-claude" ]]; then
-  echo "Expected fallback .superturtle-claude directory when .claude already exists." >&2
+if [[ -d "${PROJECT_DIR}/.superturtle-claude" ]]; then
+  echo "Did not expect fallback .superturtle-claude directory to be created." >&2
   exit 1
 fi
 
-if [[ ! -f "${PROJECT_DIR}/.superturtle-claude/settings.json" ]]; then
-  echo "Expected template files to be copied into .superturtle-claude." >&2
+if [[ ! -f "${PROJECT_DIR}/.claude/settings.json" ]]; then
+  echo "Expected template files to be merged into the existing .claude directory." >&2
   exit 1
 fi
 
