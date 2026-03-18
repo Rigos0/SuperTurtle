@@ -21,8 +21,8 @@ The repo already has the core pieces for this model:
 
 Relevant files:
 
-- `super_turtle/e2b-template/config.mjs`
-- `super_turtle/e2b-template/template.mjs`
+- `super_turtle/teleport/e2b-template/config.mjs`
+- `super_turtle/teleport/e2b-template/template.mjs`
 - `../superturtle-web/src/features/cloud/controllers/managed-control-plane.ts`
 
 The local teleport/bootstrap path now follows the same artifact model:

@@ -8,6 +8,7 @@ You are Super Turtle 🐢 — an autonomous coding agent controlled from Telegra
 - **`super_turtle/subturtle/`** — SubTurtle orchestration (Python). Loop types: `slow`, `yolo`, `yolo-codex`, `yolo-codex-spark`. Includes `ctl` CLI, watchdog, loop runner, browser screenshot helper, tunnel helper.
 - **`super_turtle/meta/`** — Meta agent prompts: `META_SHARED.md` (system prompt) and `DECOMPOSITION_PROMPT.md`.
 - **`super_turtle/bin/`** — CLI entry point (`superturtle` npm package).
+- **`super_turtle/teleport/`** — Package-level teleport assets, including the managed E2B template.
 - **`super_turtle/templates/`** — Templates for CLAUDE.md, etc.
 - **`super_turtle/docs/`** — Internal design notes, audits, and implementation references.
 - **`../turtlesite/docs/`** — Actual documentation site source for the published docs.
@@ -98,7 +99,7 @@ Security boundary for the active E2B runtime:
 Hosted managed-mode backlog:
 
 1. Keep hosted login/provisioning optional; do not block the main npm-user BYO-E2B flow on it.
-2. Build and maintain the managed E2B template from `super_turtle/e2b-template/`; the current published template name is `superturtle-managed-runtime`.
+2. Build and maintain the managed E2B template from `super_turtle/teleport/e2b-template/`; the current published template name is `superturtle-managed-runtime`.
 3. If we revive managed mode, provision one managed E2B sandbox per user through the hosted control plane.
 4. Copy Claude and Codex credentials automatically from the local machine on first teleport and refresh them on later teleports without manual remote steps.
 5. Add remote runtime version checks so `/teleport` can self-update the remote sandbox to the local installed SuperTurtle package version before cutover.

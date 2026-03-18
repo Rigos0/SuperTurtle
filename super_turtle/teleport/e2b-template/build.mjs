@@ -7,7 +7,7 @@ import { template } from "./template.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const repoRoot = path.resolve(__dirname, "..", "..");
+const repoRoot = path.resolve(__dirname, "..", "..", "..");
 
 function loadDotEnvFile(filePath) {
   if (!fs.existsSync(filePath)) {
@@ -61,4 +61,3 @@ console.log(`Name: ${buildInfo.name}`);
 console.log(`Template ID: ${buildInfo.templateId}`);
 console.log(`Build ID: ${buildInfo.buildId}`);
 console.log(`Tags: ${buildInfo.tags.join(", ")}`);
-

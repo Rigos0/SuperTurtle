@@ -3,7 +3,7 @@
   "version": "0.2.5",
   "description": "Code from anywhere with your voice. Autonomous coding system controlled from Telegram.",
   "scripts": {
-    "e2b:template:build": "node e2b-template/build.mjs",
+    "e2b:template:build": "node teleport/e2b-template/build.mjs",
     "test:pack": "bash tests/npm-package-smoke.sh",
     "test:init-safe": "bash tests/init-non-destructive.sh",
     "test:init-git-binding": "bash tests/init-git-binding.sh",
