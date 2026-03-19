@@ -75,7 +75,7 @@ afterEach(() => {
   }
 });
 
-describe("CodexSession conductor inbox delivery", () => {
+describe.serial("CodexSession conductor inbox delivery", () => {
   it("injects pending background events into the next interactive Codex turn and acknowledges them on success", async () => {
     const tempDir = makeTempDir();
     const chatId = 626262;

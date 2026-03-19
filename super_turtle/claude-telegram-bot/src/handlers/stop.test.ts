@@ -482,6 +482,75 @@ describe("stop handlers", () => {
     }
   });
 
+  it("handleStop suppresses duplicate replies for the same chat", async () => {
+    const actualImportSuffix = `${Date.now()}-${Math.random()}`;
+    const actualStreaming = await import(`./streaming.ts?stop-dedupe=${actualImportSuffix}`);
+    const deferredQueue = await import(`../deferred-queue.ts?stop-dedupe=${actualImportSuffix}`);
+    const actualDriverRouting = await import(
+      `./driver-routing.ts?stop-dedupe=${actualImportSuffix}`
+    );
+
+    let stopCalls = 0;
+    let releaseStop!: () => void;
+    const stopGate = new Promise<void>((resolve) => {
+      releaseStop = resolve;
+    });
+
+    mock.module("./streaming", () => ({
+      ...actualStreaming,
+      getStreamingState: () => undefined,
+      clearStreamingState: () => {},
+      cleanupToolMessages: async () => {},
+    }));
+    mock.module("../deferred-queue", () => ({ ...deferredQueue }));
+    mock.module("./driver-routing", () => ({
+      ...actualDriverRouting,
+      stopActiveDriverQuery: async () => {
+        stopCalls += 1;
+        await stopGate;
+        return "stopped" as const;
+      },
+    }));
+
+    Bun.spawnSync = ((cmd: unknown, _opts?: unknown) => {
+      if (!Array.isArray(cmd)) {
+        return originalSpawnSync(cmd as Parameters<typeof Bun.spawnSync>[0]);
+      }
+      throw new Error(`handleStop should not call ctl for foreground-only stop: ${cmd.join(" ")}`);
+    }) as typeof Bun.spawnSync;
+
+    const replies: string[] = [];
+    const ctx = {
+      chat: { id: 41005 },
+      api: {
+        editMessageText: async () => {},
+        deleteMessage: async () => {},
+      },
+      reply: async (text: string) => {
+        replies.push(text);
+        return {} as any;
+      },
+    } as unknown as Context;
+
+    const { handleStop } = await import(`./stop.ts?stop-dedupe=${actualImportSuffix}`);
+
+    try {
+      const first = handleStop(ctx, 41005);
+      const second = handleStop(ctx, 41005);
+      releaseStop();
+      await Promise.all([first, second]);
+
+      expect(stopCalls).toBe(1);
+      expect(replies).toEqual(["🛑 Stopped current work."]);
+
+      await handleStop(ctx, 41005);
+      expect(replies).toEqual(["🛑 Stopped current work."]);
+    } finally {
+      deferredQueue.clearDeferredQueue(41005);
+      deferredQueue.unsuppressDrain(41005);
+    }
+  });
+
   it("stopAllRunningWork suppresses drain, clears queue, then drains after unsuppress", async () => {
     const actualImportSuffix = `${Date.now()}-${Math.random()}`;
 

@@ -7,6 +7,9 @@ import { cleanupToolMessages, clearStreamingState, getStreamingState } from "./s
 import { streamLog } from "../logger";
 const stopLog = streamLog.child({ handler: "stop" });
 const stopReplyHandledChats = new Set<number>();
+const recentStopReplyExpiryByChat = new Map<number, number>();
+const inFlightStopByChat = new Map<number, Promise<void>>();
+const STOP_REPLY_DEDUPE_WINDOW_MS = 2_000;
 
 export interface StopSubturtlesResult {
   attempted: string[];
@@ -120,73 +123,113 @@ export function consumeHandledStopReply(chatId: number | undefined): boolean {
   return true;
 }
 
+function hasRecentStopReply(chatId: number, now = Date.now()): boolean {
+  const expiresAt = recentStopReplyExpiryByChat.get(chatId);
+  if (typeof expiresAt !== "number") {
+    return false;
+  }
+  if (expiresAt <= now) {
+    recentStopReplyExpiryByChat.delete(chatId);
+    return false;
+  }
+  return true;
+}
+
+function markRecentStopReply(chatId: number, now = Date.now()): void {
+  recentStopReplyExpiryByChat.set(chatId, now + STOP_REPLY_DEDUPE_WINDOW_MS);
+}
+
 /**
  * Unified user-facing stop handler for all stop entrypoints.
  * Stops the active foreground run and clears the queue, but leaves background
  * SubTurtles alone.
  */
 export async function handleStop(ctx: Context, chatId: number): Promise<void> {
-  const state = getStreamingState(chatId);
-  const result = await stopForegroundWork(chatId);
-  const driverStopped = result.driverStopResult !== false;
-  if (state) {
-    await cleanupToolMessages(ctx, state);
+  if (hasRecentStopReply(chatId)) {
+    stopLog.info({ chatId }, "Suppressed duplicate stop reply");
+    return;
+  }
 
-    // Append an explicit stopped indicator to the last streamed text segment, if any.
-    const segmentIds = driverStopped ? [...state.textMessages.keys()] : [];
-    if (segmentIds.length > 0) {
-      const lastSegmentId = Math.max(...segmentIds);
-      const lastMsg = state.textMessages.get(lastSegmentId);
-      const lastContent = state.lastContent.get(lastSegmentId);
-      const suffix = "\n\n⏹ <i>Stopped</i>";
+  const inFlightStop = inFlightStopByChat.get(chatId);
+  if (inFlightStop) {
+    stopLog.info({ chatId }, "Joined in-flight stop request");
+    await inFlightStop;
+    return;
+  }
 
-      if (
-        lastMsg &&
-        lastContent &&
-        lastContent.trim().length > 0 &&
-        !lastContent.includes("⏹ <i>Stopped</i>")
-      ) {
-        try {
-          await ctx.api.editMessageText(
-            lastMsg.chat.id,
-            lastMsg.message_id,
-            `${lastContent}${suffix}`,
-            { parse_mode: "HTML" }
-          );
-        } catch {
-          // Ignore edit failures (message deleted, unchanged, or invalid HTML)
+  const stopPromise = (async () => {
+    const state = getStreamingState(chatId);
+    const result = await stopForegroundWork(chatId);
+    const driverStopped = result.driverStopResult !== false;
+    if (state) {
+      await cleanupToolMessages(ctx, state);
+
+      // Append an explicit stopped indicator to the last streamed text segment, if any.
+      const segmentIds = driverStopped ? [...state.textMessages.keys()] : [];
+      if (segmentIds.length > 0) {
+        const lastSegmentId = Math.max(...segmentIds);
+        const lastMsg = state.textMessages.get(lastSegmentId);
+        const lastContent = state.lastContent.get(lastSegmentId);
+        const suffix = "\n\n⏹ <i>Stopped</i>";
+
+        if (
+          lastMsg &&
+          lastContent &&
+          lastContent.trim().length > 0 &&
+          !lastContent.includes("⏹ <i>Stopped</i>")
+        ) {
+          try {
+            await ctx.api.editMessageText(
+              lastMsg.chat.id,
+              lastMsg.message_id,
+              `${lastContent}${suffix}`,
+              { parse_mode: "HTML" }
+            );
+          } catch {
+            // Ignore edit failures (message deleted, unchanged, or invalid HTML)
+          }
         }
       }
     }
-  }
-  clearStreamingState(chatId);
+    clearStreamingState(chatId);
 
-  let message = "Nothing to stop.";
-  if (driverStopped) {
-    stopReplyHandledChats.add(chatId);
-    message = "🛑 Stopped current work.";
-    if (result.queueCleared > 0) {
+    let message = "Nothing to stop.";
+    if (driverStopped) {
+      stopReplyHandledChats.add(chatId);
+      message = "🛑 Stopped current work.";
+      if (result.queueCleared > 0) {
+        message =
+          `🛑 Stopped current work. Cleared ${result.queueCleared} queued message` +
+          `${result.queueCleared === 1 ? "" : "s"}.`;
+      }
+    } else if (result.queueCleared > 0) {
       message =
-        `🛑 Stopped current work. Cleared ${result.queueCleared} queued message` +
+        `🛑 Cleared ${result.queueCleared} queued message` +
         `${result.queueCleared === 1 ? "" : "s"}.`;
     }
-  } else if (result.queueCleared > 0) {
-    message =
-      `🛑 Cleared ${result.queueCleared} queued message` +
-      `${result.queueCleared === 1 ? "" : "s"}.`;
+
+    stopLog.info(
+      {
+        chatId,
+        stopSubturtles: false,
+        driverStopResult: result.driverStopResult,
+        subturtlesAttempted: result.attempted.length,
+        subturtlesStopped: result.stopped.length,
+        queueCleared: result.queueCleared,
+      },
+      "Stop executed"
+    );
+
+    await ctx.reply(message);
+    markRecentStopReply(chatId);
+  })();
+
+  inFlightStopByChat.set(chatId, stopPromise);
+  try {
+    await stopPromise;
+  } finally {
+    if (inFlightStopByChat.get(chatId) === stopPromise) {
+      inFlightStopByChat.delete(chatId);
+    }
   }
-
-  stopLog.info(
-    {
-      chatId,
-      stopSubturtles: false,
-      driverStopResult: result.driverStopResult,
-      subturtlesAttempted: result.attempted.length,
-      subturtlesStopped: result.stopped.length,
-      queueCleared: result.queueCleared,
-    },
-    "Stop executed"
-  );
-
-  await ctx.reply(message);
 }
