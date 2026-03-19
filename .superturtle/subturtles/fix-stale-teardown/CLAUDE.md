@@ -1,5 +1,5 @@
 # Current task
-Investigate and fix the full-suite dashboard log endpoint failure that still blocks a clean `bun test` run after the codex-driver stale-session teardown fix.
+Unblock full-suite verification by resolving or isolating the current unrelated handler/streaming test failures, then re-check whether any dashboard log endpoint failure still reproduces under `bun test`.
 
 # End goal with specs
 In `codex-driver.ts`, the `done` status is deferred (line 51-57) so it fires after pending output flush. But in `codex-session.ts` (line 1543-1546), the stale-session detection path calls `statusCallback("done", "")` then throws. This means:
@@ -29,8 +29,9 @@ Acceptance criteria:
 - [x] Read stale-session detection in `src/codex-session.ts` around line 1532-1548
 - [x] Implement fix: wrap lines 80-88 in try/finally so deferred done always delivered
 - [x] Add test: stale session emits `done`, then throws, and the downstream `done` callback still fires
-- [ ] Investigate and fix the existing `src/dashboard.test.ts` full-suite failure where `GET /api/subturtles/:name/logs` returns 404 during `bun test` runs but passes in isolation <- current
-- [ ] Re-run all tests (`cd super_turtle/claude-telegram-bot && bun test`) after the dashboard failure is resolved
+- [x] Re-check the reported dashboard logs 404 in the current tree; `bun test src/dashboard.test.ts` passes, and the route-specific logs test returns 200 for an existing `subturtle.log`
+- [ ] Resolve or isolate the current unrelated full-suite failures from dirty `src/handlers/*` changes so full-suite verification is meaningful again <- current
+- [ ] After the handler/streaming failures are cleared, re-run `cd super_turtle/claude-telegram-bot && bun test` and confirm whether `/api/subturtles/:name/logs` still has any order-dependent failure
 - [x] Commit with descriptive message
 
-Note: `bun test src/drivers/codex-driver.test.ts` passed. Full `bun test` still fails in `src/dashboard.test.ts` for `GET /api/subturtles/:name/logs`; the same dashboard test passes when run in isolation, so the remaining blocker appears unrelated to the codex-driver change.
+Note: `bun test src/dashboard.test.ts` passes in the current tree, so the earlier `/api/subturtles/:name/logs` 404 is not currently reproducible. A full `bun test` run now fails first in unrelated dirty handler/streaming areas, including `src/handlers/commands.subturtle.test.ts`, `src/handlers/callback.subturtle.test.ts`, and `src/handlers/streaming.test.ts`, so those failures need to be cleared or isolated before dashboard behavior can be verified meaningfully in-suite.
