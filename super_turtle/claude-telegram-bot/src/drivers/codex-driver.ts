@@ -3,8 +3,17 @@ import type { ChatDriver, DriverRunInput, DriverStatusSnapshot } from "./types";
 import type { McpCompletionCallback } from "../types";
 import { codexLog } from "../logger";
 
+const DEFAULT_PENDING_REQUEST_TIMEOUT_MS = 1500;
+const DEFAULT_PENDING_PUMP_SHUTDOWN_TIMEOUT_MS = 2000;
+
 async function wait(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getTimeoutMs(envName: string, fallback: number): number {
+  const raw = process.env[envName];
+  const parsed = raw ? Number(raw) : Number.NaN;
+  return Number.isFinite(parsed) && parsed >= 10 ? Math.floor(parsed) : fallback;
 }
 
 export class CodexDriver implements ChatDriver {
@@ -22,6 +31,82 @@ export class CodexDriver implements ChatDriver {
     } = await import("../handlers/streaming");
 
     process.env.TELEGRAM_CHAT_ID = String(input.chatId);
+    const pendingRequestTimeoutMs = getTimeoutMs(
+      "CODEX_PENDING_REQUEST_TIMEOUT_MS",
+      DEFAULT_PENDING_REQUEST_TIMEOUT_MS
+    );
+    const pendingPumpShutdownTimeoutMs = getTimeoutMs(
+      "CODEX_PENDING_PUMP_SHUTDOWN_TIMEOUT_MS",
+      DEFAULT_PENDING_PUMP_SHUTDOWN_TIMEOUT_MS
+    );
+
+    const runPendingCheck = async (
+      checkName: string,
+      phase: string,
+      operation: () => Promise<boolean>
+    ): Promise<boolean> => {
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+      try {
+        return await Promise.race([
+          operation().catch((error) => {
+            codexLog.warn(
+              { err: error, driver: this.id, chatId: input.chatId, checkName, phase },
+              "Pending Codex output check failed"
+            );
+            return false;
+          }),
+          new Promise<boolean>((resolve) => {
+            timeoutId = setTimeout(() => {
+              codexLog.warn(
+                {
+                  driver: this.id,
+                  chatId: input.chatId,
+                  checkName,
+                  phase,
+                  timeoutMs: pendingRequestTimeoutMs,
+                },
+                "Pending Codex output check timed out"
+              );
+              resolve(false);
+            }, pendingRequestTimeoutMs);
+          }),
+        ]);
+      } finally {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      }
+    };
+
+    const flushPendingOutputs = async (phase: string): Promise<void> => {
+      await Promise.all([
+        runPendingCheck(
+          "ask_user",
+          phase,
+          () => checkPendingAskUserRequests(input.ctx, input.chatId)
+        ),
+        runPendingCheck(
+          "send_image",
+          phase,
+          () => checkPendingSendImageRequests(input.ctx, input.chatId)
+        ),
+        runPendingCheck(
+          "send_turtle",
+          phase,
+          () => checkPendingSendTurtleRequests(input.ctx, input.chatId)
+        ),
+        runPendingCheck(
+          "bot_control",
+          phase,
+          () => checkPendingBotControlRequests(codexSession, input.chatId)
+        ),
+        runPendingCheck(
+          "pino_logs",
+          phase,
+          () => checkPendingPinoLogsRequests(input.chatId)
+        ),
+      ]);
+    };
 
     // MCP completion callback: fires when an mcp_tool_call completes
     const mcpCompletionCallback: McpCompletionCallback = async (_server, tool) => {
@@ -39,9 +124,10 @@ export class CodexDriver implements ChatDriver {
 
         // Retry a few times in case of timing issues
         for (let attempt = 0; attempt < 3; attempt++) {
-          const buttonsSent = await checkPendingAskUserRequests(
-            input.ctx,
-            input.chatId
+          const buttonsSent = await runPendingCheck(
+            "ask_user",
+            `mcp:${normalizedTool}`,
+            () => checkPendingAskUserRequests(input.ctx, input.chatId)
           );
           if (buttonsSent) {
             codexLog.info(
@@ -67,9 +153,10 @@ export class CodexDriver implements ChatDriver {
 
         // Retry a few times in case of timing issues
         for (let attempt = 0; attempt < 3; attempt++) {
-          const photoSent = await checkPendingSendTurtleRequests(
-            input.ctx,
-            input.chatId
+          const photoSent = await runPendingCheck(
+            "send_turtle",
+            `mcp:${normalizedTool}`,
+            () => checkPendingSendTurtleRequests(input.ctx, input.chatId)
           );
           if (photoSent) break;
           if (attempt < 2) {
@@ -86,9 +173,10 @@ export class CodexDriver implements ChatDriver {
         await new Promise((resolve) => setTimeout(resolve, 200));
 
         for (let attempt = 0; attempt < 3; attempt++) {
-          const imageSent = await checkPendingSendImageRequests(
-            input.ctx,
-            input.chatId
+          const imageSent = await runPendingCheck(
+            "send_image",
+            `mcp:${normalizedTool}`,
+            () => checkPendingSendImageRequests(input.ctx, input.chatId)
           );
           if (imageSent) break;
           if (attempt < 2) {
@@ -108,9 +196,10 @@ export class CodexDriver implements ChatDriver {
 
         // Retry a few times in case of timing issues
         for (let attempt = 0; attempt < 3; attempt++) {
-          const handled = await checkPendingBotControlRequests(
-            codexSession,
-            input.chatId
+          const handled = await runPendingCheck(
+            "bot_control",
+            `mcp:${normalizedTool}`,
+            () => checkPendingBotControlRequests(codexSession, input.chatId)
           );
           if (handled) break;
           if (attempt < 2) {
@@ -127,7 +216,11 @@ export class CodexDriver implements ChatDriver {
         await new Promise((resolve) => setTimeout(resolve, 200));
 
         for (let attempt = 0; attempt < 3; attempt++) {
-          const handled = await checkPendingPinoLogsRequests(input.chatId);
+          const handled = await runPendingCheck(
+            "pino_logs",
+            `mcp:${normalizedTool}`,
+            () => checkPendingPinoLogsRequests(input.chatId)
+          );
           if (handled) break;
           if (attempt < 2) {
             await new Promise((resolve) => setTimeout(resolve, 100));
@@ -142,11 +235,7 @@ export class CodexDriver implements ChatDriver {
     const pendingPump = (async () => {
       while (keepPolling) {
         try {
-          await checkPendingAskUserRequests(input.ctx, input.chatId);
-          await checkPendingSendImageRequests(input.ctx, input.chatId);
-          await checkPendingSendTurtleRequests(input.ctx, input.chatId);
-          await checkPendingBotControlRequests(codexSession, input.chatId);
-          await checkPendingPinoLogsRequests(input.chatId);
+          await flushPendingOutputs("poll");
         } catch (error) {
           codexLog.warn(
             { err: error, driver: this.id, chatId: input.chatId },
@@ -188,18 +277,23 @@ export class CodexDriver implements ChatDriver {
       );
     } finally {
       keepPolling = false;
-      await pendingPump;
+      const pendingPumpStopped = await Promise.race([
+        pendingPump.then(() => true),
+        wait(pendingPumpShutdownTimeoutMs).then(() => false),
+      ]);
+      if (!pendingPumpStopped) {
+        codexLog.warn(
+          { driver: this.id, chatId: input.chatId, timeoutMs: pendingPumpShutdownTimeoutMs },
+          "Pending Codex output pump did not stop before timeout"
+        );
+      }
     }
 
     // Final flush for late writes near turn completion.
     // Wait longer (300ms) and retry multiple times in case MCP server is still writing.
     await wait(300);
     for (let attempt = 0; attempt < 3; attempt++) {
-      await checkPendingAskUserRequests(input.ctx, input.chatId);
-      await checkPendingSendImageRequests(input.ctx, input.chatId);
-      await checkPendingSendTurtleRequests(input.ctx, input.chatId);
-      await checkPendingBotControlRequests(codexSession, input.chatId);
-      await checkPendingPinoLogsRequests(input.chatId);
+      await flushPendingOutputs("final_flush");
       if (attempt < 2) {
         await wait(100);
       }

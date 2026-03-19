@@ -98,4 +98,62 @@ describe("CodexDriver", () => {
     expect(response).toBe("ok");
     expect(sendImageChecks).toContain(789);
   });
+
+  it("forwards done even when a pending checker hangs after Codex completion", async () => {
+    const originalPendingTimeout = process.env.CODEX_PENDING_REQUEST_TIMEOUT_MS;
+    const originalPumpShutdownTimeout = process.env.CODEX_PENDING_PUMP_SHUTDOWN_TIMEOUT_MS;
+    process.env.CODEX_PENDING_REQUEST_TIMEOUT_MS = "10";
+    process.env.CODEX_PENDING_PUMP_SHUTDOWN_TIMEOUT_MS = "25";
+
+    try {
+      mock.module("../handlers/streaming", () => ({
+        checkPendingAskUserRequests: async () => await new Promise<boolean>(() => {}),
+        checkPendingBotControlRequests: async () => false,
+        checkPendingPinoLogsRequests: async () => false,
+        checkPendingSendImageRequests: async () => false,
+        checkPendingSendTurtleRequests: async () => false,
+      }));
+
+      codexSession.sendMessage = (async (_message, statusCallback) => {
+        await statusCallback?.("done", "");
+        return "ok";
+      }) as typeof codexSession.sendMessage;
+
+      const statusEvents: string[] = [];
+      const { CodexDriver } = await loadCodexDriverModule();
+      const driver = new CodexDriver();
+
+      const response = await Promise.race([
+        driver.runMessage({
+          message: "finish cleanly",
+          source: "text",
+          username: "tester",
+          userId: 123,
+          chatId: 456,
+          ctx: {} as Context,
+          statusCallback: async (statusType) => {
+            statusEvents.push(statusType);
+          },
+        }),
+        new Promise<string>((_, reject) => {
+          setTimeout(() => reject(new Error("driver stalled")), 900);
+        }),
+      ]);
+
+      expect(response).toBe("ok");
+      expect(statusEvents).toContain("done");
+    } finally {
+      if (originalPendingTimeout === undefined) {
+        delete process.env.CODEX_PENDING_REQUEST_TIMEOUT_MS;
+      } else {
+        process.env.CODEX_PENDING_REQUEST_TIMEOUT_MS = originalPendingTimeout;
+      }
+
+      if (originalPumpShutdownTimeout === undefined) {
+        delete process.env.CODEX_PENDING_PUMP_SHUTDOWN_TIMEOUT_MS;
+      } else {
+        process.env.CODEX_PENDING_PUMP_SHUTDOWN_TIMEOUT_MS = originalPumpShutdownTimeout;
+      }
+    }
+  });
 });
