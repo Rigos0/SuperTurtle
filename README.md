@@ -13,7 +13,7 @@
 
 ---
 
-SuperTurtle is an autonomous coding agent you control from Telegram. Send a voice message or text from your phone, and it combines [Codex](https://openai.com/index/introducing-codex/) with [Claude Code](https://claude.ai/code) on your machine to write code, run tests, fix bugs, and ship features. You can be on the couch, on a walk, or on a completely different machine. For bigger tasks it spins up parallel workers called SubTurtles and supervises them to completion. You get milestone updates as things land, not a wall of logs.
+SuperTurtle is an autonomous coding agent you control from Telegram. Send a voice message or text from your phone, and SuperTurtle gets to work on your machine using [Codex](https://openai.com/index/introducing-codex/) and [Claude Code](https://claude.ai/code). Whether you're on the couch, out for a walk, or on a different machine entirely, SuperTurtle keeps the work moving. For bigger tasks it spins up parallel workers called SubTurtles and supervises them to completion. You get milestone updates as things land, not a wall of logs.
 
 ## Install
 
@@ -24,8 +24,6 @@ superturtle start
 ```
 
 For normal local use, `superturtle start` is the command that makes the bot run continuously. Use `superturtle stop` to stop it.
-
-Do not manually run both `start` and `service run`. `service run` is the internal foreground runner used by `launchd`, `systemd`, and cloud-managed runtimes.
 
 For agents and CI, init runs non-interactively with flags:
 
