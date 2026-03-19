@@ -3,7 +3,7 @@
 </p>
 
 <h3 align="center">superturtle</h3>
-<p align="center">Code from anywhere with your voice.</p>
+<p align="center">Coding agent on your phone.</p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/superturtle"><img src="https://img.shields.io/npm/v/superturtle?style=flat-square&label=npm" alt="npm" /></a>
