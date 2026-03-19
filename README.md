@@ -82,6 +82,10 @@ superturtle init --token <BOT_TOKEN> --user <TELEGRAM_USER_ID> --openai-key <KEY
 | Runtime model | Moving the agent between your machine, sandboxes, and VMs with one command is part of the product direction | Runs on one machine at a time: local machine or VM |
 | Main agent runtime | Wraps the Codex and Claude Code CLIs | Embedded `pi-agent-core` / `pi-mono` runtime |
 
+<p align="center">
+  <img src="assets/readme-stickers/more-turtles/turtle-crab.png" width="108" alt="Crab turtle" />
+</p>
+
 ## Headless CLI Pattern
 
 SuperTurtle uses the headless CLI pattern for everything.
