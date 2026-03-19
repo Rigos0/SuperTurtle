@@ -340,8 +340,8 @@ export async function handleCallback(ctx: Context): Promise<void> {
     return;
   }
 
-  // 5a. Handle subturtle menu callback: sub_menu
-  if (callbackData === "sub_menu") {
+  // 5a. Handle subturtle menu callback: sub_menu[:page]
+  if (callbackData === "sub_menu" || callbackData.startsWith("sub_menu:")) {
     await handleSubturtleMenuCallback(ctx);
     return;
   }
@@ -593,6 +593,10 @@ async function handleSubturtleLogsCallback(
  * Handle "↩ Menu" button — re-displays the /sub listing.
  */
 async function handleSubturtleMenuCallback(ctx: Context): Promise<void> {
+  const callbackData = ctx.callbackQuery?.data || "";
+  const pageMatch = /^sub_menu:(\d+)$/.exec(callbackData);
+  const page = pageMatch ? Number.parseInt(pageMatch[1]!, 10) : 0;
+
   try {
     const proc = Bun.spawnSync([CTL_PATH, "list"], {
       cwd: WORKING_DIR,
@@ -621,7 +625,7 @@ async function handleSubturtleMenuCallback(ctx: Context): Promise<void> {
       return;
     }
 
-    const menu = await buildSubturtleMenuMessage(turtles);
+    const menu = await buildSubturtleMenuMessage(turtles, page);
     await ctx.editMessageText(menu.text, {
       parse_mode: "HTML",
       reply_markup: menu.replyMarkup,
@@ -641,7 +645,14 @@ async function handleSubturtlePickCallback(
   ctx: Context,
   callbackData: string
 ): Promise<void> {
-  const name = callbackData.replace("sub_pick:", "");
+  const match = /^sub_pick:([^:]+)(?::(\d+))?$/.exec(callbackData);
+  if (!match) {
+    await ctx.answerCallbackQuery({ text: "Invalid SubTurtle name" });
+    return;
+  }
+
+  const name = match[1]!;
+  const menuPage = match[2] ? Number.parseInt(match[2], 10) : 0;
 
   if (!name || !isSafeCallbackId(name)) {
     await ctx.answerCallbackQuery({ text: "Invalid SubTurtle name" });
@@ -666,7 +677,7 @@ async function handleSubturtlePickCallback(
       return;
     }
 
-    await replySubturtleDetail(ctx, turtle, true, "edit");
+    await replySubturtleDetail(ctx, turtle, true, "edit", menuPage);
     await ctx.answerCallbackQuery();
   } catch (error) {
     callbackLog.error({ err: error, name, chatId: ctx.chat?.id }, "Failed to show SubTurtle detail");

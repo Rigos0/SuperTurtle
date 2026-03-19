@@ -113,9 +113,12 @@ describe("subturtle callback actions", () => {
   });
 
   it("edits in place when selecting a SubTurtle from the menu", async () => {
-    const turtleName = "picked-sub";
+    const turtleNames = ["picked-a", "picked-b", "picked-c", "picked-sub"];
+    const turtleName = turtleNames[3]!;
     const turtleDir = join(SUPERTURTLE_SUBTURTLES_DIR, turtleName);
-    mkdirSync(turtleDir, { recursive: true });
+    for (const name of turtleNames) {
+      mkdirSync(join(SUPERTURTLE_SUBTURTLES_DIR, name), { recursive: true });
+    }
     writeFileSync(
       join(turtleDir, "CLAUDE.md"),
       [
@@ -131,7 +134,11 @@ describe("subturtle callback actions", () => {
       const parts = Array.isArray(cmd) ? cmd.map((part) => String(part)) : [String(cmd)];
       if (parts[0]?.endsWith("/subturtle/ctl") && parts[1] === "list") {
         return {
-          stdout: Buffer.from(`  ${turtleName}      running  yolo-codex   (PID 12345)   9m left       Placeholder task`),
+          stdout: Buffer.from(
+            turtleNames
+              .map((name, idx) => `  ${name}      running  yolo-codex   (PID ${12345 + idx})   9m left       Placeholder task`)
+              .join("\n")
+          ),
           stderr: Buffer.from(""),
           success: true,
           exitCode: 0,
@@ -144,12 +151,14 @@ describe("subturtle callback actions", () => {
       );
     }) as typeof Bun.spawnSync;
 
-    const { ctx, callbackAnswers, replies, edits } = makeCallbackCtx(`sub_pick:${turtleName}`);
+    const { ctx, callbackAnswers, replies, edits } = makeCallbackCtx(`sub_pick:${turtleName}:1`);
 
     try {
       await handleCallback(ctx);
     } finally {
-      rmSync(turtleDir, { recursive: true, force: true });
+      for (const name of turtleNames) {
+        rmSync(join(SUPERTURTLE_SUBTURTLES_DIR, name), { recursive: true, force: true });
+      }
     }
 
     expect(callbackAnswers).toEqual([""]);
@@ -157,14 +166,18 @@ describe("subturtle callback actions", () => {
     expect(edits).toHaveLength(1);
     expect(edits[0]?.text).toContain(`<b>${turtleName}</b>`);
     expect(edits[0]?.text).toContain("Review pagination callbacks.");
+    const keyboard = (edits[0]?.extra as any)?.reply_markup?.inline_keyboard || [];
+    expect(keyboard.flat().some((button: any) => button.callback_data === "sub_menu:1")).toBe(true);
   });
 
   it("edits the existing message when returning to the SubTurtle menu", async () => {
-    const turtleName = "menu-sub";
-    const turtleDir = join(SUPERTURTLE_SUBTURTLES_DIR, turtleName);
-    mkdirSync(turtleDir, { recursive: true });
+    const turtleNames = ["menu-a", "menu-b", "menu-c", "menu-sub"];
+    const turtleName = turtleNames[3]!;
+    for (const name of turtleNames) {
+      mkdirSync(join(SUPERTURTLE_SUBTURTLES_DIR, name), { recursive: true });
+    }
     writeFileSync(
-      join(turtleDir, "CLAUDE.md"),
+      join(SUPERTURTLE_SUBTURTLES_DIR, turtleName, "CLAUDE.md"),
       [
         "## Current Task",
         "Render menu from callback.",
@@ -178,7 +191,11 @@ describe("subturtle callback actions", () => {
       const parts = Array.isArray(cmd) ? cmd.map((part) => String(part)) : [String(cmd)];
       if (parts[0]?.endsWith("/subturtle/ctl") && parts[1] === "list") {
         return {
-          stdout: Buffer.from(`  ${turtleName}      running  yolo-codex   (PID 12345)   9m left       Placeholder task`),
+          stdout: Buffer.from(
+            turtleNames
+              .map((name, idx) => `  ${name}      running  yolo-codex   (PID ${12345 + idx})   9m left       Placeholder task`)
+              .join("\n")
+          ),
           stderr: Buffer.from(""),
           success: true,
           exitCode: 0,
@@ -191,19 +208,24 @@ describe("subturtle callback actions", () => {
       );
     }) as typeof Bun.spawnSync;
 
-    const { ctx, callbackAnswers, replies, edits } = makeCallbackCtx("sub_menu");
+    const { ctx, callbackAnswers, replies, edits } = makeCallbackCtx("sub_menu:1");
 
     try {
       await handleCallback(ctx);
     } finally {
-      rmSync(turtleDir, { recursive: true, force: true });
+      for (const name of turtleNames) {
+        rmSync(join(SUPERTURTLE_SUBTURTLES_DIR, name), { recursive: true, force: true });
+      }
     }
 
     expect(callbackAnswers).toEqual([""]);
     expect(replies).toHaveLength(0);
     expect(edits).toHaveLength(1);
     expect(edits[0]?.text).toContain("<b>SubTurtles</b>");
-    expect(edits[0]?.text).toContain(`<b>${turtleName}</b>`);
+    expect(edits[0]?.text).toContain("page 2/2");
+    const keyboard = (edits[0]?.extra as any)?.reply_markup?.inline_keyboard || [];
+    expect(keyboard.flat().some((button: any) => button.callback_data === `sub_pick:${turtleName}:1`)).toBe(true);
+    expect(keyboard.flat().some((button: any) => button.callback_data === "sub_menu:0")).toBe(true);
   });
 });
 

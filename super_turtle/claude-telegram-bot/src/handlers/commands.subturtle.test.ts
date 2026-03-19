@@ -103,7 +103,58 @@ describe("/subturtle", () => {
 
     const keyboard = (replies[0]!.extra?.reply_markup as { inline_keyboard?: Array<Array<{ callback_data?: string }>> })?.inline_keyboard;
     expect(Array.isArray(keyboard)).toBe(true);
-    expect(keyboard?.flat().some((button) => button.callback_data === `subturtle_stop:${turtleName}`)).toBe(true);
-    expect(keyboard?.flat().some((button) => button.callback_data === `subturtle_logs:${turtleName}`)).toBe(true);
+    expect(keyboard?.flat().some((button) => button.callback_data === `sub_pick:${turtleName}:0`)).toBe(true);
+    expect(keyboard?.flat().some((button) => button.callback_data === `subturtle_stop:${turtleName}`)).toBe(false);
+    expect(keyboard?.flat().some((button) => button.callback_data === `subturtle_logs:${turtleName}`)).toBe(false);
+    expect(keyboard?.flat().some((button) => button.callback_data === `sub_bl:${turtleName}:0`)).toBe(false);
+    expect(keyboard?.flat().some((button) => button.callback_data === `sub_lg:${turtleName}:0`)).toBe(false);
+  });
+
+  it("paginates running subturtle picker buttons three at a time", async () => {
+    const workdir = WORKING_DIR;
+    const turtleNames = ["sub-1", "sub-2", "sub-3", "sub-4"];
+    const originalSpawnSync = Bun.spawnSync;
+    const replies: Array<{ text: string; extra?: { parse_mode?: string; reply_markup?: unknown } }> = [];
+
+    Bun.spawnSync = ((cmd: unknown, opts?: unknown) => {
+      if (Array.isArray(cmd) && String(cmd[0]).endsWith("/subturtle/ctl") && cmd[1] === "list") {
+        const output = turtleNames
+          .map((name, idx) => `  ${name}      running  yolo-codex   (PID ${12340 + idx})   9m left       Task ${idx + 1}`)
+          .join("\n");
+
+        return {
+          stdout: Buffer.from(output),
+          stderr: Buffer.from(""),
+          success: true,
+          exitCode: 0,
+        } as ReturnType<typeof Bun.spawnSync>;
+      }
+
+      return originalSpawnSync(cmd as Parameters<typeof Bun.spawnSync>[0], opts as Parameters<typeof Bun.spawnSync>[1]);
+    }) as typeof Bun.spawnSync;
+
+    const ctx = {
+      from: { id: authorizedUserId },
+      reply: async (text: string, extra?: { parse_mode?: string; reply_markup?: unknown }) => {
+        replies.push({ text, extra });
+      },
+    } as any;
+
+    try {
+      await handleSubturtle(ctx);
+    } finally {
+      Bun.spawnSync = originalSpawnSync;
+      for (const name of turtleNames) {
+        rmSync(join(workdir, ".superturtle/subturtles", name), { recursive: true, force: true });
+      }
+    }
+
+    const keyboard = (replies[0]!.extra?.reply_markup as { inline_keyboard?: Array<Array<{ callback_data?: string }>> })?.inline_keyboard || [];
+    expect(keyboard.flat().filter((button) => button.callback_data?.startsWith("sub_pick:"))).toHaveLength(3);
+    expect(keyboard.flat().some((button) => button.callback_data === "sub_pick:sub-1:0")).toBe(true);
+    expect(keyboard.flat().some((button) => button.callback_data === "sub_pick:sub-3:0")).toBe(true);
+    expect(keyboard.flat().some((button) => button.callback_data === "sub_pick:sub-4:0")).toBe(false);
+    expect(keyboard.flat().some((button) => button.callback_data === "sub_menu:1")).toBe(true);
+    expect(replies[0]!.text).toContain("page 1/2");
   });
 });

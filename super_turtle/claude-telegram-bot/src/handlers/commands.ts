@@ -317,6 +317,8 @@ type InlineKeyboardMarkup = {
   inline_keyboard: InlineKeyboardButton[][];
 };
 
+const SUBTURTLE_MENU_PAGE_SIZE = 3;
+
 export type ClaudeStateSummary = {
   currentTask: string;
   backlogDone: number;
@@ -2117,7 +2119,8 @@ export async function handleSubturtle(ctx: Context): Promise<void> {
 }
 
 export async function buildSubturtleMenuMessage(
-  turtles: ListedSubTurtle[]
+  turtles: ListedSubTurtle[],
+  page = 0
 ): Promise<{ text: string; replyMarkup?: InlineKeyboardMarkup }> {
   const runningTurtles = turtles.filter((t) => t.status === "running");
   const rootStatePath = `${WORKING_DIR}/CLAUDE.md`;
@@ -2174,23 +2177,36 @@ export async function buildSubturtleMenuMessage(
     }
   }
 
-  // 1 running SubTurtle → show 4 action buttons directly
-  // 2+ running → show name-selection buttons so user picks one first
-    if (runningTurtles.length === 1) {
-      const name = runningTurtles[0]!.name;
+  if (runningTurtles.length > 0) {
+    const totalPages = Math.ceil(runningTurtles.length / SUBTURTLE_MENU_PAGE_SIZE);
+    const safePage = Math.max(0, Math.min(page, totalPages - 1));
+    const start = safePage * SUBTURTLE_MENU_PAGE_SIZE;
+    const pageTurtles = runningTurtles.slice(start, start + SUBTURTLE_MENU_PAGE_SIZE);
+
+    if (totalPages > 1) {
+      messageLines.push("");
+      messageLines.push(
+        `📚 <b>Running picker:</b> page ${safePage + 1}/${totalPages} (${runningTurtles.length} running)`
+      );
+    }
+
+    for (const turtle of pageTurtles) {
       keyboard.push([
-        { text: "📋 State", callback_data: `subturtle_logs:${name}` },
-        { text: "🛑 Stop", callback_data: `subturtle_stop:${name}` },
-    ]);
-    keyboard.push([
-      { text: "📝 Backlog", callback_data: `sub_bl:${name}:0` },
-      { text: "📜 Logs", callback_data: `sub_lg:${name}:0` },
-    ]);
-  } else if (runningTurtles.length > 1) {
-    for (const turtle of runningTurtles) {
-      keyboard.push([
-        { text: `🐢 ${turtle.name}`, callback_data: `sub_pick:${turtle.name}` },
+        { text: `🐢 ${turtle.name}`, callback_data: `sub_pick:${turtle.name}:${safePage}` },
       ]);
+    }
+
+    if (totalPages > 1) {
+      const navButtons: InlineKeyboardButton[] = [];
+      if (safePage > 0) {
+        navButtons.push({ text: "◀ Prev", callback_data: `sub_menu:${safePage - 1}` });
+      }
+      if (safePage < totalPages - 1) {
+        navButtons.push({ text: "▶ Next", callback_data: `sub_menu:${safePage + 1}` });
+      }
+      if (navButtons.length > 0) {
+        keyboard.push(navButtons);
+      }
     }
   }
 
@@ -2209,7 +2225,8 @@ export async function replySubturtleDetail(
   ctx: Context,
   turtle: ListedSubTurtle,
   showMenu: boolean,
-  mode: "reply" | "edit" = "reply"
+  mode: "reply" | "edit" = "reply",
+  menuPage = 0
 ): Promise<void> {
   const statePath = `${SUPERTURTLE_SUBTURTLES_DIR}/${turtle.name}/CLAUDE.md`;
   const summary = await readClaudeStateSummary(statePath);
@@ -2239,7 +2256,6 @@ export async function replySubturtleDetail(
 
   const keyboard: Array<Array<{ text: string; callback_data: string }>> = [
     [
-      { text: "📋 State", callback_data: `subturtle_logs:${turtle.name}` },
       { text: "🛑 Stop", callback_data: `subturtle_stop:${turtle.name}` },
     ],
     [
@@ -2249,7 +2265,7 @@ export async function replySubturtleDetail(
   ];
 
   if (showMenu) {
-    keyboard.push([{ text: "↩ Menu", callback_data: "sub_menu" }]);
+    keyboard.push([{ text: "↩ Menu", callback_data: `sub_menu:${menuPage}` }]);
   }
 
   const payload = {
