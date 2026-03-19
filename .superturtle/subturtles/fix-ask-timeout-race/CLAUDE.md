@@ -26,6 +26,7 @@ Acceptance criteria:
 - [x] Triage unrelated full-suite failures surfaced by `cd super_turtle/claude-telegram-bot && bun test` and separate them from this timeout-race change
 - [x] Fix streaming/media regressions in `src/handlers/streaming.test.ts` that currently break pending delivery and silent notification expectations
 - [x] Fix SubTurtle board/dashboard regressions in `src/dashboard.test.ts`, `src/handlers/commands.subturtle.test.ts`, and `src/handlers/callback.subturtle.test.ts`
+  Verified with `cd super_turtle/claude-telegram-bot && bun test src/dashboard.test.ts src/handlers/commands.subturtle.test.ts src/handlers/callback.subturtle.test.ts`
 - [ ] Fix stop-handler session API regressions in `src/handlers/stop.test.ts` <- current
 - [ ] Fix voice typing cleanup timeout in `src/handlers/voice.typing.test.ts`
 - [ ] Re-run `cd super_turtle/claude-telegram-bot && bun test` and confirm the full suite is green
