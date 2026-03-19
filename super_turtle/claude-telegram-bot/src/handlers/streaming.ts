@@ -8,8 +8,12 @@ import type { Context } from "grammy";
 import type { Message } from "grammy/types";
 import { InlineKeyboard, InputFile } from "grammy";
 import { closeSync, openSync, statSync, unlinkSync } from "fs";
-import type { StatusCallback } from "../types";
+import type { DriverStatusType, StatusCallback } from "../types";
 import { convertMarkdownToHtml, escapeHtml } from "../formatting";
+import {
+  classifyDriverStatusMessage,
+  OutboundMessageKind,
+} from "../message-kinds";
 import {
   TELEGRAM_MESSAGE_LIMIT,
   TELEGRAM_SAFE_LIMIT,
@@ -1244,17 +1248,16 @@ export function createStatusCallback(
     activeStreamingStates.set(chatId, state);
   }
   startHeartbeat(ctx, state);
-  return async (statusType: string, content: string, segmentId?: number) => {
+  return async (statusType: DriverStatusType, content: string, segmentId?: number) => {
     try {
+      const outboundMessageKind = classifyDriverStatusMessage(statusType);
       if (statusType !== "done") {
         state.lastStatusAt = Date.now();
       }
       if (
         state.heartbeatMessage &&
-        (statusType === "thinking" ||
-          statusType === "tool" ||
-          statusType === "text" ||
-          statusType === "segment_end")
+        (outboundMessageKind === OutboundMessageKind.InteractiveProgress ||
+          outboundMessageKind === OutboundMessageKind.InteractiveFinal)
       ) {
         await clearHeartbeatMessage(ctx, state);
       }
@@ -1474,8 +1477,9 @@ export function createSilentStatusCallback(
   _ctx: Context,
   state: StreamingState
 ): StatusCallback {
-  return async (statusType: string, content: string, segmentId?: number) => {
+  return async (statusType: DriverStatusType, content: string, segmentId?: number) => {
     try {
+      const outboundMessageKind = classifyDriverStatusMessage(statusType);
       if (statusType === "tool") {
         state.sawToolUse = true;
         if (isSpawnOrchestrationToolStatus(content)) {
@@ -1483,6 +1487,8 @@ export function createSilentStatusCallback(
         }
       }
       if (
+        (outboundMessageKind === OutboundMessageKind.InteractiveProgress ||
+          outboundMessageKind === OutboundMessageKind.InteractiveFinal) &&
         (statusType === "text" || statusType === "segment_end") &&
         segmentId !== undefined
       ) {

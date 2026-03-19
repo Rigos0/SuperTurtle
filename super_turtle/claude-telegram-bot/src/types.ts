@@ -5,9 +5,16 @@
 import type { Context } from "grammy";
 import type { Message } from "grammy/types";
 
+export type DriverStatusType =
+  | "thinking"
+  | "tool"
+  | "text"
+  | "segment_end"
+  | "done";
+
 // Status callback for streaming updates
 export type StatusCallback = (
-  type: "thinking" | "tool" | "text" | "segment_end" | "done",
+  type: DriverStatusType,
   content: string,
   segmentId?: number
 ) => Promise<void>;
