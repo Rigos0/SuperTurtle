@@ -31,6 +31,7 @@ async function loadTextModuleForRemoteMode(
 ) {
   const actualConfig = await import("../config");
   const actualTeleport = await import("../teleport");
+  const actualSession = await import("../session");
   const actualSecurity = await import("../security");
   const actualUtils = await import("../utils");
   const actualDeferredQueue = await import("../deferred-queue");
@@ -57,15 +58,16 @@ async function loadTextModuleForRemoteMode(
         : actualTeleport.TELEPORT_AGENT_TEXT_ONLY_MESSAGE,
   }));
   mock.module("../session", () => ({
-    session: {
-      lastMessage: "",
-      isActive: false,
-      conversationTitle: "",
-      typingController: null,
-      startProcessing() {
-        return () => {};
-      },
-    },
+    ...actualSession,
+    session: Object.assign(
+      Object.create(Object.getPrototypeOf(actualSession.session)),
+      actualSession.session,
+      {
+        lastMessage: "",
+        conversationTitle: "",
+        typingController: null,
+      }
+    ),
   }));
   mock.module("../security", () => ({
     ...actualSecurity,
