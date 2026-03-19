@@ -377,6 +377,10 @@ export type LiveSubturtleBoardApi = {
     chatId: number,
     messageId?: number
   ) => Promise<unknown>;
+  deleteMessage?: (
+    chatId: number,
+    messageId: number
+  ) => Promise<unknown>;
 };
 
 export type ClaudeStateSummary = {
@@ -716,6 +720,10 @@ function formatLiveBoardMetaLine(
   options: { includeTimeout?: boolean } = {}
 ): string | null {
   const parts: string[] = [];
+
+  if (turtle.type) {
+    parts.push(escapeHtml(turtle.type));
+  }
 
   if (summary && summary.backlogTotal > 0) {
     parts.push(`${summary.backlogDone}/${summary.backlogTotal} done`);
@@ -2676,6 +2684,8 @@ export async function syncLiveSubturtleBoard(
     disableNotification?: boolean;
     view?: LiveSubturtleBoardView;
     createIfMissing?: boolean;
+    targetMessageId?: number;
+    allowCreateOnEditFailure?: boolean;
   } = {}
 ): Promise<{ status: "created" | "updated" | "unchanged" | "skipped"; messageId: number | null; view: LiveSubturtleBoardView }> {
   const turtles = listSubturtles();
@@ -2683,6 +2693,11 @@ export async function syncLiveSubturtleBoard(
   const record = readLiveSubturtleBoardRecord(chatId);
   const targetView = normalizeLiveSubturtleBoardView(options.view || record?.current_view || { kind: "board" });
   const shouldCreateIfMissing = options.createIfMissing ?? hasActiveWorkers;
+  const targetMessageId =
+    typeof options.targetMessageId === "number" && Number.isFinite(options.targetMessageId)
+      ? options.targetMessageId
+      : null;
+  const allowCreateOnEditFailure = options.allowCreateOnEditFailure ?? true;
 
   if (!record && !shouldCreateIfMissing) {
     return { status: "skipped", messageId: null, view: { kind: "board" } };
@@ -2737,6 +2752,34 @@ export async function syncLiveSubturtleBoard(
     }
   };
 
+  const deleteMessage = async (messageId: number) => {
+    if (!api.deleteMessage) return;
+    try {
+      await api.deleteMessage(chatId, messageId);
+    } catch (error) {
+      const summary = String(error).toLowerCase();
+      if (
+        !summary.includes("message to delete not found") &&
+        !summary.includes("message can't be deleted") &&
+        !summary.includes("message identifier is not specified")
+      ) {
+        throw error;
+      }
+    }
+  };
+
+  const cleanupSupersededMessages = async (messageIds: Array<number | null | undefined>) => {
+    const uniqueIds = Array.from(
+      new Set(
+        messageIds.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
+      )
+    );
+    for (const messageId of uniqueIds) {
+      await unpinMessage(messageId);
+      await deleteMessage(messageId);
+    }
+  };
+
   if (record && !options.force) {
     const ageMs = Date.now() - Date.parse(record.updated_at);
     if (
@@ -2753,33 +2796,40 @@ export async function syncLiveSubturtleBoard(
     }
   }
 
-  if (record) {
+  const editMessageId = targetMessageId ?? record?.message_id ?? null;
+
+  if (editMessageId !== null) {
     try {
-      await api.editMessageText(chatId, record.message_id, payload.text, {
+      await api.editMessageText(chatId, editMessageId, payload.text, {
         parse_mode: "HTML",
         reply_markup: payload.replyMarkup,
       });
       if (hasActiveWorkers) {
-        await pinMessage(record.message_id);
+        await pinMessage(editMessageId);
       } else {
-        await unpinMessage(record.message_id);
+        await unpinMessage(editMessageId);
       }
-      saveRecord(record.message_id);
-      return { status: "updated", messageId: record.message_id, view: payload.view };
+      await cleanupSupersededMessages(record && record.message_id !== editMessageId ? [record.message_id] : []);
+      saveRecord(editMessageId);
+      return { status: "updated", messageId: editMessageId, view: payload.view };
     } catch (error) {
       if (shouldIgnoreUnchangedMessageError(error)) {
         if (hasActiveWorkers) {
-          await pinMessage(record.message_id);
+          await pinMessage(editMessageId);
         } else {
-          await unpinMessage(record.message_id);
+          await unpinMessage(editMessageId);
         }
-        saveRecord(record.message_id);
-        return { status: "unchanged", messageId: record.message_id, view: payload.view };
+        await cleanupSupersededMessages(record && record.message_id !== editMessageId ? [record.message_id] : []);
+        saveRecord(editMessageId);
+        return { status: "unchanged", messageId: editMessageId, view: payload.view };
       }
-      if (!shouldRecreateLiveBoard(error)) {
+      if (!allowCreateOnEditFailure || !shouldRecreateLiveBoard(error)) {
         throw error;
       }
-      await unpinMessage(record.message_id);
+      await cleanupSupersededMessages([
+        record?.message_id,
+        editMessageId !== record?.message_id ? editMessageId : null,
+      ]);
     }
   }
 

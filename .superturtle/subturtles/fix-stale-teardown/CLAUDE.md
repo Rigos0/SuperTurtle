@@ -1,5 +1,5 @@
 # Current task
-Unblock full-suite verification by resolving or isolating the current unrelated handler/streaming test failures, then re-check whether any dashboard log endpoint failure still reproduces under `bun test`.
+Finish isolating `src/handlers/commands.subturtle.test.ts` and `src/handlers/callback.subturtle.test.ts` from cross-file board-state collisions under full `bun test`, then re-check which unrelated failures still remain.
 
 # End goal with specs
 In `codex-driver.ts`, the `done` status is deferred (line 51-57) so it fires after pending output flush. But in `codex-session.ts` (line 1543-1546), the stale-session detection path calls `statusCallback("done", "")` then throws. This means:
@@ -30,8 +30,10 @@ Acceptance criteria:
 - [x] Implement fix: wrap lines 80-88 in try/finally so deferred done always delivered
 - [x] Add test: stale session emits `done`, then throws, and the downstream `done` callback still fires
 - [x] Re-check the reported dashboard logs 404 in the current tree; `bun test src/dashboard.test.ts` passes, and the route-specific logs test returns 200 for an existing `subturtle.log`
-- [ ] Resolve or isolate the current unrelated full-suite failures from dirty `src/handlers/*` changes so full-suite verification is meaningful again <- current
-- [ ] After the handler/streaming failures are cleared, re-run `cd super_turtle/claude-telegram-bot && bun test` and confirm whether `/api/subturtles/:name/logs` still has any order-dependent failure
+- [x] Re-isolate `commands.subturtle` and `callback.subturtle` from leaked `mock.module("../config")` state by loading fresh handler modules per test
+- [ ] Finish isolating `src/handlers/commands.subturtle.test.ts` and `src/handlers/callback.subturtle.test.ts` from shared live-board state collisions during full-suite runs <- current
+- [ ] After the subturtle handler suites are stable in the full suite, re-run `cd super_turtle/claude-telegram-bot && bun test` and confirm whether `/api/subturtles/:name/logs` still has any order-dependent failure
+- [ ] Investigate the remaining unrelated full-suite failures after subturtle isolation: `src/session.ask-user.test.ts`, `src/handlers/codex.flow.test.ts`, and `src/handlers/voice.typing.test.ts`
 - [x] Commit with descriptive message
 
-Note: `bun test src/dashboard.test.ts` passes in the current tree, so the earlier `/api/subturtles/:name/logs` 404 is not currently reproducible. A full `bun test` run now fails first in unrelated dirty handler/streaming areas, including `src/handlers/commands.subturtle.test.ts`, `src/handlers/callback.subturtle.test.ts`, and `src/handlers/streaming.test.ts`, so those failures need to be cleared or isolated before dashboard behavior can be verified meaningfully in-suite.
+Note: `bun test src/dashboard.test.ts` still passes in isolation, so the earlier `/api/subturtles/:name/logs` 404 is not currently reproducible by itself. After re-isolating the subturtle handler imports, a full `bun test` run dropped the prior `streaming.test.ts` failures, but it still reports 11 failures, led by shared-state issues in `src/handlers/commands.subturtle.test.ts` / `src/handlers/callback.subturtle.test.ts`, plus unrelated failures in `src/session.ask-user.test.ts`, `src/handlers/codex.flow.test.ts`, and `src/handlers/voice.typing.test.ts`.

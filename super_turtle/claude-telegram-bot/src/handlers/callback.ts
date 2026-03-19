@@ -626,6 +626,7 @@ async function handleSubturtleLogsCallback(
  */
 async function handleLiveSubturtleBoardRefresh(ctx: Context): Promise<void> {
   const chatId = ctx.chat?.id;
+  const targetMessageId = ctx.callbackQuery?.message?.message_id;
   if (!chatId) {
     await ctx.answerCallbackQuery({ text: "Chat unavailable" });
     return;
@@ -636,6 +637,8 @@ async function handleLiveSubturtleBoardRefresh(ctx: Context): Promise<void> {
       force: true,
       pin: true,
       disableNotification: true,
+      targetMessageId,
+      allowCreateOnEditFailure: false,
     });
     await ctx.answerCallbackQuery({
       text: result.status === "unchanged" ? "Already up to date" : "Live board refreshed",
@@ -668,6 +671,8 @@ async function handleLiveSubturtleBoardPick(
       pin: true,
       disableNotification: true,
       view: { kind: "detail", name },
+      targetMessageId: ctx.callbackQuery?.message?.message_id,
+      allowCreateOnEditFailure: false,
     });
     await ctx.answerCallbackQuery();
   } catch (error) {
@@ -678,6 +683,7 @@ async function handleLiveSubturtleBoardPick(
 
 async function handleLiveSubturtleBoardHome(ctx: Context): Promise<void> {
   const chatId = ctx.chat?.id;
+  const targetMessageId = ctx.callbackQuery?.message?.message_id;
   if (!chatId) {
     await ctx.answerCallbackQuery({ text: "Chat unavailable" });
     return;
@@ -689,6 +695,8 @@ async function handleLiveSubturtleBoardHome(ctx: Context): Promise<void> {
       pin: true,
       disableNotification: true,
       view: { kind: "board" },
+      targetMessageId,
+      allowCreateOnEditFailure: false,
     });
     await ctx.answerCallbackQuery();
   } catch (error) {
@@ -721,6 +729,8 @@ async function handleLiveSubturtleBoardBacklog(
       pin: true,
       disableNotification: true,
       view: { kind: "backlog", name: parsed.name, page: parsed.page },
+      targetMessageId: ctx.callbackQuery?.message?.message_id,
+      allowCreateOnEditFailure: false,
     });
     await ctx.answerCallbackQuery();
   } catch (error) {
@@ -753,6 +763,8 @@ async function handleLiveSubturtleBoardLogs(
       pin: true,
       disableNotification: true,
       view: { kind: "logs", name: parsed.name, page: parsed.page },
+      targetMessageId: ctx.callbackQuery?.message?.message_id,
+      allowCreateOnEditFailure: false,
     });
     await ctx.answerCallbackQuery();
   } catch (error) {
@@ -989,6 +1001,8 @@ async function handleSubturtleStopCallback(
           pin: true,
           disableNotification: true,
           view: { kind: "board" },
+          targetMessageId: ctx.callbackQuery?.message?.message_id,
+          allowCreateOnEditFailure: false,
         });
       } else {
         await ctx.editMessageText(`✅ <b>${escapeHtml(name)}</b> stopped`, {

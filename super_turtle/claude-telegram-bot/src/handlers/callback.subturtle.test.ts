@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 
@@ -6,19 +6,40 @@ process.env.TELEGRAM_BOT_TOKEN ||= "test-token";
 process.env.TELEGRAM_ALLOWED_USERS ||= "123";
 process.env.CLAUDE_WORKING_DIR ||= process.cwd();
 
-const { handleCallback } = await import("./callback");
-const { ALLOWED_USERS, WORKING_DIR, SUPERTURTLE_SUBTURTLES_DIR } = await import("../config");
-const authorizedUserId =
-  ALLOWED_USERS[0] ??
-  Number((process.env.TELEGRAM_ALLOWED_USERS || "123").split(",")[0]?.trim() || "123");
+type CallbackModule = typeof import("./callback");
+
+const workingDir = process.env.CLAUDE_WORKING_DIR || process.cwd();
+const subturtlesDir = join(workingDir, ".superturtle", "subturtles");
+const authorizedUserId = Number(
+  (process.env.TELEGRAM_ALLOWED_USERS || "123").split(",")[0]?.trim() || "123"
+);
 
 const originalSpawnSync = Bun.spawnSync;
 
-afterEach(() => {
-  Bun.spawnSync = originalSpawnSync;
+async function loadActualConfig() {
+  return import(`../config.ts?callback-subturtle-config=${Date.now()}-${Math.random()}`);
+}
+
+async function loadCallbackModule(): Promise<CallbackModule> {
+  return import(`./callback.ts?callback-subturtle=${Date.now()}-${Math.random()}`);
+}
+
+async function handleCallbackForTest(ctx: any) {
+  const { handleCallback } = await loadCallbackModule();
+  return handleCallback(ctx);
+}
+
+beforeEach(async () => {
+  const actualConfig = await loadActualConfig();
+  mock.module("../config", () => actualConfig);
 });
 
-function makeCallbackCtx(callbackData: string, chatId = 912345678) {
+afterEach(() => {
+  Bun.spawnSync = originalSpawnSync;
+  mock.restore();
+});
+
+function makeCallbackCtx(callbackData: string, chatId = 912345678, callbackMessageId = 77) {
   const callbackAnswers: string[] = [];
   const replies: Array<{ text: string; extra?: { parse_mode?: string } }> = [];
   const edits: Array<{ text: string; extra?: { parse_mode?: string } }> = [];
@@ -26,7 +47,7 @@ function makeCallbackCtx(callbackData: string, chatId = 912345678) {
   const ctx = {
     from: { id: authorizedUserId, username: "tester" },
     chat: { id: chatId, type: "private" },
-    callbackQuery: { data: callbackData },
+    callbackQuery: { data: callbackData, message: { message_id: callbackMessageId, chat: { id: chatId } } },
     answerCallbackQuery: async (payload?: { text?: string }) => {
       callbackAnswers.push(payload?.text || "");
     },
@@ -89,7 +110,7 @@ describe("subturtle callback actions", () => {
     }) as typeof Bun.spawnSync;
 
     const { ctx, callbackAnswers, edits } = makeCallbackCtx("subturtle_stop:worker-a");
-    await handleCallback(ctx);
+    await handleCallbackForTest(ctx);
 
     expect(commands.some((parts) => parts[0]?.endsWith("/subturtle/ctl"))).toBe(true);
     expect(commands.some((parts) => parts[1] === "stop" && parts[2] === "worker-a")).toBe(true);
@@ -111,7 +132,7 @@ describe("subturtle callback actions", () => {
 
   it("renders SubTurtle state details for subturtle_logs callbacks", async () => {
     const turtleName = "callback-sub-1";
-    const turtleDir = join(SUPERTURTLE_SUBTURTLES_DIR, turtleName);
+    const turtleDir = join(subturtlesDir, turtleName);
     const statePath = join(turtleDir, "CLAUDE.md");
     mkdirSync(turtleDir, { recursive: true });
     writeFileSync(
@@ -129,7 +150,7 @@ describe("subturtle callback actions", () => {
     const { ctx, callbackAnswers, replies } = makeCallbackCtx(`subturtle_logs:${turtleName}`);
 
     try {
-      await handleCallback(ctx);
+      await handleCallbackForTest(ctx);
     } finally {
       rmSync(turtleDir, { recursive: true, force: true });
     }
@@ -146,9 +167,9 @@ describe("subturtle callback actions", () => {
   it("edits in place when selecting a SubTurtle from the menu", async () => {
     const turtleNames = ["picked-a", "picked-b", "picked-c", "picked-sub"];
     const turtleName = turtleNames[3]!;
-    const turtleDir = join(SUPERTURTLE_SUBTURTLES_DIR, turtleName);
+    const turtleDir = join(subturtlesDir, turtleName);
     for (const name of turtleNames) {
-      mkdirSync(join(SUPERTURTLE_SUBTURTLES_DIR, name), { recursive: true });
+      mkdirSync(join(subturtlesDir, name), { recursive: true });
     }
     writeFileSync(
       join(turtleDir, "CLAUDE.md"),
@@ -185,10 +206,10 @@ describe("subturtle callback actions", () => {
     const { ctx, callbackAnswers, replies, edits } = makeCallbackCtx(`sub_pick:${turtleName}:1`);
 
     try {
-      await handleCallback(ctx);
+      await handleCallbackForTest(ctx);
     } finally {
       for (const name of turtleNames) {
-        rmSync(join(SUPERTURTLE_SUBTURTLES_DIR, name), { recursive: true, force: true });
+        rmSync(join(subturtlesDir, name), { recursive: true, force: true });
       }
     }
 
@@ -196,6 +217,7 @@ describe("subturtle callback actions", () => {
     expect(replies).toHaveLength(0);
     expect(edits).toHaveLength(1);
     expect(edits[0]?.text).toContain(`🟢 <b>${turtleName}</b>`);
+    expect(edits[0]?.text).toContain("yolo-codex");
     expect(edits[0]?.text).toContain("Review pagination callbacks.");
     expect(edits[0]?.text).toContain("9m left");
     expect(edits[0]?.text).not.toContain("Current:");
@@ -210,10 +232,10 @@ describe("subturtle callback actions", () => {
     const turtleNames = ["menu-a", "menu-b", "menu-c", "menu-sub"];
     const turtleName = turtleNames[3]!;
     for (const name of turtleNames) {
-      mkdirSync(join(SUPERTURTLE_SUBTURTLES_DIR, name), { recursive: true });
+      mkdirSync(join(subturtlesDir, name), { recursive: true });
     }
     writeFileSync(
-      join(SUPERTURTLE_SUBTURTLES_DIR, turtleName, "CLAUDE.md"),
+      join(subturtlesDir, turtleName, "CLAUDE.md"),
       [
         "## Current Task",
         "Render menu from callback.",
@@ -247,10 +269,10 @@ describe("subturtle callback actions", () => {
     const { ctx, callbackAnswers, replies, edits } = makeCallbackCtx("sub_menu:1");
 
     try {
-      await handleCallback(ctx);
+      await handleCallbackForTest(ctx);
     } finally {
       for (const name of turtleNames) {
-        rmSync(join(SUPERTURTLE_SUBTURTLES_DIR, name), { recursive: true, force: true });
+        rmSync(join(subturtlesDir, name), { recursive: true, force: true });
       }
     }
 
@@ -267,9 +289,9 @@ describe("subturtle callback actions", () => {
   it("keeps live board detail navigation in the same tracked message", async () => {
     const chatId = 923456781;
     const turtleName = "live-board-sub";
-    const turtleDir = join(SUPERTURTLE_SUBTURTLES_DIR, turtleName);
+    const turtleDir = join(subturtlesDir, turtleName);
     const boardPath = join(
-      WORKING_DIR,
+      workingDir,
       ".superturtle/state/telegram/subturtle-boards",
       `${chatId}.json`
     );
@@ -284,7 +306,7 @@ describe("subturtle callback actions", () => {
         "- [ ] Keep everything in one message <- current",
       ].join("\n")
     );
-    mkdirSync(join(WORKING_DIR, ".superturtle/state/telegram/subturtle-boards"), { recursive: true });
+    mkdirSync(join(workingDir, ".superturtle/state/telegram/subturtle-boards"), { recursive: true });
     writeFileSync(
       boardPath,
       JSON.stringify({
@@ -317,10 +339,10 @@ describe("subturtle callback actions", () => {
       );
     }) as typeof Bun.spawnSync;
 
-    const { ctx, callbackAnswers, replies, edits } = makeCallbackCtx(`sub_board_pick:${turtleName}`, chatId);
+    const { ctx, callbackAnswers, replies, edits } = makeCallbackCtx(`sub_board_pick:${turtleName}`, chatId, 77);
 
     try {
-      await handleCallback(ctx);
+      await handleCallbackForTest(ctx);
     } finally {
       rmSync(turtleDir, { recursive: true, force: true });
       rmSync(boardPath, { force: true });
@@ -330,6 +352,7 @@ describe("subturtle callback actions", () => {
     expect(replies).toHaveLength(0);
     expect(edits).toHaveLength(1);
     expect(edits[0]?.text).toContain(`<b>${turtleName}</b>`);
+    expect(edits[0]?.text).toContain("yolo-codex");
     const keyboard = (edits[0]?.extra as any)?.reply_markup?.inline_keyboard || [];
     expect(keyboard.flat().some((button: any) => button.callback_data === `sub_board_bl:${turtleName}:0`)).toBe(true);
     expect(keyboard.flat().some((button: any) => button.callback_data === `sub_board_lg:${turtleName}:0`)).toBe(true);
@@ -340,7 +363,7 @@ describe("subturtle callback actions", () => {
 describe("backlog pagination", () => {
   it("shows first page of backlog with Next button", async () => {
     const turtleName = "backlog-test";
-    const turtleDir = join(SUPERTURTLE_SUBTURTLES_DIR, turtleName);
+    const turtleDir = join(subturtlesDir, turtleName);
     mkdirSync(turtleDir, { recursive: true });
 
     // Create a backlog with 8 items (more than one page of 5)
@@ -355,7 +378,7 @@ describe("backlog pagination", () => {
     const { ctx, callbackAnswers, edits } = makeCallbackCtx(`sub_bl:${turtleName}:0`);
 
     try {
-      await handleCallback(ctx);
+      await handleCallbackForTest(ctx);
     } finally {
       rmSync(turtleDir, { recursive: true, force: true });
     }
@@ -381,7 +404,7 @@ describe("backlog pagination", () => {
 
   it("shows second page with Prev button", async () => {
     const turtleName = "backlog-page2";
-    const turtleDir = join(SUPERTURTLE_SUBTURTLES_DIR, turtleName);
+    const turtleDir = join(subturtlesDir, turtleName);
     mkdirSync(turtleDir, { recursive: true });
 
     const items = Array.from({ length: 8 }, (_, i) => `- [ ] Item ${i + 1}`);
@@ -393,7 +416,7 @@ describe("backlog pagination", () => {
     const { ctx, callbackAnswers, edits } = makeCallbackCtx(`sub_bl:${turtleName}:1`);
 
     try {
-      await handleCallback(ctx);
+      await handleCallbackForTest(ctx);
     } finally {
       rmSync(turtleDir, { recursive: true, force: true });
     }
@@ -411,7 +434,7 @@ describe("backlog pagination", () => {
 
   it("returns toast when backlog is empty", async () => {
     const turtleName = "backlog-empty";
-    const turtleDir = join(SUPERTURTLE_SUBTURTLES_DIR, turtleName);
+    const turtleDir = join(subturtlesDir, turtleName);
     mkdirSync(turtleDir, { recursive: true });
 
     writeFileSync(
@@ -422,7 +445,7 @@ describe("backlog pagination", () => {
     const { ctx, callbackAnswers, edits } = makeCallbackCtx(`sub_bl:${turtleName}:0`);
 
     try {
-      await handleCallback(ctx);
+      await handleCallbackForTest(ctx);
     } finally {
       rmSync(turtleDir, { recursive: true, force: true });
     }
@@ -435,7 +458,7 @@ describe("backlog pagination", () => {
 describe("log pagination", () => {
   it("shows most recent log lines on page 0 with Older button", async () => {
     const turtleName = "logs-test";
-    const turtleDir = join(SUPERTURTLE_SUBTURTLES_DIR, turtleName);
+    const turtleDir = join(subturtlesDir, turtleName);
     mkdirSync(turtleDir, { recursive: true });
 
     // Create 50 log lines (more than one page of 30)
@@ -445,7 +468,7 @@ describe("log pagination", () => {
     const { ctx, callbackAnswers, edits } = makeCallbackCtx(`sub_lg:${turtleName}:0`);
 
     try {
-      await handleCallback(ctx);
+      await handleCallbackForTest(ctx);
     } finally {
       rmSync(turtleDir, { recursive: true, force: true });
     }
@@ -467,7 +490,7 @@ describe("log pagination", () => {
 
   it("returns toast when log file is missing", async () => {
     const { ctx, callbackAnswers, edits } = makeCallbackCtx("sub_lg:nonexistent:0");
-    await handleCallback(ctx);
+    await handleCallbackForTest(ctx);
 
     expect(callbackAnswers).toEqual(["Log file not found"]);
     expect(edits).toHaveLength(0);
@@ -476,15 +499,15 @@ describe("log pagination", () => {
   it("keeps live board log navigation in the same tracked message", async () => {
     const chatId = 923456782;
     const turtleName = "live-board-logs";
-    const turtleDir = join(SUPERTURTLE_SUBTURTLES_DIR, turtleName);
+    const turtleDir = join(subturtlesDir, turtleName);
     const boardPath = join(
-      WORKING_DIR,
+      workingDir,
       ".superturtle/state/telegram/subturtle-boards",
       `${chatId}.json`
     );
     mkdirSync(turtleDir, { recursive: true });
     writeFileSync(join(turtleDir, "subturtle.log"), Array.from({ length: 35 }, (_, i) => `Log line ${i + 1}`).join("\n"));
-    mkdirSync(join(WORKING_DIR, ".superturtle/state/telegram/subturtle-boards"), { recursive: true });
+    mkdirSync(join(workingDir, ".superturtle/state/telegram/subturtle-boards"), { recursive: true });
     writeFileSync(
       boardPath,
       JSON.stringify({
@@ -517,10 +540,10 @@ describe("log pagination", () => {
       );
     }) as typeof Bun.spawnSync;
 
-    const { ctx, callbackAnswers, replies, edits } = makeCallbackCtx(`sub_board_lg:${turtleName}:0`, chatId);
+    const { ctx, callbackAnswers, replies, edits } = makeCallbackCtx(`sub_board_lg:${turtleName}:0`, chatId, 88);
 
     try {
-      await handleCallback(ctx);
+      await handleCallbackForTest(ctx);
     } finally {
       rmSync(turtleDir, { recursive: true, force: true });
       rmSync(boardPath, { force: true });
@@ -544,7 +567,7 @@ describe("log pagination", () => {
 describe("pinologs callback levels", () => {
   it("rejects unsupported pinologs levels", async () => {
     const { ctx, callbackAnswers, replies } = makeCallbackCtx("pinologs:verbose");
-    await handleCallback(ctx);
+    await handleCallbackForTest(ctx);
 
     expect(callbackAnswers).toEqual(["Invalid log level"]);
     expect(replies).toHaveLength(0);
