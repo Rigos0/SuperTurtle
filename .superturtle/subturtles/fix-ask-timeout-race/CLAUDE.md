@@ -1,5 +1,5 @@
 # Current task
-Fix the unrelated streaming/media regressions surfaced by `cd super_turtle/claude-telegram-bot && bun test` so repo-wide verification can proceed.
+Fix the SubTurtle board/dashboard regressions surfaced by `cd super_turtle/claude-telegram-bot && bun test` so repo-wide verification can proceed.
 
 # End goal with specs
 When `runPendingCheck("ask_user", ...)` times out via the `Promise.race` timeout branch, but the actual `ask_user` check resolves `true` shortly after, `handleToolCompletion()` must still return `true` (breakOnHandled) so Codex stops streaming. Currently the timeout wins the race and returns `false`, causing Codex to keep streaming after the prompt was already sent to the user.
@@ -24,8 +24,8 @@ Acceptance criteria:
 - [x] Add test: ask_user resolves true just after timeout → handleToolCompletion returns true
 - [x] Add test: non-ask_user tool timeout still returns false (no grace window)
 - [x] Triage unrelated full-suite failures surfaced by `cd super_turtle/claude-telegram-bot && bun test` and separate them from this timeout-race change
-- [ ] Fix streaming/media regressions in `src/handlers/streaming.test.ts` that currently break pending delivery and silent notification expectations <- current
-- [ ] Fix SubTurtle board/dashboard regressions in `src/dashboard.test.ts`, `src/handlers/commands.subturtle.test.ts`, and `src/handlers/callback.subturtle.test.ts`
+- [x] Fix streaming/media regressions in `src/handlers/streaming.test.ts` that currently break pending delivery and silent notification expectations
+- [ ] Fix SubTurtle board/dashboard regressions in `src/dashboard.test.ts`, `src/handlers/commands.subturtle.test.ts`, and `src/handlers/callback.subturtle.test.ts` <- current
 - [ ] Fix stop-handler session API regressions in `src/handlers/stop.test.ts`
 - [ ] Fix voice typing cleanup timeout in `src/handlers/voice.typing.test.ts`
 - [ ] Re-run `cd super_turtle/claude-telegram-bot && bun test` and confirm the full suite is green

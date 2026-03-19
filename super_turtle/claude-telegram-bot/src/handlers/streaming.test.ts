@@ -42,6 +42,7 @@ async function cleanupIpcFiles(pattern: string): Promise<void> {
 }
 
 beforeEach(async () => {
+  mock.restore();
   process.env.SUPERTURTLE_IPC_DIR = IPC_DIR;
   await cleanupIpcFiles(STREAMING_ASK_USER_PATTERN);
   await cleanupIpcFiles(STREAMING_PINO_LOGS_PATTERN);
@@ -49,6 +50,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  mock.restore();
   await cleanupIpcFiles(STREAMING_ASK_USER_PATTERN);
   await cleanupIpcFiles(STREAMING_PINO_LOGS_PATTERN);
   await cleanupIpcFiles(STREAMING_BOT_CONTROL_PATTERN);
@@ -223,6 +225,7 @@ describe("checkPendingSendImageRequests()", () => {
 
 describe("pending media request locking", () => {
   it("prevents duplicate send_turtle delivery when pollers race on the same request", async () => {
+    const { checkPendingSendTurtleRequests } = await loadFreshStreamingModule();
     const customIpcDir = `/tmp/streaming-send-turtle-lock-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const previousIpcDir = process.env.SUPERTURTLE_IPC_DIR;
     mkdirSync(customIpcDir, { recursive: true });
@@ -518,6 +521,7 @@ describe("bot-control dynamic import", () => {
 
 describe("streaming notifications", () => {
   it("keeps interim streamed replies silent and promotes the final segment as the notifying message", async () => {
+    const { StreamingState, createStatusCallback } = await loadFreshStreamingModule();
     const replyCalls: Array<{ text: string; extra?: Record<string, unknown> }> = [];
     const deleteMessageMock = mock(async () => {});
     let nextMessageId = 1;
@@ -552,6 +556,7 @@ describe("streaming notifications", () => {
   });
 
   it("sends thinking/tool progress messages with push notifications disabled", async () => {
+    const { StreamingState, createStatusCallback } = await loadFreshStreamingModule();
     const replyCalls: Array<{ text: string; extra?: Record<string, unknown> }> = [];
 
     const ctx = {
@@ -580,6 +585,12 @@ describe("streaming notifications", () => {
   });
 
   it("keeps the final text reply as the notifying message when an image is sent later", async () => {
+    const {
+      checkPendingSendImageRequests,
+      clearStreamingState,
+      createStatusCallback,
+      StreamingState,
+    } = await loadFreshStreamingModule();
     const customIpcDir = `/tmp/streaming-text-wins-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const previousIpcDir = process.env.SUPERTURTLE_IPC_DIR;
     mkdirSync(customIpcDir, { recursive: true });
@@ -663,6 +674,12 @@ describe("streaming notifications", () => {
   });
 
   it("promotes a final image reply as the notifying message", async () => {
+    const {
+      checkPendingSendImageRequests,
+      clearStreamingState,
+      createStatusCallback,
+      StreamingState,
+    } = await loadFreshStreamingModule();
     const customIpcDir = `/tmp/streaming-image-notify-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const previousIpcDir = process.env.SUPERTURTLE_IPC_DIR;
     mkdirSync(customIpcDir, { recursive: true });
@@ -734,6 +751,12 @@ describe("streaming notifications", () => {
   });
 
   it("promotes a final sticker reply as the notifying message", async () => {
+    const {
+      checkPendingSendTurtleRequests,
+      clearStreamingState,
+      createStatusCallback,
+      StreamingState,
+    } = await loadFreshStreamingModule();
     const customIpcDir = `/tmp/streaming-sticker-notify-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const previousIpcDir = process.env.SUPERTURTLE_IPC_DIR;
     mkdirSync(customIpcDir, { recursive: true });
