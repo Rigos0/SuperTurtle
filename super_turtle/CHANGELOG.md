@@ -7,6 +7,8 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-03-19
+
 ### Changed
 - intermediate Telegram updates are now push-silent, with the final reply still notifying normally
 - startup notifications now send a short Telegram message whenever the turtle process boots
