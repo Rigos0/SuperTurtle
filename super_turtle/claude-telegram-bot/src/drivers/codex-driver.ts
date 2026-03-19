@@ -1,20 +1,12 @@
 import { codexSession } from "../codex-session";
 import type { ChatDriver, DriverRunInput, DriverStatusSnapshot } from "./types";
 import type { McpCompletionCallback } from "../types";
+import { classifyCodexToolCompletionMessage } from "../message-kinds";
 import { codexLog } from "../logger";
-
-const DEFAULT_PENDING_REQUEST_TIMEOUT_MS = 1500;
-const DEFAULT_PENDING_PUMP_SHUTDOWN_TIMEOUT_MS = 2000;
-
-async function wait(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function getTimeoutMs(envName: string, fallback: number): number {
-  const raw = process.env[envName];
-  const parsed = raw ? Number(raw) : Number.NaN;
-  return Number.isFinite(parsed) && parsed >= 10 ? Math.floor(parsed) : fallback;
-}
+import {
+  buildCodexPendingChecks,
+  createCodexPendingOutputCoordinator,
+} from "./codex-pending-outputs";
 
 export class CodexDriver implements ChatDriver {
   readonly id = "codex" as const;
@@ -31,222 +23,28 @@ export class CodexDriver implements ChatDriver {
     } = await import("../handlers/streaming");
 
     process.env.TELEGRAM_CHAT_ID = String(input.chatId);
-    const pendingRequestTimeoutMs = getTimeoutMs(
-      "CODEX_PENDING_REQUEST_TIMEOUT_MS",
-      DEFAULT_PENDING_REQUEST_TIMEOUT_MS
-    );
-    const pendingPumpShutdownTimeoutMs = getTimeoutMs(
-      "CODEX_PENDING_PUMP_SHUTDOWN_TIMEOUT_MS",
-      DEFAULT_PENDING_PUMP_SHUTDOWN_TIMEOUT_MS
-    );
+    const pendingOutputs = createCodexPendingOutputCoordinator({
+      driverId: this.id,
+      chatId: input.chatId,
+      checks: buildCodexPendingChecks({
+        ctx: input.ctx,
+        chatId: input.chatId,
+        checkPendingAskUserRequests,
+        checkPendingSendImageRequests,
+        checkPendingSendTurtleRequests,
+        checkPendingBotControlRequests,
+        checkPendingPinoLogsRequests,
+      }),
+      outboundMessageKindForTool: (tool) => {
+        const kind = classifyCodexToolCompletionMessage(tool);
+        return kind ? String(kind) : null;
+      },
+    });
+    const pendingPump = pendingOutputs.startPump();
 
-    const runPendingCheck = async (
-      checkName: string,
-      phase: string,
-      operation: () => Promise<boolean>
-    ): Promise<boolean> => {
-      let timeoutId: ReturnType<typeof setTimeout> | null = null;
-      try {
-        return await Promise.race([
-          operation().catch((error) => {
-            codexLog.warn(
-              { err: error, driver: this.id, chatId: input.chatId, checkName, phase },
-              "Pending Codex output check failed"
-            );
-            return false;
-          }),
-          new Promise<boolean>((resolve) => {
-            timeoutId = setTimeout(() => {
-              codexLog.warn(
-                {
-                  driver: this.id,
-                  chatId: input.chatId,
-                  checkName,
-                  phase,
-                  timeoutMs: pendingRequestTimeoutMs,
-                },
-                "Pending Codex output check timed out"
-              );
-              resolve(false);
-            }, pendingRequestTimeoutMs);
-          }),
-        ]);
-      } finally {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
-      }
-    };
-
-    const flushPendingOutputs = async (phase: string): Promise<void> => {
-      await Promise.all([
-        runPendingCheck(
-          "ask_user",
-          phase,
-          () => checkPendingAskUserRequests(input.ctx, input.chatId)
-        ),
-        runPendingCheck(
-          "send_image",
-          phase,
-          () => checkPendingSendImageRequests(input.ctx, input.chatId)
-        ),
-        runPendingCheck(
-          "send_turtle",
-          phase,
-          () => checkPendingSendTurtleRequests(input.ctx, input.chatId)
-        ),
-        runPendingCheck(
-          "bot_control",
-          phase,
-          () => checkPendingBotControlRequests(codexSession, input.chatId)
-        ),
-        runPendingCheck(
-          "pino_logs",
-          phase,
-          () => checkPendingPinoLogsRequests(input.chatId)
-        ),
-      ]);
-    };
-
-    // MCP completion callback: fires when an mcp_tool_call completes
     const mcpCompletionCallback: McpCompletionCallback = async (_server, tool) => {
-      // Route by tool name, not MCP server, so merged bot-control tools still resolve.
-      const normalizedTool = tool.toLowerCase().replace(/-/g, "_");
-
-      // Detect ask-user tool and handle inline
-      if (normalizedTool === "ask_user") {
-        codexLog.info(
-          { driver: this.id, tool: normalizedTool, chatId: input.chatId },
-          "Ask-user tool completed, checking for pending requests"
-        );
-        // Small delay to let MCP server write the file
-        await new Promise((resolve) => setTimeout(resolve, 200));
-
-        // Retry a few times in case of timing issues
-        for (let attempt = 0; attempt < 3; attempt++) {
-          const buttonsSent = await runPendingCheck(
-            "ask_user",
-            `mcp:${normalizedTool}`,
-            () => checkPendingAskUserRequests(input.ctx, input.chatId)
-          );
-          if (buttonsSent) {
-            codexLog.info(
-              { driver: this.id, tool: normalizedTool, chatId: input.chatId, attempt: attempt + 1 },
-              "Ask-user buttons sent, ask_user triggered"
-            );
-            return true; // Signal to break event loop
-          }
-          if (attempt < 2) {
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          }
-        }
-      }
-
-      // Detect send-turtle tool and handle inline
-      if (normalizedTool === "send_turtle") {
-        codexLog.info(
-          { driver: this.id, tool: normalizedTool, chatId: input.chatId },
-          "Send-turtle tool completed, checking for pending requests"
-        );
-        // Small delay to let MCP server write the file
-        await new Promise((resolve) => setTimeout(resolve, 200));
-
-        // Retry a few times in case of timing issues
-        for (let attempt = 0; attempt < 3; attempt++) {
-          const photoSent = await runPendingCheck(
-            "send_turtle",
-            `mcp:${normalizedTool}`,
-            () => checkPendingSendTurtleRequests(input.ctx, input.chatId)
-          );
-          if (photoSent) break;
-          if (attempt < 2) {
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          }
-        }
-      }
-
-      if (normalizedTool === "send_image") {
-        codexLog.info(
-          { driver: this.id, tool: normalizedTool, chatId: input.chatId },
-          "Send-image tool completed, checking for pending requests"
-        );
-        await new Promise((resolve) => setTimeout(resolve, 200));
-
-        for (let attempt = 0; attempt < 3; attempt++) {
-          const imageSent = await runPendingCheck(
-            "send_image",
-            `mcp:${normalizedTool}`,
-            () => checkPendingSendImageRequests(input.ctx, input.chatId)
-          );
-          if (imageSent) break;
-          if (attempt < 2) {
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          }
-        }
-      }
-
-      // Detect bot-control tool and handle inline
-      if (normalizedTool === "bot_control") {
-        codexLog.info(
-          { driver: this.id, tool: normalizedTool, chatId: input.chatId },
-          "Bot-control tool completed, checking for pending requests"
-        );
-        // Small delay to let MCP server write the file
-        await new Promise((resolve) => setTimeout(resolve, 200));
-
-        // Retry a few times in case of timing issues
-        for (let attempt = 0; attempt < 3; attempt++) {
-          const handled = await runPendingCheck(
-            "bot_control",
-            `mcp:${normalizedTool}`,
-            () => checkPendingBotControlRequests(codexSession, input.chatId)
-          );
-          if (handled) break;
-          if (attempt < 2) {
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          }
-        }
-      }
-
-      if (normalizedTool === "pino_logs") {
-        codexLog.info(
-          { driver: this.id, tool: normalizedTool, chatId: input.chatId },
-          "Pino-logs tool completed, checking for pending requests"
-        );
-        await new Promise((resolve) => setTimeout(resolve, 200));
-
-        for (let attempt = 0; attempt < 3; attempt++) {
-          const handled = await runPendingCheck(
-            "pino_logs",
-            `mcp:${normalizedTool}`,
-            () => checkPendingPinoLogsRequests(input.chatId)
-          );
-          if (handled) break;
-          if (attempt < 2) {
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          }
-        }
-      }
-
-      return false; // Only ask-user triggers event loop break
+      return pendingOutputs.handleToolCompletion(tool);
     };
-
-    let keepPolling = true;
-    const pendingPump = (async () => {
-      while (keepPolling) {
-        try {
-          await flushPendingOutputs("poll");
-        } catch (error) {
-          codexLog.warn(
-            { err: error, driver: this.id, chatId: input.chatId },
-            "Failed to process pending Codex MCP request"
-          );
-        }
-        if (keepPolling) {
-          await wait(100);
-        }
-      }
-    })();
 
     const downstreamStatusCallback = input.statusCallback;
     type DeferredDoneArgs = Parameters<NonNullable<typeof downstreamStatusCallback>>;
@@ -276,28 +74,10 @@ export class CodexDriver implements ChatDriver {
         input.chatId
       );
     } finally {
-      keepPolling = false;
-      const pendingPumpStopped = await Promise.race([
-        pendingPump.then(() => true),
-        wait(pendingPumpShutdownTimeoutMs).then(() => false),
-      ]);
-      if (!pendingPumpStopped) {
-        codexLog.warn(
-          { driver: this.id, chatId: input.chatId, timeoutMs: pendingPumpShutdownTimeoutMs },
-          "Pending Codex output pump did not stop before timeout"
-        );
-      }
+      await pendingPump.stop();
     }
 
-    // Final flush for late writes near turn completion.
-    // Wait longer (300ms) and retry multiple times in case MCP server is still writing.
-    await wait(300);
-    for (let attempt = 0; attempt < 3; attempt++) {
-      await flushPendingOutputs("final_flush");
-      if (attempt < 2) {
-        await wait(100);
-      }
-    }
+    await pendingOutputs.flushAfterCompletion();
 
     if (deferredDone && downstreamStatusCallback) {
       await downstreamStatusCallback(
