@@ -306,6 +306,23 @@ function buildServiceCommand({ cwd, logPath, restartOnCrash, keepAwakeCommand = 
   );
 }
 
+function buildPlatformServiceCommand({
+  cwd,
+  logPath,
+  restartOnCrash,
+  platform = os.platform(),
+  commandExists = shellCommandExists,
+}) {
+  const keepAwakeCommand = getKeepAwakeCommand(platform, commandExists);
+  const serviceCommand = buildServiceCommand({
+    cwd,
+    logPath,
+    restartOnCrash,
+    keepAwakeCommand,
+  });
+  return { keepAwakeCommand, serviceCommand };
+}
+
 function getCloudLeaseStatePath(cwd) {
   return resolve(cwd, ".superturtle", "cloud-runtime-lease.json");
 }
@@ -1090,19 +1107,17 @@ async function serviceRun() {
   fs.mkdirSync(dirname(logPaths.loop), { recursive: true });
   fs.closeSync(fs.openSync(logPaths.loop, "a"));
 
-  const keepAwakeCommand = getKeepAwakeCommand(process.platform);
+  const { keepAwakeCommand, serviceCommand } = buildPlatformServiceCommand({
+    cwd,
+    logPath: logPaths.loop,
+    restartOnCrash: serviceEnv.SUPERTURTLE_RESTART_ON_CRASH,
+    platform: process.platform,
+  });
   if (process.platform === "darwin" && !keepAwakeCommand) {
     console.warn("Warning: caffeinate not found on macOS. System may sleep during long runs.");
   } else if (process.platform === "linux" && !keepAwakeCommand) {
     console.warn("Warning: systemd-inhibit not found. Running without sleep prevention.");
   }
-
-  const serviceCommand = buildServiceCommand({
-    cwd,
-    logPath: logPaths.loop,
-    restartOnCrash: serviceEnv.SUPERTURTLE_RESTART_ON_CRASH,
-    keepAwakeCommand,
-  });
 
   console.log(`Starting SuperTurtle ${serviceModeLabel(env)} runner...`);
   console.log(`Loop log: ${logPaths.loop}`);
@@ -2131,6 +2146,7 @@ Cloud:
 module.exports = {
   __test__: {
     buildServiceCommand,
+    buildPlatformServiceCommand,
     getKeepAwakeCommand,
   },
 };
