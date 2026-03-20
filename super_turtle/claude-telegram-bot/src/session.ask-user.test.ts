@@ -1,16 +1,30 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import type { Context } from "grammy";
-import { readFileSync, rmSync } from "fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "fs";
+import { join } from "path";
 
 process.env.TELEGRAM_BOT_TOKEN ||= "test-token";
 process.env.TELEGRAM_ALLOWED_USERS ||= "123";
 process.env.CLAUDE_WORKING_DIR ||= process.cwd();
+const TEST_IPC_DIR = mkdtempSync(join("/tmp", "superturtle-ask-user-test-"));
+const originalSuperTurtleIpcDir = process.env.SUPERTURTLE_IPC_DIR;
 
 const originalSpawn = Bun.spawn;
 const originalSpawnSync = Bun.spawnSync;
 
-const { IPC_DIR, TOKEN_PREFIX } = await import("./config");
+const actualConfig = await import(`./config.ts?ask-user-config=${Date.now()}-${Math.random()}`);
+const { TOKEN_PREFIX } = actualConfig;
+const IPC_DIR = TEST_IPC_DIR;
 const SESSION_ASK_USER_PATTERN = "ask-user-session-*.json";
+
+beforeEach(() => {
+  process.env.SUPERTURTLE_IPC_DIR = IPC_DIR;
+  mock.module("./config", () => ({
+    ...actualConfig,
+    IPC_DIR,
+  }));
+  mkdirSync(IPC_DIR, { recursive: true });
+});
 
 async function cleanupAskUserFiles(): Promise<void> {
   const glob = new Bun.Glob(SESSION_ASK_USER_PATTERN);
@@ -53,13 +67,28 @@ function mockToolDiscovery(tools: string[] = [
 afterEach(async () => {
   Bun.spawn = originalSpawn;
   Bun.spawnSync = originalSpawnSync;
+  if (originalSuperTurtleIpcDir === undefined) {
+    delete process.env.SUPERTURTLE_IPC_DIR;
+  } else {
+    process.env.SUPERTURTLE_IPC_DIR = originalSuperTurtleIpcDir;
+  }
+  mock.restore();
   await cleanupAskUserFiles();
+});
+
+afterAll(() => {
+  if (originalSuperTurtleIpcDir === undefined) {
+    delete process.env.SUPERTURTLE_IPC_DIR;
+  } else {
+    process.env.SUPERTURTLE_IPC_DIR = originalSuperTurtleIpcDir;
+  }
+  rmSync(TEST_IPC_DIR, { recursive: true, force: true });
 });
 
 describe("ClaudeSession ask_user tool routing", () => {
   it("handles ask_user calls from bot-control namespace", async () => {
     let killed = false;
-    const chatId = 6769019304;
+    const chatId = 123456;
     const requestId = `session-ask-user-test-${Date.now()}-${Math.random()}`;
     const requestFile = `${IPC_DIR}/ask-user-${requestId}.json`;
     mockToolDiscovery();
@@ -202,7 +231,7 @@ describe("ClaudeSession ask_user tool routing", () => {
 
     const { ClaudeSession } = await loadSessionModule();
     const session = new ClaudeSession();
-    const chatId = 6769019304;
+    const chatId = 123456;
 
     await session.sendMessageStreaming(
       "hello",
@@ -285,7 +314,7 @@ describe("ClaudeSession ask_user tool routing", () => {
       "tester",
       123,
       async () => {},
-      6769019304
+      123456
     );
 
     const allowedToolsIndex = spawnedArgs.indexOf("--allowedTools");

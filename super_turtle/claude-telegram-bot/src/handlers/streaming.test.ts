@@ -644,7 +644,10 @@ describe("streaming notifications", () => {
       const handled = await checkPendingSendImageRequests(ctx, 123);
       expect(handled).toBe(true);
       expect(replyWithPhotoMock).toHaveBeenCalledTimes(1);
-      expect(replyWithPhotoMock.mock.calls[0]?.[1]).toMatchObject({
+      const photoCall = replyWithPhotoMock.mock.calls[0] as
+        | [unknown, { caption?: string; disable_notification?: boolean }]
+        | undefined;
+      expect(photoCall?.[1]).toMatchObject({
         caption: "Late image",
         disable_notification: true,
       });

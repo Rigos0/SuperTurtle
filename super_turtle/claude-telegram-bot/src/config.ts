@@ -52,7 +52,8 @@ const IS_TEST_ENV =
 export const TELEGRAM_TOKEN =
   process.env.TELEGRAM_BOT_TOKEN || (IS_TEST_ENV ? "test-token" : "");
 export { TOKEN_PREFIX };
-export const IPC_DIR = `/tmp/superturtle-${TOKEN_PREFIX}`;
+export const IPC_DIR =
+  process.env.SUPERTURTLE_IPC_DIR?.trim() || `/tmp/superturtle-${TOKEN_PREFIX}`;
 process.env.SUPERTURTLE_IPC_DIR ||= IPC_DIR;
 export const ALLOWED_USERS: number[] = (
   process.env.TELEGRAM_ALLOWED_USERS || (IS_TEST_ENV ? "123" : "")

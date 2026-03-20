@@ -35,7 +35,9 @@ export function isRelevantSubturtleBoardEventType(eventType: string): boolean {
   return RELEVANT_EVENT_TYPES.has(eventType);
 }
 
-function parseJsonLines(buffer: Buffer): { lines: WorkerEventRecord[]; remainder: Buffer } {
+function parseJsonLines(
+  buffer: Buffer<ArrayBufferLike>
+): { lines: WorkerEventRecord[]; remainder: Buffer<ArrayBufferLike> } {
   const records: WorkerEventRecord[] = [];
   let start = 0;
 
@@ -75,7 +77,7 @@ export function startSubturtleBoardService(api: LiveSubturtleBoardApi): { stop: 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let watcher: FSWatcher | null = null;
   let fileOffset = existsSync(eventsPath) ? statSync(eventsPath).size : 0;
-  let remainder = Buffer.alloc(0);
+  let remainder: Buffer<ArrayBufferLike> = Buffer.alloc(0);
   let reconciling = false;
   let pendingRerun = false;
 
@@ -144,7 +146,7 @@ export function startSubturtleBoardService(api: LiveSubturtleBoardApi): { stop: 
   try {
     watcher = watch(stateDir, (_eventType, filename) => {
       if (stopped) return;
-      const name = typeof filename === "string" ? filename : filename?.toString() || "";
+      const name = typeof filename === "string" ? filename : String(filename ?? "");
       if (name === "events.jsonl") {
         readNewEvents();
       }

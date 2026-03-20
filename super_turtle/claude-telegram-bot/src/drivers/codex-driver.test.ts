@@ -131,7 +131,7 @@ describe("CodexDriver", () => {
           userId: 123,
           chatId: 456,
           ctx: {} as Context,
-          statusCallback: async (statusType) => {
+          statusCallback: async (statusType: string) => {
             statusEvents.push(statusType);
           },
         }),
@@ -183,7 +183,7 @@ describe("CodexDriver", () => {
         userId: 123,
         chatId: 456,
         ctx: {} as Context,
-        statusCallback: async (statusType) => {
+        statusCallback: async (statusType: string) => {
           statusEvents.push(statusType);
         },
       })

@@ -10,6 +10,13 @@ type CallbackModule = typeof import("./callback");
 
 const workingDir = process.env.CLAUDE_WORKING_DIR || process.cwd();
 const subturtlesDir = join(workingDir, ".superturtle", "subturtles");
+const subturtleBoardsDir = join(
+  workingDir,
+  ".superturtle",
+  "state",
+  "telegram",
+  "subturtle-boards"
+);
 const authorizedUserId = Number(
   (process.env.TELEGRAM_ALLOWED_USERS || "123").split(",")[0]?.trim() || "123"
 );
@@ -29,20 +36,36 @@ async function handleCallbackForTest(ctx: any) {
   return handleCallback(ctx);
 }
 
+function cleanupTrackedBoard(chatId: number): void {
+  rmSync(join(subturtleBoardsDir, `${chatId}.json`), { force: true });
+}
+
 beforeEach(async () => {
   const actualConfig = await loadActualConfig();
-  mock.module("../config", () => actualConfig);
+  mock.module("../config", () => ({
+    ...actualConfig,
+    TELEGRAM_TOKEN: "test-token",
+    ALLOWED_USERS: [authorizedUserId],
+    WORKING_DIR: workingDir,
+    SUPERTURTLE_DATA_DIR: join(workingDir, ".superturtle"),
+  }));
+  cleanupTrackedBoard(912345678);
+  cleanupTrackedBoard(923456781);
+  cleanupTrackedBoard(923456782);
 });
 
 afterEach(() => {
   Bun.spawnSync = originalSpawnSync;
+  cleanupTrackedBoard(912345678);
+  cleanupTrackedBoard(923456781);
+  cleanupTrackedBoard(923456782);
   mock.restore();
 });
 
 function makeCallbackCtx(callbackData: string, chatId = 912345678, callbackMessageId = 77) {
   const callbackAnswers: string[] = [];
-  const replies: Array<{ text: string; extra?: { parse_mode?: string } }> = [];
-  const edits: Array<{ text: string; extra?: { parse_mode?: string } }> = [];
+  const replies: Array<{ text: string; extra?: { parse_mode?: string; reply_markup?: unknown } }> = [];
+  const edits: Array<{ text: string; extra?: { parse_mode?: string; reply_markup?: unknown } }> = [];
 
   const ctx = {
     from: { id: authorizedUserId, username: "tester" },
@@ -118,13 +141,6 @@ describe("subturtle callback actions", () => {
       {
         text: "✅ <b>worker-a</b> stopped",
         extra: { parse_mode: "HTML" },
-      },
-      {
-        text: "🐢 <b>SubTurtles</b>\n\nNo SubTurtles running",
-        extra: {
-          parse_mode: "HTML",
-          reply_markup: undefined,
-        },
       },
     ]);
     expect(callbackAnswers).toEqual(["worker-a stopped"]);

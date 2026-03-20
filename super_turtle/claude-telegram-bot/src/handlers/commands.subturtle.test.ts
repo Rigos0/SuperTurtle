@@ -34,7 +34,13 @@ async function syncLiveSubturtleBoardForTest(api: any, chatId: number, options?:
 
 beforeEach(async () => {
   const actualConfig = await loadActualConfig();
-  mock.module("../config", () => actualConfig);
+  mock.module("../config", () => ({
+    ...actualConfig,
+    TELEGRAM_TOKEN: "test-token",
+    ALLOWED_USERS: [authorizedUserId],
+    WORKING_DIR: workingDir,
+    SUPERTURTLE_DATA_DIR: join(workingDir, ".superturtle"),
+  }));
 });
 
 afterEach(() => {
@@ -159,7 +165,11 @@ describe("/subturtle", () => {
     expect(text).not.toContain("Current:");
     expect(text).not.toContain("<b>→</b>");
 
-    const keyboard = (replies[0]!.extra?.reply_markup as { inline_keyboard?: Array<Array<{ callback_data?: string }>> })?.inline_keyboard;
+    const keyboard = (
+      replies[0]!.extra?.reply_markup as {
+        inline_keyboard?: Array<Array<{ text?: string; callback_data?: string }>>;
+      }
+    )?.inline_keyboard;
     expect(Array.isArray(keyboard)).toBe(true);
     expect(keyboard?.flat().some((button) => button.text === "📝 Tasks")).toBe(true);
     expect(keyboard?.flat().some((button) => button.text === "📜 Logs")).toBe(true);
