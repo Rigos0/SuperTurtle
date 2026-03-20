@@ -1081,7 +1081,6 @@ export class ClaudeSession {
 
     // If ask_user was triggered, return early - user will respond via button
     if (askUserTriggered) {
-      await statusCallback("done", "");
       turnResponse = "[Waiting for user selection]";
       return turnResponse;
     }

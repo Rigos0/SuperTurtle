@@ -310,7 +310,7 @@ describe("stop handlers", () => {
     }
   });
 
-  it("handleStop clears streaming state for the chat", async () => {
+  it("handleStop retains the progress message for an active foreground run", async () => {
     const actualImportSuffix = `${Date.now()}-${Math.random()}`;
     const actualStreaming = await import(`./streaming.ts?stop-test=${actualImportSuffix}`);
     const deferredQueue = await import(`../deferred-queue.ts?stop-test=${actualImportSuffix}`);
@@ -320,24 +320,32 @@ describe("stop handlers", () => {
 
     const chatId = 41001;
     const state = new actualStreaming.StreamingState();
-
-    let clearedChatId: number | null = null;
-    let cleanupCalls = 0;
+    const progressStates: string[] = [];
+    const retainCalls: Array<number | undefined> = [];
+    const replies: string[] = [];
 
     mock.module("./streaming", () => ({
       ...actualStreaming,
       getStreamingState: (id: number) => (id === chatId ? (state as any) : undefined),
-      clearStreamingState: (id: number) => {
-        clearedChatId = id;
+      updateRetainedProgressState: async (
+        _ctx: Context,
+        _state: unknown,
+        progressState: string
+      ) => {
+        progressStates.push(progressState);
       },
-      cleanupToolMessages: async () => {
-        cleanupCalls += 1;
+      retainStreamingState: async (
+        _ctx: Context,
+        _state: unknown,
+        options?: { chatId?: number }
+      ) => {
+        retainCalls.push(options?.chatId);
       },
     }));
     mock.module("../deferred-queue", () => ({ ...deferredQueue }));
     mock.module("./driver-routing", () => ({
       ...actualDriverRouting,
-      stopActiveDriverQuery: async () => false,
+      stopActiveDriverQuery: async () => "stopped" as const,
     }));
 
     const { handleStop } = await import(`./stop.ts?stop-test=${actualImportSuffix}`);
@@ -369,13 +377,18 @@ describe("stop handlers", () => {
         deleteMessage: async () => {},
         editMessageText: async () => {},
       },
-      reply: async () => ({}) as any,
+      reply: async (text: string) => {
+        replies.push(text);
+        return {} as any;
+      },
     } as unknown as Context;
 
     try {
       await handleStop(ctx, chatId);
-      expect(cleanupCalls).toBe(1);
-      expect(clearedChatId as number | null).toBe(chatId);
+      expect(progressStates).toEqual(["Stopping", "Stopped"]);
+      expect(retainCalls).toEqual([chatId]);
+      expect(replies).toEqual([]);
+      expect(state.stopRequestedByUser).toBe(true);
     } finally {
       deferredQueue.clearDeferredQueue(chatId);
       deferredQueue.unsuppressDrain(chatId);

@@ -28,7 +28,9 @@ import {
   StreamingState,
   createSilentStatusCallback,
   createStatusCallback,
+  retainStreamingState,
   teardownStreamingState,
+  updateRetainedProgressState,
 } from "./streaming";
 import { eventLog, streamLog } from "../logger";
 import {
@@ -203,12 +205,66 @@ export async function handleText(
       chat_id: chatId,
       driver: driver.id,
     });
+
+    if (state.awaitingUserAttention && !state.teardownCompleted) {
+      await retainStreamingState(ctx, state, {
+        chatId,
+        clearRegisteredState: true,
+      });
+    }
   } catch (error) {
     const errorSummary = summarizeErrorMessage(error);
-    await teardownStreamingState(ctx, state, {
-      chatId,
-      clearRegisteredState: true,
-    });
+    const retainStoppedProgress = async (): Promise<void> => {
+      if (state.teardownCompleted) {
+        return;
+      }
+      try {
+        await updateRetainedProgressState(ctx, state, "Stopped", {
+          toolHint: null,
+          storeSnapshot: true,
+          terminalSnapshot: true,
+        });
+        await retainStreamingState(ctx, state, {
+          chatId,
+          clearRegisteredState: true,
+        });
+      } catch (progressError) {
+        streamLog.warn(
+          { err: progressError, chatId, requestId, driver: driver.id },
+          "Failed to retain stopped progress message"
+        );
+        await teardownStreamingState(ctx, state, {
+          chatId,
+          clearRegisteredState: true,
+        });
+      }
+    };
+    const retainFailedProgress = async (): Promise<void> => {
+      if (state.teardownCompleted) {
+        return;
+      }
+      try {
+        await updateRetainedProgressState(ctx, state, "Failed", {
+          summary: errorSummary,
+          toolHint: null,
+          storeSnapshot: true,
+          terminalSnapshot: true,
+        });
+        await retainStreamingState(ctx, state, {
+          chatId,
+          clearRegisteredState: true,
+        });
+      } catch (progressError) {
+        streamLog.warn(
+          { err: progressError, chatId, requestId, driver: driver.id },
+          "Failed to retain failed progress message"
+        );
+        await teardownStreamingState(ctx, state, {
+          chatId,
+          clearRegisteredState: true,
+        });
+      }
+    };
 
     streamLog.error(
       {
@@ -226,10 +282,21 @@ export async function handleText(
     if (driver.isCancellationError(error)) {
       const wasInterrupt = session.consumeInterruptFlag();
       const stopAlreadyHandled = consumeHandledStopReply(chatId);
-      if (!silent && !wasInterrupt && !stopAlreadyHandled) {
+      const userInitiatedStop =
+        state.stopRequestedByUser || wasInterrupt || stopAlreadyHandled;
+      if (userInitiatedStop) {
+        await retainStoppedProgress();
+      } else {
+        await teardownStreamingState(ctx, state, {
+          chatId,
+          clearRegisteredState: true,
+        });
+      }
+      if (!silent && !userInitiatedStop) {
         await ctx.reply("🛑 Query stopped.");
       }
     } else if (!silent) {
+      await retainFailedProgress();
       await auditLogError(
         userId,
         username,
@@ -242,6 +309,8 @@ export async function handleText(
         }
       );
       await ctx.reply(`❌ Error: ${errorSummary.slice(0, 200)}`);
+    } else {
+      await retainFailedProgress();
     }
   } finally {
     // Keep processing state consistent even if error-path notifications fail.

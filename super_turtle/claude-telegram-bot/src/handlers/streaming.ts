@@ -46,7 +46,7 @@ const HEARTBEAT_TICK_MS = 1_000;
 const REQUEST_LOCK_STALE_MS = 60_000;
 const MAX_PROGRESS_SNAPSHOTS = 12;
 
-type CanonicalProgressState =
+export type CanonicalProgressState =
   | "Starting"
   | "Thinking"
   | "Using tools"
@@ -230,8 +230,12 @@ export async function checkPendingAskUserRequests(
 
       if (options.length > 0 && requestId) {
         const keyboard = createAskUserKeyboard(requestId, options);
+        const state = getStreamingState(chatId);
         const sentMsg = await ctx.reply(`❓ ${question}`, { reply_markup: keyboard });
         buttonsSent = true;
+        if (state) {
+          state.awaitingUserAttention = true;
+        }
 
         // Mark as sent
         data.status = "sent";
@@ -935,6 +939,8 @@ export class StreamingState {
   lastAnswerPreview: string | null = null;
   lastHeartbeatAt = 0;
   teardownCompleted = false;
+  awaitingUserAttention = false;
+  stopRequestedByUser = false;
 
   getSilentCapturedText(): string {
     return [...this.silentSegments.entries()]
@@ -1309,6 +1315,21 @@ async function applyProgressStateUpdate(
   await queueRenderedProgressMessageUpdate(ctx, state);
 }
 
+export async function updateRetainedProgressState(
+  ctx: Context,
+  state: StreamingState,
+  progressState: CanonicalProgressState,
+  options: {
+    summary?: string;
+    toolHint?: string | null;
+    trackActivity?: boolean;
+    storeSnapshot?: boolean;
+    terminalSnapshot?: boolean;
+  } = {}
+): Promise<void> {
+  await applyProgressStateUpdate(ctx, state, progressState, options);
+}
+
 async function updateProgressMessage(
   ctx: Context,
   state: StreamingState,
@@ -1551,6 +1572,17 @@ export async function teardownStreamingState(
       clearStreamingState(ctx.chat.id);
     }
   }
+}
+
+export async function retainStreamingState(
+  ctx: Context,
+  state: StreamingState,
+  options: Omit<TeardownOptions, "retainProgressMessage"> = {}
+): Promise<void> {
+  await teardownStreamingState(ctx, state, {
+    ...options,
+    retainProgressMessage: true,
+  });
 }
 
 function decodeBasicHtmlEntities(text: string): string {

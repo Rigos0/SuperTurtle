@@ -1,5 +1,5 @@
 # Current task
-Implement or align stop/failure/attention-required behavior so the retained progress message remains correct across those flows; `stop.ts` still sends a separate stop reply, and `text.ts` error handling still tears the progress message down.
+Align final success/artifact delivery with the spec; `streaming.ts` still renders raw previews instead of `Done`, and media flows send silent artifacts before re-notifying via text promotion.
 
 # End goal with specs
 Finish the Telegram foreground progress UX end-to-end so the shipped code matches the current implementation spec in `super_turtle/docs/TELEGRAM_PROGRESS_UX_SPEC.md`.
@@ -53,8 +53,8 @@ Acceptance criteria:
 - [x] Compare `super_turtle/docs/TELEGRAM_PROGRESS_UX_SPEC.md` against `super_turtle/claude-telegram-bot/src/handlers/streaming.ts`, `text.ts`, `stop.ts`, and `callback.ts` to list the concrete missing behaviors
 - [x] Implement canonical progress-state rendering and any required retained-progress metadata in `super_turtle/claude-telegram-bot/src/handlers/streaming.ts`
 - [x] Implement retained snapshot history and `Back` / `Next` navigation for the retained progress message; `callback.ts` currently has no progress-viewer callbacks and `StreamingState` stores no snapshot history
-- [ ] Implement or align stop/failure/attention-required behavior so the retained progress message remains correct across those flows; `stop.ts` still sends a separate stop reply, and `text.ts` error handling still tears the progress message down <- current
-- [ ] Align final success/artifact delivery with the spec; `streaming.ts` still renders raw previews instead of `Done`, and media flows send silent artifacts before re-notifying via text promotion
+- [x] Implement or align stop/failure/attention-required behavior so the retained progress message remains correct across those flows; `stop.ts` still sends a separate stop reply, and `text.ts` error handling still tears the progress message down
+- [ ] Align final success/artifact delivery with the spec; `streaming.ts` still renders raw previews instead of `Done`, and media flows send silent artifacts before re-notifying via text promotion <- current
 - [ ] Update or add focused tests for the newly implemented behaviors
 - [ ] Run the relevant test files and fix regressions
 - [ ] Commit the changes with a clear message

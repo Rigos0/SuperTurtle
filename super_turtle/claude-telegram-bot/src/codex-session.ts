@@ -1547,6 +1547,14 @@ ${messageToSend}`;
         }
       }
 
+      if (askUserTriggered) {
+        this.lastActivity = new Date();
+        this.lastError = null;
+        this.lastErrorTime = null;
+        turnResponse = "[Waiting for user selection]";
+        return turnResponse;
+      }
+
       if (statusCallback) {
         await statusCallback("done", "");
       }

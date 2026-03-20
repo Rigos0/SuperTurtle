@@ -3,7 +3,11 @@ import { WORKING_DIR, CTL_PATH } from "../config";
 import { session } from "../session";
 import { stopActiveDriverQuery } from "./driver-routing";
 import { clearDeferredQueue, suppressDrain } from "../deferred-queue";
-import { cleanupToolMessages, clearStreamingState, getStreamingState } from "./streaming";
+import {
+  getStreamingState,
+  retainStreamingState,
+  updateRetainedProgressState,
+} from "./streaming";
 import { streamLog } from "../logger";
 const stopLog = streamLog.child({ handler: "stop" });
 const stopReplyHandledChats = new Set<number>();
@@ -159,39 +163,41 @@ export async function handleStop(ctx: Context, chatId: number): Promise<void> {
 
   const stopPromise = (async () => {
     const state = getStreamingState(chatId);
-    const result = await stopForegroundWork(chatId);
-    const driverStopped = result.driverStopResult !== false;
     if (state) {
-      await cleanupToolMessages(ctx, state);
-
-      // Append an explicit stopped indicator to the last streamed text segment, if any.
-      const segmentIds = driverStopped ? [...state.textMessages.keys()] : [];
-      if (segmentIds.length > 0) {
-        const lastSegmentId = Math.max(...segmentIds);
-        const lastMsg = state.textMessages.get(lastSegmentId);
-        const lastContent = state.lastContent.get(lastSegmentId);
-        const suffix = "\n\n⏹ <i>Stopped</i>";
-
-        if (
-          lastMsg &&
-          lastContent &&
-          lastContent.trim().length > 0 &&
-          !lastContent.includes("⏹ <i>Stopped</i>")
-        ) {
-          try {
-            await ctx.api.editMessageText(
-              lastMsg.chat.id,
-              lastMsg.message_id,
-              `${lastContent}${suffix}`,
-              { parse_mode: "HTML" }
-            );
-          } catch {
-            // Ignore edit failures (message deleted, unchanged, or invalid HTML)
-          }
-        }
+      state.stopRequestedByUser = true;
+      try {
+        await updateRetainedProgressState(ctx, state, "Stopping", {
+          toolHint: null,
+          storeSnapshot: true,
+        });
+      } catch (error) {
+        stopLog.warn({ err: error, chatId }, "Failed to render stopping progress state");
       }
     }
-    clearStreamingState(chatId);
+
+    const result = await stopForegroundWork(chatId);
+    const driverStopped = result.driverStopResult !== false;
+    const retainProgressOnly = Boolean(state);
+
+    if (state && result.driverStopResult !== "pending") {
+      try {
+        await updateRetainedProgressState(ctx, state, "Stopped", {
+          summary:
+            result.queueCleared > 0
+              ? `Run stopped. Cleared ${result.queueCleared} queued message${result.queueCleared === 1 ? "" : "s"}.`
+              : undefined,
+          toolHint: null,
+          storeSnapshot: true,
+          terminalSnapshot: true,
+        });
+        await retainStreamingState(ctx, state, {
+          chatId,
+          clearRegisteredState: true,
+        });
+      } catch (error) {
+        stopLog.warn({ err: error, chatId }, "Failed to retain stopped progress message");
+      }
+    }
 
     let message = "Nothing to stop.";
     if (driverStopped) {
@@ -220,8 +226,13 @@ export async function handleStop(ctx: Context, chatId: number): Promise<void> {
       "Stop executed"
     );
 
-    await ctx.reply(message);
-    markRecentStopReply(chatId);
+    if (!retainProgressOnly) {
+      await ctx.reply(message);
+      markRecentStopReply(chatId);
+    } else if (driverStopped || result.driverStopResult === "pending") {
+      stopReplyHandledChats.add(chatId);
+      markRecentStopReply(chatId);
+    }
   })();
 
   inFlightStopByChat.set(chatId, stopPromise);

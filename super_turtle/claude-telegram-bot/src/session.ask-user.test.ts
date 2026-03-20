@@ -181,7 +181,7 @@ describe("ClaudeSession ask_user tool routing", () => {
     expect(response).toBe("[Waiting for user selection]");
     expect(killed).toBe(true);
     expect(updated.status).toBe("sent");
-    expect(statusEvents).toContain("done");
+    expect(statusEvents).not.toContain("done");
   });
 
   it("writes chat-scoped TELEGRAM_CHAT_ID into Claude MCP config", async () => {
