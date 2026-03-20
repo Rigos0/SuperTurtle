@@ -1169,6 +1169,9 @@ function recordProgressSnapshot(
   if (!options.terminal && isBlankProgressSummary(state.progressSummary)) {
     return;
   }
+  if (!options.terminal && state.progressState !== "Writing answer") {
+    return;
+  }
 
   const snapshot: ProgressSnapshot = {
     progressState: state.progressState,
@@ -1180,9 +1183,12 @@ function recordProgressSnapshot(
   const previous = state.progressSnapshots[state.progressSnapshots.length - 1];
   const isDuplicate =
     previous &&
-    previous.progressState === snapshot.progressState &&
     previous.summary === snapshot.summary &&
-    previous.toolHint === snapshot.toolHint;
+    previous.toolHint === snapshot.toolHint &&
+    (
+      previous.progressState === snapshot.progressState ||
+      options.terminal === true
+    );
 
   if (!options.force && isDuplicate) {
     if (options.terminal === true && previous) {

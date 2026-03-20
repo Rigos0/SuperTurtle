@@ -137,14 +137,13 @@ The retained viewer must page through a bounded ordered list of progress snapsho
 
 Store a snapshot when any of the following happens:
 
-- canonical state transition
-- tool start
-- tool completion
 - first visible answer preview
+- subsequent visible answer previews when the displayed answer text changes
 - heartbeat transition into `Still working`
 - terminal transition to `Stopped`, `Done`, or `Failed`
 
 Do not store the initial blank placeholder as a snapshot.
+Do not store internal progress-only states such as `Thinking` or `Using tools` in the arrow viewer.
 
 ### Deduping rules
 

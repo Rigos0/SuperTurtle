@@ -105,8 +105,9 @@ describe("handleCallback Codex switching and controls", () => {
       const state = new StreamingState();
       const statusCallback = createStatusCallback(ctx, state, { showToolStatus: true });
       await state.progressUpdateChain;
-      await statusCallback("thinking", "Planning the answer");
-      await statusCallback("tool", "Tool step completed");
+      await statusCallback("segment_end", "Answer draft 1", 0);
+      await statusCallback("segment_end", "Answer draft 2", 1);
+      await statusCallback("segment_end", "Answer draft 3", 2);
       await statusCallback("done", "");
 
       await handleCallback(ctx);
@@ -121,7 +122,7 @@ describe("handleCallback Codex switching and controls", () => {
     expect(result.payload).not.toBeNull();
     expect(result.payload?.callbackAnswers).toEqual([{}]);
     expect(result.payload?.lastEdit?.text || "").toContain("2 / 3");
-    expect(result.payload?.lastEdit?.text || "").toContain("Tool step completed");
+    expect(result.payload?.lastEdit?.text || "").toContain("Answer draft 2");
     expect(
       result.payload?.lastEdit?.extra?.reply_markup?.inline_keyboard?.flat().map(
         (button) => button.callback_data || ""
@@ -170,8 +171,9 @@ describe("handleCallback Codex switching and controls", () => {
       const state = new StreamingState();
       const statusCallback = createStatusCallback(ctx, state, { showToolStatus: true });
       await state.progressUpdateChain;
-      await statusCallback("thinking", "Planning the answer");
-      await statusCallback("tool", "Tool step completed");
+      await statusCallback("segment_end", "Answer draft 1", 0);
+      await statusCallback("segment_end", "Answer draft 2", 1);
+      await statusCallback("segment_end", "Answer draft 3", 2);
       await statusCallback("done", "");
 
       await navigateRetainedProgressViewer(ctx, "back");
@@ -195,7 +197,7 @@ describe("handleCallback Codex switching and controls", () => {
       result.payload?.editCountBeforeBoundaryTap
     );
     expect(result.payload?.lastEditText || "").toContain("1 / 3");
-    expect(result.payload?.lastEditText || "").toContain("Planning the answer");
+    expect(result.payload?.lastEditText || "").toContain("Answer draft 1");
   });
 
   it("reports missing retained progress history when no viewer is registered", async () => {
