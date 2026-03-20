@@ -3,7 +3,7 @@
  */
 
 import { createHash } from "crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { InlineKeyboard, type Context } from "grammy";
 import { session, getAvailableModels, EFFORT_DISPLAY, type EffortLevel } from "../session";
@@ -504,6 +504,12 @@ function writeLiveSubturtleBoardRecord(record: LiveSubturtleBoardRecord): void {
     liveSubturtleBoardPath(record.chat_id),
     `${JSON.stringify(record, null, 2)}\n`
   );
+}
+
+function deleteLiveSubturtleBoardRecord(chatId: number): void {
+  try {
+    unlinkSync(liveSubturtleBoardPath(chatId));
+  } catch {}
 }
 
 function summarizeBoardReplyMarkup(replyMarkup?: InlineKeyboardMarkup): string {
@@ -2718,6 +2724,9 @@ export async function syncLiveSubturtleBoard(
       current_view: payload.view,
     });
   };
+  const clearRecord = () => {
+    deleteLiveSubturtleBoardRecord(chatId);
+  };
 
   const pinMessage = async (messageId: number) => {
     if (!options.pin || !api.pinChatMessage) return;
@@ -2789,8 +2798,10 @@ export async function syncLiveSubturtleBoard(
     ) {
       if (hasActiveWorkers) {
         await pinMessage(record.message_id);
+        saveRecord(record.message_id);
       } else {
         await unpinMessage(record.message_id);
+        clearRecord();
       }
       return { status: "unchanged", messageId: record.message_id, view: record.current_view || payload.view };
     }
@@ -2806,21 +2817,23 @@ export async function syncLiveSubturtleBoard(
       });
       if (hasActiveWorkers) {
         await pinMessage(editMessageId);
+        saveRecord(editMessageId);
       } else {
         await unpinMessage(editMessageId);
+        clearRecord();
       }
       await cleanupSupersededMessages(record && record.message_id !== editMessageId ? [record.message_id] : []);
-      saveRecord(editMessageId);
       return { status: "updated", messageId: editMessageId, view: payload.view };
     } catch (error) {
       if (shouldIgnoreUnchangedMessageError(error)) {
         if (hasActiveWorkers) {
           await pinMessage(editMessageId);
+          saveRecord(editMessageId);
         } else {
           await unpinMessage(editMessageId);
+          clearRecord();
         }
         await cleanupSupersededMessages(record && record.message_id !== editMessageId ? [record.message_id] : []);
-        saveRecord(editMessageId);
         return { status: "unchanged", messageId: editMessageId, view: payload.view };
       }
       if (!allowCreateOnEditFailure || !shouldRecreateLiveBoard(error)) {
@@ -2844,10 +2857,11 @@ export async function syncLiveSubturtleBoard(
   }
   if (hasActiveWorkers) {
     await pinMessage(messageId);
+    saveRecord(messageId, now);
   } else {
     await unpinMessage(messageId);
+    clearRecord();
   }
-  saveRecord(messageId, now);
   return { status: "created", messageId, view: payload.view };
 }
 

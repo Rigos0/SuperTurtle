@@ -368,10 +368,7 @@ describe("/subturtle", () => {
       expect(edited).toBe(0);
       expect(unpinned).toEqual([{ chatId, messageId: 731 }]);
       expect(sent).toBe(0);
-
-      const trackedBoard = JSON.parse(readFileSync(boardPath, "utf-8"));
-      expect(trackedBoard.message_id).toBe(731);
-      expect(trackedBoard.current_view).toEqual({ kind: "board" });
+      expect(existsSync(boardPath)).toBe(false);
     } finally {
       rmSync(boardPath, { force: true });
     }
@@ -502,6 +499,96 @@ describe("/subturtle", () => {
 
       expect(result.status).toBe("updated");
       expect(unpinned).toEqual([{ chatId, messageId: 901 }]);
+      expect(existsSync(boardPath)).toBe(false);
+    } finally {
+      rmSync(boardPath, { force: true });
+    }
+  });
+
+  it("creates a fresh board for the next active run after an idle board was cleared", async () => {
+    const workdir = workingDir;
+    const chatId = authorizedUserId + 51;
+    const boardPath = join(
+      workdir,
+      ".superturtle/state/telegram/subturtle-boards",
+      `${chatId}.json`
+    );
+    rmSync(boardPath, { force: true });
+    mkdirSync(dirname(boardPath), { recursive: true });
+    writeFileSync(
+      boardPath,
+      JSON.stringify({
+        chat_id: chatId,
+        message_id: 1201,
+        last_render_hash: "old",
+        last_rendered_at: "2026-03-19T00:00:00Z",
+        created_at: "2026-03-19T00:00:00Z",
+        updated_at: "2026-03-19T00:00:00Z",
+        current_view: { kind: "board" },
+      })
+    );
+
+    const unpinned: Array<{ chatId: number; messageId?: number }> = [];
+    let sent = 0;
+    let edited = 0;
+
+    Bun.spawnSync = ((cmd: unknown, opts?: unknown) => {
+      if (Array.isArray(cmd) && String(cmd[0]).endsWith("/subturtle/ctl") && cmd[1] === "list") {
+        return {
+          stdout: Buffer.from("No SubTurtles found."),
+          stderr: Buffer.from(""),
+          success: true,
+          exitCode: 0,
+        } as ReturnType<typeof Bun.spawnSync>;
+      }
+      return originalSpawnSync(cmd as Parameters<typeof Bun.spawnSync>[0], opts as Parameters<typeof Bun.spawnSync>[1]);
+    }) as typeof Bun.spawnSync;
+
+    try {
+      const idleResult = await syncLiveSubturtleBoardForTest({
+        sendMessage: async () => ({ message_id: 1202, chat: { id: chatId } }),
+        editMessageText: async () => {
+          edited += 1;
+        },
+        unpinChatMessage: async (targetChatId: number, messageId?: number) => {
+          unpinned.push({ chatId: targetChatId, messageId });
+        },
+      }, chatId, { pin: true, disableNotification: true });
+
+      expect(idleResult.status).toBe("updated");
+      expect(unpinned).toEqual([{ chatId, messageId: 1201 }]);
+      expect(existsSync(boardPath)).toBe(false);
+
+      Bun.spawnSync = ((cmd: unknown, opts?: unknown) => {
+        if (Array.isArray(cmd) && String(cmd[0]).endsWith("/subturtle/ctl") && cmd[1] === "list") {
+          return {
+            stdout: Buffer.from("  worker-a      running  yolo-codex   (PID 12345)   9m left       Same task"),
+            stderr: Buffer.from(""),
+            success: true,
+            exitCode: 0,
+          } as ReturnType<typeof Bun.spawnSync>;
+        }
+        return originalSpawnSync(cmd as Parameters<typeof Bun.spawnSync>[0], opts as Parameters<typeof Bun.spawnSync>[1]);
+      }) as typeof Bun.spawnSync;
+
+      const activeResult = await syncLiveSubturtleBoardForTest({
+        sendMessage: async () => {
+          sent += 1;
+          return { message_id: 1203, chat: { id: chatId } };
+        },
+        editMessageText: async () => {
+          edited += 1;
+        },
+        pinChatMessage: async () => {},
+      }, chatId, { pin: true, disableNotification: true });
+
+      expect(activeResult.status).toBe("created");
+      expect(activeResult.messageId).toBe(1203);
+      expect(sent).toBe(1);
+      expect(edited).toBe(1);
+
+      const trackedBoard = JSON.parse(readFileSync(boardPath, "utf-8"));
+      expect(trackedBoard.message_id).toBe(1203);
     } finally {
       rmSync(boardPath, { force: true });
     }
