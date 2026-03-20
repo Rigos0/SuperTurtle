@@ -1,5 +1,5 @@
 # Current task
-Align final success/artifact delivery with the spec; `streaming.ts` still renders raw previews instead of `Done`, and media flows send silent artifacts before re-notifying via text promotion.
+All backlog items are complete.
 
 # End goal with specs
 Finish the Telegram foreground progress UX end-to-end so the shipped code matches the current implementation spec in `super_turtle/docs/TELEGRAM_PROGRESS_UX_SPEC.md`.
@@ -54,10 +54,10 @@ Acceptance criteria:
 - [x] Implement canonical progress-state rendering and any required retained-progress metadata in `super_turtle/claude-telegram-bot/src/handlers/streaming.ts`
 - [x] Implement retained snapshot history and `Back` / `Next` navigation for the retained progress message; `callback.ts` currently has no progress-viewer callbacks and `StreamingState` stores no snapshot history
 - [x] Implement or align stop/failure/attention-required behavior so the retained progress message remains correct across those flows; `stop.ts` still sends a separate stop reply, and `text.ts` error handling still tears the progress message down
-- [ ] Align final success/artifact delivery with the spec; `streaming.ts` still renders raw previews instead of `Done`, and media flows send silent artifacts before re-notifying via text promotion <- current
-- [ ] Update or add focused tests for the newly implemented behaviors
-- [ ] Run the relevant test files and fix regressions
-- [ ] Commit the changes with a clear message
+- [x] Align final success/artifact delivery with the spec; `streaming.ts` now keeps the retained progress message canonical and stages text/media terminal output until completion, with final artifacts taking precedence over text when present
+- [x] Update or add focused tests for the newly implemented behaviors
+- [x] Run the relevant test files and fix regressions
+- [x] Commit the changes with a clear message
 
 Audit findings:
 - `streaming.ts` creates and retains a silent progress message, but it renders raw thinking/tool/text content instead of canonical `Starting` / `Thinking` / `Using tools` / `Writing answer` / `Still working` / terminal states with a summary and footer.
@@ -66,3 +66,6 @@ Audit findings:
 - `callback.ts` has no handler for progress history navigation, so the required `Back` / `Next` controls and page indicator do not exist.
 - Normal stop and failure flows do not preserve the retained message in spec shape: `stop.ts` sends a separate stop reply instead of `Stopping` / `Stopped` edits, and `text.ts` error handling deletes the progress message rather than retaining `Failed`.
 - Final artifact handling is still off-spec: image/sticker flows are sent silently as side effects and then promoted through a text resend path instead of making the artifact itself the notified terminal result beneath a retained `Done` progress message.
+
+## Loop Control
+STOP

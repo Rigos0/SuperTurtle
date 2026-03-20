@@ -295,48 +295,26 @@ export async function checkPendingSendTurtleRequests(
       const state = getStreamingState(chatId);
 
       if (url) {
-        try {
-          // Download image and send as a sticker (renders smaller/cuter than photo)
-          const response = await fetch(url);
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const buffer = Buffer.from(await response.arrayBuffer());
-          const inputFile = new InputFile(buffer, "turtle.webp");
-          const stickerMsg = await ctx.replyWithSticker(inputFile, {
-            disable_notification: state ? true : undefined,
+        if (state) {
+          await applyProgressStateUpdate(ctx, state, "Writing answer", {
+            summary: buildArtifactProgressSummary("sticker", caption),
+            toolHint: null,
+            storeSnapshot: true,
           });
-          const stickerFileId = (stickerMsg as Message & { sticker?: { file_id?: string } }).sticker?.file_id;
-          if (state && stickerFileId && shouldSetMediaNotifiableOutput(state)) {
+          if (shouldSetMediaNotifiableOutput(state)) {
             setLastNotifiableOutput(
               state,
-              [stickerMsg],
-              async (targetCtx, notify) => [
-                await sendTextMessage(
-                  targetCtx,
-                  caption ? `🐢 ${caption}` : "🐢 Turtle sent.",
-                  { notify }
-                ),
-              ]
+              [],
+              async (targetCtx, notify) =>
+                sendStickerOutput(targetCtx, url, { caption, notify }),
+              {
+                kind: "final_artifact",
+                progressSummary: buildArtifactDoneSummary("sticker", caption),
+              }
             );
           }
-        } catch (photoError) {
-          // Photo send failed — try sending as a link instead
-          streamLog.warn(
-            { err: photoError, filepath, url, chatId },
-            "Failed to send turtle photo, falling back to link"
-          );
-          const fallbackText = `🐢 ${url}${caption ? `\n${caption}` : ""}`;
-          const fallbackMsg = state
-            ? await replySilently(ctx, fallbackText)
-            : await ctx.reply(fallbackText);
-          if (state && shouldSetMediaNotifiableOutput(state)) {
-            setLastNotifiableOutput(
-              state,
-              [fallbackMsg],
-              async (targetCtx, notify) => [
-                await sendTextMessage(targetCtx, fallbackText, { notify }),
-              ]
-            );
-          }
+        } else {
+          await sendStickerOutput(ctx, url, { caption, notify: true });
         }
         photoSent = true;
 
@@ -397,60 +375,33 @@ export async function checkPendingSendImageRequests(
       if (source) {
         try {
           const isUrl = source.startsWith("http://") || source.startsWith("https://");
-
-          if (isUrl) {
-            // Send URL directly — Telegram can fetch it
-            const photoMsg = await ctx.replyWithPhoto(source, {
-              caption,
-              disable_notification: state ? true : undefined,
-            });
-            const photoSizes = (photoMsg as Message & { photo?: Array<{ file_id?: string }> }).photo;
-            const photoFileId = Array.isArray(photoSizes) && photoSizes.length > 0
-              ? photoSizes[photoSizes.length - 1]?.file_id
-              : undefined;
-            if (state && photoFileId && shouldSetMediaNotifiableOutput(state)) {
-              setLastNotifiableOutput(
-                state,
-                [photoMsg],
-                async (targetCtx, notify) => [
-                  await sendTextMessage(
-                    targetCtx,
-                    caption ? `🖼️ ${caption}` : "🖼️ Image sent.",
-                    { notify }
-                  ),
-                ]
-              );
-            }
-          } else {
-            // Local file path — read and send as InputFile
+          if (!isUrl) {
             const fileData = Bun.file(source);
             if (!(await fileData.exists())) {
               throw new Error(`File not found: ${source}`);
             }
-            const buffer = Buffer.from(await fileData.arrayBuffer());
-            const fileName = source.split("/").pop() || "image.png";
-            const inputFile = new InputFile(buffer, fileName);
-            const photoMsg = await ctx.replyWithPhoto(inputFile, {
-              caption,
-              disable_notification: state ? true : undefined,
+          }
+
+          if (state) {
+            await applyProgressStateUpdate(ctx, state, "Writing answer", {
+              summary: buildArtifactProgressSummary("image", caption),
+              toolHint: null,
+              storeSnapshot: true,
             });
-            const photoSizes = (photoMsg as Message & { photo?: Array<{ file_id?: string }> }).photo;
-            const photoFileId = Array.isArray(photoSizes) && photoSizes.length > 0
-              ? photoSizes[photoSizes.length - 1]?.file_id
-              : undefined;
-            if (state && photoFileId && shouldSetMediaNotifiableOutput(state)) {
+            if (shouldSetMediaNotifiableOutput(state)) {
               setLastNotifiableOutput(
                 state,
-                [photoMsg],
-                async (targetCtx, notify) => [
-                  await sendTextMessage(
-                    targetCtx,
-                    caption ? `🖼️ ${caption}` : "🖼️ Image sent.",
-                    { notify }
-                  ),
-                ]
+                [],
+                async (targetCtx, notify) =>
+                  sendImageOutput(targetCtx, source, { caption, notify }),
+                {
+                  kind: "final_artifact",
+                  progressSummary: buildArtifactDoneSummary("image", caption),
+                }
               );
             }
+          } else {
+            await sendImageOutput(ctx, source, { caption, notify: true });
           }
           imageSent = true;
         } catch (sendError) {
@@ -458,20 +409,27 @@ export async function checkPendingSendImageRequests(
             { err: sendError, filepath, source, chatId },
             "Failed to send image, falling back to link/path"
           );
-          // Fallback: send as text
           const fallback = source.startsWith("http") ? source : `📎 ${source}`;
           const fallbackText = `${fallback}${caption ? `\n${caption}` : ""}`;
-          const fallbackMsg = state
-            ? await replySilently(ctx, fallbackText)
-            : await ctx.reply(fallbackText);
           if (state && shouldSetMediaNotifiableOutput(state)) {
+            await applyProgressStateUpdate(ctx, state, "Writing answer", {
+              summary: buildArtifactProgressSummary("image", caption),
+              toolHint: null,
+              storeSnapshot: true,
+            });
             setLastNotifiableOutput(
               state,
-              [fallbackMsg],
+              [],
               async (targetCtx, notify) => [
                 await sendTextMessage(targetCtx, fallbackText, { notify }),
-              ]
+              ],
+              {
+                kind: "final_artifact",
+                progressSummary: buildArtifactDoneSummary("image", caption),
+              }
             );
+          } else if (!state) {
+            await sendTextMessage(ctx, fallbackText, { notify: true });
           }
           imageSent = true;
         }
@@ -921,6 +879,8 @@ export class StreamingState {
     messages: Message[];
     resend: (ctx: Context, notify: boolean) => Promise<Message[]>;
     replaceExisting: boolean;
+    kind: "final_success" | "final_artifact";
+    progressSummary: string | null;
   } | null = null;
   silentSegments = new Map<number, string>(); // segment_id -> captured text for silent mode
   sawToolUse = false; // used to avoid replaying side-effectful tool runs on retries
@@ -1131,6 +1091,28 @@ function summarizeToolHint(content: string): string | null {
     return null;
   }
   return truncateProgressLine(normalized, 40);
+}
+
+function buildArtifactProgressSummary(
+  noun: "image" | "sticker",
+  caption?: string
+): string {
+  const prefix = noun === "image" ? "Preparing final image" : "Preparing final sticker";
+  const normalizedCaption =
+    typeof caption === "string" ? normalizeProgressLine(caption) : "";
+  const summary = normalizedCaption ? `${prefix}: ${normalizedCaption}` : `${prefix}.`;
+  return truncateProgressLine(summary, 160);
+}
+
+function buildArtifactDoneSummary(
+  noun: "image" | "sticker",
+  caption?: string
+): string {
+  const prefix = noun === "image" ? "Final image ready" : "Final sticker ready";
+  const normalizedCaption =
+    typeof caption === "string" ? normalizeProgressLine(caption) : "";
+  const summary = normalizedCaption ? `${prefix}: ${normalizedCaption}` : `${prefix}.`;
+  return truncateProgressLine(summary, 160);
 }
 
 function formatElapsed(ms: number): string {
@@ -1469,6 +1451,66 @@ async function sendTextMessage(
   return ctx.reply(text, getNotificationExtra(options.notify ?? false));
 }
 
+async function sendImageOutput(
+  ctx: Context,
+  source: string,
+  options: { caption?: string; notify?: boolean } = {}
+): Promise<Message[]> {
+  const caption = options.caption || undefined;
+  const notify = options.notify ?? false;
+  const replyOptions = getNotificationExtra(notify, caption ? { caption } : undefined);
+
+  try {
+    const isUrl = source.startsWith("http://") || source.startsWith("https://");
+    if (isUrl) {
+      return [await ctx.replyWithPhoto(source, replyOptions)];
+    }
+
+    const fileData = Bun.file(source);
+    if (!(await fileData.exists())) {
+      throw new Error(`File not found: ${source}`);
+    }
+    const buffer = Buffer.from(await fileData.arrayBuffer());
+    const fileName = source.split("/").pop() || "image.png";
+    return [await ctx.replyWithPhoto(new InputFile(buffer, fileName), replyOptions)];
+  } catch (sendError) {
+    streamLog.warn({ err: sendError, source }, "Failed to send image, falling back to link/path");
+    const fallback = source.startsWith("http") ? source : `📎 ${source}`;
+    const fallbackText = `${fallback}${caption ? `\n${caption}` : ""}`;
+    return [await sendTextMessage(ctx, fallbackText, { notify })];
+  }
+}
+
+async function sendStickerOutput(
+  ctx: Context,
+  url: string,
+  options: { caption?: string; notify?: boolean } = {}
+): Promise<Message[]> {
+  const caption = options.caption || undefined;
+  const notify = options.notify ?? false;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return [
+      await ctx.replyWithSticker(
+        new InputFile(buffer, "turtle.webp"),
+        getNotificationExtra(notify)
+      ),
+    ];
+  } catch (photoError) {
+    streamLog.warn(
+      { err: photoError, url, chatId: ctx.chat?.id },
+      "Failed to send turtle photo, falling back to link"
+    );
+    const fallbackText = `🐢 ${url}${caption ? `\n${caption}` : ""}`;
+    return [await sendTextMessage(ctx, fallbackText, { notify })];
+  }
+}
+
 async function sendRenderedContent(
   ctx: Context,
   formatted: string,
@@ -1495,17 +1537,23 @@ function setLastNotifiableOutput(
   state: StreamingState,
   messages: Message[],
   resend: (ctx: Context, notify: boolean) => Promise<Message[]>,
-  options: { replaceExisting?: boolean } = {}
+  options: {
+    kind?: "final_success" | "final_artifact";
+    progressSummary?: string | null;
+    replaceExisting?: boolean;
+  } = {}
 ): void {
   state.lastNotifiableOutput = {
     messages,
     resend,
+    kind: options.kind ?? "final_success",
+    progressSummary: options.progressSummary ?? null,
     replaceExisting: options.replaceExisting === true,
   };
 }
 
 function shouldSetMediaNotifiableOutput(state: StreamingState): boolean {
-  return !state.hasTextSegmentOutput;
+  return !state.lastNotifiableOutput || state.lastNotifiableOutput.kind !== "final_artifact";
 }
 
 function startHeartbeat(ctx: Context, state: StreamingState): void {
@@ -1699,10 +1747,10 @@ async function sendChunkedMessages(
 async function promoteFinalSegmentNotification(
   ctx: Context,
   state: StreamingState
-): Promise<void> {
+): Promise<boolean> {
   const output = state.lastNotifiableOutput;
   if (!output) {
-    return;
+    return false;
   }
 
   if (output.replaceExisting) {
@@ -1722,8 +1770,10 @@ async function promoteFinalSegmentNotification(
 
   try {
     output.messages = await output.resend(ctx, true);
+    return output.messages.length > 0;
   } catch (error) {
     streamLog.debug({ err: error }, "Failed to promote last notifiable output");
+    return false;
   }
 }
 
@@ -1807,119 +1857,52 @@ export function createStatusCallback(
       } else if (statusType === "segment_end" && segmentId !== undefined) {
         if (content) {
           state.hasTextSegmentOutput = true;
-          state.lastAnswerPreview = summarizeProgressContent(
+          const preview = summarizeProgressContent(
             convertMarkdownToHtml(content),
             160,
             DEFAULT_PROGRESS_SUMMARY["Writing answer"]
           );
+          state.lastAnswerPreview = preview;
+          await applyProgressStateUpdate(ctx, state, "Writing answer", {
+            summary: preview,
+            toolHint: null,
+            storeSnapshot: true,
+          });
           const formatted = convertMarkdownToHtml(content);
-
-          if (state.textMessages.has(segmentId)) {
-            const msg = state.textMessages.get(segmentId)!;
-
-            // Skip if content unchanged
-            if (formatted === state.lastContent.get(segmentId)) {
-              setLastNotifiableOutput(
-                state,
-                state.renderedTextMessages.get(segmentId) || [msg],
-                async (targetCtx, notify) => sendRenderedContent(targetCtx, formatted, notify),
-                { replaceExisting: true }
-              );
-              return;
-            }
-
-            if (formatted.length <= TELEGRAM_MESSAGE_LIMIT) {
-              try {
-                await ctx.api.editMessageText(
-                  msg.chat.id,
-                  msg.message_id,
-                  formatted,
-                  {
-                    parse_mode: "HTML",
-                  }
-                );
-                state.renderedTextMessages.set(segmentId, [msg]);
-                state.lastContent.set(segmentId, formatted);
-              } catch (error) {
-                const errorStr = String(error);
-                if (errorStr.includes("MESSAGE_TOO_LONG")) {
-                  // HTML overhead pushed it over - delete and chunk
-                  try {
-                    await ctx.api.deleteMessage(msg.chat.id, msg.message_id);
-                  } catch (delError) {
-                    streamLog.debug({ err: delError }, "Failed to delete for chunking");
-                  }
-                  const messages = await sendChunkedMessages(ctx, formatted);
-                  state.renderedTextMessages.set(segmentId, messages);
-                  if (messages.length > 0) {
-                    const lastMsg = messages[messages.length - 1]!;
-                    state.textMessages.set(segmentId, lastMsg);
-                    state.lastContent.set(segmentId, formatted);
-                  }
-                } else {
-                  streamLog.debug({ err: error }, "Failed to edit final message");
-                }
+          state.lastContent.set(segmentId, formatted);
+          if (state.lastNotifiableOutput?.kind !== "final_artifact") {
+            setLastNotifiableOutput(
+              state,
+              [],
+              async (targetCtx, notify) => sendRenderedContent(targetCtx, formatted, notify),
+              {
+                kind: "final_success",
+                progressSummary: preview,
               }
-            } else {
-              // Too long - delete and split
-              try {
-                await ctx.api.deleteMessage(msg.chat.id, msg.message_id);
-              } catch (error) {
-                streamLog.debug({ err: error }, "Failed to delete message for splitting");
-              }
-              const messages = await sendChunkedMessages(ctx, formatted);
-              state.renderedTextMessages.set(segmentId, messages);
-              if (messages.length > 0) {
-                const lastMsg = messages[messages.length - 1]!;
-                state.textMessages.set(segmentId, lastMsg);
-                state.lastContent.set(segmentId, formatted);
-              }
-            }
-          } else {
-            // No streaming message was created (response was too short to trigger
-            // the throttled text callback). Send the final content as a new message.
-            if (formatted.length <= TELEGRAM_MESSAGE_LIMIT) {
-              try {
-                const msg = await replySilently(ctx, formatted, { parse_mode: "HTML" });
-                state.textMessages.set(segmentId, msg);
-                state.renderedTextMessages.set(segmentId, [msg]);
-                state.lastContent.set(segmentId, formatted);
-              } catch {
-                try {
-                  const msg = await replySilently(ctx, formatted);
-                  state.textMessages.set(segmentId, msg);
-                  state.renderedTextMessages.set(segmentId, [msg]);
-                  state.lastContent.set(segmentId, formatted);
-                } catch (plainError) {
-                  streamLog.debug({ err: plainError }, "Failed to send short segment");
-                }
-              }
-            } else {
-              const messages = await sendChunkedMessages(ctx, formatted);
-              state.renderedTextMessages.set(segmentId, messages);
-              if (messages.length > 0) {
-                const lastMsg = messages[messages.length - 1]!;
-                state.textMessages.set(segmentId, lastMsg);
-                state.lastContent.set(segmentId, formatted);
-              }
-            }
+            );
           }
-
-          setLastNotifiableOutput(
-            state,
-            state.renderedTextMessages.get(segmentId) || [],
-            async (targetCtx, notify) => sendRenderedContent(targetCtx, formatted, notify),
-            { replaceExisting: true }
-          );
         }
       } else if (statusType === "done") {
+        const finalOutput = state.lastNotifiableOutput;
+        const doneSummary =
+          finalOutput?.progressSummary ||
+          state.lastAnswerPreview ||
+          DEFAULT_PROGRESS_SUMMARY.Done;
+
+        if (finalOutput?.kind === "final_artifact") {
+          await promoteFinalSegmentNotification(ctx, state);
+        }
+
         await applyProgressStateUpdate(ctx, state, "Done", {
-          summary: state.lastAnswerPreview || DEFAULT_PROGRESS_SUMMARY.Done,
+          summary: doneSummary,
           toolHint: null,
           storeSnapshot: true,
           terminalSnapshot: true,
         });
-        await promoteFinalSegmentNotification(ctx, state);
+
+        if (!finalOutput || finalOutput.kind !== "final_artifact") {
+          await promoteFinalSegmentNotification(ctx, state);
+        }
         await teardownStreamingState(ctx, state, {
           chatId,
           clearRegisteredState: true,
