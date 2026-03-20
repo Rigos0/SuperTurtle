@@ -1,5 +1,5 @@
 # Current task
-Update `super_turtle/claude-telegram-bot/src/handlers/streaming.test.ts` to cover retained progress updates and separate final answer delivery.
+All backlog items are complete. Stop the loop.
 
 # End goal with specs
 Finish the Telegram progress UX work end-to-end: specs, implementation, tests, and final commit(s).
@@ -45,6 +45,9 @@ Acceptance criteria:
 - [x] Update any other spec files only where the UX/runtime contract must stay aligned
 - [x] Re-read all touched spec docs and remove contradictions, vague wording, and stale status language
 - [x] Implement a single retained progress-message path for foreground text runs in `super_turtle/claude-telegram-bot/src/handlers/streaming.ts`
-- [ ] Update `super_turtle/claude-telegram-bot/src/handlers/streaming.test.ts` to cover retained progress updates and separate final answer delivery <- current
-- [ ] Run the relevant streaming test file and fix regressions
-- [ ] Commit the remaining implementation changes with a clear message
+- [x] Update `super_turtle/claude-telegram-bot/src/handlers/streaming.test.ts` to cover retained progress updates and separate final answer delivery
+- [x] Run the relevant streaming test file and fix regressions
+- [x] Commit the remaining implementation changes with a clear message
+
+## Loop Control
+STOP
