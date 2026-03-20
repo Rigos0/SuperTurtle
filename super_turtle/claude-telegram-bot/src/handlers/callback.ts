@@ -312,8 +312,11 @@ export async function handleCallback(ctx: Context): Promise<void> {
     if (driver === "claude") {
       await resetAllDriverSessions({ stopRunning: true });
       session.activeDriver = "claude";
-      const lines = await buildSessionOverviewLines("Switched to Claude Code 🔵");
-      await ctx.editMessageText(lines.join("\n"), { parse_mode: "HTML" });
+      const picker = buildClaudeModelPickerMessage();
+      await ctx.editMessageText(picker.text, {
+        parse_mode: "HTML",
+        reply_markup: picker.replyMarkup,
+      });
       await ctx.answerCallbackQuery({ text: "Switched to Claude Code" });
     } else if (driver === "codex") {
       if (!CODEX_AVAILABLE) {
@@ -324,8 +327,11 @@ export async function handleCallback(ctx: Context): Promise<void> {
         await resetAllDriverSessions({ stopRunning: true });
         await codexSession.startNewThread();
         session.activeDriver = "codex";
-        const lines = await buildSessionOverviewLines("Switched to Codex 🟢");
-        await ctx.editMessageText(lines.join("\n"), { parse_mode: "HTML" });
+        const picker = await buildCodexModelPickerMessage();
+        await ctx.editMessageText(picker.text, {
+          parse_mode: "HTML",
+          reply_markup: picker.replyMarkup,
+        });
         await ctx.answerCallbackQuery({ text: "Switched to Codex" });
       } catch (error) {
         await ctx.answerCallbackQuery({ text: `Codex error: ${String(error).slice(0, 50)}` });

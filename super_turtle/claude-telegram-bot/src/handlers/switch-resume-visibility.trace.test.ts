@@ -71,7 +71,7 @@ function runTraceProbe(): {
     const marker = ${JSON.stringify(marker)};
     const tokenPrefix = ${JSON.stringify(tokenPrefix)};
     const { readFileSync, rmSync } = await import("fs");
-    const { handleResume, handleSwitch } = await import("./src/handlers/commands.ts");
+    const { handleResume, performDriverSwitch } = await import("./src/handlers/commands.ts");
     const { SESSION_FILE } = await import("./src/config.ts");
     const { session } = await import("./src/session.ts");
     const { codexSession } = await import("./src/codex-session.ts");
@@ -136,11 +136,7 @@ function runTraceProbe(): {
     codexSession.getSessionListLive = async () => codexSession.getSessionList();
 
     try {
-      await handleSwitch({
-        from: { id: 123 },
-        message: { text: "/switch codex" },
-        reply: async () => ({ message_id: 1 }),
-      });
+      await performDriverSwitch("codex");
 
       await handleResume({
         from: { id: 123 },

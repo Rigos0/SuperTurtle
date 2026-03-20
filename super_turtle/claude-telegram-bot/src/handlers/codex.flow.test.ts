@@ -53,7 +53,7 @@ async function probeCodexFlow(): Promise<CodexFlowResult> {
 	    const { mkdirSync } = await import("fs");
 	    mkdirSync(ipcDir, { recursive: true });
 
-    const { handleSwitch, handleModel, handleResume } = await import(commandsPath);
+    const { handleModel, handleResume, performDriverSwitch } = await import(commandsPath);
     const { handleText } = await import(textPath);
     const { handleCallback } = await import(callbackPath);
     const { session } = await import(sessionPath);
@@ -204,8 +204,8 @@ async function probeCodexFlow(): Promise<CodexFlowResult> {
       session.activeDriver = "claude";
       await codexSession.kill();
 
-      // /switch codex
-      await handleSwitch(mkCtx("/switch codex"));
+      // switch to codex driver
+      await performDriverSwitch("codex");
 
       // send message with streaming + MCP side effects
       await handleText(mkCtx("build integration test"));
