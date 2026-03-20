@@ -67,7 +67,7 @@ Expected result:
 
 - the same sandbox resumes
 - Telegram reaches the webhook
-- if the remote runtime is fully provisioned, the bot handles the message normally
+- if the remote runtime is fully provisioned, the bot handles the message with the same retained-progress plus separate terminal-result contract used in local polling mode
 
 ## Inspect state
 

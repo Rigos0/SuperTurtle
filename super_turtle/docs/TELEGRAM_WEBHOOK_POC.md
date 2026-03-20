@@ -14,6 +14,17 @@ Teleport uses the same webhook transport, but not the same ownership flow:
 - generic webhook mode may self-register the Telegram webhook at startup
 - teleport handoff should keep webhook registration under the local orchestrator so ownership flips only after remote readiness succeeds
 
+## Foreground UX Contract
+
+Webhook transport must not change the foreground run UX.
+
+Required behavior:
+
+- one silent retained progress message is created when a foreground run starts
+- active-run thinking, tool, streaming-text, and heartbeat updates edit that same message in place
+- the final successful answer, final error, or final artifact is sent as a separate terminal result message beneath the retained progress message
+- startup, readiness, and cutover status remain separate system notifications rather than foreground progress states
+
 What it does not do yet:
 
 - no `/teleport` cutover flow
