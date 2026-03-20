@@ -349,6 +349,13 @@ type LiveSubturtleBoardRecord = {
   current_view?: LiveSubturtleBoardView;
 };
 
+type LiveSubturtleBoardChatMessage = {
+  message_id?: number;
+  text?: string;
+  caption?: string;
+  reply_markup?: unknown;
+};
+
 export type LiveSubturtleBoardApi = {
   sendMessage: (
     chatId: number,
@@ -381,6 +388,9 @@ export type LiveSubturtleBoardApi = {
     chatId: number,
     messageId: number
   ) => Promise<unknown>;
+  getChat?: (
+    chatId: number
+  ) => Promise<{ pinned_message?: LiveSubturtleBoardChatMessage }>;
 };
 
 export type ClaudeStateSummary = {
@@ -539,6 +549,120 @@ function shouldRecreateLiveBoard(error: unknown): boolean {
     summary.includes("message can't be edited") ||
     summary.includes("message identifier is not specified")
   );
+}
+
+function liveSubturtleBoardCallbackData(
+  replyMarkup?: LiveSubturtleBoardChatMessage["reply_markup"]
+): string[] {
+  if (!replyMarkup || typeof replyMarkup !== "object" || Array.isArray(replyMarkup)) {
+    return [];
+  }
+
+  const inlineKeyboard = (replyMarkup as { inline_keyboard?: unknown }).inline_keyboard;
+  if (!Array.isArray(inlineKeyboard)) {
+    return [];
+  }
+
+  return inlineKeyboard.flatMap((row) =>
+    Array.isArray(row)
+      ? row
+          .map((button) =>
+            typeof button === "object" &&
+            button !== null &&
+            typeof (button as { callback_data?: unknown }).callback_data === "string"
+              ? (button as { callback_data: string }).callback_data
+              : ""
+          )
+          .filter((callbackData) => callbackData.length > 0)
+      : []
+  );
+}
+
+function recoverLiveSubturtleBoardView(
+  message: LiveSubturtleBoardChatMessage
+): LiveSubturtleBoardView | null {
+  const callbackData = liveSubturtleBoardCallbackData(message.reply_markup);
+  const text = [message.text, message.caption]
+    .find((value): value is string => typeof value === "string" && value.trim().length > 0)
+    ?.trim() || "";
+
+  if (!callbackData.some((value) => value.startsWith("sub_board_"))) {
+    return text.startsWith("🐢 SubTurtles") ? { kind: "board" } : null;
+  }
+
+  const backlogMatch = /^📝\s+Tasks\s+for\s+([^\n]+)\n[^\n]*page\s+(\d+)\/\d+/m.exec(text);
+  if (backlogMatch && isSafeSubturtleName(backlogMatch[1]?.trim())) {
+    return {
+      kind: "backlog",
+      name: backlogMatch[1]!.trim(),
+      page: normalizeBoardPage(Number(backlogMatch[2]) - 1),
+    };
+  }
+
+  const logsMatch = /^📜\s+Logs\s+for\s+([^\n]+)\s+[-—]\s+page\s+(\d+)\/\d+/m.exec(text);
+  if (logsMatch && isSafeSubturtleName(logsMatch[1]?.trim())) {
+    return {
+      kind: "logs",
+      name: logsMatch[1]!.trim(),
+      page: normalizeBoardPage(Number(logsMatch[2]) - 1),
+    };
+  }
+
+  if (callbackData.includes("sub_board_home")) {
+    const detailName = callbackData
+      .map((value) => {
+        const stopMatch = /^sub_board_stop:([^:]+)$/.exec(value);
+        if (stopMatch?.[1] && isSafeSubturtleName(stopMatch[1])) {
+          return stopMatch[1];
+        }
+        const backlogButtonMatch = /^sub_board_bl:([^:]+):\d+$/.exec(value);
+        if (backlogButtonMatch?.[1] && isSafeSubturtleName(backlogButtonMatch[1])) {
+          return backlogButtonMatch[1];
+        }
+        const logsButtonMatch = /^sub_board_lg:([^:]+):\d+$/.exec(value);
+        if (logsButtonMatch?.[1] && isSafeSubturtleName(logsButtonMatch[1])) {
+          return logsButtonMatch[1];
+        }
+        return null;
+      })
+      .find((value): value is string => typeof value === "string");
+
+    if (detailName) {
+      return { kind: "detail", name: detailName };
+    }
+  }
+
+  return { kind: "board" };
+}
+
+async function recoverPinnedLiveSubturtleBoard(
+  api: LiveSubturtleBoardApi,
+  chatId: number
+): Promise<{ messageId: number; view: LiveSubturtleBoardView } | null> {
+  if (!api.getChat) {
+    return null;
+  }
+
+  try {
+    const chat = await api.getChat(chatId);
+    const pinnedMessage = chat?.pinned_message;
+    if (
+      !pinnedMessage ||
+      typeof pinnedMessage.message_id !== "number" ||
+      !Number.isFinite(pinnedMessage.message_id)
+    ) {
+      return null;
+    }
+
+    const view = recoverLiveSubturtleBoardView(pinnedMessage);
+    if (!view) {
+      return null;
+    }
+
+    return { messageId: pinnedMessage.message_id, view };
+  } catch {
+    return null;
+  }
 }
 
 export function parseClaudeBacklogItems(content: string): ClaudeBacklogItem[] {
@@ -2697,18 +2821,33 @@ export async function syncLiveSubturtleBoard(
   const turtles = listSubturtles();
   const hasActiveWorkers = turtles.some((turtle) => turtle.status === "running");
   const record = readLiveSubturtleBoardRecord(chatId);
-  const targetView = normalizeLiveSubturtleBoardView(options.view || record?.current_view || { kind: "board" });
   const shouldCreateIfMissing = options.createIfMissing ?? hasActiveWorkers;
   const targetMessageId =
     typeof options.targetMessageId === "number" && Number.isFinite(options.targetMessageId)
       ? options.targetMessageId
       : null;
   const allowCreateOnEditFailure = options.allowCreateOnEditFailure ?? true;
+  let recoveredPinnedBoard: { messageId: number; view: LiveSubturtleBoardView } | null | undefined;
+
+  const loadRecoveredPinnedBoard = async () => {
+    if (typeof recoveredPinnedBoard !== "undefined") {
+      return recoveredPinnedBoard;
+    }
+    recoveredPinnedBoard = await recoverPinnedLiveSubturtleBoard(api, chatId);
+    return recoveredPinnedBoard;
+  };
 
   if (!record && !shouldCreateIfMissing) {
     return { status: "skipped", messageId: null, view: { kind: "board" } };
   }
 
+  if (targetMessageId === null && !record) {
+    await loadRecoveredPinnedBoard();
+  }
+
+  const targetView = normalizeLiveSubturtleBoardView(
+    options.view || record?.current_view || recoveredPinnedBoard?.view || { kind: "board" }
+  );
   const payload = await buildLiveSubturtleBoardPayload(turtles, targetView);
   const renderHash = computeLiveSubturtleBoardHash(payload.text, payload.replyMarkup);
   const now = nowIso();
@@ -2789,6 +2928,40 @@ export async function syncLiveSubturtleBoard(
     }
   };
 
+  const finalizeExistingBoardMessage = async (
+    messageId: number,
+    status: "updated" | "unchanged",
+    supersededMessageIds: Array<number | null | undefined> = []
+  ) => {
+    if (hasActiveWorkers) {
+      await pinMessage(messageId);
+      saveRecord(messageId);
+    } else {
+      await unpinMessage(messageId);
+      clearRecord();
+    }
+    await cleanupSupersededMessages(supersededMessageIds);
+    return { status, messageId, view: payload.view };
+  };
+
+  const editExistingBoardMessage = async (
+    messageId: number,
+    supersededMessageIds: Array<number | null | undefined> = []
+  ) => {
+    try {
+      await api.editMessageText(chatId, messageId, payload.text, {
+        parse_mode: "HTML",
+        reply_markup: payload.replyMarkup,
+      });
+      return await finalizeExistingBoardMessage(messageId, "updated", supersededMessageIds);
+    } catch (error) {
+      if (shouldIgnoreUnchangedMessageError(error)) {
+        return await finalizeExistingBoardMessage(messageId, "unchanged", supersededMessageIds);
+      }
+      throw error;
+    }
+  };
+
   if (record && !options.force) {
     const ageMs = Date.now() - Date.parse(record.updated_at);
     if (
@@ -2807,42 +2980,46 @@ export async function syncLiveSubturtleBoard(
     }
   }
 
-  const editMessageId = targetMessageId ?? record?.message_id ?? null;
+  const editMessageId = targetMessageId ?? record?.message_id ?? recoveredPinnedBoard?.messageId ?? null;
 
   if (editMessageId !== null) {
+    const supersededMessageIds =
+      record && record.message_id !== editMessageId ? [record.message_id] : [];
     try {
-      await api.editMessageText(chatId, editMessageId, payload.text, {
-        parse_mode: "HTML",
-        reply_markup: payload.replyMarkup,
-      });
-      if (hasActiveWorkers) {
-        await pinMessage(editMessageId);
-        saveRecord(editMessageId);
-      } else {
-        await unpinMessage(editMessageId);
-        clearRecord();
-      }
-      await cleanupSupersededMessages(record && record.message_id !== editMessageId ? [record.message_id] : []);
-      return { status: "updated", messageId: editMessageId, view: payload.view };
+      return await editExistingBoardMessage(editMessageId, supersededMessageIds);
     } catch (error) {
-      if (shouldIgnoreUnchangedMessageError(error)) {
-        if (hasActiveWorkers) {
-          await pinMessage(editMessageId);
-          saveRecord(editMessageId);
-        } else {
-          await unpinMessage(editMessageId);
-          clearRecord();
-        }
-        await cleanupSupersededMessages(record && record.message_id !== editMessageId ? [record.message_id] : []);
-        return { status: "unchanged", messageId: editMessageId, view: payload.view };
-      }
       if (!allowCreateOnEditFailure || !shouldRecreateLiveBoard(error)) {
         throw error;
       }
-      await cleanupSupersededMessages([
-        record?.message_id,
-        editMessageId !== record?.message_id ? editMessageId : null,
-      ]);
+      if (targetMessageId === null) {
+        const recoveredBoard = await loadRecoveredPinnedBoard();
+        if (recoveredBoard && recoveredBoard.messageId !== editMessageId) {
+          try {
+            return await editExistingBoardMessage(recoveredBoard.messageId, [
+              record?.message_id,
+            ]);
+          } catch (recoveredError) {
+            if (!allowCreateOnEditFailure || !shouldRecreateLiveBoard(recoveredError)) {
+              throw recoveredError;
+            }
+            await cleanupSupersededMessages([
+              record?.message_id,
+              editMessageId,
+              recoveredBoard.messageId,
+            ]);
+          }
+        } else {
+          await cleanupSupersededMessages([
+            record?.message_id,
+            editMessageId,
+          ]);
+        }
+      } else {
+        await cleanupSupersededMessages([
+          record?.message_id,
+          editMessageId !== record?.message_id ? editMessageId : null,
+        ]);
+      }
     }
   }
 

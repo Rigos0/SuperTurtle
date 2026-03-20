@@ -1,6 +1,6 @@
 # Current task
 
-Implement idempotent live-board reconciliation by reusing the callback target message when present and otherwise recovering the currently pinned SubTurtle board before creating a new one.
+Add regression tests for record deletion / stale record / recreate paths and pinned-message dedupe behavior, including pinned-board recovery when the record is missing.
 
 # End goal with specs
 
@@ -26,7 +26,7 @@ Implement idempotent live-board reconciliation by reusing the callback target me
 
 - [x] Audit the live board lifecycle in `src/handlers/commands.ts`, `src/subturtle-board-service.ts`, and related callbacks to define the concrete recovery/dedupe strategy
 - [x] Rewrite or remove the unsafe board-record test behavior in `src/handlers/commands.subturtle.test.ts` using a temp working/data dir fixture so tests never touch the live tracking file
-- [ ] Implement idempotent live-board reconciliation by reusing the callback target message when present and otherwise recovering the currently pinned SubTurtle board before creating a new one <- current
-- [ ] Add regression tests for record deletion / stale record / recreate paths and pinned-message dedupe behavior, including pinned-board recovery when the record is missing
+- [x] Implement idempotent live-board reconciliation by reusing the callback target message when present and otherwise recovering the currently pinned SubTurtle board before creating a new one
+- [ ] Add regression tests for record deletion / stale record / recreate paths and pinned-message dedupe behavior, including pinned-board recovery when the record is missing <- current
 - [ ] Run the relevant bot test slice and fix any failures caused by the changes
 - [ ] Update this state file to reflect progress and stop only when the backlog is complete
