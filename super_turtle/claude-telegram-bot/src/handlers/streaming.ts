@@ -40,9 +40,33 @@ import {
 // Union type for bot control to work with both Claude and Codex sessions
 type BotControlSession = ClaudeSession | CodexSession;
 const PENDING_REQUEST_MAX_AGE_MS = 5 * 60 * 1000;
-const HEARTBEAT_IDLE_MS = 15_000;
-const HEARTBEAT_TICK_MS = 5_000;
+const HEARTBEAT_IDLE_MS = 20_000;
+const HEARTBEAT_REFRESH_MS = 30_000;
+const HEARTBEAT_TICK_MS = 1_000;
 const REQUEST_LOCK_STALE_MS = 60_000;
+
+type CanonicalProgressState =
+  | "Starting"
+  | "Thinking"
+  | "Using tools"
+  | "Writing answer"
+  | "Still working"
+  | "Stopping"
+  | "Stopped"
+  | "Done"
+  | "Failed";
+
+const DEFAULT_PROGRESS_SUMMARY: Record<CanonicalProgressState, string> = {
+  Starting: "Waiting for the first step.",
+  Thinking: "Working through the request.",
+  "Using tools": "Running tools.",
+  "Writing answer": "Drafting the final reply.",
+  "Still working": "No new updates yet.",
+  Stopping: "Cancelling the run.",
+  Stopped: "Run stopped.",
+  Done: "Reply ready.",
+  Failed: "The run failed.",
+};
 
 function getIpcDir(): string {
   const override = process.env.SUPERTURTLE_IPC_DIR?.trim();
@@ -889,6 +913,11 @@ export class StreamingState {
   heartbeatUpdating = false;
   statusStartedAt = Date.now();
   lastStatusAt = Date.now();
+  progressState: CanonicalProgressState = "Starting";
+  progressSummary = DEFAULT_PROGRESS_SUMMARY.Starting;
+  progressToolHint: string | null = null;
+  lastAnswerPreview: string | null = null;
+  lastHeartbeatAt = 0;
   teardownCompleted = false;
 
   getSilentCapturedText(): string {
@@ -988,6 +1017,102 @@ function toPlainProgressText(text: string): string {
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function normalizeProgressLine(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function truncateProgressLine(text: string, maxLength: number): string {
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return text.slice(0, Math.max(0, maxLength - 3)).trimEnd() + "...";
+}
+
+function summarizeProgressContent(
+  content: string,
+  maxLength: number,
+  fallback: string
+): string {
+  const normalized = normalizeProgressLine(toPlainProgressText(content));
+  if (!normalized) {
+    return fallback;
+  }
+  return truncateProgressLine(normalized, maxLength);
+}
+
+function summarizeToolHint(content: string): string | null {
+  const normalized = normalizeProgressLine(toPlainProgressText(content))
+    .replace(/^[^\p{L}\p{N}]+/u, "");
+  if (!normalized) {
+    return null;
+  }
+  return truncateProgressLine(normalized, 40);
+}
+
+function formatElapsed(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (seconds === 0) {
+    return `${minutes}m`;
+  }
+  return `${minutes}m ${seconds}s`;
+}
+
+function renderProgressMessage(state: StreamingState): string {
+  const footerParts = [`Elapsed ${formatElapsed(Date.now() - state.statusStartedAt)}`];
+  if (state.progressToolHint) {
+    footerParts.push(state.progressToolHint);
+  }
+
+  return [
+    `<b>${escapeHtml(state.progressState)}</b>`,
+    escapeHtml(state.progressSummary),
+    `<i>${escapeHtml(footerParts.join(" • "))}</i>`,
+  ].join("\n");
+}
+
+async function queueRenderedProgressMessageUpdate(
+  ctx: Context,
+  state: StreamingState
+): Promise<void> {
+  await queueProgressMessageUpdate(ctx, state, renderProgressMessage(state));
+}
+
+async function applyProgressStateUpdate(
+  ctx: Context,
+  state: StreamingState,
+  progressState: CanonicalProgressState,
+  options: {
+    summary?: string;
+    toolHint?: string | null;
+    trackActivity?: boolean;
+  } = {}
+): Promise<void> {
+  const nextSummary = options.summary ?? DEFAULT_PROGRESS_SUMMARY[progressState];
+  const nextToolHint =
+    options.toolHint === undefined ? state.progressToolHint : options.toolHint;
+  const changed =
+    state.progressState !== progressState ||
+    state.progressSummary !== nextSummary ||
+    state.progressToolHint !== nextToolHint;
+
+  state.progressState = progressState;
+  state.progressSummary = nextSummary;
+  state.progressToolHint = nextToolHint;
+
+  if (changed && options.trackActivity !== false) {
+    state.lastStatusAt = Date.now();
+    state.lastHeartbeatAt = 0;
+  }
+
+  await queueRenderedProgressMessageUpdate(ctx, state);
 }
 
 async function updateProgressMessage(
@@ -1138,15 +1263,25 @@ function startHeartbeat(ctx: Context, state: StreamingState): void {
   if (state.heartbeatTimer) return;
   state.statusStartedAt = Date.now();
   state.lastStatusAt = Date.now();
+  state.lastHeartbeatAt = 0;
   state.heartbeatTimer = setInterval(async () => {
     if (state.heartbeatUpdating) return;
     if (Date.now() - state.lastStatusAt < HEARTBEAT_IDLE_MS) return;
+    if (
+      state.progressState === "Still working" &&
+      Date.now() - state.lastHeartbeatAt < HEARTBEAT_REFRESH_MS
+    ) {
+      return;
+    }
 
     state.heartbeatUpdating = true;
     try {
-      const elapsedSec = Math.floor((Date.now() - state.statusStartedAt) / 1000);
-      const text = `<i>Still working… ${elapsedSec}s</i>`;
-      await queueProgressMessageUpdate(ctx, state, text);
+      state.lastHeartbeatAt = Date.now();
+      await applyProgressStateUpdate(ctx, state, "Still working", {
+        summary: state.progressSummary,
+        toolHint: state.progressToolHint,
+        trackActivity: false,
+      });
     } catch (error) {
       streamLog.debug({ errorSummary: describeError(error) }, "Heartbeat update skipped");
     } finally {
@@ -1344,46 +1479,72 @@ export function createStatusCallback(
   }
   startHeartbeat(ctx, state);
   if (typeof ctx.reply === "function") {
-    void queueProgressMessageUpdate(ctx, state, "<i>Starting…</i>").catch((error) => {
+    void applyProgressStateUpdate(ctx, state, "Starting", {
+      summary: DEFAULT_PROGRESS_SUMMARY.Starting,
+      toolHint: null,
+    }).catch((error) => {
       streamLog.debug({ err: error }, "Failed to create retained progress message");
     });
   }
   return async (statusType: DriverStatusType, content: string, segmentId?: number) => {
     try {
       const outboundMessageKind = classifyDriverStatusMessage(statusType);
-      if (statusType !== "done") {
-        state.lastStatusAt = Date.now();
-      }
 
       if (statusType === "thinking") {
-        const preview =
-          content.length > 500 ? content.slice(0, 500) + "..." : content;
-        const escaped = escapeHtml(preview);
-        await queueProgressMessageUpdate(ctx, state, `<i>${escaped}</i>`);
+        await applyProgressStateUpdate(ctx, state, "Thinking", {
+          summary: summarizeProgressContent(
+            content,
+            140,
+            DEFAULT_PROGRESS_SUMMARY.Thinking
+          ),
+          toolHint: null,
+        });
       } else if (statusType === "tool") {
         state.sawToolUse = true;
         if (isSpawnOrchestrationToolStatus(content)) {
           state.sawSpawnOrchestration = true;
         }
-        if (!shouldSendToolStatusMessage(content, options.showToolStatus)) {
-          return;
-        }
-        await queueProgressMessageUpdate(ctx, state, content);
+        const showToolDetails = shouldSendToolStatusMessage(
+          content,
+          options.showToolStatus
+        );
+        await applyProgressStateUpdate(ctx, state, "Using tools", {
+          summary: showToolDetails
+            ? summarizeProgressContent(
+              content,
+              140,
+              DEFAULT_PROGRESS_SUMMARY["Using tools"]
+            )
+            : DEFAULT_PROGRESS_SUMMARY["Using tools"],
+          toolHint: showToolDetails ? summarizeToolHint(content) : null,
+        });
       } else if (statusType === "text" && segmentId !== undefined) {
         const now = Date.now();
         const lastEdit = state.lastEditTimes.get(segmentId) || 0;
         if (now - lastEdit > STREAMING_THROTTLE_MS) {
-          const formatted = formatWithinLimit(content);
-          if (formatted === state.lastContent.get(segmentId)) {
+          const preview = summarizeProgressContent(
+            convertMarkdownToHtml(content),
+            160,
+            DEFAULT_PROGRESS_SUMMARY["Writing answer"]
+          );
+          if (preview === state.lastAnswerPreview) {
             return;
           }
-          await queueProgressMessageUpdate(ctx, state, formatted);
-          state.lastContent.set(segmentId, formatted);
+          state.lastAnswerPreview = preview;
+          await applyProgressStateUpdate(ctx, state, "Writing answer", {
+            summary: preview,
+            toolHint: null,
+          });
           state.lastEditTimes.set(segmentId, now);
         }
       } else if (statusType === "segment_end" && segmentId !== undefined) {
         if (content) {
           state.hasTextSegmentOutput = true;
+          state.lastAnswerPreview = summarizeProgressContent(
+            convertMarkdownToHtml(content),
+            160,
+            DEFAULT_PROGRESS_SUMMARY["Writing answer"]
+          );
           const formatted = convertMarkdownToHtml(content);
 
           if (state.textMessages.has(segmentId)) {
@@ -1485,6 +1646,10 @@ export function createStatusCallback(
           );
         }
       } else if (statusType === "done") {
+        await applyProgressStateUpdate(ctx, state, "Done", {
+          summary: state.lastAnswerPreview || DEFAULT_PROGRESS_SUMMARY.Done,
+          toolHint: null,
+        });
         await promoteFinalSegmentNotification(ctx, state);
         await teardownStreamingState(ctx, state, {
           chatId,
