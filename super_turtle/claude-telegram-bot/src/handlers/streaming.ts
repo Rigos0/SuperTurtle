@@ -873,6 +873,9 @@ export class StreamingState {
   toolMessages: Message[] = []; // ephemeral tool status messages
   lastEditTimes = new Map<number, number>(); // segment_id -> last edit time
   lastContent = new Map<number, string>(); // segment_id -> last sent content
+  progressMessage: Message | null = null; // retained silent progress message for foreground runs
+  lastProgressContent: string | null = null;
+  progressUpdateChain: Promise<void> = Promise.resolve();
   hasTextSegmentOutput = false;
   lastNotifiableOutput: {
     messages: Message[];
@@ -882,7 +885,6 @@ export class StreamingState {
   silentSegments = new Map<number, string>(); // segment_id -> captured text for silent mode
   sawToolUse = false; // used to avoid replaying side-effectful tool runs on retries
   sawSpawnOrchestration = false; // true when streamed tool activity indicates `ctl spawn` orchestration
-  heartbeatMessage: Message | null = null; // ephemeral "still working" indicator
   heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   heartbeatUpdating = false;
   statusStartedAt = Date.now();
@@ -942,20 +944,20 @@ export async function cleanupToolMessages(ctx: Context, state: StreamingState): 
     }
   }
   state.toolMessages = [];
-  state.heartbeatMessage = null;
 }
 
-async function clearHeartbeatMessage(ctx: Context, state: StreamingState): Promise<void> {
-  if (!state.heartbeatMessage) return;
-  const msg = state.heartbeatMessage;
-  state.heartbeatMessage = null;
+async function clearProgressMessage(ctx: Context, state: StreamingState): Promise<void> {
+  if (!state.progressMessage) return;
+  const msg = state.progressMessage;
+  state.progressMessage = null;
+  state.lastProgressContent = null;
   try {
     await ctx.api.deleteMessage(msg.chat.id, msg.message_id);
   } catch (error) {
     if (!isIgnorableDeleteMessageError(error)) {
       streamLog.debug(
         { errorSummary: describeError(error), chatId: msg.chat.id, messageId: msg.message_id },
-        "Failed to delete heartbeat message"
+        "Failed to delete progress message"
       );
     }
   }
@@ -976,6 +978,103 @@ async function replySilently(
   extra?: ReplyExtra
 ): Promise<Message> {
   return ctx.reply(text, withSilentNotification(extra));
+}
+
+function toPlainProgressText(text: string): string {
+  return decodeBasicHtmlEntities(text)
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(?:p|div|li|pre|blockquote|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+async function updateProgressMessage(
+  ctx: Context,
+  state: StreamingState,
+  text: string
+): Promise<void> {
+  if (text === state.lastProgressContent) {
+    return;
+  }
+
+  if (state.progressMessage) {
+    try {
+      await ctx.api.editMessageText(
+        state.progressMessage.chat.id,
+        state.progressMessage.message_id,
+        text,
+        { parse_mode: "HTML" }
+      );
+      state.lastProgressContent = text;
+      return;
+    } catch (error) {
+      const errorSummary = describeError(error).toLowerCase();
+      if (errorSummary.includes("message is not modified")) {
+        state.lastProgressContent = text;
+        return;
+      }
+      const plainText = toPlainProgressText(text);
+      if (plainText.length > 0) {
+        try {
+          await ctx.api.editMessageText(
+            state.progressMessage.chat.id,
+            state.progressMessage.message_id,
+            plainText
+          );
+          state.lastProgressContent = text;
+          return;
+        } catch (plainError) {
+          const plainErrorSummary = describeError(plainError).toLowerCase();
+          if (plainErrorSummary.includes("message is not modified")) {
+            state.lastProgressContent = text;
+            return;
+          }
+          if (!isIgnorableDeleteMessageError(plainError)) {
+            streamLog.debug(
+              { err: plainError },
+              "Failed to edit retained progress message as plain text"
+            );
+          }
+        }
+      }
+      if (!isIgnorableDeleteMessageError(error)) {
+        streamLog.debug({ err: error }, "Failed to edit retained progress message as HTML");
+      }
+      state.progressMessage = null;
+      state.lastProgressContent = null;
+    }
+  }
+
+  if (typeof ctx.reply !== "function") {
+    return;
+  }
+
+  try {
+    const msg = await replySilently(ctx, text, { parse_mode: "HTML" });
+    state.progressMessage = msg;
+    state.lastProgressContent = text;
+  } catch (error) {
+    const plainText = toPlainProgressText(text);
+    if (plainText.length === 0) {
+      throw error;
+    }
+    const msg = await replySilently(ctx, plainText);
+    state.progressMessage = msg;
+    state.lastProgressContent = text;
+  }
+}
+
+function queueProgressMessageUpdate(
+  ctx: Context,
+  state: StreamingState,
+  text: string
+): Promise<void> {
+  state.progressUpdateChain = state.progressUpdateChain
+    .catch(() => {})
+    .then(() => updateProgressMessage(ctx, state, text));
+  return state.progressUpdateChain;
 }
 
 function getNotificationExtra(notify: boolean, extra?: ReplyExtra): ReplyExtra | undefined {
@@ -1047,19 +1146,7 @@ function startHeartbeat(ctx: Context, state: StreamingState): void {
     try {
       const elapsedSec = Math.floor((Date.now() - state.statusStartedAt) / 1000);
       const text = `<i>Still working… ${elapsedSec}s</i>`;
-
-      if (state.heartbeatMessage) {
-        await ctx.api.editMessageText(
-          state.heartbeatMessage.chat.id,
-          state.heartbeatMessage.message_id,
-          text,
-          { parse_mode: "HTML" }
-        );
-      } else {
-        const msg = await replySilently(ctx, text, { parse_mode: "HTML" });
-        state.heartbeatMessage = msg;
-        state.toolMessages.push(msg);
-      }
+      await queueProgressMessageUpdate(ctx, state, text);
     } catch (error) {
       streamLog.debug({ errorSummary: describeError(error) }, "Heartbeat update skipped");
     } finally {
@@ -1077,6 +1164,7 @@ function stopHeartbeat(state: StreamingState): void {
 interface TeardownOptions {
   chatId?: number;
   clearRegisteredState?: boolean;
+  retainProgressMessage?: boolean;
 }
 
 export async function teardownStreamingState(
@@ -1087,7 +1175,9 @@ export async function teardownStreamingState(
   if (state.teardownCompleted) return;
   state.teardownCompleted = true;
   stopHeartbeat(state);
-  await clearHeartbeatMessage(ctx, state);
+  if (options.retainProgressMessage !== true) {
+    await clearProgressMessage(ctx, state);
+  }
   await cleanupToolMessages(ctx, state);
   if (options.clearRegisteredState) {
     if (typeof options.chatId === "number") {
@@ -1253,29 +1343,23 @@ export function createStatusCallback(
     activeStreamingStates.set(chatId, state);
   }
   startHeartbeat(ctx, state);
+  if (typeof ctx.reply === "function") {
+    void queueProgressMessageUpdate(ctx, state, "<i>Starting…</i>").catch((error) => {
+      streamLog.debug({ err: error }, "Failed to create retained progress message");
+    });
+  }
   return async (statusType: DriverStatusType, content: string, segmentId?: number) => {
     try {
       const outboundMessageKind = classifyDriverStatusMessage(statusType);
       if (statusType !== "done") {
         state.lastStatusAt = Date.now();
       }
-      if (
-        state.heartbeatMessage &&
-        (outboundMessageKind === OutboundMessageKind.InteractiveProgress ||
-          outboundMessageKind === OutboundMessageKind.InteractiveFinal)
-      ) {
-        await clearHeartbeatMessage(ctx, state);
-      }
 
       if (statusType === "thinking") {
-        // Show thinking inline, compact (first 500 chars)
         const preview =
           content.length > 500 ? content.slice(0, 500) + "..." : content;
         const escaped = escapeHtml(preview);
-        const thinkingMsg = await replySilently(ctx, `<i>${escaped}</i>`, {
-          parse_mode: "HTML",
-        });
-        state.toolMessages.push(thinkingMsg);
+        await queueProgressMessageUpdate(ctx, state, `<i>${escaped}</i>`);
       } else if (statusType === "tool") {
         state.sawToolUse = true;
         if (isSpawnOrchestrationToolStatus(content)) {
@@ -1284,75 +1368,17 @@ export function createStatusCallback(
         if (!shouldSendToolStatusMessage(content, options.showToolStatus)) {
           return;
         }
-        // Tool status content is pre-formatted HTML (from formatToolStatus
-        // or formatCodexToolStatus) — do NOT double-escape.
-        try {
-          const toolMsg = await replySilently(ctx, content, { parse_mode: "HTML" });
-          state.toolMessages.push(toolMsg);
-        } catch (htmlError) {
-          // HTML parse failed (unexpected entity edge case) - try plain text
-          streamLog.debug({ err: htmlError }, "HTML tool status failed, using plain text");
-          const toolMsg = await replySilently(ctx, escapeHtml(content));
-          state.toolMessages.push(toolMsg);
-        }
+        await queueProgressMessageUpdate(ctx, state, content);
       } else if (statusType === "text" && segmentId !== undefined) {
         const now = Date.now();
         const lastEdit = state.lastEditTimes.get(segmentId) || 0;
-
-        if (!state.textMessages.has(segmentId)) {
-          // New segment - create message
+        if (now - lastEdit > STREAMING_THROTTLE_MS) {
           const formatted = formatWithinLimit(content);
-          try {
-            const msg = await replySilently(ctx, formatted, { parse_mode: "HTML" });
-            state.textMessages.set(segmentId, msg);
-            state.renderedTextMessages.set(segmentId, [msg]);
-            state.lastContent.set(segmentId, formatted);
-          } catch (htmlError) {
-            // HTML parse failed, fall back to plain text
-            streamLog.debug({ err: htmlError }, "HTML reply failed, using plain text");
-            const msg = await replySilently(ctx, formatted);
-            state.textMessages.set(segmentId, msg);
-            state.renderedTextMessages.set(segmentId, [msg]);
-            state.lastContent.set(segmentId, formatted);
-          }
-          state.lastEditTimes.set(segmentId, now);
-        } else if (now - lastEdit > STREAMING_THROTTLE_MS) {
-          // Update existing segment message (throttled)
-          const msg = state.textMessages.get(segmentId)!;
-          const formatted = formatWithinLimit(content);
-          // Skip if content unchanged
           if (formatted === state.lastContent.get(segmentId)) {
             return;
           }
-          try {
-            await ctx.api.editMessageText(
-              msg.chat.id,
-              msg.message_id,
-              formatted,
-              {
-                parse_mode: "HTML",
-              }
-            );
-            state.lastContent.set(segmentId, formatted);
-          } catch (error) {
-            const errorStr = String(error);
-            if (errorStr.includes("MESSAGE_TOO_LONG")) {
-              // Skip this intermediate update - segment_end will chunk properly
-              streamLog.debug("Streaming edit too long, deferring to segment_end");
-            } else {
-              streamLog.debug({ err: error }, "HTML edit failed, trying plain text");
-              try {
-                await ctx.api.editMessageText(
-                  msg.chat.id,
-                  msg.message_id,
-                  formatted
-                );
-                state.lastContent.set(segmentId, formatted);
-              } catch (editError) {
-                streamLog.debug({ err: editError }, "Edit message failed");
-              }
-            }
-          }
+          await queueProgressMessageUpdate(ctx, state, formatted);
+          state.lastContent.set(segmentId, formatted);
           state.lastEditTimes.set(segmentId, now);
         }
       } else if (statusType === "segment_end" && segmentId !== undefined) {
@@ -1463,6 +1489,7 @@ export function createStatusCallback(
         await teardownStreamingState(ctx, state, {
           chatId,
           clearRegisteredState: true,
+          retainProgressMessage: outboundMessageKind === null,
         });
       }
     } catch (error) {
