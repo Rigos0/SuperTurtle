@@ -2,287 +2,178 @@
 
 ## Status
 
-Draft product and implementation spec.
+Active implementation spec.
 
-Primary goal: improve Telegram UX for foreground runs by replacing many progress messages with one retained progress message plus one final answer message.
+## Purpose
 
-## Audit Findings
+Define the Telegram UX contract for one interactive foreground run.
 
-This draft is not yet implementation-ready. The sections below still need concrete decisions or normative language before engineering work should start:
+The implementation must replace multi-bubble progress chatter with:
 
-- `Foreground Run Model` and `Open Design Questions` do not define whether the first progress message appears immediately or after a delay, so the initial UX timing remains undecided.
-- `Progress Message Content`, `Message Types`, and `Decision Summary` describe example states, but they do not define a canonical state vocabulary or exact rendering contract for each state.
-- `Notification Policy` and `Open Design Questions` leave stop/error completion behavior partially open, including whether stopped runs keep the retained progress message and when failures require a separate terminal bubble.
-- `Progress History Model`, `Data Model Requirements`, and `Navigation UX` describe bounded history conceptually, but they do not define the default retention limit, snapshot deduping rules, or the minimum paging metadata.
-- `Special Cases` and `Delivery Policy` describe desired outcomes for prompts, artifacts, long answers, and restart recovery, but they do not define precedence when multiple cases apply in one run.
-- transport ownership and webhook cutover are described elsewhere, so this spec still needs one explicit statement that foreground progress UX must stay the same under local polling and remote webhook delivery.
+- one retained progress message edited in place while the run is active
+- one terminal result message sent beneath it when the run ends
 
-## Problem
+This contract is transport-agnostic. It must remain the same under local long polling and remote webhook delivery.
 
-The current foreground UX can create a wall of Telegram messages during one answer:
+## Scope
 
-- streamed text can span multiple visible messages
-- tool/thinking updates can create separate progress messages
-- heartbeat or restart/status messages can add more noise
+This spec applies to user-triggered foreground runs only.
 
-This creates two user-facing problems:
+It does not redefine:
 
-1. when the user leaves Telegram, they can still get a noisy sequence of notifications
-2. the chat becomes harder to scan because one answer can occupy many bubbles
+- startup boot messages
+- teleport or cutover status messages
+- background notifications
+- generic command replies that are not part of an active foreground run
 
-At the same time, observability remains important. The user must still be able to tell:
+Those are separate message classes and must not reuse the retained progress message.
 
-- work is happening
-- the bot is not stalled
-- the run used tools or took meaningful steps
-- the final answer is available
+## Canonical Terms
 
-## UX Summary
+- `progress message`: the single Telegram message created for a foreground run and updated with `editMessageText`
+- `terminal result message`: the final Telegram message for the run; on success this is the final answer, and on failure this is the final error message
+- `progress snapshot`: one retained history entry used by the `Back` / `Next` viewer
+- `attention-required message`: a separate Telegram message that requires an explicit user action, such as an ask-user prompt
 
-Each foreground run should use:
+## Required Run Shape
 
-- one progress message that is edited in place while work is happening
-- one final answer message sent beneath it when the run completes
+Every foreground run must follow this shape:
 
-The progress message should remain in chat after completion so the user can inspect it later.
+1. Create one silent progress message as soon as the run is accepted for execution.
+2. Update only that message while the run is active.
+3. Leave that message in chat after the run ends.
+4. Send at most one terminal result message for the run, except when a long success result must be chunked for Telegram length limits.
 
-The final answer should be the only terminal message that notifies for a normal successful run.
+The progress message is mandatory for all foreground runs, including runs that later stop, fail, or produce a final artifact.
 
-## Core UX Goals
+## Progress Message Lifecycle
 
-- avoid spamming the user with a wall of progress messages
-- preserve confidence that the bot is still working
-- keep the final answer easy to find
-- keep progress inspectable after the run ends
-- make the UX resilient to special cases like images, stickers, tool prompts, and long answers
+### Creation
 
-## Transport Boundary
+- The progress message must be created immediately after the run is accepted.
+- Creation must be silent.
+- The first render must happen before the first tool update or streamed answer preview is shown.
+- If the run exits before any meaningful work occurs, the progress message must still be created and then updated to the terminal state.
 
-This spec defines the user-visible contract for one interactive foreground run.
+### Updates
 
-It must stay the same whether Telegram updates are being delivered by:
+- The progress message must be updated only through message edits.
+- Streaming text, tool activity, heartbeat updates, and stop-state transitions must not create new Telegram messages.
+- The message should update when the canonical state changes or when the visible summary meaningfully changes.
+- Token-level streaming must be coalesced into summary updates rather than mirrored literally.
 
-- local long polling
-- a remote webhook runtime after `/teleport`
+### Retention
 
-Transport ownership, webhook registration, liveness or readiness checks, and `/teleport` or `/home` cutover behavior are runtime concerns defined in the transport specs.
+- The progress message must remain in chat after success, stop, and failure.
+- The retained message becomes the viewer for progress snapshots.
+- The retained message must never be auto-deleted.
 
-Those runtime concerns must not change the foreground UX contract:
+## Canonical Progress States
 
-- one retained progress message for the run
-- one final result message beneath it
-- progress updates remain non-notifying edits
+The renderer must use this state vocabulary:
 
-Startup boot messages, background notifications, and other system-status messages are separate concerns. They must not reuse the retained progress message or replace the final result message for a foreground run.
+- `Starting`: run accepted, waiting for first meaningful step
+- `Thinking`: model is working without an active tool call
+- `Using tools`: one or more tools are currently running
+- `Writing answer`: final user-facing response is being composed
+- `Still working`: no meaningful visible change for the quiet-period threshold
+- `Stopping`: user stop requested, cancellation still in progress
+- `Stopped`: run ended because of a user stop request
+- `Done`: run completed successfully
+- `Failed`: run ended with an error
 
-## Foreground Run Model
+No other top-level state labels should be introduced in the first implementation.
 
-### Progress Message
+## Render Contract
 
-Each user-triggered foreground run creates one progress message.
+The progress message must render these sections in order:
 
-This message is the single place where ongoing activity is shown:
+1. State line
+2. Summary line or short paragraph
+3. Footer metadata line
+4. Optional history controls after completion
 
-- initial acknowledgement
-- thinking summary
-- tool activity summary
-- partial response preview
-- "still working" heartbeat
-- stopping / cancelled state
-- terminal status summary for completed runs
+Required content rules:
 
-The progress message must be updated with `editMessageText` rather than by sending new messages.
+- The state line must use exactly one canonical state label.
+- The summary must contain the latest concise user-meaningful update.
+- The footer must include elapsed time.
+- The footer may include one short tool hint when useful.
+- The full message should stay glanceable and should target roughly 3 to 6 short lines.
 
-### Final Answer Message
+The renderer must prefer concise summaries such as:
 
-When the run completes successfully:
+- current step description
+- current tool name
+- short answer preview
+- stop or failure reason
 
-- the progress message is left in chat
-- one final answer message is sent underneath it
-- this final answer message is the main user-facing result
-- this is the message that should notify
+The renderer must not:
 
-This gives the user:
+- dump raw streaming tokens
+- dump every tool event verbatim
+- turn the progress message into a log transcript
 
-- one durable observability surface
-- one clear final answer surface
+## Heartbeat Policy
 
-## Progress Message Content
+`Still working` is required as an in-place progress state.
 
-The progress message should show a concise summary, not a raw full transcript.
+Behavior:
 
-Recommended structure:
+- Enter `Still working` only after 20 seconds with no meaningful visible update.
+- While the run stays quiet, refresh the heartbeat at most once every 30 seconds.
+- Include elapsed time in the footer while in `Still working`.
+- Replace `Still working` immediately when a new meaningful update arrives.
 
-1. header with current state
-2. short progress body
-3. metadata/footer
-4. inline navigation buttons when history exists
+Heartbeat updates must never create a new Telegram message and must never notify.
 
-Example sections:
+## Progress Snapshot History
 
-- state: `Thinking`, `Using tools`, `Writing answer`, `Still working`, `Stopping`, `Done`
-- progress summary: most recent useful status text or a compact summary of the latest step
-- elapsed time: `23s`
-- driver/tool hints when useful
+The retained viewer must page through a bounded ordered list of progress snapshots.
 
-The progress message should be optimized for glanceability, not completeness.
+### Required snapshot events
 
-## Retained Progress History
+Store a snapshot when any of the following happens:
 
-Once the run is done, the progress message remains visible and becomes a lightweight viewer for the run history.
+- initial `Starting` render
+- canonical state transition
+- tool start
+- tool completion
+- first visible answer preview
+- heartbeat transition into `Still working`
+- terminal transition to `Stopped`, `Done`, or `Failed`
 
-This retained message should support inline buttons:
+### Deduping rules
 
-- `Back`
-- `Next`
+Do not store a new snapshot when all of the following are unchanged from the previous snapshot:
 
-Purpose:
+- canonical state
+- summary text
+- tool label
 
-- let the user inspect the progress timeline after the run
-- avoid flooding the chat with all intermediate states
-- preserve observability after completion
+Elapsed time alone must not create a new snapshot.
 
-## Progress History Model
+### Retention limit
 
-The progress message should not store every token-level update.
+- Retain at most 12 snapshots per run.
+- When the limit is exceeded, drop the oldest non-terminal snapshots first.
+- The terminal snapshot must always be retained.
 
-Instead it should store a bounded list of meaningful snapshots, for example:
+### Navigation contract
 
-- initial start
-- tool start / tool completion
-- significant text milestones
-- heartbeat updates only if useful
-- stop / error / done state
+After the run ends, the retained progress message must expose inline `Back` and `Next` buttons when more than one snapshot exists.
 
-The retained `Back` / `Next` viewer should page through those meaningful snapshots.
+Minimum viewer requirements:
 
-This is a UX requirement, not a raw logging requirement.
+- default to the terminal snapshot after completion
+- show the selected snapshot content in the progress message body
+- show a page indicator in the footer in `N / M` form
+- disable or omit `Back` on the first snapshot
+- disable or omit `Next` on the last snapshot
 
-The progress history should be concise enough that paging is helpful and not tedious.
+## Delivery Contract
 
-## Notification Policy
-
-### Normal foreground success
-
-- progress message creation: silent
-- progress message edits: no new notification
-- final answer message: notify
-
-### Still working heartbeat
-
-- represented as an edit to the progress message
-- should not create a new Telegram message
-- should not notify
-
-### User stop
-
-If the user stops an in-flight run:
-
-- update the progress message to `Stopping...`
-- once the stop resolves, update it to `Stopped`
-- do not send an extra notifying completion message by default
-
-The main point is to avoid a second terminal bubble for a user-initiated stop unless there is a failure.
-
-### Error
-
-If the run fails:
-
-- update the progress message to reflect failure
-- send one final error/result message if the failure needs prominent user attention
-
-Fatal failures should notify.
-
-## Still Working Indicator
-
-The "still working" concept should remain in the new UX.
-
-Reason:
-
-- it reassures the user that the bot is alive
-- it reduces perceived stalling
-- it preserves observability without generating more chat bubbles
-
-However, it should become an in-place state of the progress message rather than a separate message.
-
-Recommended behavior:
-
-- do not show it immediately
-- only show it after a quiet threshold
-- include elapsed time
-- clear or replace it as soon as meaningful new progress appears
-
-Example:
-
-`Still working... 28s`
-
-This should be treated as a confidence signal, not as core content.
-
-## Special Cases
-
-Special cases are the main reason this needs a deliberate design instead of a quick refactor.
-
-### Images and Stickers
-
-Image and sticker outputs may be:
-
-- intermediate artifacts
-- final artifacts
-- side effects requested by tools
-
-Policy:
-
-- do not force these into the text progress message
-- use the progress message to describe what is happening
-- if the artifact is the final answer, send it as the final result beneath the progress message
-
-If an image or sticker is part of the final answer, it should behave like the terminal result and may notify.
-
-### Ask User / Inline Choice Prompts
-
-These require explicit user attention and should remain separate Telegram messages.
-
-Policy:
-
-- progress message stays as context
-- the prompt is sent as a separate interactive message
-- the prompt should notify because it requires action
-
-### Long Final Answers
-
-Telegram length limits still apply.
-
-Policy:
-
-- the retained progress message remains unchanged
-- the final answer may still need chunking
-- if chunking is required, only the last chunk should notify
-
-### Tool Noise
-
-Tool activity should usually be summarized rather than mirrored literally.
-
-The progress message should prefer:
-
-- concise tool labels
-- current step summaries
-- meaningful state changes
-
-It should avoid dumping every tool event verbatim unless the tool status is itself important UX.
-
-### Restart / Recovery
-
-If the process restarts mid-run, the UX should aim to preserve confidence rather than perfect continuity.
-
-Desired behavior:
-
-- if recoverable, reconnect to the progress message and continue updating it
-- transport cutover or runtime recovery must not change the retained-progress plus final-result shape seen by the user
-- otherwise, produce a clear terminal state and let the next run start fresh
-
-## Message Types
-
-The implementation should distinguish at least these intents:
+The implementation must classify foreground output into these intents:
 
 - `progress_update`
 - `progress_heartbeat`
@@ -291,105 +182,123 @@ The implementation should distinguish at least these intents:
 - `final_error`
 - `attention_required`
 - `final_artifact`
-- `command_reply`
-- `background_notification`
-- `system_notification`
 
-This intent layer should drive delivery policy.
+Required delivery mapping:
 
-## Delivery Policy
+- `progress_update` -> edit existing progress message only
+- `progress_heartbeat` -> edit existing progress message only
+- `progress_stop_state` -> edit existing progress message only
+- `final_success` -> send a new terminal result message; notify
+- `final_error` -> send a new terminal result message; notify
+- `attention_required` -> send a separate message; notify
+- `final_artifact` -> send a new terminal result message; notify
 
-Recommended delivery modes:
+`background_notification`, `system_notification`, and unrelated `command_reply` delivery remain outside this foreground contract.
 
-- `edit_only`
-- `send_silent`
-- `send_notify`
-- `send_notify_last_chunk_only`
+## Terminal Outcome Rules
 
-Mapping:
+### Success
 
-- `progress_update` -> `edit_only`
-- `progress_heartbeat` -> `edit_only`
-- `progress_stop_state` -> `edit_only`
-- `final_success` -> `send_notify`
-- `final_error` -> `send_notify`
-- `attention_required` -> `send_notify`
-- `final_artifact` -> `send_notify`
+- Update the progress message to `Done`.
+- Leave the retained progress message in chat.
+- Send one terminal result message beneath it.
+- If the success result exceeds Telegram length limits, chunk it and notify only on the last chunk.
 
-`background_notification` and `system_notification` remain separate concerns and should not be forced through the foreground progress model. Boot or cutover status messages belong to `system_notification`, not to foreground progress state.
+### User stop
 
-## Data Model Requirements
+- On stop request, update the progress message to `Stopping`.
+- When cancellation resolves, update it to `Stopped`.
+- Do not send a terminal result message for a normal user-initiated stop.
+- If stop handling itself fails, treat the run as `Failed` and send a terminal result message.
 
-The foreground run state should support:
+### Failure
 
-- one current progress message id
-- current progress state
-- bounded history of progress snapshots
-- final outcome metadata
-- linkage between the retained progress message and the final answer message
+- Update the progress message to `Failed`.
+- Always send one terminal result message describing the failure.
+- Failure must notify.
 
-Suggested progress snapshot fields:
+## Special-Case Precedence
 
-- timestamp
-- state
-- short text summary
-- optional tool label
-- optional elapsed time
+When multiple cases apply in one run, use this precedence order:
 
-## Navigation UX
+1. `attention_required`
+2. `final_artifact`
+3. `final_success`
+4. `final_error`
 
-After completion, the retained progress message should expose inline navigation:
+Interpretation:
 
-- `Back`
-- `Next`
+- If the run needs user input, send an `attention_required` message immediately and keep the progress message as context.
+- If the final result is an artifact such as an image or sticker, send that artifact as the terminal result message even if text output was also generated.
+- If the run fails before a final artifact or success result is sent, send `final_error`.
 
-Minimum requirement:
+## Special Cases
 
-- browse a bounded ordered list of progress snapshots
+### Ask-user prompts and inline choices
 
-Nice-to-have later:
+- These must be sent as separate `attention_required` messages.
+- They must notify.
+- The progress message should stay visible and provide the latest context.
+- While waiting for the user, the progress message should stay in its most recent non-terminal state and must not switch to `Done` or `Stopped`.
 
-- page indicator like `3 / 8`
-- jump-to-start or jump-to-end controls
+### Final artifacts
 
-The first version should keep the interaction minimal.
+- Do not try to serialize binary or media output into the text progress message.
+- Use the progress summary to describe the artifact being prepared or sent.
+- Send the artifact itself as the terminal result message.
+- Update the progress message to `Done` after the artifact send succeeds.
+
+### Long final answers
+
+- Keep the retained progress message unchanged once the run reaches `Done`.
+- Send the final answer in chunks only when required by Telegram limits.
+- Only the last success chunk may notify.
+
+### Tool-heavy runs
+
+- Summarize tool activity into concise state and summary updates.
+- Show the active tool name only when it improves comprehension.
+- Do not mirror every tool event into the progress message.
+
+### Restart and recovery
+
+- If the process can recover the active run and progress message id, it must resume editing the same progress message.
+- Recovery must preserve the one-progress-message plus one-terminal-result shape.
+- If recovery cannot resume safely, update the existing progress message to `Failed` when possible and send a terminal result message on the next recovered control path.
+
+## Minimum Run State
+
+The runtime state for a foreground run must track:
+
+- chat id
+- run id
+- progress message id
+- current canonical state
+- current rendered summary text
+- optional current tool label
+- run start timestamp
+- retained progress snapshots
+- selected history index after completion
+- terminal outcome metadata
+- optional terminal result message id or ids for long-answer chunking
 
 ## Non-Goals
 
-This UX is not trying to:
+This UX is not intended to:
 
-- preserve every streamed token for chat replay
-- turn the progress message into a full log viewer
-- remove all special-case result messages
-- replace separate attention-required prompts
+- preserve every streamed token for replay
+- replace logs or traces
+- fold system notifications into the progress message
+- eliminate separate attention-required prompts
 
-## Implementation Direction
+## Acceptance Criteria
 
-Recommended implementation shape:
+The implementation is correct when all of the following are true:
 
-1. define the intent taxonomy and delivery policy
-2. introduce a dedicated progress-message controller
-3. route foreground streaming updates through that controller
-4. keep final result sending separate from progress rendering
-5. handle artifacts and prompts as explicit special cases
-6. add retained snapshot browsing after the base controller works
-
-This should be treated as a UX-driven refactor, not as a small patch to the current streaming file.
-
-## Open Design Questions
-
-- should the initial progress message appear immediately or only after a short delay?
-- should the final progress state say `Done` or something more descriptive?
-- should a user-initiated stop leave the retained progress message in chat or auto-delete it after a short delay?
-- how many progress snapshots should be retained by default?
-
-## Decision Summary
-
-The intended foreground UX is:
-
-- one progress message edited in place during work
-- the progress message remains after completion
-- that retained message supports `Back` / `Next` inspection
-- one final answer message appears underneath it
-- the final answer is the message that notifies
-- "still working" remains, but only as an in-place progress state
+- every foreground run creates exactly one silent progress message
+- active-run updates are edits, not new progress bubbles
+- normal success produces one retained progress message plus one notifying terminal result message
+- user stop retains the progress message and does not emit a second terminal bubble unless stop handling fails
+- failures retain the progress message and always emit one notifying terminal result message
+- the retained viewer supports bounded `Back` / `Next` navigation with a page indicator
+- the user-visible behavior is unchanged across local polling and webhook transport
