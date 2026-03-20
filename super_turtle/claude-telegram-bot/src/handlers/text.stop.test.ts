@@ -1,150 +1,161 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import type { Context } from "grammy";
-import { session } from "../session";
+import { describe, expect, it } from "bun:test";
+import { resolve } from "path";
 
-type TextModule = typeof import("./text");
+type StopProbePayload = {
+  replies: string[];
+  stopProcessingCalls: number;
+  typingStopCalls: number;
+  drainDeferredQueueCalls: number;
+};
 
-const originalStartProcessing = session.startProcessing;
-const originalActiveDriver = session.activeDriver;
-const originalTypingController = session.typingController;
-const originalConversationTitle = session.conversationTitle;
-const originalLastMessage = session.lastMessage;
+type StopProbeResult = {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  payload: StopProbePayload | null;
+};
 
-let runMessageWithActiveDriverMock: ReturnType<typeof mock>;
-let startTypingIndicatorMock: ReturnType<typeof mock>;
-let drainDeferredQueueMock: ReturnType<typeof mock>;
-let stopProcessingMock: ReturnType<typeof mock>;
-let typingStopMock: ReturnType<typeof mock>;
+const marker = "__HANDLE_TEXT_STOP_PROBE__=";
+const projectRoot = resolve(import.meta.dir, "../..");
 
-async function loadTextModule(): Promise<TextModule> {
-  return import(`./text.ts?text-stop-test=${Date.now()}-${Math.random()}`);
-}
-
-beforeEach(async () => {
-  const actualImportSuffix = `${Date.now()}-${Math.random()}`;
-  const actualDeferredQueue = await import(
-    `../deferred-queue.ts?actual=${actualImportSuffix}`
-  );
-  const actualDriverRouting = await import(
-    `./driver-routing.ts?actual=${actualImportSuffix}`
-  );
-  const actualRegistry = await import(`../drivers/registry.ts?actual=${actualImportSuffix}`);
-  const actualSecurity = await import(`../security.ts?actual=${actualImportSuffix}`);
-  const actualStreaming = await import(`./streaming.ts?actual=${actualImportSuffix}`);
-  const actualUtils = await import(`../utils.ts?actual=${actualImportSuffix}`);
-
-  runMessageWithActiveDriverMock = mock(async () => {
-    throw new Error("Query cancelled");
-  });
-  drainDeferredQueueMock = mock(async () => {});
-  stopProcessingMock = mock(() => {});
-  typingStopMock = mock(() => {});
-  startTypingIndicatorMock = mock(() => ({ stop: typingStopMock }));
-
-  session.activeDriver = "claude";
-  session.startProcessing = mock(
-    () => stopProcessingMock
-  ) as unknown as typeof session.startProcessing;
-  session.typingController = null;
-  session.conversationTitle = null;
-  session.lastMessage = null;
-
-  const driver = {
-    id: "claude" as const,
-    displayName: "Claude",
-    auditEvent: "TEXT" as const,
-    runMessage: async () => "",
-    stop: async () => false as const,
-    kill: async () => {},
-    isCrashError: () => false,
-    isStallError: () => false,
-    isCancellationError: () => true,
-    getStatusSnapshot: () => ({
-      driverName: "Claude",
-      isActive: false,
-      sessionId: null,
-      lastActivity: null,
-      lastError: null,
-      lastErrorTime: null,
-      lastUsage: null,
-    }),
+async function runStopSuppressionProbe(): Promise<StopProbeResult> {
+  const env: Record<string, string> = {
+    ...process.env,
+    TELEGRAM_BOT_TOKEN: "test-token",
+    TELEGRAM_ALLOWED_USERS: "123",
+    CLAUDE_WORKING_DIR: process.cwd(),
+    HOME: process.env.HOME || "/tmp",
   };
 
-  mock.module("../drivers/registry", () => ({
-    ...actualRegistry,
-    getCurrentDriver: () => driver,
-  }));
+  const paths = {
+    textHandlerPath: resolve(import.meta.dir, "text.ts"),
+    sessionPath: resolve(import.meta.dir, "../session.ts"),
+    driversRegistryPath: resolve(import.meta.dir, "../drivers/registry.ts"),
+    securityPath: resolve(import.meta.dir, "../security.ts"),
+    utilsPath: resolve(import.meta.dir, "../utils.ts"),
+    deferredQueuePath: resolve(import.meta.dir, "../deferred-queue.ts"),
+    stopPath: resolve(import.meta.dir, "stop.ts"),
+    streamingPath: resolve(import.meta.dir, "streaming.ts"),
+    teleportPath: resolve(import.meta.dir, "../teleport.ts"),
+    loggerPath: resolve(import.meta.dir, "../logger.ts"),
+  };
 
-  mock.module("../security", () => ({
-    ...actualSecurity,
-    isAuthorized: () => true,
-    rateLimiter: {
-      check: () => [true, null] as const,
-    },
-  }));
+  const script = `
+    const { mock } = await import("bun:test");
+    const marker = ${JSON.stringify(marker)};
+    const paths = ${JSON.stringify(paths)};
+    const actualDeferredQueue = await import(paths.deferredQueuePath + "?actual=" + Date.now());
+    const actualStreaming = await import(paths.streamingPath + "?actual=" + Date.now());
 
-  mock.module("../utils", () => ({
-    ...actualUtils,
-    auditLog: async (..._args: unknown[]) => {},
-    auditLogAuth: async (..._args: unknown[]) => {},
-    auditLogError: async (..._args: unknown[]) => {},
-    auditLogRateLimit: async (..._args: unknown[]) => {},
-    checkInterrupt: async (message: string) => message,
-    generateRequestId: () => "text-stop-test",
-    isStopIntent: () => false,
-    startTypingIndicator: (ctx: Context) => startTypingIndicatorMock(ctx),
-  }));
+    let stopProcessingCalls = 0;
+    let typingStopCalls = 0;
+    let drainDeferredQueueCalls = 0;
 
-  mock.module("./driver-routing", () => ({
-    ...actualDriverRouting,
-    isAnyDriverRunning: () => false,
-    isBackgroundRunActive: () => false,
-    preemptBackgroundRunForUserPriority: async () => false,
-    runMessageWithActiveDriver: (input: unknown) => runMessageWithActiveDriverMock(input),
-  }));
+    const driver = {
+      id: "claude",
+      displayName: "Claude",
+      auditEvent: "TEXT",
+      runMessage: async () => {
+        throw new Error("Query cancelled");
+      },
+      stop: async () => false,
+      kill: async () => {},
+      isCrashError: () => false,
+      isStallError: () => false,
+      isCancellationError: () => true,
+      getStatusSnapshot: () => ({
+        driverName: "Claude",
+        isActive: false,
+        sessionId: null,
+        lastActivity: null,
+        lastError: null,
+        lastErrorTime: null,
+        lastUsage: null,
+      }),
+    };
 
-  mock.module("./streaming", () => ({
-    ...actualStreaming,
-    StreamingState: class StreamingState {},
-    createStatusCallback: () => async () => {},
-    createSilentStatusCallback: () => async () => {},
-    teardownStreamingState: async () => {},
-  }));
+    mock.module(paths.driversRegistryPath, () => ({
+      getDriver: () => driver,
+      getCurrentDriver: () => driver,
+    }));
 
-  mock.module("../deferred-queue", () => ({
-    ...actualDeferredQueue,
-    drainDeferredQueue: (
-      ctx: Context,
-      chatId: number,
-      onDrainItem?: (msg: unknown) => Promise<void>
-    ) => drainDeferredQueueMock(ctx, chatId, onDrainItem),
-    enqueueDeferredMessage: () => 1,
-    makeDrainItemNotifier: () => async () => {},
-    unsuppressDrain: () => {},
-  }));
+    mock.module(paths.securityPath, () => ({
+      isAuthorized: () => true,
+      rateLimiter: {
+        check: () => [true, null],
+      },
+    }));
 
-  mock.module("./stop", () => ({
-    handleStop: async () => {},
-    consumeHandledStopReply: () => true,
-  }));
-});
+    mock.module(paths.utilsPath, () => ({
+      auditLog: async () => {},
+      auditLogAuth: async () => {},
+      auditLogError: async () => {},
+      auditLogRateLimit: async () => {},
+      checkInterrupt: async (message) => message,
+      generateRequestId: () => "text-stop-test",
+      isStopIntent: () => false,
+      startTypingIndicator: () => ({
+        stop: () => {
+          typingStopCalls += 1;
+        },
+      }),
+    }));
 
-afterEach(() => {
-  session.startProcessing = originalStartProcessing;
-  session.activeDriver = originalActiveDriver;
-  session.typingController = originalTypingController;
-  session.conversationTitle = originalConversationTitle;
-  session.lastMessage = originalLastMessage;
-  session.clearStopRequested();
-  mock.restore();
-});
+    mock.module(paths.deferredQueuePath, () => ({
+      ...actualDeferredQueue,
+      drainDeferredQueue: async () => {
+        drainDeferredQueueCalls += 1;
+      },
+      enqueueDeferredMessage: () => 1,
+      makeDrainItemNotifier: () => async () => {},
+      unsuppressDrain: () => {},
+    }));
 
-describe("handleText explicit stop suppression", () => {
-  it("does not send a second stop reply after handleStop already acknowledged the cancel", async () => {
-    const { handleText } = await loadTextModule();
-    const replies: string[] = [];
-    const chat = { id: 321, type: "private" } as const;
+    mock.module(paths.stopPath, () => ({
+      handleStop: async () => {},
+      consumeHandledStopReply: () => true,
+    }));
 
+    mock.module(paths.streamingPath, () => ({
+      ...actualStreaming,
+      StreamingState: class StreamingState {},
+      createStatusCallback: () => async () => {},
+      createSilentStatusCallback: () => async () => {},
+      teardownStreamingState: async () => {},
+    }));
+
+    mock.module(paths.teleportPath, () => ({
+      TELEPORT_CONTROL_MESSAGE: "remote-control",
+      isTeleportRemoteControlMode: () => false,
+    }));
+
+    mock.module(paths.loggerPath, () => {
+      const logger = {
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+        child: () => logger,
+      };
+      return {
+        logger,
+        eventLog: logger,
+        streamLog: logger,
+        cmdLog: logger,
+      };
+    });
+
+    const { session } = await import(paths.sessionPath);
+    session.activeDriver = "claude";
+    session.typingController = null;
+    session.conversationTitle = null;
+    session.lastMessage = null;
+    session.startProcessing = () => () => {
+      stopProcessingCalls += 1;
+    };
+
+    const { handleText } = await import(paths.textHandlerPath + "?probe=" + Date.now());
+    const replies = [];
+    const chat = { id: 321, type: "private" };
     const ctx = {
       from: { id: 123, username: "tester", is_bot: false, first_name: "Tester" },
       chat,
@@ -154,7 +165,7 @@ describe("handleText explicit stop suppression", () => {
         date: Math.floor(Date.now() / 1000),
         chat,
       },
-      reply: async (text: string) => {
+      reply: async (text) => {
         replies.push(String(text));
         return {
           message_id: replies.length,
@@ -167,13 +178,60 @@ describe("handleText explicit stop suppression", () => {
         editMessageText: async () => {},
         deleteMessage: async () => {},
       },
-    } as unknown as Context;
+    };
 
     await handleText(ctx);
 
-    expect(replies).toEqual([]);
-    expect(stopProcessingMock).toHaveBeenCalledTimes(1);
-    expect(typingStopMock).toHaveBeenCalledTimes(1);
-    expect(drainDeferredQueueMock).toHaveBeenCalledTimes(1);
+    console.log(
+      marker +
+        JSON.stringify({
+          replies,
+          stopProcessingCalls,
+          typingStopCalls,
+          drainDeferredQueueCalls,
+        })
+    );
+  `;
+
+  const proc = Bun.spawn({
+    cmd: ["bun", "--no-env-file", "-e", script],
+    cwd: projectRoot,
+    env,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+
+  const payloadLine = stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.startsWith(marker));
+
+  const payload = payloadLine
+    ? (JSON.parse(payloadLine.slice(marker.length)) as StopProbePayload)
+    : null;
+
+  return { exitCode, stdout, stderr, payload };
+}
+
+describe("handleText explicit stop suppression", () => {
+  it("does not send a second stop reply after handleStop already acknowledged the cancel", async () => {
+    const result = await runStopSuppressionProbe();
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Stop suppression probe failed:\n${result.stderr || result.stdout}`
+      );
+    }
+
+    expect(result.payload).not.toBeNull();
+    expect(result.payload?.replies).toEqual([]);
+    expect(result.payload?.stopProcessingCalls).toBe(1);
+    expect(result.payload?.typingStopCalls).toBe(1);
+    expect(result.payload?.drainDeferredQueueCalls).toBe(1);
   });
 });

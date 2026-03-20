@@ -48,6 +48,13 @@ type ModelPickerProbePayload = {
   replies: ReplyRecord[];
 };
 
+type HandleStatusProbePayload = {
+  replies: ReplyRecord[];
+  stopTypingCalls: number;
+  sessionKillCalls: number;
+  codexKillCalls: number;
+};
+
 function mockContext(messageText: string): {
   ctx: {
     from: { id: number };
@@ -207,6 +214,80 @@ function runSwitchNoArgInIsolatedProcess(codexEnabled: boolean): ReplyRecord[] {
   expect(jsonEnd).toBeGreaterThanOrEqual(jsonStart);
   const jsonText = combinedOutput.slice(jsonStart, jsonEnd + 1);
   return JSON.parse(jsonText) as ReplyRecord[];
+}
+
+function runHandleStatusProbeInIsolatedProcess(): HandleStatusProbePayload {
+  const projectRoot = resolve(import.meta.dir, "../..");
+  const marker = "__HANDLE_STATUS_PROBE__=";
+  const endMarker = "__HANDLE_STATUS_PROBE_END__";
+  const script = `
+    process.env.TELEGRAM_BOT_TOKEN = "test-token";
+    process.env.TELEGRAM_ALLOWED_USERS = "123";
+    process.env.CLAUDE_WORKING_DIR = process.cwd();
+    process.env.CODEX_ENABLED = "false";
+    process.env.CODEX_CLI_AVAILABLE_OVERRIDE = "false";
+    console.log = () => {};
+    console.warn = () => {};
+    console.error = () => {};
+    const { session } = await import("./src/session.ts");
+    const { codexSession } = await import("./src/codex-session.ts");
+    const { handleStatus } = await import("./src/handlers/commands.ts");
+    let stopTypingCalls = 0;
+    let sessionKillCalls = 0;
+    let codexKillCalls = 0;
+    session.stopTyping = () => {
+      stopTypingCalls += 1;
+    };
+    session.kill = async () => {
+      sessionKillCalls += 1;
+    };
+    codexSession.kill = async () => {
+      codexKillCalls += 1;
+    };
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response("{}", { status: 404 });
+    const originalSpawnSync = Bun.spawnSync;
+    Bun.spawnSync = ((cmd, opts) => {
+      const parts = Array.isArray(cmd) ? cmd.map((part) => String(part)) : [String(cmd)];
+      if (parts[0] === "security" && parts[1] === "find-generic-password") {
+        return {
+          stdout: Buffer.from(""),
+          stderr: Buffer.from("mocked keychain miss"),
+          success: false,
+          exitCode: 1,
+        };
+      }
+      return originalSpawnSync(cmd, opts);
+    });
+    const replies = [];
+    const ctx = {
+      from: { id: 123 },
+      message: { text: "/status" },
+      reply: async (text, extra) => {
+        replies.push({ text, extra });
+      },
+    };
+    try {
+      await handleStatus(ctx);
+    } finally {
+      globalThis.fetch = originalFetch;
+      Bun.spawnSync = originalSpawnSync;
+    }
+    process.stdout.write(
+      ${JSON.stringify(marker)} +
+        JSON.stringify({ replies, stopTypingCalls, sessionKillCalls, codexKillCalls }) +
+        ${JSON.stringify(endMarker)}
+    );
+  `;
+  const proc = Bun.spawnSync(["bun", "-e", script], { cwd: projectRoot });
+  expect(proc.exitCode).toBe(0);
+  const combinedOutput = `${proc.stdout.toString()}\n${proc.stderr.toString()}`;
+  const markerIndex = combinedOutput.indexOf(marker);
+  expect(markerIndex).toBeGreaterThanOrEqual(0);
+  const endMarkerIndex = combinedOutput.indexOf(endMarker, markerIndex + marker.length);
+  expect(endMarkerIndex).toBeGreaterThanOrEqual(0);
+  const payloadText = combinedOutput.slice(markerIndex + marker.length, endMarkerIndex).trim();
+  return JSON.parse(payloadText) as HandleStatusProbePayload;
 }
 
 function runModelPickerProbeInIsolatedProcess(opts: {
@@ -780,40 +861,15 @@ describe("handlers with mock Context", () => {
   });
 
   it("handleStatus replies with HTML settings overview without resetting sessions", async () => {
-    const { handleStatus: freshHandleStatus } = await loadFreshCommandsModule("handle-status");
-    let stopTypingCalls = 0;
-    let sessionKillCalls = 0;
-    let codexKillCalls = 0;
+    const probe = runHandleStatusProbeInIsolatedProcess();
 
-    session.stopTyping = () => {
-      stopTypingCalls += 1;
-    };
-    session.kill = (async () => {
-      sessionKillCalls += 1;
-    }) as typeof session.kill;
-    codexSession.kill = (async () => {
-      codexKillCalls += 1;
-    }) as typeof codexSession.kill;
-
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => new Response("{}", { status: 404 })) as unknown as typeof fetch;
-    const restoreSpawnSync = mockClaudeCredentialLookupFailure();
-
-    const { ctx, replies } = mockContext("/status");
-    try {
-      await freshHandleStatus(ctx as any);
-    } finally {
-      globalThis.fetch = originalFetch;
-      restoreSpawnSync();
-    }
-
-    expect(replies).toHaveLength(1);
-    expect(replies[0]!.extra?.parse_mode).toBe("HTML");
-    expect(replies[0]!.text).toContain("<b>Status</b>");
-    expect(replies[0]!.text).not.toContain("<b>Commands:</b>");
-    expect(stopTypingCalls).toBe(0);
-    expect(sessionKillCalls).toBe(0);
-    expect(codexKillCalls).toBe(0);
+    expect(probe.replies).toHaveLength(1);
+    expect(probe.replies[0]!.extra?.parse_mode).toBe("HTML");
+    expect(probe.replies[0]!.text).toContain("<b>Status</b>");
+    expect(probe.replies[0]!.text).not.toContain("<b>Commands:</b>");
+    expect(probe.stopTypingCalls).toBe(0);
+    expect(probe.sessionKillCalls).toBe(0);
+    expect(probe.codexKillCalls).toBe(0);
   });
 
   it("handleCron shows no-jobs message when cron job list is empty", async () => {

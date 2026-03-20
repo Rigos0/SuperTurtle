@@ -230,6 +230,67 @@ function makeReq(path: string): { req: Request; url: URL; } {
   return { req: new Request(fullUrl), url: new URL(fullUrl) };
 }
 
+function runSubturtleLogsRouteProbeInIsolatedProcess(): {
+  status: number;
+  body: Record<string, unknown>;
+} {
+  const projectRoot = resolve(import.meta.dir, "..");
+  const workspaceRoot = resolve(projectRoot, "../..");
+  const marker = "__SUBTURTLE_LOGS_PROBE__=";
+  const endMarker = "__SUBTURTLE_LOGS_PROBE_END__";
+  const script = `
+    const { join } = await import("path");
+    const { mkdirSync, rmSync, writeFileSync } = await import("fs");
+    process.env.TELEGRAM_BOT_TOKEN = "test-token";
+    process.env.TELEGRAM_ALLOWED_USERS = "123";
+    process.env.CLAUDE_WORKING_DIR = ${JSON.stringify(workspaceRoot)};
+    console.log = () => {};
+    console.warn = () => {};
+    console.error = () => {};
+    const { routes } = await import("./src/dashboard.ts");
+    const testTurtleName = "__test_logs_turtle__";
+    const testDir = join(process.env.CLAUDE_WORKING_DIR, ".superturtle/subturtles", testTurtleName);
+    mkdirSync(testDir, { recursive: true });
+    writeFileSync(join(testDir, "subturtle.pid"), "99999");
+    writeFileSync(join(testDir, "subturtle.log"), "line1\\nline2\\nline3\\n");
+    const path = "/api/subturtles/" + testTurtleName + "/logs?lines=10";
+    const fullUrl = "http://localhost" + path;
+    const req = new Request(fullUrl);
+    const url = new URL(fullUrl);
+    const route = routes.find((entry) => url.pathname.match(entry.pattern));
+    if (!route) {
+      throw new Error("logs route not found");
+    }
+    const match = url.pathname.match(route.pattern);
+    if (!match) {
+      throw new Error("logs route match failed");
+    }
+    try {
+      const res = await route.handler(req, url, match);
+      const body = await res.json();
+      process.stdout.write(
+        ${JSON.stringify(marker)} +
+          JSON.stringify({ status: res.status, body }) +
+          ${JSON.stringify(endMarker)}
+      );
+    } finally {
+      rmSync(testDir, { recursive: true, force: true });
+    }
+  `;
+  const proc = Bun.spawnSync(["bun", "-e", script], { cwd: projectRoot });
+  expect(proc.exitCode).toBe(0);
+  const combinedOutput = `${proc.stdout.toString()}\n${proc.stderr.toString()}`;
+  const markerIndex = combinedOutput.indexOf(marker);
+  expect(markerIndex).toBeGreaterThanOrEqual(0);
+  const endMarkerIndex = combinedOutput.indexOf(endMarker, markerIndex + marker.length);
+  expect(endMarkerIndex).toBeGreaterThanOrEqual(0);
+  const payloadText = combinedOutput.slice(markerIndex + marker.length, endMarkerIndex).trim();
+  return JSON.parse(payloadText) as {
+    status: number;
+    body: Record<string, unknown>;
+  };
+}
+
 function enqueueTestMessage(chatId: number, text: string, enqueuedAt: number): void {
   enqueueDeferredMessage({
     text,
@@ -377,16 +438,12 @@ describe("GET /api/subturtles/:name/logs", () => {
   });
 
   it("returns log lines for existing SubTurtle with log file", async () => {
-    const result = findRoute(`/api/subturtles/${testTurtleName}/logs`);
-    expect(result).not.toBeNull();
-    const { req, url } = makeReq(`/api/subturtles/${testTurtleName}/logs?lines=10`);
-    const res = await result!.handler(req, url, result!.match);
-    expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
-    expect(body.name).toBe(testTurtleName);
-    expect(body.lines).toBeInstanceOf(Array);
-    expect((body.lines as string[]).length).toBeGreaterThan(0);
-    expect(body.totalLines).toBeGreaterThanOrEqual(3);
+    const probe = runSubturtleLogsRouteProbeInIsolatedProcess();
+    expect(probe.status).toBe(200);
+    expect(probe.body.name).toBe(testTurtleName);
+    expect(probe.body.lines).toBeInstanceOf(Array);
+    expect((probe.body.lines as string[]).length).toBeGreaterThan(0);
+    expect(probe.body.totalLines).toBeGreaterThanOrEqual(3);
   });
 });
 
