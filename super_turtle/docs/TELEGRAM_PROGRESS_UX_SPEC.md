@@ -15,7 +15,7 @@ This draft is not yet implementation-ready. The sections below still need concre
 - `Notification Policy` and `Open Design Questions` leave stop/error completion behavior partially open, including whether stopped runs keep the retained progress message and when failures require a separate terminal bubble.
 - `Progress History Model`, `Data Model Requirements`, and `Navigation UX` describe bounded history conceptually, but they do not define the default retention limit, snapshot deduping rules, or the minimum paging metadata.
 - `Special Cases` and `Delivery Policy` describe desired outcomes for prompts, artifacts, long answers, and restart recovery, but they do not define precedence when multiple cases apply in one run.
-- `Open Design Questions` leaves startup/system-notification scope unresolved, so the boundary between foreground progress UX and broader Telegram noise reduction is still ambiguous.
+- transport ownership and webhook cutover are described elsewhere, so this spec still needs one explicit statement that foreground progress UX must stay the same under local polling and remote webhook delivery.
 
 ## Problem
 
@@ -55,6 +55,25 @@ The final answer should be the only terminal message that notifies for a normal 
 - keep the final answer easy to find
 - keep progress inspectable after the run ends
 - make the UX resilient to special cases like images, stickers, tool prompts, and long answers
+
+## Transport Boundary
+
+This spec defines the user-visible contract for one interactive foreground run.
+
+It must stay the same whether Telegram updates are being delivered by:
+
+- local long polling
+- a remote webhook runtime after `/teleport`
+
+Transport ownership, webhook registration, liveness or readiness checks, and `/teleport` or `/home` cutover behavior are runtime concerns defined in the transport specs.
+
+Those runtime concerns must not change the foreground UX contract:
+
+- one retained progress message for the run
+- one final result message beneath it
+- progress updates remain non-notifying edits
+
+Startup boot messages, background notifications, and other system-status messages are separate concerns. They must not reuse the retained progress message or replace the final result message for a foreground run.
 
 ## Foreground Run Model
 
@@ -258,6 +277,7 @@ If the process restarts mid-run, the UX should aim to preserve confidence rather
 Desired behavior:
 
 - if recoverable, reconnect to the progress message and continue updating it
+- transport cutover or runtime recovery must not change the retained-progress plus final-result shape seen by the user
 - otherwise, produce a clear terminal state and let the next run start fresh
 
 ## Message Types
@@ -296,7 +316,7 @@ Mapping:
 - `attention_required` -> `send_notify`
 - `final_artifact` -> `send_notify`
 
-`background_notification` and `system_notification` remain separate concerns and should not be forced through the foreground progress model.
+`background_notification` and `system_notification` remain separate concerns and should not be forced through the foreground progress model. Boot or cutover status messages belong to `system_notification`, not to foreground progress state.
 
 ## Data Model Requirements
 
@@ -361,7 +381,6 @@ This should be treated as a UX-driven refactor, not as a small patch to the curr
 - should the initial progress message appear immediately or only after a short delay?
 - should the final progress state say `Done` or something more descriptive?
 - should a user-initiated stop leave the retained progress message in chat or auto-delete it after a short delay?
-- should startup notifications be reduced or disabled so they do not compete with this foreground UX?
 - how many progress snapshots should be retained by default?
 
 ## Decision Summary

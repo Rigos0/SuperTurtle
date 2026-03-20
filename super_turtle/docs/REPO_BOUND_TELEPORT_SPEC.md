@@ -138,6 +138,12 @@ Transport is mode-specific, not global:
 
 This keeps local installs from exposing ports while allowing cloud sandboxes to receive Telegram updates directly.
 
+Interactive UX must stay transport-agnostic:
+
+- a foreground run keeps the same retained-progress plus final-result contract before and after ownership cutover
+- switching between local polling and remote webhook delivery changes transport ownership, not the user-visible progress message model
+- startup or cutover status messages remain separate system notifications, not foreground progress states
+
 ## Pause/Resume Policy
 
 Remote lifecycle must be controllable from Telegram.

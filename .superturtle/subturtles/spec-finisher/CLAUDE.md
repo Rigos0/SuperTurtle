@@ -1,5 +1,5 @@
 # Current task
-Cross-check the adjacent Telegram and runtime specs for terms or requirements that need to stay aligned with the Telegram progress UX spec.
+Rewrite `super_turtle/docs/TELEGRAM_PROGRESS_UX_SPEC.md` into a concrete implementation-ready spec.
 
 # End goal with specs
 Finish the spec files under `super_turtle/docs/` that are still in draft or need alignment for the current Telegram/runtime work.
@@ -32,8 +32,8 @@ Acceptance criteria:
 
 # Backlog
 - [x] Read `super_turtle/docs/TELEGRAM_PROGRESS_UX_SPEC.md` closely and list the unresolved or draft-only sections
-- [ ] Cross-check `super_turtle/docs/TELEGRAM_WEBHOOK_POC.md` and `super_turtle/docs/REPO_BOUND_TELEPORT_SPEC.md` for terms or requirements that should match <- current
-- [ ] Rewrite `super_turtle/docs/TELEGRAM_PROGRESS_UX_SPEC.md` into a concrete implementation-ready spec
+- [x] Cross-check `super_turtle/docs/TELEGRAM_WEBHOOK_POC.md` and `super_turtle/docs/REPO_BOUND_TELEPORT_SPEC.md` for terms or requirements that should match
+- [ ] Rewrite `super_turtle/docs/TELEGRAM_PROGRESS_UX_SPEC.md` into a concrete implementation-ready spec <- current
 - [ ] Update any other spec files only where the UX/runtime contract must stay aligned
 - [ ] Re-read all touched docs and remove contradictions, vague wording, and stale status language
 - [ ] Commit the doc/spec changes with a clear message
