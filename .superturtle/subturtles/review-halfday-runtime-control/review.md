@@ -1,5 +1,9 @@
 # Runtime/Control Review Notes
 
+## Findings
+
+1. High: [`super_turtle/bin/superturtle.js`](/Users/Richard.Mladek/Documents/projects/agentic/super_turtle/bin/superturtle.js#L930) still assumes the spawned shell PID is also a killable process-group ID, but [`serviceRun()`](/Users/Richard.Mladek/Documents/projects/agentic/super_turtle/bin/superturtle.js#L1128) starts `bash -lc ...` without `detached: true`, so `process.kill(-child.pid, ...)` falls through with `ESRCH` and the fallback only signals the intermediate shell. In a local reproduction of the new `caffeinate -s ... | tee` command shape, the wrapped worker stayed alive after the shell PID was terminated. Because [`shutdown()`](/Users/Richard.Mladek/Documents/projects/agentic/super_turtle/bin/superturtle.js#L1004) immediately releases the hosted lease and clears `.superturtle/service.pid`, `superturtle stop`, lease-loss shutdown, and signal handling can all report a clean stop while the bot loop continues running untracked. The new keep-awake wrapper makes this more dangerous by adding another long-lived process below the tracked shell. [`super_turtle/tests/sleep-prevention.test.js`](/Users/Richard.Mladek/Documents/projects/agentic/super_turtle/tests/sleep-prevention.test.js#L5) only checks generated command strings, so this stop-path regression is currently untested.
+
 ## Scope
 
 Window captured on 2026-03-20 11:46:02 +0100 on `dev`, covering commits since 2026-03-19 23:46:02 +0100.

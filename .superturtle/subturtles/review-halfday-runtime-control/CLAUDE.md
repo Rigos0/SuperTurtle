@@ -1,6 +1,6 @@
 # Current task
 
-Review `super_turtle/bin/superturtle.js` for startup, shutdown, and process ownership regressions.
+Review Codex driver changes in `src/drivers/` plus `src/codex-session.ts` and `src/config.ts`.
 
 # End goal with specs
 
@@ -25,8 +25,8 @@ Review `super_turtle/bin/superturtle.js` for startup, shutdown, and process owne
 # Backlog
 
 - [x] Collect the exact commit list and touched files for the runtime/control lane
-- [ ] Review `super_turtle/bin/superturtle.js` for startup, shutdown, and process ownership regressions <- current
-- [ ] Review Codex driver changes in `src/drivers/` plus `src/codex-session.ts` and `src/config.ts`
+- [x] Review `super_turtle/bin/superturtle.js` for startup, shutdown, and process ownership regressions
+- [ ] Review Codex driver changes in `src/drivers/` plus `src/codex-session.ts` and `src/config.ts` <- current
 - [ ] Review SubTurtle-related changes in `src/subturtle-board-service.ts`, command/callback handling, and lifecycle cleanup
 - [ ] Audit the associated tests for missing failure cases and flaky assumptions
 - [ ] Write prioritized findings in `review.md` with concrete file references and residual risks
