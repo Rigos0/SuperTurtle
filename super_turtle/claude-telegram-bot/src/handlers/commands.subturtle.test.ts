@@ -678,6 +678,272 @@ describe("/subturtle", () => {
     }
   });
 
+  it("recovers the pinned live board when the tracking record was deleted", async () => {
+    const workdir = workingDir;
+    const chatId = authorizedUserId + 61;
+    const boardPath = join(
+      workdir,
+      ".superturtle/state/telegram/subturtle-boards",
+      `${chatId}.json`
+    );
+    rmSync(boardPath, { force: true });
+
+    const pins: Array<{ chatId: number; messageId: number }> = [];
+    const edits: Array<{ chatId: number; messageId: number }> = [];
+    let sent = 0;
+
+    Bun.spawnSync = ((cmd: unknown, opts?: unknown) => {
+      if (Array.isArray(cmd) && String(cmd[0]).endsWith("/subturtle/ctl") && cmd[1] === "list") {
+        return {
+          stdout: Buffer.from("  worker-a      running  yolo-codex   (PID 12345)   9m left       Same task"),
+          stderr: Buffer.from(""),
+          success: true,
+          exitCode: 0,
+        } as ReturnType<typeof Bun.spawnSync>;
+      }
+      return originalSpawnSync(cmd as Parameters<typeof Bun.spawnSync>[0], opts as Parameters<typeof Bun.spawnSync>[1]);
+    }) as typeof Bun.spawnSync;
+
+    try {
+      const result = await syncLiveSubturtleBoardForTest({
+        sendMessage: async () => {
+          sent += 1;
+          return { message_id: 1002, chat: { id: chatId } };
+        },
+        editMessageText: async (targetChatId: number, messageId: number) => {
+          edits.push({ chatId: targetChatId, messageId });
+        },
+        pinChatMessage: async (targetChatId: number, messageId: number) => {
+          pins.push({ chatId: targetChatId, messageId });
+        },
+        getChat: async () => ({
+          pinned_message: {
+            message_id: 1001,
+            text: "🟢 worker-a\n\nSame task",
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: "📝 Tasks", callback_data: "sub_board_bl:worker-a:0" },
+                  { text: "📜 Logs", callback_data: "sub_board_lg:worker-a:0" },
+                ],
+                [{ text: "🛑 Stop", callback_data: "sub_board_stop:worker-a" }],
+                [{ text: "Back", callback_data: "sub_board_home" }],
+              ],
+            },
+          },
+        }),
+      }, chatId, { force: true, pin: true, disableNotification: true });
+
+      expect(result.status).toBe("updated");
+      expect(result.messageId).toBe(1001);
+      expect(result.view).toEqual({ kind: "detail", name: "worker-a" });
+      expect(sent).toBe(0);
+      expect(edits).toEqual([{ chatId, messageId: 1001 }]);
+      expect(pins).toEqual([{ chatId, messageId: 1001 }]);
+
+      const trackedBoard = JSON.parse(readFileSync(boardPath, "utf-8"));
+      expect(trackedBoard.message_id).toBe(1001);
+      expect(trackedBoard.current_view).toEqual({ kind: "detail", name: "worker-a" });
+    } finally {
+      rmSync(boardPath, { force: true });
+    }
+  });
+
+  it("falls back to the currently pinned board when the tracked message went stale", async () => {
+    const workdir = workingDir;
+    const chatId = authorizedUserId + 62;
+    const boardPath = join(
+      workdir,
+      ".superturtle/state/telegram/subturtle-boards",
+      `${chatId}.json`
+    );
+    rmSync(boardPath, { force: true });
+    mkdirSync(dirname(boardPath), { recursive: true });
+    writeFileSync(
+      boardPath,
+      JSON.stringify({
+        chat_id: chatId,
+        message_id: 1101,
+        last_render_hash: "old",
+        last_rendered_at: "2026-03-19T00:00:00Z",
+        created_at: "2026-03-19T00:00:00Z",
+        updated_at: "2026-03-19T00:00:00Z",
+        current_view: { kind: "board" },
+      })
+    );
+
+    const pins: Array<{ chatId: number; messageId: number }> = [];
+    const unpinned: Array<{ chatId: number; messageId?: number }> = [];
+    const deleted: Array<{ chatId: number; messageId: number }> = [];
+    const edits: Array<{ chatId: number; messageId: number }> = [];
+    let sent = 0;
+
+    Bun.spawnSync = ((cmd: unknown, opts?: unknown) => {
+      if (Array.isArray(cmd) && String(cmd[0]).endsWith("/subturtle/ctl") && cmd[1] === "list") {
+        return {
+          stdout: Buffer.from("  worker-a      running  yolo-codex   (PID 12345)   9m left       Same task"),
+          stderr: Buffer.from(""),
+          success: true,
+          exitCode: 0,
+        } as ReturnType<typeof Bun.spawnSync>;
+      }
+      return originalSpawnSync(cmd as Parameters<typeof Bun.spawnSync>[0], opts as Parameters<typeof Bun.spawnSync>[1]);
+    }) as typeof Bun.spawnSync;
+
+    try {
+      const result = await syncLiveSubturtleBoardForTest({
+        sendMessage: async () => {
+          sent += 1;
+          return { message_id: 1103, chat: { id: chatId } };
+        },
+        editMessageText: async (targetChatId: number, messageId: number) => {
+          edits.push({ chatId: targetChatId, messageId });
+          if (messageId === 1101) {
+            throw new Error("message to edit not found");
+          }
+        },
+        pinChatMessage: async (targetChatId: number, messageId: number) => {
+          pins.push({ chatId: targetChatId, messageId });
+        },
+        unpinChatMessage: async (targetChatId: number, messageId?: number) => {
+          unpinned.push({ chatId: targetChatId, messageId });
+        },
+        deleteMessage: async (targetChatId: number, messageId: number) => {
+          deleted.push({ chatId: targetChatId, messageId });
+        },
+        getChat: async () => ({
+          pinned_message: {
+            message_id: 1102,
+            text: "🐢 SubTurtles\n\n🟢 worker-a",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "📝 Tasks", callback_data: "sub_board_bl:worker-a:0" }],
+              ],
+            },
+          },
+        }),
+      }, chatId, { force: true, pin: true, disableNotification: true });
+
+      expect(result.status).toBe("updated");
+      expect(result.messageId).toBe(1102);
+      expect(sent).toBe(0);
+      expect(edits).toEqual([
+        { chatId, messageId: 1101 },
+        { chatId, messageId: 1102 },
+      ]);
+      expect(pins).toEqual([{ chatId, messageId: 1102 }]);
+      expect(unpinned).toEqual([{ chatId, messageId: 1101 }]);
+      expect(deleted).toEqual([{ chatId, messageId: 1101 }]);
+
+      const trackedBoard = JSON.parse(readFileSync(boardPath, "utf-8"));
+      expect(trackedBoard.message_id).toBe(1102);
+      expect(trackedBoard.current_view).toEqual({ kind: "board" });
+    } finally {
+      rmSync(boardPath, { force: true });
+    }
+  });
+
+  it("dedupes both stale tracked and pinned boards before recreating a fresh board", async () => {
+    const workdir = workingDir;
+    const chatId = authorizedUserId + 63;
+    const boardPath = join(
+      workdir,
+      ".superturtle/state/telegram/subturtle-boards",
+      `${chatId}.json`
+    );
+    rmSync(boardPath, { force: true });
+    mkdirSync(dirname(boardPath), { recursive: true });
+    writeFileSync(
+      boardPath,
+      JSON.stringify({
+        chat_id: chatId,
+        message_id: 1201,
+        last_render_hash: "old",
+        last_rendered_at: "2026-03-19T00:00:00Z",
+        created_at: "2026-03-19T00:00:00Z",
+        updated_at: "2026-03-19T00:00:00Z",
+        current_view: { kind: "board" },
+      })
+    );
+
+    const pins: Array<{ chatId: number; messageId: number }> = [];
+    const unpinned: Array<{ chatId: number; messageId?: number }> = [];
+    const deleted: Array<{ chatId: number; messageId: number }> = [];
+    const edits: Array<{ chatId: number; messageId: number }> = [];
+    let sent = 0;
+
+    Bun.spawnSync = ((cmd: unknown, opts?: unknown) => {
+      if (Array.isArray(cmd) && String(cmd[0]).endsWith("/subturtle/ctl") && cmd[1] === "list") {
+        return {
+          stdout: Buffer.from("  worker-a      running  yolo-codex   (PID 12345)   9m left       Same task"),
+          stderr: Buffer.from(""),
+          success: true,
+          exitCode: 0,
+        } as ReturnType<typeof Bun.spawnSync>;
+      }
+      return originalSpawnSync(cmd as Parameters<typeof Bun.spawnSync>[0], opts as Parameters<typeof Bun.spawnSync>[1]);
+    }) as typeof Bun.spawnSync;
+
+    try {
+      const result = await syncLiveSubturtleBoardForTest({
+        sendMessage: async () => {
+          sent += 1;
+          return { message_id: 1203, chat: { id: chatId } };
+        },
+        editMessageText: async (targetChatId: number, messageId: number) => {
+          edits.push({ chatId: targetChatId, messageId });
+          if (messageId === 1201) {
+            throw new Error("message to edit not found");
+          }
+          throw new Error("message can't be edited");
+        },
+        pinChatMessage: async (targetChatId: number, messageId: number) => {
+          pins.push({ chatId: targetChatId, messageId });
+        },
+        unpinChatMessage: async (targetChatId: number, messageId?: number) => {
+          unpinned.push({ chatId: targetChatId, messageId });
+        },
+        deleteMessage: async (targetChatId: number, messageId: number) => {
+          deleted.push({ chatId: targetChatId, messageId });
+        },
+        getChat: async () => ({
+          pinned_message: {
+            message_id: 1202,
+            text: "🐢 SubTurtles\n\n🟢 worker-a",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "📝 Tasks", callback_data: "sub_board_bl:worker-a:0" }],
+              ],
+            },
+          },
+        }),
+      }, chatId, { force: true, pin: true, disableNotification: true });
+
+      expect(result.status).toBe("created");
+      expect(result.messageId).toBe(1203);
+      expect(sent).toBe(1);
+      expect(edits).toEqual([
+        { chatId, messageId: 1201 },
+        { chatId, messageId: 1202 },
+      ]);
+      expect(unpinned).toEqual([
+        { chatId, messageId: 1201 },
+        { chatId, messageId: 1202 },
+      ]);
+      expect(deleted).toEqual([
+        { chatId, messageId: 1201 },
+        { chatId, messageId: 1202 },
+      ]);
+      expect(pins).toEqual([{ chatId, messageId: 1203 }]);
+
+      const trackedBoard = JSON.parse(readFileSync(boardPath, "utf-8"));
+      expect(trackedBoard.message_id).toBe(1203);
+      expect(trackedBoard.current_view).toEqual({ kind: "board" });
+    } finally {
+      rmSync(boardPath, { force: true });
+    }
+  });
+
   it("edits the callback-target board message instead of creating a duplicate when the stored record drifted", async () => {
     const workdir = workingDir;
     const chatId = authorizedUserId + 7;
