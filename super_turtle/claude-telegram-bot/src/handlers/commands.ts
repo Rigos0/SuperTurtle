@@ -65,8 +65,7 @@ const CLAUDE_USAGE_RATE_LIMIT_MESSAGE =
 const LOCAL_TELEGRAM_COMMANDS = [
   { command: "new", description: "Start a fresh session" },
   { command: "stop", description: "Stop current work" },
-  { command: "model", description: "Switch model or effort" },
-  { command: "switch", description: "Switch between Claude and Codex" },
+  { command: "model", description: "Switch driver, model, or effort" },
   { command: "usage", description: "Show subscription usage" },
   { command: "context", description: "Show context usage" },
   { command: "status", description: "Show detailed status" },
@@ -1188,6 +1187,28 @@ export async function handleModel(ctx: Context): Promise<void> {
     return;
   }
 
+  // Support direct driver switch: /model claude or /model codex
+  const args = ctx.message?.text?.split(/\s+/).slice(1) || [];
+  const target = args[0]?.toLowerCase();
+
+  if (target === "claude" || target === "codex") {
+    const error = await performDriverSwitch(target);
+    if (error) {
+      await ctx.reply(error);
+      return;
+    }
+    // Show the model picker for the new driver
+    if (target === "codex") {
+      return handleCodexModel(ctx);
+    }
+    const picker = buildClaudeModelPickerMessage();
+    await ctx.reply(picker.text, {
+      parse_mode: "HTML",
+      reply_markup: picker.replyMarkup,
+    });
+    return;
+  }
+
   if (session.activeDriver === "codex" && !CODEX_AVAILABLE) {
     session.activeDriver = "claude";
     await ctx.reply(`${getCodexUnavailableMessage()}\nUsing Claude model controls.`);
@@ -1203,6 +1224,27 @@ export async function handleModel(ctx: Context): Promise<void> {
     parse_mode: "HTML",
     reply_markup: picker.replyMarkup,
   });
+}
+
+/**
+ * Perform a driver switch. Returns null on success, error message on failure.
+ */
+export async function performDriverSwitch(
+  driver: "claude" | "codex"
+): Promise<string | null> {
+  if (driver === "codex" && !CODEX_AVAILABLE) {
+    return getCodexUnavailableMessage();
+  }
+  await resetAllDriverSessions({ stopRunning: true });
+  if (driver === "codex") {
+    try {
+      await codexSession.startNewThread();
+    } catch (error) {
+      return `❌ Failed to switch to Codex: ${String(error).slice(0, 100)}`;
+    }
+  }
+  session.activeDriver = driver;
+  return null;
 }
 
 /**
@@ -1230,6 +1272,25 @@ type ModelPickerMarkup = {
   inline_keyboard: ModelPickerButton[][];
 };
 
+function buildDriverRow(): ModelPickerButton[][] {
+  const codexButton = CODEX_AVAILABLE
+    ? {
+        text: `${session.activeDriver === "codex" ? "✔ " : ""}Codex 🟢`,
+        callback_data: "switch:codex",
+      }
+    : {
+        text: "Codex (unavailable)",
+        callback_data: "switch:codex_unavailable",
+      };
+  return [[
+    {
+      text: `${session.activeDriver === "claude" ? "✔ " : ""}Claude Code 🔵`,
+      callback_data: "switch:claude",
+    },
+    codexButton,
+  ]];
+}
+
 export function buildClaudeModelPickerMessage(): {
   text: string;
   replyMarkup: ModelPickerMarkup;
@@ -1255,14 +1316,16 @@ export function buildClaudeModelPickerMessage(): {
 
   const modelName = currentModel?.displayName || session.model;
   const modelDesc = currentModel?.description ? ` — ${currentModel.description}` : "";
+  const driverRow = buildDriverRow();
 
   return {
     text:
+      `<b>Driver:</b> Claude Code 🔵\n` +
       `<b>Model:</b> ${modelName}${modelDesc}\n` +
       `<b>Effort:</b> ${currentEffort}\n\n` +
-      `Select model or effort level:`,
+      `Select driver, model, or effort level:`,
     replyMarkup: {
-      inline_keyboard: [...modelButtons, ...effortButtons],
+      inline_keyboard: [...driverRow, ...modelButtons, ...effortButtons],
     },
   };
 }
@@ -1297,88 +1360,18 @@ export async function buildCodexModelPickerMessage(): Promise<{
 
   const modelName = currentModel?.displayName || codexSession.model;
   const modelDesc = currentModel?.description ? ` — ${currentModel.description}` : "";
+  const driverRow = buildDriverRow();
 
   return {
     text:
+      `<b>Driver:</b> Codex 🟢\n` +
       `<b>Codex Model:</b> ${modelName}${modelDesc}\n` +
       `<b>Reasoning Effort:</b> ${currentEffort}\n\n` +
-      `Select model or reasoning effort:`,
+      `Select driver, model, or reasoning effort:`,
     replyMarkup: {
-      inline_keyboard: [...modelButtons, ...effortButtons],
+      inline_keyboard: [...driverRow, ...modelButtons, ...effortButtons],
     },
   };
-}
-
-/**
- * /switch - Switch between Claude Code and Codex drivers.
- */
-export async function handleSwitch(ctx: Context): Promise<void> {
-  const userId = ctx.from?.id;
-
-  if (!isAuthorized(userId, ALLOWED_USERS)) {
-    await ctx.reply("Unauthorized.");
-    return;
-  }
-
-  // Parse command: /switch codex or /switch claude
-  const args = ctx.message?.text?.split(/\s+/).slice(1) || [];
-  const target = args[0]?.toLowerCase();
-
-  if (!target) {
-    // No argument — show options
-    const currentDriver = session.activeDriver;
-    const driverEmoji = currentDriver === "codex" ? "🟢" : "🔵";
-    const codexRow = CODEX_AVAILABLE
-      ? [[{
-          text: `${currentDriver === "codex" ? "✔ " : ""}Codex 🟢`,
-          callback_data: "switch:codex",
-        }]]
-      : [[{
-          text: "Codex unavailable",
-          callback_data: "switch:codex_unavailable",
-        }]];
-    await ctx.reply(`<b>Current driver:</b> ${currentDriver} ${driverEmoji}\n\nSwitch to:`, {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: `${currentDriver === "claude" ? "✔ " : ""}Claude Code 🔵`,
-              callback_data: "switch:claude",
-            },
-          ],
-          ...codexRow,
-        ],
-      },
-    });
-    return;
-  }
-
-  // Direct switch via argument
-  if (target === "claude") {
-    await resetAllDriverSessions({ stopRunning: true });
-    session.activeDriver = "claude";
-    const lines = await buildSessionOverviewLines("Switched to Claude Code 🔵");
-    await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
-  } else if (target === "codex") {
-    if (!CODEX_AVAILABLE) {
-      await ctx.reply(getCodexUnavailableMessage());
-      return;
-    }
-    await resetAllDriverSessions({ stopRunning: true });
-    try {
-      // Fail fast: ensure Codex is available after reset.
-      await codexSession.startNewThread();
-      session.activeDriver = "codex";
-    } catch (error) {
-      await ctx.reply(`❌ Failed to switch to Codex: ${String(error).slice(0, 100)}`);
-      return;
-    }
-    const lines = await buildSessionOverviewLines("Switched to Codex 🟢");
-    await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
-  } else {
-    await ctx.reply(`❌ Unknown driver: ${target}. Use /switch claude or /switch codex`);
-  }
 }
 
 type JsonObj = Record<string, unknown>;

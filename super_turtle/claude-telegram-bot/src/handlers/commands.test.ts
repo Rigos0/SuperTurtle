@@ -158,18 +158,18 @@ function runSwitchNoArgInIsolatedProcess(codexEnabled: boolean): ReplyRecord[] {
     console.log = () => {};
     console.warn = () => {};
     console.error = () => {};
-    const { handleSwitch } = await import("./src/handlers/commands.ts");
+    const { handleModel } = await import("./src/handlers/commands.ts");
     const { session } = await import("./src/session.ts");
     session.activeDriver = "claude";
     const replies = [];
     const ctx = {
       from: { id: 123 },
-      message: { text: "/switch" },
+      message: { text: "/model" },
       reply: async (text, extra) => {
         replies.push({ text, extra });
       },
     };
-    await handleSwitch(ctx);
+    await handleModel(ctx);
     process.stdout.write(JSON.stringify(replies));
   `;
   const proc = Bun.spawnSync(["bun", "-e", script], { cwd: projectRoot });
@@ -383,7 +383,7 @@ function runSwitchCommandProbeInIsolatedProcess(opts: {
       return originalSpawn(cmd, spawnOpts);
     });
 
-    const { handleSwitch } = await import("./src/handlers/commands.ts");
+    const { handleModel } = await import("./src/handlers/commands.ts");
     const { session } = await import("./src/session.ts");
     const { codexSession } = await import("./src/codex-session.ts");
 
@@ -408,13 +408,13 @@ function runSwitchCommandProbeInIsolatedProcess(opts: {
     const replies = [];
     const ctx = {
       from: { id: 123 },
-      message: { text: ${JSON.stringify(opts.command)} },
+      message: { text: ${JSON.stringify(opts.command.replace("/switch", "/model"))} },
       reply: async (text, extra) => {
         replies.push({ text: String(text), extra });
       },
     };
 
-    await handleSwitch(ctx);
+    await handleModel(ctx);
 
     process.stdout.write(
       ${JSON.stringify(marker)} +
@@ -959,7 +959,7 @@ describe("handlers with mock Context", () => {
     const reply = replies[0]!;
     expect(reply.extra?.parse_mode).toBe("HTML");
     expect(reply.text).toContain("<b>Model:</b>");
-    expect(reply.text).toContain("Select model or effort level:");
+    expect(reply.text).toContain("Select driver, model, or effort level:");
 
     const keyboard = getInlineKeyboard(reply);
     expect(keyboard.length).toBeGreaterThan(1);
@@ -1095,25 +1095,25 @@ describe("handlers with mock Context", () => {
     ]);
   });
 
-  it("handleSwitch shows switch buttons when Codex is unavailable", () => {
+  it("handleModel shows driver row with Codex unavailable when Codex is disabled", () => {
     const replies = runSwitchNoArgInIsolatedProcess(false);
     expect(replies).toHaveLength(1);
     const reply = replies[0]!;
     expect(reply.extra?.parse_mode).toBe("HTML");
-    expect(reply.text).toContain("<b>Current driver:</b>");
+    expect(reply.text).toContain("<b>Driver:</b>");
 
     const callbackData = getInlineKeyboard(reply).flat().map((button) => button.callback_data || "");
     expect(callbackData).toContain("switch:claude");
     expect(callbackData).toContain("switch:codex_unavailable");
   }, 20_000);
 
-  it("handleSwitch shows Codex button when Codex is available", () => {
+  it("handleModel shows driver row with Codex button when Codex is available", () => {
     const replies = runSwitchNoArgInIsolatedProcess(true);
 
     expect(replies).toHaveLength(1);
     const reply = replies[0]!;
     expect(reply.extra?.parse_mode).toBe("HTML");
-    expect(reply.text).toContain("<b>Current driver:</b>");
+    expect(reply.text).toContain("<b>Driver:</b>");
 
     const callbackData = getInlineKeyboard(reply).flat().map((button) => button.callback_data || "");
     expect(callbackData).toContain("switch:claude");
@@ -1121,9 +1121,9 @@ describe("handlers with mock Context", () => {
     expect(callbackData).not.toContain("switch:codex_unavailable");
   }, 20_000);
 
-  it("handleSwitch /switch codex returns unavailable message when Codex is disabled", () => {
+  it("handleModel /model codex returns unavailable message when Codex is disabled", () => {
     const result = runSwitchCommandProbeInIsolatedProcess({
-      command: "/switch codex",
+      command: "/model codex",
       codexEnabled: false,
       codexCliAvailable: false,
     });
@@ -1136,9 +1136,9 @@ describe("handlers with mock Context", () => {
     expect(result.replies[0]!.text).toContain("Codex is disabled in config");
   }, 20_000);
 
-  it("handleSwitch /switch codex switches driver and resets sessions when Codex is available", () => {
+  it("handleModel /model codex switches driver and resets sessions when Codex is available", () => {
     const result = runSwitchCommandProbeInIsolatedProcess({
-      command: "/switch codex",
+      command: "/model codex",
       codexEnabled: true,
       codexCliAvailable: true,
     });
@@ -1149,12 +1149,11 @@ describe("handlers with mock Context", () => {
     expect(result.codexKillCalls).toBe(1);
     expect(result.replies).toHaveLength(1);
     expect(result.replies[0]!.extra?.parse_mode).toBe("HTML");
-    expect(result.replies[0]!.text).toContain("Switched to Codex");
   }, 20_000);
 
-  it("handleSwitch /switch codex reports failure when Codex thread start fails", () => {
+  it("handleModel /model codex reports failure when Codex thread start fails", () => {
     const result = runSwitchCommandProbeInIsolatedProcess({
-      command: "/switch codex",
+      command: "/model codex",
       codexEnabled: true,
       codexCliAvailable: true,
       forceStartThreadFailure: true,

@@ -58,7 +58,7 @@ async function runTraceProbe(): Promise<TraceResult> {
     const { mkdirSync, rmSync } = await import("fs");
     mkdirSync(ipcDir, { recursive: true });
 
-    const { handleNew, handleSwitch } = await import(commandsPath);
+    const { handleNew, performDriverSwitch } = await import(commandsPath);
     const { handleCallback } = await import(callbackPath);
     const { checkPendingBotControlRequests } = await import(streamingPath);
     const { session } = await import(sessionPath);
@@ -169,7 +169,7 @@ async function runTraceProbe(): Promise<TraceResult> {
       setActiveSessions("claude-command-switch", "codex-command-switch");
       session.activeDriver = "claude";
       events.length = 0;
-      await handleSwitch(mkCtx("/switch codex"));
+      await performDriverSwitch("codex");
       const commandSwitchToCodex = snapshot();
 
       setActiveSessions("claude-callback-switch", "codex-callback-switch");

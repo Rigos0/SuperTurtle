@@ -24,7 +24,6 @@ describe("TELEGRAM_COMMANDS", () => {
       "new",
       "stop",
       "model",
-      "switch",
       "usage",
       "context",
       "status",
